@@ -7,9 +7,14 @@
              pump (SENDER). The pump may call send / clear with a token that set_devices has just taken out of the list (the pump read the cable an instant before): the sink must answer
              an unknown token with send < 0 and ignore it in clear, and its token-to-device table must be safe to read from the sender thread while the control thread changes it (a
              lock of its own, or a copy swapped atomically; the core takes none). Nothing else needs a lock: clock_map stays lock-free, for the audio callback.
+             A send that returns < 0 marks the device's cable gone UNTIL THE NEXT set_devices (which gives it another chance): a shell that lists only on hot-plug must call set_devices again to revive it.
+   BEFORE THE FIRST MAP Everything the pump drains before the first thunder_midiout_clock_map is dropped (dropped_nomap), a Start included: the shell must call clock_map once before PLAY
+             (thunder_midi_start). clock_map is meant to be called from the audio callback, right after thunder_midi_process (the floor compares the callback's clock with the last block start);
+             from a timer it adds up to the age of the pair to the floor's shift.
+   LIFETIME  thunder_midiout_free: after BOTH the sender thread (pump) and every thread that calls clock_map (the audio callback) have stopped.
    THREADS   CONTROL: create, free, set_devices, assign, set_clock, set_gear, set_playing, set_out_latency, get_port: the ONE thread that also calls the thunder_midi_set_* calls
-             (single producer); they re-sync the scheduler's ports and return THUNDER_MIDIOUT_E_BUSY if its command ring was full (the table is updated anyway: repeat the call
-             or any later control call and the scheduler is brought up to date). SENDER: thunder_midiout_pump, the ONLY thread that calls thunder_midi_drain; every sink call comes
+             (single producer); set_devices, assign, set_clock, set_gear and set_playing re-sync the scheduler's ports and return THUNDER_MIDIOUT_E_BUSY if its command ring was full (the table is
+             updated anyway: repeat that call, or any other of these five, and the scheduler is brought up to date; set_out_latency and get_port do not sync). SENDER: thunder_midiout_pump, the ONLY thread that calls thunder_midi_drain; every sink call comes
              from it (and so may take the shell's own mutex), except sink.now_ns, which must be callable from any thread (a clock read: clock_map calls it). ANY: clock_map
              (one writer at a time: a concurrent call is skipped, never blocks), stats_get.
    TIMES     int64 nanoseconds of the host clock the sink's now_ns reads. A record's `frame` is the core's audio frame (thunder/midi.h): host time = the clock map.
@@ -52,8 +57,9 @@ typedef struct thunder_midiout_dev {         /* one physical output, as the shel
   char name[THUNDER_MIDIOUT_ID_BYTES];       /* what Settings shows */
   uint32_t flags;                            /* THUNDER_MIDIOUT_DEV_TS */
   uint32_t reserved;                         /* 0 */
-  uint64_t token;                            /* the shell's own handle for this device (any value, e.g. a pointer or a counter): what send / clear are given. It must stay the same for as long as
-                                                the shell keeps the device open, whatever the device's place in the list; two listed devices must not share one */
+  uint64_t token;                            /* the shell's own handle for this device: what send / clear are given. Use a COUNTER, not a pointer: a token must never be reused for another device while the
+                                                handle lives (a record that read the old one may still be in flight). It stays the same for as long as the shell keeps the device open, whatever the device's place in
+                                                the list. Two devices of one list must not share a token (set_devices returns E_ARG) */
 } thunder_midiout_dev;
 
 typedef struct thunder_midiout_sink {        /* implemented by the shell */

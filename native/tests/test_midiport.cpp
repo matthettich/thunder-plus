@@ -28,11 +28,11 @@ static int fails = 0;
 struct Rec { int dev; int len; uint8_t b[3]; int64_t at, sentAt; bool recalled; };
 struct Fake {
   std::atomic<int64_t> now{0}; int64_t step = 0;      // now_ns returns the clock and then advances it by `step` (a spinning pump needs a clock that moves)
-  uint32_t caps = 0; std::vector<Rec> rec; bool fail[32] = {}; int clears[32] = {};
+  uint32_t caps = 0; int64_t sendCost = 0; std::vector<Rec> rec; bool fail[32] = {}; int clears[32] = {};
   static int64_t nowFn(void* u) { Fake* f = (Fake*)u; const int64_t v = f->now.load(); if (f->step) f->now.store(v + f->step); return v; }
   static int sendFn(void* u, uint64_t dev, const uint8_t* b, int len, int64_t at) {
     Fake* f = (Fake*)u; if (dev >= 32 || f->fail[dev]) return -1;   // a token this fake does not know is a gone device
-    Rec r; std::memset(&r, 0, sizeof r); r.dev = (int)dev; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; r.sentAt = f->now.load(); f->rec.push_back(r); return 0;
+    Rec r; std::memset(&r, 0, sizeof r); r.dev = (int)dev; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; r.sentAt = f->now.load(); f->rec.push_back(r); if (f->sendCost) f->now.fetch_add(f->sendCost); return 0;   // (a slow sink: the clock moves while it sends)
   }
   static void clearFn(void* u, uint64_t dev) { Fake* f = (Fake*)u; if (dev < 32) f->clears[dev]++; for (Rec& r : f->rec) if ((uint64_t)r.dev == dev && r.at > f->now.load()) r.recalled = true; }   // the OS drops what it holds for the device
   thunder_midiout_sink sink() { thunder_midiout_sink s; s.user = this; s.now_ns = nowFn; s.send = sendFn; s.clear = clearFn; s.caps = caps; return s; }
@@ -200,8 +200,7 @@ static void test2() {
   r.fk.now.store(r.hostOf(f50) - 400000); r.pump(); r.fk.now.store(r.hostOf(f50) + 5000000); r.pump();
   int x80 = 0, x90 = 0, y80 = 0; for (const Rec& x : r.fk.rec) { if (x.dev == 0 && (x.b[0] & 0xF0) == 0x80) x80++; if (x.dev == 0 && (x.b[0] & 0xF0) == 0x90) x90++; if (x.dev == 1 && (x.b[0] & 0xF0) == 0x80) y80++; }
   CHECK(x90 == 1, "2: X got only its first note-on (%d): what was sent is not recalled, what was queued after the CLEAR is gone", x90);
-  CHECK(y80 == 0 || y80 == 1, "2: n/a");
-  (void)x80;
+  CHECK(y80 == 1 && x80 == 0, "2: Y's note-off survived the CLEAR of X (%d) and X's cleared note-off did not go out (%d)", y80, x80);
   // the same with a second, untouched cable: Y keeps its note-off
   Rig q(0, 1000); setDevs(q.o, {"X", "Y"}); thunder_midiout_assign(q.o, 0, "X"); thunder_midiout_assign(q.o, 1, "Y"); q.proc(); thunder_midiout_clock_map(q.o, 0, q.host0);
   const int64_t g50 = q.frameAt(0.050); q.raw(0, {0x80, 60, 0}, 0.050); q.raw(1, {0x80, 62, 0}, 0.050); q.proc();
@@ -272,6 +271,10 @@ static void test4() {
     const int64_t F = 481000, got = atOf(r, F);
     CHECK(got == want(off, F) && got > want(lineOff(frame0, host0), F) + 9000000, "4: the floor moves the heard moment %.0f ns later (%lld vs %lld)", 30000000.0 - imp, (long long)got, (long long)want(off, F));
     CHECK(thunder_midiout_set_out_latency(r.o, -1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_out_latency(r.o, 3000000000LL) == THUNDER_MIDIOUT_E_ARG, "4: set_out_latency range"); }
+  { // the guard imp > -0.5 s: an engine more than 0.5 s BEHIND what is heard (a stale or foreign pair) is not "corrected" by the floor
+    Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.now = 10.0; r.proc();
+    thunder_midiout_set_out_latency(r.o, 30000000); const int64_t frame0 = 528000 /* 11.0 s */, host0 = 77000000000LL; r.fk.now.store(host0); thunder_midiout_clock_map(r.o, frame0, host0);
+    const int64_t F = 481000, got = atOf(r, F); CHECK(got == want(lineOff(frame0, host0), F), "4: a pair that puts the heard moment 1 s ahead of the engine is used as given, the floor does not shift it (%lld vs %lld)", (long long)got, (long long)want(lineOff(frame0, host0), F)); }
   { // an engine that leads by MORE than the floor (a truthful map) is left alone; so is a map with no floor set
     Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.now = 10.0; r.proc();
     thunder_midiout_set_out_latency(r.o, 10000000); const int64_t frame0 = 479000, host0 = 77000000000LL; r.fk.now.store(host0); thunder_midiout_clock_map(r.o, frame0, host0);   // 20.8 ms ahead >= 10 ms
@@ -453,7 +456,8 @@ static void threadsOnce(uint32_t caps) {
   }
   stop.store(true); audio.join(); sender.join();
   const auto s = statsOf(o);
-  CHECK(blocks.load() > 100 && pumps.load() > 100 && rs.sent.load() > 50, "threads (%s): %llu blocks, %lld pumps, %llu messages sent", caps ? "TS" : "spin", (unsigned long long)blocks.load(), (long long)pumps.load(), (unsigned long long)rs.sent.load());
+  CHECK(blocks.load() > 100 && pumps.load() > 20 && rs.sent.load() > 50,   // (Windows sleeps in 15 ms ticks: the pump loop runs less often there)
+         "threads (%s): %llu blocks, %lld pumps, %llu messages sent", caps ? "TS" : "spin", (unsigned long long)blocks.load(), (long long)pumps.load(), (unsigned long long)rs.sent.load());
   CHECK((caps ? s.sent <= rs.sent.load() : s.sent == rs.sent.load()) && s.send_errors == 0, "threads: the sink saw what the stats say (%llu / %llu; with stamps a CLEAR re-sends what the flush dropped, which the stats do not count)", (unsigned long long)s.sent, (unsigned long long)rs.sent.load());
   std::printf("threads (%s): %llu blocks, %lld pumps, %llu sent, %llu dropped (gone %llu cleared %llu), max queue %llu\n", caps ? "TS" : "spin", (unsigned long long)blocks.load(), (long long)pumps.load(), (unsigned long long)s.sent, (unsigned long long)(s.dropped_gone + s.dropped_cleared), (unsigned long long)s.dropped_gone, (unsigned long long)s.dropped_cleared, (unsigned long long)s.max_queue);
   thunder_midiout_free(o); thunder_midi_free(h);
@@ -527,9 +531,33 @@ static void testRates() {
   CHECK(std::llabs(at[0] - want) <= 20 && std::llabs(at[1] - want) <= 20, "L3: 250 ms after a 3 ms step the map is %lld (5 ms calls) and %lld (25 ms calls), the web's rate gives %lld", (long long)at[0], (long long)at[1], (long long)want);
 }
 
+// CodeRabbit on #268: a slow send counts against the next message's lateness; more stamped messages than the CLEAR history holds must wait, not be lost; a key-on posted before the first block
+static void testReview() {
+  { Rig r(THUNDER_MIDIOUT_CAP_TS); setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc(); thunder_midiout_clock_map(r.o, 0, r.host0);
+    const int64_t A = r.hostOf(r.frameAt(0.010)); r.raw(0, {0xB0, 7, 1}, 0.010); r.raw(0, {0xF8}, 0.0105); r.proc();
+    r.fk.sendCost = 25000000; r.fk.now.store(A + 1000000); r.pump(); const auto s = statsOf(r.o);   // the CC goes 1 ms late and takes 25 ms: the tick, 0.5 ms late at entry, is 25 ms late when its turn comes
+    CHECK(s.sent == 1 && s.dropped_late_ticks == 1, "review: a tick made late by a slow send is dropped (sent %llu, dropped ticks %llu)", (unsigned long long)s.sent, (unsigned long long)s.dropped_late_ticks); }
+  { Rig r(THUNDER_MIDIOUT_CAP_TS); setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc(); thunder_midiout_clock_map(r.o, 0, r.host0);
+    for (int i = 0; i < 150; i++) r.raw(0, {0x90, (uint8_t)(i % 100), 100}, 0.010 + 0.00001 * i); r.proc();
+    for (int i = 150; i < 300; i++) r.raw(0, {0x90, (uint8_t)(i % 100), 100}, 0.010 + 0.00001 * i); r.proc();
+    int64_t nx = 0; r.fk.now.store(r.host0); r.pump(&nx);
+    CHECK(r.fk.rec.size() == 256 && statsOf(r.o).queue_full == 0, "review: only as many messages are handed to the OS early as the CLEAR history can hold (%zu of 300)", r.fk.rec.size());
+    CHECK(nx != INT64_MAX && nx > r.host0, "review: the rest wakes the pump when a slot is free");
+    r.fk.now.store(r.fk.rec.back().at + 2000000); r.pump(&nx);
+    CHECK(r.fk.rec.size() == 300 && statsOf(r.o).sent == 300, "review: the rest is sent once the first ones are due (%zu)", r.fk.rec.size()); }
+  { std::string song; readFile(std::string(THUNDER_ROOT) + "/native/tests/golden/midi-ledger-mono-notes.song.json", song);
+    thunder_midi* h = thunder_midi_create(48000, nullptr, 0); thunder_midi_set_song(h, (const uint8_t*)song.data(), song.size()); thunder_midi_set_port(h, 0, 1, 0, 0, 0);
+    thunder_midi_key_on(h, 0, 0, 48, 100);                                              // posted BEFORE the first block, which brings the host's FX latency 0.1 s
+    thunder::midi_begin(h, 0, 128.0 / 48000, 0.1, ~0ull); thunder::midi_end(h, 0, 0, 120, false);
+    for (int i = 1; i < 40; i++) { thunder::midi_begin(h, i * 128.0 / 48000, 128.0 / 48000, 0.1, ~0ull); thunder::midi_end(h, i * 128.0 / 48000, 0, 120, false); }
+    thunder_midi_msg m[64]; const int64_t n = thunder_midi_drain(h, m, 64); int64_t on = -1; for (int64_t i = 0; i < n; i++) if ((m[i].b[0] & 0xF0) == 0x90) { on = m[i].frame; break; }
+    CHECK(on >= 4800, "review: a key-on queued before the first block is timed with that block's FX latency (frame %lld, wanted >= 4800)", (long long)on);
+    thunder_midi_free(h); }
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--threads") == 0) { threadsOnce(0); threadsOnce(THUNDER_MIDIOUT_CAP_TS); threadsDevs(false); threadsDevs(true); std::printf(fails ? "midiport threads: FAILED\n" : "midiport threads: ok\n"); return fails ? 1 : 0; }
-  test12(); test6(); testTokens(); testRates(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
+  test12(); test6(); testTokens(); testRates(); testReview(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
   std::printf(fails ? "midiport: %d FAILED\n" : "midiport: all passed\n", fails);
   return fails ? 1 : 0;
 }

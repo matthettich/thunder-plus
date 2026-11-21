@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <algorithm>
 #include <new>
 
 #include "midi/midi_host.h"
@@ -61,6 +62,7 @@ struct thunder_midiout {
   std::atomic<uint8_t> cabLive[kCabs];
   std::atomic<uint64_t> cabTok[kCabs];
   std::atomic<uint32_t> epoch;             // bumped by every set_devices
+  std::atomic<uint8_t> cabPurge[kCabs];    // the slot was reused for another device id: whatever is queued for the cable belongs to the old one (the pump drops it at its next epoch sweep)
   std::atomic<uint8_t> cabGone[kCabs];     // the sink said so for the cable's device: until the next set_devices
   std::atomic<int64_t> outLat;             // the clock map's floor, ns
 
@@ -75,6 +77,7 @@ struct thunder_midiout {
   thunder_midi_msg q[kQ]; int head, tail;       // sorted by frame (stable), the live part is [head, tail)
   uint32_t seenEpoch;
   struct Hand { thunder_midi_msg m; int64_t at; uint64_t dev; bool live; } hand[kHand]; int handN;   // the last stamped messages given to the OS (CAP_TS): what a CLEAR may have to recall (and what the OS's flush must not lose)
+  struct { bool ok; double off; int64_t host; } lastSnap;   // the last map the pump read whole: kept when a writer is caught mid-update
   std::atomic<uint64_t> st[10];                  // the stats, in the order of thunder_midiout_stats from `sent`
 };
 
@@ -97,6 +100,7 @@ int cabOf(thunder_midiout* o, const char* id) {   // the sticky slot of a device
     if (o->cabLive[i].load(std::memory_order_relaxed) == 0 && (oldest < 0 || c.cab[i].seq < c.cab[oldest].seq)) oldest = i;
   }
   const int s = free >= 0 ? free : oldest >= 0 ? oldest : 0;
+  if (c.cab[s].used) o->cabPurge[s].store(1, std::memory_order_release);   // a reuse
   c.cab[s].used = true; copyId(c.cab[s].id, id); c.cab[s].seq = ++c.cabSeq; return s;
 }
 
@@ -190,10 +194,11 @@ thunder_midiout* thunder_midiout_create(thunder_midi* core_midi, double sample_r
   for (auto& d : o->cabLive) d.store(0, std::memory_order_relaxed);
   for (auto& d : o->cabTok) d.store(0, std::memory_order_relaxed);
   for (auto& g : o->cabGone) g.store(0, std::memory_order_relaxed);
+  for (auto& g : o->cabPurge) g.store(0, std::memory_order_relaxed);
   for (auto& s : o->st) s.store(0, std::memory_order_relaxed);
   o->epoch.store(0, std::memory_order_relaxed); o->outLat.store(0, std::memory_order_relaxed);
   o->busy.clear(); o->mseq.store(0, std::memory_order_relaxed); o->mOffBits.store(0, std::memory_order_relaxed); o->mHost.store(0, std::memory_order_relaxed); o->mValid.store(0, std::memory_order_relaxed);
-  std::memset(o->q, 0, sizeof o->q); o->head = o->tail = 0; o->seenEpoch = 0; std::memset(o->hand, 0, sizeof o->hand); o->handN = 0;
+  std::memset(o->q, 0, sizeof o->q); o->head = o->tail = 0; o->seenEpoch = 0; std::memset(o->hand, 0, sizeof o->hand); o->handN = 0; o->lastSnap.ok = false; o->lastSnap.off = 0; o->lastSnap.host = 0;
   return o;
 }
 
@@ -203,7 +208,7 @@ int thunder_midiout_set_devices(thunder_midiout* o, const thunder_midiout_dev* d
   if (!o || n < 0 || n > kDevs || (n > 0 && !devs)) return THUNDER_MIDIOUT_E_ARG;
   for (int i = 0; i < n; i++) {
     if (!idOk(devs[i].id) || !devs[i].id[0] || !idOk(devs[i].name)) return THUNDER_MIDIOUT_E_ARG;
-    for (int k = 0; k < i; k++) if (std::strcmp(devs[k].id, devs[i].id) == 0) return THUNDER_MIDIOUT_E_ARG;
+    for (int k = 0; k < i; k++) if (std::strcmp(devs[k].id, devs[i].id) == 0 || devs[k].token == devs[i].token) return THUNDER_MIDIOUT_E_ARG;   // an id or a token listed twice
   }
   auto& c = o->c;
   for (int i = 0; i < n; i++) c.devs[i] = devs[i];
@@ -280,15 +285,15 @@ void thunder_midiout_clock_map(thunder_midiout* o, int64_t frame0, int64_t host_
 
 namespace {
 struct Snap { bool valid; double off; int64_t host; };
-Snap readMap(const thunder_midiout* o) {
-  Snap r{false, 0, 0};
+bool readMap(const thunder_midiout* o, Snap& r) {   // false: no consistent snapshot this time (a writer was mid-update on every try)
+  r = Snap{false, 0, 0};
   for (int tries = 0; tries < 16; tries++) {
     const uint32_t a = o->mseq.load(std::memory_order_acquire);
     if (a & 1) continue;
     r.valid = o->mValid.load(std::memory_order_acquire) != 0; r.off = bitsToD(o->mOffBits.load(std::memory_order_acquire)); r.host = o->mHost.load(std::memory_order_acquire);
-    if (o->mseq.load(std::memory_order_acquire) == a) return r;
+    if (o->mseq.load(std::memory_order_acquire) == a) return true;
   }
-  return r;   // a writer that never finishes: the last read (a torn pair would still be a map from a few ms ago)
+  return false;
 }
 }  // namespace
 
@@ -298,7 +303,8 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   if (next_ns) *next_ns = kNoNext;
   const bool ts = (o->sink.caps & THUNDER_MIDIOUT_CAP_TS) != 0;
   int64_t now = o->sink.now_ns(o->sink.user);
-  const Snap map = readMap(o);
+  Snap map; if (readMap(o, map)) { o->lastSnap.ok = map.valid; o->lastSnap.off = map.off; o->lastSnap.host = map.host; } else if (o->lastSnap.ok) { map.valid = true; map.off = o->lastSnap.off; map.host = o->lastSnap.host; }   // a writer caught mid-update: the last whole map
+  else { map.valid = o->mValid.load(std::memory_order_acquire) != 0; map.off = bitsToD(o->mOffBits.load(std::memory_order_acquire)); map.host = o->mHost.load(std::memory_order_acquire); }   // never read whole yet: the offset is one 64-bit atomic, always a real value; "no map" only if none was ever written
 
   // 1. the scheduler's records into the queue: a CLEAR marker applies to what is queued at that point of the stream; before the first map nothing can be timed
   thunder_midi_msg buf[128];
@@ -315,10 +321,12 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   const uint32_t ep = o->epoch.load(std::memory_order_acquire);
   if (ep != o->seenEpoch) {
     o->seenEpoch = ep; uint64_t n = 0;
-    for (int i = o->tail - 1; i >= o->head; i--) if (!listed(o, o->q[i].cable)) { qRemove(o, i); n++; }
+    for (int i = o->tail - 1; i >= o->head; i--) if (!listed(o, o->q[i].cable) || o->cabPurge[o->q[i].cable].load(std::memory_order_acquire)) { qRemove(o, i); n++; }
     if (n) bump(o, S_GONE, n);
+    for (auto& g : o->cabPurge) if (g.load(std::memory_order_relaxed)) g.store(0, std::memory_order_relaxed);
   }
   if (!map.valid) return 0;
+  { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // the drain and the CLEARs took time
   const bool stale = now - map.host > THUNDER_MIDIOUT_STALE_NS;
   // 3. what is due
   int sent = 0;
@@ -327,9 +335,13 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     uint64_t dev;
     if (!resolve(o, m.cable, dev)) { o->head++; bump(o, S_GONE); continue; }
     int64_t at = atNs(map.off, o->sr, m.frame);
-    const int64_t lead = ts ? THUNDER_MIDIOUT_SEND_AHEAD_NS : THUNDER_MIDIOUT_SPIN_NS;
-    if (at - now > lead) { if (next_ns) *next_ns = at - lead; break; }
-    if (!ts && at > now) {                                   // no stamps: the pump itself waits out the last 0.5 ms
+    // A message is handed to the OS early (CAP_TS) only if the CLEAR history has a free slot (a slot is free when its message's time has passed): the OS must never hold more than the
+    // history can restore after a flush. Without a free slot the message stays queued and is sent like a non-TS one, in the spin window.
+    bool early = ts; int64_t wake = 0;
+    if (ts && at > now) { const auto& slot = o->hand[o->handN]; if (slot.live && slot.at > now) { early = false; wake = slot.at; } }
+    const int64_t lead = early ? THUNDER_MIDIOUT_SEND_AHEAD_NS : THUNDER_MIDIOUT_SPIN_NS;
+    if (at - now > lead) { if (next_ns) *next_ns = wake && wake < at - lead ? wake : at - lead; break; }
+    if (!early && at > now) {                                   // no stamps: the pump itself waits out the last 0.5 ms
       int64_t t = now; for (int it = 0; it < kSpinCap && t < at; it++) t = o->sink.now_ns(o->sink.user);
       if (t > now) now = t;
     }
@@ -340,7 +352,8 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     const int r = o->sink.send(o->sink.user, dev, m.b, m.len, at);
     if (r < 0) { bump(o, S_ERR); bump(o, S_GONE); o->cabGone[m.cable].store(1, std::memory_order_relaxed); continue; }
     bump(o, S_SENT); sent++;
-    if (ts && at > now) { auto& h = o->hand[o->handN]; h.m = m; h.at = at; h.dev = dev; h.live = true; o->handN = (o->handN + 1) % kHand; }
+    { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // a slow send must count against the next message's lateness
+    if (early && at > now) { auto& h = o->hand[o->handN]; h.m = m; h.at = at; h.dev = dev; h.live = true; o->handN = (o->handN + 1) % kHand; }
   }
   if (o->head == o->tail) { o->head = o->tail = 0; }
   return sent;
@@ -350,6 +363,7 @@ int thunder_midiout_stats_get(const thunder_midiout* o, thunder_midiout_stats* o
   if (!o || !out || out->size < 16) return THUNDER_MIDIOUT_E_ARG;
   thunder_midiout_stats t; std::memset(&t, 0, sizeof t); t.size = out->size;
   uint64_t* f = &t.sent; for (int i = 0; i < 10; i++) f[i] = o->st[i].load(std::memory_order_relaxed);
+  { thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; if (thunder_midi_stats_get(o->core, &cs) == THUNDER_MIDI_OK && cs.may_hang) t.may_hang = 1; }   // the scheduler's own ring lost a note-off / Stop too
   const size_t n = out->size < sizeof t ? out->size : sizeof t; std::memcpy(out, &t, n);
   return THUNDER_MIDIOUT_OK;
 }

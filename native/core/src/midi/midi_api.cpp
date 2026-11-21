@@ -59,14 +59,14 @@ void publish(thunder_midi* h) {
   for (int i = 0; i < kStatN; i++) h->pub[i].store(v[i], std::memory_order_relaxed);
 }
 
-void apply(thunder_midi* h, const Cmd& c, double now) {
+void apply(thunder_midi* h, const Cmd& c, double now, bool hostFigures = false) {
   MidiSched& s = h->sched;
   switch (c.op) {
     case OP_SONG: { Song* old = h->cur; h->cur = static_cast<Song*>(c.p); s.setSong(h->cur); if (old) h->retire.push(old); break; }   // (control keeps <= 6 posted: the ring never fills)
     case OP_PORT: s.setPort(c.a, c.b != 0, c.c != 0, c.x, c.d); break;
     case OP_LEAD: s.setLead(c.x); break;
-    case OP_FXLAT: s.setFxLatency(c.x); break;
-    case OP_AUDIBLE: s.setAudible(c.m); break;
+    case OP_FXLAT: if (!hostFigures) s.setFxLatency(c.x); break;      // a host that feeds the figures every block (midi_begin) owns them: a posted one must not override them
+    case OP_AUDIBLE: if (!hostFigures) s.setAudible(c.m); break;
     case OP_START: s.start(c.a, now); break;
     case OP_STOP: s.stop(now); break;
     case OP_RELEASE: s.release(now, c.a != 0); break;
@@ -80,9 +80,10 @@ void apply(thunder_midi* h, const Cmd& c, double now) {
   }
 }
 // U36 T2: the two halves of a block (thunder_midi_process = begin + end; the C++ host's midi_begin / midi_end add the mixer's figures and the step loop between them).
-int blockBegin(thunder_midi* h, double now, double blockSec) {
+int blockBegin(thunder_midi* h, double now, double blockSec, bool hostFigures = false, double fxLatSec = 0, uint64_t audible = 0) {
+  if (hostFigures) { h->sched.setFxLatency(fxLatSec); h->sched.setAudible(audible); }   // BEFORE the commands: a key-on posted before the first block is timed with this block's figures
   int n = 0; Cmd c;
-  while (n < kMidiCmdCap && h->cmds.pop(c)) { apply(h, c, now); n++; }
+  while (n < kMidiCmdCap && h->cmds.pop(c)) { apply(h, c, now, hostFigures); n++; }
   h->sched.setBlock(blockSec);
   return n;
 }
@@ -163,9 +164,7 @@ int thunder_midi_raw(thunder_midi* h, int port, const uint8_t* bytes, int len, d
 namespace thunder {
 int midi_begin(thunder_midi* h, double now, double blockSec, double fxLatSec, uint64_t audible) {
   if (!h || !fin(now) || now < 0 || !fin(blockSec) || blockSec < 0 || blockSec > 1 || !fin(fxLatSec) || fxLatSec < 0 || fxLatSec > 2) return THUNDER_MIDI_E_ARG;
-  const int n = blockBegin(h, now, blockSec);
-  h->sched.setFxLatency(fxLatSec); h->sched.setAudible(audible);
-  return n;
+  return blockBegin(h, now, blockSec, true, fxLatSec, audible);
 }
 MidiSched& midi_sched(thunder_midi* h) { return h->sched; }
 bool midi_end(thunder_midi* h, double now, double seqTime, double bpm, bool alive) {
