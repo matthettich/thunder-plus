@@ -83,10 +83,10 @@ static bool goldenCase(const std::string& root, const std::string& id, bool viaS
   if (viaSession) { host.reset(new Host(SeqMode::Song, o)); if (!host->first(song)) { CHECK(false, "%s: first publish", id.c_str()); return false; } }
   else own.reset(new Seq(*song, vars0, SeqMode::Song, o));
   const auto cur = [&]() { return viaSession ? host->seq() : own.get(); };
-  const int CAP = 4096; std::vector<SeqEvent> evs((size_t)CAP); SeqStep st; Sha256 all; int n = 0, firstBad = -1; std::string badMine; int chopped = 0, stN = 0; const int maxRows = (int)G.num("rows");
+  const int CAP = 4096; std::vector<SeqEvent> evs((size_t)CAP); SeqStep st; Sha256 all; int n = 0, firstBad = -1; std::string badMine; int chopped = 0, stN = 0, sxN = 0; const int maxRows = (int)G.num("rows");
   for (; cur()->alive() && n < maxRows; n++) {
     Seq* sq = cur(); const int k = sq->step(evs.data(), CAP, &st);
-    for (int i = 0; i < k; i++) if (evs[i].type == SEV_NOTE) { if (evs[i].has & SH_CHOP) chopped++; if (evs[i].has & SH_ST) stN++; }
+    for (int i = 0; i < k; i++) if (evs[i].type == SEV_NOTE) { if (evs[i].has & SH_CHOP) chopped++; if (evs[i].has & SH_ST) stN++; if (evs[i].stSx) sxN++; }
     std::string row = seqplain::row(st.t, evs.data(), k); const std::string h = sha256_hex(row).substr(0, 12);
     if (firstBad < 0 && (n >= (int)RH.size() || h != RH.at((size_t)n).asStr())) { firstBad = n; badMine = row; }
     row += '\n'; all.add(row);
@@ -94,7 +94,7 @@ static bool goldenCase(const std::string& root, const std::string& id, bool viaS
       applyOps(S, e.get("patch")); song = loadSong(S.text()); if (!song || !host->edit(song)) { CHECK(false, "%s: edit at %d", id.c_str(), n); return false; } }
   }
   Seq* sq = cur();
-  const bool ok = firstBad < 0 && n == maxRows && all.hex() == G.str("sha256") && chopped == (int)G.num("chopped") && stN == (int)G.num("stretched") && sq->dropped() == 0 && sq->chopSkipped() == 0 && sq->chopNoHits() == 0;
+  const bool ok = firstBad < 0 && n == maxRows && all.hex() == G.str("sha256") && chopped == (int)G.num("chopped") && stN == (int)G.num("stretched") && sxN == (int)G.num("sxNotes", 0) && sq->dropped() == 0 && sq->chopSkipped() == 0 && sq->chopNoHits() == 0;
   CHECK(ok, "%s: rows %d (golden %d), first differing row %d, chopped %d (golden %d), st %d (golden %d), skipped %llu, no-hits %llu\n  C++ row: %s", id.c_str(), n, maxRows, firstBad, chopped, (int)G.num("chopped"), stN, (int)G.num("stretched"),
         (unsigned long long)sq->chopSkipped(), (unsigned long long)sq->chopNoHits(), badMine.c_str());
   std::printf("%s %s: %d rows, %d chopped notes, %d with st%s\n", ok ? "ok  " : "FAIL", id.c_str(), n, chopped, stN, viaSession ? " (a takeOver at each edit)" : "");
@@ -223,11 +223,12 @@ static void testPartClamp() {
 
 int main() {
   const std::string root = THUNDER_ROOT;
-  int good = 0; const char* ids[] = {"chop-all", "chop-rev"};
+  int good = 0; const char* ids[] = {"chop-all", "chop-rev", "chop-lines", "chop-sx"};   // chop-lines / chop-sx: WEB-FOLLOW (SYNC TO LINES, OLDSCHOOL's ev.st members)
   for (const char* id : ids) good += goldenCase(root, id, false) ? 1 : 0;
   good += goldenCase(root, "chop-edit", true) ? 1 : 0;
+  good += goldenCase(root, "chop-lines-edit", true) ? 1 : 0;   // lines changed / zeroed / removed / added while running, a takeOver at each
   goldenCase(root, "chop-all", true);   // the same through a session with no edit (the Seq of a session reads the same table)
-  std::printf("%d of 3 chop goldens equal\n", good);
+  std::printf("%d of 6 chop goldens equal\n", good); CHECK(good == 6, "%d of 6 chop goldens equal", good);
   testRules();
   testPartClamp();
   std::printf(fails ? "FAILED (%d)\n" : "PASS\n", fails);

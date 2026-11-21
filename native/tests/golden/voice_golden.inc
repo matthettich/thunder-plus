@@ -23,6 +23,7 @@ static const VoiceGolden kVoiceGolden[] = {
   {"midblock", 0xb6144cf497ea9285ull, 52000},
   {"overlap", 0x1854dbb26955777bull, 102400},
   {"stop", 0x1b420b123037132dull, 102400},
+  {"stp_msg", 0xa11073db0d31e490ull, 153600},
   {"tiny_blocks", 0xc94c4835c545daf3ull, 67200},
 };
-static const int kVoiceGoldenN = 22;
+static const int kVoiceGoldenN = 23;

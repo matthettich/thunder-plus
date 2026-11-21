@@ -29,6 +29,9 @@ class Players {
 
   // A note, off, mod or stp event (any other type: returns false, nothing done). `seq` gives the arp table and the bpm the voices read.
   bool dispatch(const SeqEvent& e, const Seq& seq, const Song& song);
+  // RESET TRACK (web #251: the core's message {op:'stp', track, t}): this track's voices in BOTH pools let go as STOP lets them go (a voice booked to start later never sounds). Not the sequencer's STP
+  // command (that is dispatch(SEV_STP), stop = false). Control / audio thread between blocks, as dispatch(); allocation-free. The pump NOTES FROM routing (the page's pmNotes) has no native counterpart yet.
+  void stopTrack(int track, double t) { pool_.stopTrack(track, t); sfpool_.stopTrack(track, t); }
   // The quantum's clocks, then its voices added into the mixer's per-track inputs.
   void setTime(double t0, int64_t frame0);
   void render(float* const* inL, float* const* inR, int frames, double t0, int64_t frame0);

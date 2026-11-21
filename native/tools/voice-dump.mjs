@@ -94,6 +94,13 @@ const CASES = {
   stop: { tracks: 2, kit: kit({ syn: true, rel: 0.05 }), evs: [
     [0, note({ t: FB(0) })], [0, note({ t: FB(30), track: 1, pad: 1 })], [0, { type: 'stp', t: FB(12), track: 0 }], [0, note({ t: FB(40), track: 0, pad: 3 })],
     [20, { op: 'stopAll', at: FB(25) }], [21, note({ t: FB(26), track: 1, pad: 1 })], [22, note({ t: FB(22, 20), track: 0, pad: 2 })], [50, { type: 'stp', t: FB(50), all: true }]] },
+  // WEB-FOLLOW item 3 (reset track, web #251): the core's message {op:'stp', track, t} (seq-core.js:1229: stop = true; a voice booked to start at or after `at` never sounds), NOT the sequencer's STP event ('stop' above)
+  stp_msg: { tracks: 3, kit: kit({ syn: true, rel: 0.05 }, {}, { syn: true, rel: 0.2 }), evs: [
+    [0, note({ t: FB(0) })], [0, note({ t: FB(1, 3), track: 1, pad: 1 })], [0, note({ t: FB(2), track: 2, pad: 2, poly: true, col: 0 })], [0, note({ t: FB(3), track: 2, pad: 3, poly: true, col: 1 })],
+    [0, note({ t: FB(40), track: 0, pad: 3 })], [0, note({ t: FB(41), track: 1, pad: 0, poly: true, col: 1 })], [0, note({ t: FB(60), track: 2, pad: 1, poly: true, col: 2 })],
+    [20, { op: 'stp', track: 0, t: FB(25) }], [20, { op: 'stp', track: 2, t: FB(10) }],   // track 0 at block 25; track 2 with a `t` already past: it goes at currentTime
+    [30, { op: 'stp', track: 1 }], [31, { op: 'stp', track: 40, t: FB(31) }], [31, { op: 'stp', track: -1, t: FB(31) }],   // no `t` = now; a track outside 0..NT-1 does nothing
+    [50, note({ t: FB(52), track: 0, pad: 1 })]] },   // a note after the reset plays normally
   tiny_blocks: { N: 7, blocks: 2400, tracks: 2, evs: [[0, note({ t: F(20), pad: 3, pan: 70 })], [30, note({ t: F(33 * 7 + 3), track: 1, pad: 1, ofs: 50, tw: { cut: 100, res: 100, dec: 100 } })], [400, { type: 'mod', t: F(400 * 7), track: 0, gain: 0.2 }]] },
 };
 export const CASE_NAMES = Object.keys(CASES);
@@ -119,7 +126,7 @@ function runCase(name) {
   for (let t = 0; t < K; t++) outputs[t] = [new Float32Array(N), new Float32Array(N)];
   for (let b = 0; b < blocks; b++) {
     ctx.currentTime = b * N / SR; ctx.currentFrame = b * N;
-    for (const [bb, e] of C.evs) if (bb === b) { if (e.op === 'stopAll') proc.stopAll(e.at); else proc.ev(JSON.parse(JSON.stringify(e))); }
+    for (const [bb, e] of C.evs) if (bb === b) { if (e.op === 'stopAll') proc.stopAll(e.at); else if (e.op === 'stp') proc.msg(JSON.parse(JSON.stringify(e))); else proc.ev(JSON.parse(JSON.stringify(e))); }
     for (let t = 0; t < K; t++) { outputs[t][0].fill(0); outputs[t][1].fill(0); }
     proc.process([], outputs);
     for (let t = 0; t < K; t++) { out[t][0].set(outputs[t][0], b * N); out[t][1].set(outputs[t][1], b * N); }

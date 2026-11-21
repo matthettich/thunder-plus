@@ -83,6 +83,12 @@ template <size_t N> bool inRates(const double (&R)[N], double x) { for (double r
 
 Json get(Json o, const char* k) { return o.get(k); }
 
+static double sxNum(Json v, double a, double b, double d, bool isInt) {
+  double x = (v.missing() || v.isNull() || (v.isStr() && v.asStr().empty()) || (v.type() == JType::Bool && !v.asBool())) ? kNaN : jsPlus(v);
+  if (!std::isfinite(x)) x = d;
+  x = std::min(b, std::max(a, x));
+  return isInt ? std::floor(x + 0.5) : x;
+}
 void readInst(Json o, int i, SongInst& I) {
   I = SongInst();
   I.pad = i % kNSlotDefault; I.kf = (i % kNSlotDefault) >= kNPad ? 1 : 0;
@@ -92,6 +98,8 @@ void readInst(Json o, int i, SongInst& I) {
   I.pan = cInt(get(o, "pan"), 128, 0, 255); I.rev = truthy(get(o, "rev")) ? 1 : 0; I.ofs = cInt(get(o, "ofs"), 0, 0, 255);
   I.slc = cInt(get(o, "slc"), 0, 0, 64); I.smode = truthy(get(o, "smode")) ? 1 : 0; I.sync = cInt(get(o, "sync"), 0, 0, 3);
   I.beats = cInt(get(o, "beats"), 4, 1, 64); I.grain = cInt(get(o, "grain"), 1, 0, 4);
+  { const int ln = cInt(get(o, "lines"), 0, -(1 << 30), 1 << 30); I.lines = ln > 0 ? clampI(ln, 1, 1024) : 0; }   // index.html:21677: `int(o.lines, 0) > 0 ? clamp(.., 1, 1024) : delete`
+  { const SongSx x = song_sx_load(o, I.sync); I.sx = x.sx; I.og = x.og; I.ou = x.ou; I.orp = x.orp; I.ox = x.ox; I.opt = x.opt; }   // index.html:21678 sxLoad
   I.mo = cInt(get(o, "mo"), 0, 0, 2); I.mch = cInt(get(o, "mch"), 0, 0, 15);
   I.mpt = cInt(get(o, "mpt"), 0, 0, kNPort - 1); I.pbr = cInt(get(o, "pbr"), 2, 1, 48);
   const Json cc = get(o, "cc");
@@ -108,6 +116,18 @@ void readInst(Json o, int i, SongInst& I) {
 }
 
 }  // namespace
+
+// index.html sxLoad (:23642): I.sx = Math.trunc(+o.sx) kept only for a (sync, sx) pair the picker has (SY_PICK: only OLDSCHOOL = sync 3, sx 1); with sx 1 the OLDSCHOOL values are clamped
+// (n(v, a, b, d, int): missing / null / '' / false = the default, a non-finite number = the default, clamp, then Math.round for the integer ones), else they are deleted (here: defaults).
+SongSx song_sx_load(Json o, int sync) {
+  SongSx r;
+  const double t = o.isObj() ? std::trunc(jsPlus(get(o, "sx"))) : kNaN;
+  if (!(t > 0) || !(t == 1 && sync == 3)) return r;
+  r.sx = 1; r.og = sxNum(get(o, "og"), 0.5, 250, 12, false); r.ou = (int)sxNum(get(o, "ou"), 0, 6, 0, true); r.orp = (int)sxNum(get(o, "orp"), 0, 3, 0, true);
+  r.ox = (int)sxNum(get(o, "ox"), 0, 50, 0, true); r.opt = (int)sxNum(get(o, "opt"), -24, 24, 0, true);
+  return r;
+}
+
 
 int Song::phrasesPresent() const { int n = 0; for (int i = 0; i < kNPH; i++) if (phraseOff[(size_t)i] >= 0) n++; return n; }
 int Song::phrasesWithContent() const {

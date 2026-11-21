@@ -285,18 +285,40 @@ function chopSong(variant) {
   const notes = [[48, 49, 50, 52, 46, 44, 51, 53, 48, 47, 45, 55, 54, 48, 56, 60], [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], [48, 55, 48, 60, 48, 52, 48, 40, 48, 48, 53, 48, 61, 48, 48, 50],
     [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], [48, 50, 48, 48, 52, 48, 48, 48, 49, 48, 48, 48, 48, 55, 48, 48], [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 47, 46, 45],
     [40, 44, 48, 52, 56, 60, 64, 68, 72, 36, 41, 47, 50, 53, 59, 66]];
-  for (let t = 0; t < 7; t++) PH.push(Array.from({ length: 32 }, (_, y) => y < 16 ? row(notes[t][y], t) : row(-1, 0)));
+  const V8 = variant === 'lines' || variant === 'sx';   // WEB-FOLLOW: an eighth track (instrument 7) for the lines / sx variants
+  for (let t = 0; t < (V8 ? 8 : 7); t++) PH.push(Array.from({ length: 32 }, (_, y) => y < 16 ? row(notes[t % 7][y], t) : row(-1, 0)));
   const cmd = (t, y, col, name, v) => { const r = PH[t][y]; r[6 + 2 * col] = FXN(name); r[7 + 2 * col] = v; };
   [0, 1, 2, 3, 15, 4, 20, 17, 5, 9, 11, 13, 14, 7, 31 % 16 + 12, 8].forEach((v, y) => cmd(1, y, 0, 'SLC', v));   // slc 16 with the SLC command (20 wraps)
   [64, 128, 200, 32, 255].forEach((v, k) => { cmd(3, 2 * k, 0, 'STA', v); cmd(4, 2 * k + 1, 0, 'STA', v); });   // sync 2 and 3 with STA (offset) notes
   cmd(2, 3, 0, 'STA', 100); cmd(0, 8, 0, 'TPO', 90); cmd(0, 12, 0, 'KIL', 2); cmd(6, 5, 0, 'RET', 0x24); cmd(6, 9, 1, 'KIL', 1);   // a bpm change mid-song, a KIL shorter than the slice, retriggers
+  // WEB-FOLLOW item 1: SYNC TO LINES (`lines`, web #257). LPB 6 (so lines / lpb is not a whole number); the LPB command (track 4, row 6) and a TPO command on the row of a note (tracks 2 and 7)
+  // must NOT change what a length in lines means (the song's lpb) but the TPO is the tempo at the note: the target, the rate of sync 1 and the stretch's st.bpm follow it.
+  if (variant === 'lines') {
+    S.lpb = 6; Object.assign(S.insts[2], { lines: 20 }); Object.assign(S.insts[3], { lines: 9 }); Object.assign(S.insts[4], { lines: 7 });
+    S.insts[7] = { ...tpl, pad: 3, sync: 1, beats: 2, lines: 30 };
+    cmd(4, 6, 0, 'LPB', 8); cmd(2, 5, 1, 'TPO', 90); cmd(7, 9, 0, 'TPO', 150);
+  }
+  // WEB-FOLLOW item 4: the stretch mode OLDSCHOOL (`sx` 1 with sync 3, web #261 / #263). A sx on a sync that is not 3 is inert (the page's loader drops it). OLDSCHOOL's own settings are the clamped ones
+  // the loader leaves. ev.st gains sx / gs / rp / x / pt; with SLICES + SMODE and a ramp (orp != 0) the slices are equal parts (not the hits).
+  if (variant === 'sx') {
+    Object.assign(S.insts[3], { sx: 1, og: 99 });
+    Object.assign(S.insts[4], { sync: 3, beats: 2, grain: 2, sx: 1, og: 6, ou: 0, orp: 0, ox: 10, opt: -3 });
+    Object.assign(S.insts[5], { sync: 3, beats: 2, sx: 1, og: 12, ou: 0, orp: 2, ox: 0, opt: 0 });
+    Object.assign(S.insts[6], { sync: 3, lines: 11, sx: 1, og: 12, ou: 3, orp: 0, ox: 0, opt: 0 });
+    S.insts[7] = { ...tpl, pad: 3, sync: 3, beats: 3, sx: 1, og: 250, ou: 6, orp: 3, ox: 50, opt: 24 };
+    cmd(7, 4, 0, 'TPO', 100); cmd(5, 7, 0, 'TPO', 140);
+  }
   if (variant === 'sync-rev') PH.forEach((p, t) => p.forEach((r, y) => { if (r[0] >= 0 && y % 3 === 0) { r[6 + 2 * 2] = FXN('PLY'); r[7 + 2 * 2] = 1; } }));   // PLY 1: reversed notes
-  S.phrases = PH; S.plen = PH.map(() => 16); S.chains = PH.map((_, t) => [[t, 0]]); S.song = Array.from({ length: 256 }, (_, r) => Array.from({ length: 33 }, (_, t) => r < 8 && t < 7 ? t : -1));
+  S.phrases = PH; S.plen = PH.map(() => 16); S.chains = PH.map((_, t) => [[t, 0]]); S.song = Array.from({ length: 256 }, (_, r) => Array.from({ length: 33 }, (_, t) => r < 8 && t < (V8 ? 8 : 7) ? t : -1));
   return { v: j.v, song: S };
 }
 const CHOP_CASES = [
   { id: 'chop-all', variant: 'all', desc: 'slc 4 around the root, slc 16 + SLC, sync 1 on a loop at another tempo, sync 2 / 3 with STA, TPO mid-song, retriggers, KIL' },
   { id: 'chop-rev', variant: 'sync-rev', desc: 'the same song with PLY 1 on every third note (reversed: the offset counts from the far end)' },
+  { id: 'chop-lines', variant: 'lines', desc: 'SYNC TO LINES (web #257): lines on sync 1 / 2 / 3 at LPB 6, an LPB command and TPO commands that must not move the lines, a second sync-1 instrument' },
+  { id: 'chop-lines-edit', variant: 'lines', edits: [{ after: 20, fn: S => { S.insts[2].lines = 30; S.insts[7].lines = 0; } }, { after: 60, fn: S => { delete S.insts[4].lines; S.insts[3].lines = 4; } }],
+    desc: 'lines edited while running (a takeOver at each): changed, set to 0 (back to beats), removed, added' },
+  { id: 'chop-sx', variant: 'sx', desc: 'OLDSCHOOL (sync 3 + sx 1, web #261 / #263): ev.st carries sx / gs / rp / x / pt, a ramp makes the SMODE slices equal parts, a sx on sync 2 is inert, ms and line-division grains at a TPO' },
   { id: 'chop-edit', variant: 'all', edits: [{ after: 20, fn: S => { S.insts[0].slc = 8; S.insts[5].slc = 6; } }, { after: 60, fn: S => { S.insts[2].sync = 0; S.insts[6].slc = 0; S.insts[7].sync = 1; } }],
     desc: 'a takeOver after edits that change slc (and sync on / off) of running instruments' },
 ];
@@ -336,6 +358,9 @@ function chopCases() {
     const now = { desc: C.desc, fileText: JSON.stringify(f), pads: info, edits: eds, rows: rows.length, events: Object.values(counts).reduce((a, b) => a + b, 0), counts, chopped, stretched: stN, sha256: sha(text),
       rowHashes: rows.map(r => crypto.createHash('sha256').update(JSON.stringify(r)).digest('hex').slice(0, 12)) };
     if (process.env.CHOP_DEBUG) console.log(JSON.stringify(counts), JSON.stringify(rows.flatMap(r => r.evs).filter(e => e.type === 'note').slice(0, 3)));
+    let sxN = 0, fracBeats = 0; for (const r of rows) for (const e of r.evs) if (e.type === 'note' && e.st) { if (e.st.sx) sxN++; if (!Number.isInteger(e.st.beats)) fracBeats++; }
+    if (C.variant === 'sx') now.sxNotes = sxN;   // (only the new case carries it: the older goldens stay byte for byte)
+    if ((C.variant === 'sx' && !sxN) || (C.variant === 'lines' && !fracBeats)) { console.log(`FAIL ${C.id}: no OLDSCHOOL notes (${sxN}) / no fractional beats (${fracBeats}): the case proves nothing`); bad = true; continue; }
     if (!chopped || (C.variant === 'all' && !stN)) { console.log(`FAIL ${C.id}: no chopped notes (${chopped}) / no st notes (${stN}): the case proves nothing`); bad = true; continue; }
     const gf = path.join(LIVE_DIR, `seq-${C.id}.json`);
     if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${chopped} chopped notes, ${stN} with st`); continue; }
