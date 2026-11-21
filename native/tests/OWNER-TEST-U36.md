@@ -37,6 +37,7 @@ Tap **COPY MIDI** (it puts the blue text on the clipboard; paste it into the cha
 - the device name and what it is (interface / synth / Bluetooth does NOT count: USB only),
 - tight or jittery, notes correct or not, clock seen or not,
 - the unplug / replug result (did A show "(not connected)" and then rejoin?),
+- the `core:` line's `map exact` / `fallback` / `odd` / `offset` numbers, and whether the test felt late on the FIRST tap after the engine started (the audio callback reads the AAudio timestamp every 20 ms: say if the sound ever glitched),
 - anything the app did that looked wrong.
 
 How to read the numbers (so you know what you are reporting): `sent` = messages handed to the phone's MIDI driver (about 205 for one test: 190 clock ticks + notes + Start / Stop);

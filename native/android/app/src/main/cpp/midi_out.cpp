@@ -57,6 +57,7 @@ size_t PortTable::size() const { std::lock_guard<std::mutex> g(mu_); return v_.s
 struct SinkGlue {
   static int64_t now(void* u) { return static_cast<MidiHost*>(u)->nowFn_(); }
   static int send(void* u, uint64_t dev, const uint8_t* b, int len, int64_t at) { return static_cast<MidiHost*>(u)->sendTo(dev, b, len, at); }
+  static void clear(void* u, uint64_t dev) { static_cast<MidiHost*>(u)->clearDev(dev); }
 };
 
 // ---- the debug song -------------------------------------------------------------------------------------------------------------------------
@@ -138,17 +139,17 @@ bool MidiHost::engineStart(double sr, TsFn tsFn, void* tsUser) {
   char err[128];
   h_ = thunder_midi_create(sr, err, sizeof err);
   if (!h_) return false;
-  sink_.user = this; sink_.now_ns = &SinkGlue::now; sink_.send = &SinkGlue::send; sink_.clear = nullptr;   // no clear on Android: nothing recalls what AMidi holds
+  sink_.user = this; sink_.now_ns = &SinkGlue::now; sink_.send = &SinkGlue::send; sink_.clear = &SinkGlue::clear;   // clearDev: drops the held messages of a port without timestamps, flushes a stamped port's
   sink_.caps = THUNDER_MIDIOUT_CAP_TS;   // per SINK, fixed at create: a port that cannot stamp is held by sendTo until its time (see there)
   o_ = thunder_midiout_create(h_, sr, &sink_);
   if (!o_) { thunder_midi_free(h_); h_ = nullptr; return false; }
   sr_ = sr; tsFn_ = tsFn; tsUser_ = tsUser;
-  frames_ = 0; lastMapNs_ = 0; mapped_ = false; mapReady_.store(false, std::memory_order_release); nHeld_ = 0;
+  frames_ = 0; lastMapNs_ = 0; mapped_ = false; mapReady_.store(false, std::memory_order_release); nHeld_ = 0; heldCount_.store(0, std::memory_order_relaxed);
   if (!held_) held_.reset(new (std::nothrow) Held[kHeld]);
   if (!held_) { thunder_midiout_free(o_); thunder_midi_free(h_); o_ = nullptr; h_ = nullptr; return false; }
   applyDevicesLocked();
   for (int p = 0; p < 4; p++) applyAssignLocked(p);
-  if (outLatNs_ > 0) thunder_midiout_set_out_latency(o_, outLatNs_);
+  if (outLatNs_.load(std::memory_order_relaxed) > 0) thunder_midiout_set_out_latency(o_, outLatNs_.load(std::memory_order_relaxed));
   stop_.store(false, std::memory_order_release);
   sender_ = std::thread(&MidiHost::senderMain, this);
   running_.store(true, std::memory_order_release);
@@ -175,11 +176,16 @@ void MidiHost::engineStop() {
     thunder::midi_sched(h_).stop(now);
     thunder::midi_end(h_, now, now, 120, false);
     thunder_midiout_set_playing(o_, 0);
+    // Quiet = the core's counters unchanged for `need` ms AND the sender holds nothing. The pump hands a message to the sink up to 20 ms before its time and the Stop is stamped 10 ms
+    // ahead plus the output latency, so a window of 25 ms + the latency is what it takes for the Stop to have been handed over; a message held for a port without timestamps counts as
+    // sent when it is held, so heldCount_ must be 0 as well (the sender sends them when due, and flushes the rest when it is told to stop).
+    const int64_t latMs = outLatNs_.load(std::memory_order_relaxed) / 1000000;
+    const int need = 25 + (int)(latMs > 300 ? 300 : latMs);
     uint64_t last = ~(uint64_t)0; int still = 0;
-    for (int i = 0; i < 200 && still < 15; i++) {
+    for (int i = 0; i < 200 + need && still < need; i++) {
       timespec ts{0, 1000000}; nanosleep(&ts, nullptr);
       thunder_midiout_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; thunder_midiout_stats_get(o_, &st);
-      still = (st.sent + st.dropped_gone == last) ? still + 1 : 0; last = st.sent + st.dropped_gone;
+      still = (st.sent + st.dropped_gone == last && heldCount_.load(std::memory_order_acquire) == 0) ? still + 1 : 0; last = st.sent + st.dropped_gone;
     }
   }
   stop_.store(true, std::memory_order_release);
@@ -187,7 +193,7 @@ void MidiHost::engineStop() {
   thunder_midiout_free(o_); o_ = nullptr;
   thunder_midi_free(h_); h_ = nullptr;
   freeDebugLocked(true);
-  nHeld_ = 0;
+  nHeld_ = 0; heldCount_.store(0, std::memory_order_relaxed);
   if (held_) for (int i = 0; i < kHeld; i++) held_[i].io.reset();
 }
 
@@ -208,8 +214,9 @@ int MidiHost::assign(int port, const std::string& id) {
 
 void MidiHost::setOutLatencyNs(int64_t ns) {
   std::lock_guard<std::mutex> g(ctl_);
-  outLatNs_ = ns < 0 ? 0 : ns > 2000000000LL ? 2000000000LL : ns;
-  if (o_) thunder_midiout_set_out_latency(o_, outLatNs_);
+  const int64_t v = ns < 0 ? 0 : ns > 2000000000LL ? 2000000000LL : ns;
+  outLatNs_.store(v, std::memory_order_relaxed);
+  if (o_) thunder_midiout_set_out_latency(o_, v);
 }
 
 int MidiHost::debugTest() {
@@ -269,10 +276,10 @@ std::string MidiHost::status() {
                   (unsigned long long)st.sent, (unsigned long long)st.late, (unsigned long long)st.dropped_gone, (unsigned long long)st.dropped_nomap, (unsigned long long)st.dropped_cleared,
                   (unsigned long long)st.queue_full, (unsigned long long)st.max_queue, (unsigned long long)st.send_errors, (unsigned long long)st.dropped_late_ticks, (unsigned long long)st.may_hang);
     s += b;
-    std::snprintf(b, sizeof b, "\ncore: ticks %llu starts %llu stops %llu ringFull %llu lateNotes %llu | map exact %llu fallback %llu odd %llu offset %lld frames | held %llu defFull %llu defFail %llu short %llu | sender prio %s",
+    std::snprintf(b, sizeof b, "\ncore: ticks %llu starts %llu stops %llu ringFull %llu lateNotes %llu | map exact %llu fallback %llu odd %llu offset %lld frames | held %llu defFull %llu defFail %llu short %llu early>3B %llu heldCleared %llu | sender prio %s",
                   (unsigned long long)cs.ticks, (unsigned long long)cs.starts, (unsigned long long)cs.stops, (unsigned long long)cs.ring_full, (unsigned long long)cs.late_notes,
                   (unsigned long long)mapExact.load(), (unsigned long long)mapFallback.load(), (unsigned long long)mapOdd.load(), (long long)lastOffsetFrames.load(),
-                  (unsigned long long)deferred.load(), (unsigned long long)deferFull.load(), (unsigned long long)deferFail.load(), (unsigned long long)shortWrite.load(),
+                  (unsigned long long)deferred.load(), (unsigned long long)deferFull.load(), (unsigned long long)deferFail.load(), (unsigned long long)shortWrite.load(), (unsigned long long)earlyLong.load(), (unsigned long long)heldCleared.load(),
                   prio_.load() == 0 ? "ok" : prio_.load() == 1 ? "refused" : "not tried");
     s += b;
   }
@@ -284,19 +291,53 @@ std::string MidiHost::status() {
 
 // ---- MidiHost: sender ----------------------------------------------------------------------------------------------------------------------
 // SENDER thread only. The pump hands a message to the sink up to 20 ms early (CAP_TS is per sink). A port that cannot stamp (Bluetooth, virtual: not measured) must not get it
-// early: it is held here (fixed array, sender-owned, no lock) and sent when its time comes. A held message is out of the core's reach: a CLEAR cannot recall it, the same as a
-// stamped message the OS already holds (no clear on Android): at most 20 ms of notes after a Stop; the core's hand-over rules say the same.
+// early: it is held here (fixed array, sender-owned, no lock) and sent when its time comes. ORDER: held messages are in arrival order, which the pump makes time order. Before sendTo
+// sends or holds anything for such a port it first sends every held message that is due (flushDeferred), so a message that is sent at once can never overtake an earlier held one:
+// the held ones still waiting are all later than `at`, because `at` is not before any earlier message's time. A CLEAR (clearDev) drops the not-yet-due held messages of its device,
+// the same as the core drops its own queue; what the core replays after a clear (the messages before the marker) comes back through sendTo and is held again.
 int MidiHost::sendTo(uint64_t dev, const uint8_t* b, int len, int64_t at) {
   PortTable::Entry e = table_.find(dev);
   if (!e.io) { sendUnknown.fetch_add(1, std::memory_order_relaxed); return -1; }
   if (e.ts) { const int r = e.io->send(b, len, at); return r < 0 ? -1 : 0; }
   const int64_t now = nowFn_();
-  if (at <= now + 50000 || len < 1 || len > 3) { const int r = e.io->send(b, len, 0); return r < 0 ? -1 : 0; }
+  flushDeferred(now);   // due held messages go first (F7)
+  if (at <= now + 50000 || len < 1) { const int r = e.io->send(b, len, 0); return r < 0 ? -1 : 0; }
+  if (len > 3) { earlyLong.fetch_add(1, std::memory_order_relaxed); const int r = e.io->send(b, len, 0); return r < 0 ? -1 : 0; }   // SysEx: not held (Held::b is 3 bytes)
   if (nHeld_ >= kHeld) { deferFull.fetch_add(1, std::memory_order_relaxed); const int r = e.io->send(b, len, 0); return r < 0 ? -1 : 0; }
   Held& h = held_[nHeld_++];
-  h.io = std::move(e.io); h.len = (uint8_t)len; std::memcpy(h.b, b, (size_t)len); h.at = at;
+  h.io = std::move(e.io); h.dev = dev; h.len = (uint8_t)len; std::memcpy(h.b, b, (size_t)len); h.at = at;
+  heldCount_.store(nHeld_, std::memory_order_release);
   deferred.fetch_add(1, std::memory_order_relaxed);
   return 0;
+}
+
+// sink.clear: the core calls it (from the pump, so on this thread) when a CLEAR meets a message of this device handed over for later; it then re-sends the messages of its history that
+// came BEFORE the marker and are not yet due. So: a stamped port is asked to flush what the OS holds; a port without stamps loses its held messages that are not yet due (those due
+// are sent now: the core does not replay them). A message of this device that is due within a microsecond of the core's own clock read may be sent here AND replayed (a duplicate): accepted.
+void MidiHost::clearDev(uint64_t dev) {
+  PortTable::Entry e = table_.find(dev);
+  if (e.io && e.ts) e.io->flush();
+  const int64_t now = nowFn_();
+  int w = 0;
+  for (int i = 0; i < nHeld_; i++) {
+    Held& h = held_[i];
+    if (h.dev == dev) {
+      if (h.at <= now) { if (h.io->send(h.b, h.len, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed); }
+      else heldCleared.fetch_add(1, std::memory_order_relaxed);
+      h.io.reset();
+      continue;
+    }
+    if (w != i) held_[w] = std::move(h);
+    w++;
+  }
+  nHeld_ = w;
+  heldCount_.store(w, std::memory_order_release);
+}
+
+void MidiHost::flushAllHeld() {
+  for (int i = 0; i < nHeld_; i++) { Held& h = held_[i]; if (h.io->send(h.b, h.len, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed); h.io.reset(); }
+  nHeld_ = 0;
+  heldCount_.store(0, std::memory_order_release);
 }
 
 int64_t MidiHost::flushDeferred(int64_t now) {
@@ -315,6 +356,7 @@ int64_t MidiHost::flushDeferred(int64_t now) {
     }
   }
   nHeld_ = w;
+  heldCount_.store(w, std::memory_order_release);
   return next;
 }
 
@@ -341,15 +383,18 @@ void MidiHost::senderMain() {
       clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
     } else sched_yield();
   }
+  // told to stop: hand over whatever the core has due, then send every held message at once, in order (a Stop or a note-off must not be lost with the array)
+  { int64_t next = INT64_MAX; thunder_midiout_pump(o_, &next); }
+  flushAllHeld();
   if (g_leave) g_leave();
 }
 
 // ---- MidiHost: audio --------------------------------------------------------------------------------------------------------------------------
-void MidiHost::audioBlock(int frames) {
+void MidiHost::audioBlock(int frames, int64_t t0) {
   if (!o_ || !h_ || frames <= 0) return;   // set before the callback starts, cleared after it stopped
   const int64_t F = frames_;
   const double now = (double)F / sr_, bs = (double)frames / sr_;
-  const int64_t mono = nowFn_();
+  const int64_t mono = t0 > 0 ? t0 : nowFn_();   // the callback's start (spec 3.4)
   using namespace thunder;
   DebugSong* d = dbg_.load(std::memory_order_acquire);
   midi_begin(h_, now, bs > 1 ? 1 : bs, 0.0, ~(uint64_t)0);
@@ -368,7 +413,7 @@ void MidiHost::audioBlock(int frames) {
   }
   // the clock map: core frame frame0 is AUDIBLE at host time host0. At most every 20 ms (AAudioStream_getTimestamp is not free), always at the first callback.
   if (!mapped_ || mono - lastMapNs_ >= 20000000LL) {
-    int64_t frame0 = F, host0 = mono; bool exact = false;
+    int64_t frame0 = F, host0 = mono + outLatNs_.load(std::memory_order_relaxed); bool exact = false;   // fallback: the block starts to be heard one output latency (the floor) after the callback
     TsPair p;
     if (tsFn_ && tsFn_(tsUser_, &p)) {
       const int64_t off = p.written - F;   // 0 in steady state if AAudio's frames written excludes the block being filled (UNVERIFIED on the device: reported in status)
@@ -380,6 +425,28 @@ void MidiHost::audioBlock(int frames) {
     mapped_ = true; lastMapNs_ = mono; mapReady_.store(true, std::memory_order_release);
   }
   frames_ = F + frames;
+}
+
+std::string toJniUtf8(const std::string& s) {
+  std::string o; o.reserve(s.size() + 8);
+  auto put3 = [&](unsigned c) { o += (char)(0xE0 | (c >> 12)); o += (char)(0x80 | ((c >> 6) & 0x3F)); o += (char)(0x80 | (c & 0x3F)); };
+  const size_t n = s.size();
+  for (size_t i = 0; i < n;) {
+    const unsigned char c = (unsigned char)s[i];
+    unsigned cp = 0; size_t len = 0;
+    if (c < 0x80) { if (c == 0) { o += (char)0xC0; o += (char)0x80; } else o += (char)c; i++; continue; }
+    else if (c >= 0xC2 && c <= 0xDF) { len = 2; cp = c & 0x1F; }
+    else if (c >= 0xE0 && c <= 0xEF) { len = 3; cp = c & 0x0F; }
+    else if (c >= 0xF0 && c <= 0xF4) { len = 4; cp = c & 0x07; }
+    bool ok = len != 0 && i + len <= n;
+    for (size_t k = 1; ok && k < len; k++) { const unsigned char d = (unsigned char)s[i + k]; if ((d & 0xC0) != 0x80) ok = false; else cp = (cp << 6) | (d & 0x3F); }
+    if (ok && ((len == 2 && cp < 0x80) || (len == 3 && cp < 0x800) || (len == 4 && (cp < 0x10000 || cp > 0x10FFFF)) || (cp >= 0xD800 && cp <= 0xDFFF))) ok = false;
+    if (!ok) { o += '?'; i++; continue; }
+    if (len == 4) { const unsigned v = cp - 0x10000; put3(0xD800 | (v >> 10)); put3(0xDC00 | (v & 0x3FF)); }
+    else o.append(s, i, len);
+    i += len;
+  }
+  return o;
 }
 
 MidiHost& host() { static MidiHost h; return h; }

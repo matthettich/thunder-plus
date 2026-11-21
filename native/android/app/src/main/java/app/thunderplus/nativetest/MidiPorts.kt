@@ -27,6 +27,7 @@ class MidiPorts private constructor(private val app: Context) {
     private val opening = HashSet<Int>()
     private val failed = HashSet<Int>()                  // open or AMidi attach failed: not retried until the device leaves
     private val attached = HashSet<Long>()               // tokens whose AMidi port is open
+    private val missing = HashSet<Long>()                // tokens of an OPEN device whose port did not open (a partial attach): retried alone, the device stays open
     private var started = false
     private var assignedA = ""
     @Volatile private var note = ""
@@ -64,7 +65,7 @@ class MidiPorts private constructor(private val app: Context) {
         infos.clear(); for (i in now) infos[i.id] = i
         val diff = registry.update(now.map { toScan(it) })
         if (diff.removed.isNotEmpty()) {
-            diff.removed.forEach { attached.remove(it.token) }
+            diff.removed.forEach { attached.remove(it.token); missing.remove(it.token) }
             pushList()   // the core stops listing them BEFORE their ports close: a send that was in flight meets an unknown token (< 0), never a freed port
             NativeMidi.nativeDetach(diff.removed.map { it.token }.toLongArray())
             val live = registry.entries.map { it.key.deviceId }.toSet()
@@ -90,6 +91,7 @@ class MidiPorts private constructor(private val app: Context) {
         if (ok.isEmpty()) { failed.add(id); try { dev.close() } catch (e: Exception) { }; note = "AMidi could not open device $id (tap MIDI A: next device to retry)"; return }
         opened[id] = dev
         ok.forEach { attached.add(it) }   // only the ports that really opened are listed
+        mine.forEach { if (it.token !in ok) missing.add(it.token) }
         pushList()
     }
 
@@ -117,7 +119,23 @@ class MidiPorts private constructor(private val app: Context) {
     }
 
     /** A device whose open failed is tried again (a failure can be temporary): on every debug-UI tap, never in a loop. */
-    private fun retryFailed() { if (failed.isNotEmpty()) { failed.clear(); rescan() } }
+    private fun retryFailed() {
+        if (failed.isNotEmpty()) { failed.clear(); rescan() }
+        retryMissing()
+    }
+
+    /** A port of an open device that did not open (a partial attach) is attached again, alone: the device stays open and the ports already attached are untouched. */
+    private fun retryMissing() {
+        if (missing.isEmpty()) return
+        var any = false
+        for ((id, dev) in opened) {
+            val mine = registry.entries.filter { it.key.deviceId == id && it.token in missing }
+            if (mine.isEmpty()) continue
+            val ok = NativeMidi.nativeAttach(dev, mine.map { it.token }.toLongArray(), mine.map { it.key.portNumber }.toIntArray(), mine.map { it.ts }.toBooleanArray())
+            ok.forEach { attached.add(it); missing.remove(it); any = true }
+        }
+        if (any) pushList()
+    }
 
     /** Debug UI: starts the engine if needed, puts A on a device if it has none, runs the two-bar test. Returns what to show. */
     fun runTest(ctx: Context): String {

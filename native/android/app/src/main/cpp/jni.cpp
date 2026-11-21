@@ -67,6 +67,7 @@ inline void setFlushToZero() {
 // No allocation (scratch is in the Engine, fixed size), no locks, no logging, no JNI. A block larger than kMaxBlock is
 // rendered in pieces.
 void dataCallback(ma_device* dev, void* out, const void* /*in*/, ma_uint32 frames) {
+  const int64_t cbStart = monoNs();   // the clock map's host time is the callback's start (spec 3.4)
   Engine* e = static_cast<Engine*>(dev->pUserData);
   float* o = static_cast<float*>(out);
   setFlushToZero();
@@ -83,7 +84,7 @@ void dataCallback(ma_device* dev, void* out, const void* /*in*/, ma_uint32 frame
     }
     done += n;
   }
-  if (e->midi) e->midi->audioBlock((int)frames);   // U36 T9: the scheduler's block and the clock map, after the block (midi_out.h AUDIO)
+  if (e->midi) e->midi->audioBlock((int)frames, cbStart);   // U36 T9: the scheduler's block and the clock map, after the block (midi_out.h AUDIO)
   rtlog_end(&g_rt, monoNs(), (int)frames);
 }
 

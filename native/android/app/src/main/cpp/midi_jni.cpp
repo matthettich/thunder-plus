@@ -31,18 +31,24 @@ class AmidiPort : public tpa::PortIo {
   ~AmidiPort() override { if (port_) AMidiInputPort_close(port_); }   // before dev_ (the device) is released: members die in reverse order
   int send(const uint8_t* b, int len, int64_t at) override {
     // AMidiInputPort_sendWithTimestamp: the time is CLOCK_MONOTONIC ns, the same clock as tpa::monoNs (what the pump's at_ns is on). Plain send: now.
-    // AMidi returns the bytes written, 0 when the port's buffer is full (NOT an error code), < 0 for an error. A message is sent whole or not at all (UNVERIFIED), so 0 is
-    // retried a few times (0.2 ms apart: this is the sender thread, the pump waits at most 0.6 ms); still not accepted: the message is LOST, counted in `short`, and reported to the
-    // core as a send error (< 0), not as delivered: a lost note-off must show in the stats. (That marks the cable gone until the next set_devices: a full buffer after four tries means the device is stuck.)
-    for (int tries = 0; tries < 4; tries++) {
-      const ssize_t n = (ts_ && at > 0) ? AMidiInputPort_sendWithTimestamp(port_, b, (size_t)len, at) : AMidiInputPort_send(port_, b, (size_t)len);
+    // AMidi returns the bytes written, 0 when the port's buffer is full (NOT an error code), < 0 for an error. A write may be PARTIAL (0 < n < len, UNVERIFIED on a device): the
+    // rest is then sent from byte n, never from byte 0 again (that would repeat bytes of a message already begun). A write of 0 bytes is retried a few times (0.2 ms apart: this is
+    // the sender thread, the pump waits at most 0.6 ms); still not accepted after four: the message is LOST, counted in `short`, and reported to the core as a send error (< 0), not as
+    // delivered: a lost note-off must show in the stats. (That marks the cable gone until the next set_devices: a full buffer after four tries means the device is stuck.)
+    int off = 0, zero = 0;
+    while (zero < 4) {
+      const ssize_t n = (ts_ && at > 0) ? AMidiInputPort_sendWithTimestamp(port_, b + off, (size_t)(len - off), at) : AMidiInputPort_send(port_, b + off, (size_t)(len - off));
       if (n < 0) return -1;   // AMEDIA_ERROR_*: the device is gone
-      if (n >= len) return 0;
+      if (n >= len - off) return 0;
       tpa::host().shortWrite.fetch_add(1, std::memory_order_relaxed);
+      if (n > 0) { off += (int)n; continue; }   // progress: not a refusal
+      zero++;
       timespec ts{0, 200 * 1000}; nanosleep(&ts, nullptr);
     }
     return -1;
   }
+  // sink.clear on a stamped port: AMidi's flush message makes the system discard what it holds for later (API 29; UNVERIFIED on the Fold). The core then re-sends the messages before its marker.
+  void flush() override { if (port_) AMidiInputPort_sendFlush(port_); }
  private:
   std::shared_ptr<AmidiDevice> dev_;
   AMidiInputPort* port_;
@@ -131,6 +137,6 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeAssign(J
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeTest(JNIEnv*, jobject) { return tpa::host().debugTest(); }
 JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativePoll(JNIEnv*, jobject) { return tpa::host().debugPoll() ? JNI_TRUE : JNI_FALSE; }
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeSenderTid(JNIEnv*, jobject) { return tpa::host().senderTid(); }
-JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeStatus(JNIEnv* env, jobject) { return env->NewStringUTF(tpa::host().status().c_str()); }
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeStatus(JNIEnv* env, jobject) { return env->NewStringUTF(tpa::toJniUtf8(tpa::host().status()).c_str());   // NewStringUTF wants MODIFIED UTF-8: a device name with an emoji (4 bytes) would abort under CheckJNI }
 
 }  // extern "C"

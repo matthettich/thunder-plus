@@ -11,12 +11,16 @@
 //             sender thread or the audio thread.
 //   AUDIO     audioBlock(): the AAudio callback's thread. No lock, no allocation, no JNI, no I/O: thunder_midi commands, the debug sequencer, thunder_midiout_clock_map (wait-free),
 //             an optional AAudio timestamp read at most every 20 ms (TsFn: dlsym'd function pointers, called with a stream pointer; it must be bounded and lock-free).
-//   SENDER    senderMain(): created in engineStart, joined in engineStop. Calls thunder_midiout_pump in a loop and the sink's send (-> PortTable lookup, PortIo::send).
+//   SENDER    senderMain(): created in engineStart, joined in engineStop. Calls thunder_midiout_pump in a loop and the sink's send and clear (the core calls both from inside the pump, so
+//             on this thread: midiport.h THREADS). Send -> PortTable lookup, PortIo::send. A message for a port without timestamps is HELD (sender-owned array, no lock) until its time; the
+//             core's CLEAR calls sink.clear(dev), which drops that device's held messages that are not yet due (the core then re-sends the ones before the marker) and asks a stamped port to
+//             flush what the OS holds (PortIo::flush). When the sender is told to stop it sends every held message at once, in order, before it ends.
 //   TABLE     PortTable (token -> PortIo): ONE std::mutex, held for a vector lookup / swap only; NEVER across a send, an open, a close or a destructor. The sender copies the
 //             shared_ptr out and releases the lock before it sends; the control thread swaps entries under the lock and lets the OLD shared_ptr die AFTER the unlock. So a port is
 //             closed (PortIo destructor) by whichever thread drops the last reference, never under the lock, never while a send on it is running (the sender's copy keeps it alive).
 //             The audio thread never takes this mutex (clock_map and thunder_midi_process do not reach the table).
-//   SHUTDOWN  engineStop(): the CALLER has already stopped the audio callback (ma_device_uninit); engineStop then stops and joins the sender, THEN frees thunder_midiout, THEN
+//   SHUTDOWN  engineStop(): the CALLER has already stopped the audio callback (ma_device_uninit); engineStop then waits (bounded) until the core's queue has gone quiet and the sender holds
+//             no message (heldCount_, an atomic the sender updates), stops and joins the sender (which flushes what is still held), THEN frees thunder_midiout, THEN
 //             thunder_midi: midiport.h's LIFETIME rule (free after the sender AND every clock_map caller have stopped).
 #ifndef THUNDER_ANDROID_MIDI_OUT_H
 #define THUNDER_ANDROID_MIDI_OUT_H
@@ -43,6 +47,8 @@ class PortIo {
   virtual ~PortIo() {}
   // at_ns <= 0: send now. > 0: a CLOCK_MONOTONIC time (only called for a port the shell declared timestamp-capable). Returns 0 on success, < 0 = the device is gone.
   virtual int send(const uint8_t* bytes, int len, int64_t at_ns) = 0;
+  // SENDER (called from sink.clear for a timestamp-capable port): discard what the OS still holds stamped for later. Default: nothing to discard.
+  virtual void flush() {}
 };
 
 // token -> open port. See TABLE above.
@@ -113,7 +119,8 @@ class MidiHost {
   // Once per audio callback, AFTER the block was rendered, with the callback's frame count. Counts the frames itself (it must equal the core's audio clock: it starts at 0 when
   // the engine starts). Runs the scheduler's block (thunder_midi_process, or the debug song's steps), then publishes the clock map at most every 20 ms (TsFn pair, else the
   // callback-start fallback). The pair math is spec 3.4: frame0 = pos - (written - F_cb), host_ns0 = ns.
-  void audioBlock(int frames);
+  // t0: CLOCK_MONOTONIC at the START of the callback (spec 3.4 takes the pair there); 0 = read the clock now (the Linux test).
+  void audioBlock(int frames, int64_t t0 = 0);
 
   // ---- test hooks (the Linux test) --------------------------------------------------------------------------------------------------------------------------
   void setNowFn(NowFn f) { nowFn_ = f ? f : &monoNs; }
@@ -122,11 +129,15 @@ class MidiHost {
 
   // counters (any thread, relaxed)
   std::atomic<uint64_t> deferred{0}, deferFull{0}, deferFail{0}, shortWrite{0}, mapExact{0}, mapFallback{0}, mapOdd{0}, sendUnknown{0};
+  std::atomic<uint64_t> earlyLong{0};   // a message of more than 3 bytes (SysEx) for a port without timestamps: sent at once, up to 20 ms before its time (not held)
+  std::atomic<uint64_t> heldCleared{0}; // held messages dropped by a CLEAR
   std::atomic<int64_t> lastOffsetFrames{0};   // written - F_cb at the last exact map: the owner's report says whether it is 0 (UNVERIFIED on a device)
 
  private:
   friend struct SinkGlue;
   int sendTo(uint64_t dev, const uint8_t* b, int len, int64_t at);   // SENDER
+  void clearDev(uint64_t dev);                                       // SENDER (sink.clear)
+  void flushAllHeld();                                               // SENDER: sends every held message now, in order
   void senderMain();
   int64_t flushDeferred(int64_t now);                               // SENDER: sends the held messages that are due; returns the next due time (INT64_MAX: none)
   int applyDevicesLocked();                                         // ctl_ held
@@ -144,7 +155,7 @@ class MidiHost {
   TsFn tsFn_ = nullptr; void* tsUser_ = nullptr;
   std::vector<DevInfo> devs_;               // saved (control)
   std::string assign_[4];                   // saved (control)
-  int64_t outLatNs_ = 0;                    // saved (control)
+  std::atomic<int64_t> outLatNs_{0};        // saved (control writes; the audio thread reads it for the fallback map)
   std::thread sender_;
   std::atomic<bool> stop_{false};
   std::atomic<int> tid_{0};
@@ -156,11 +167,15 @@ class MidiHost {
   std::atomic<DebugSong*> dbg_{nullptr};
   DebugSong* dbgOwned_ = nullptr;
   // sender-owned: messages for a port without timestamps, held until their time (the pump hands everything to the sink up to 20 ms early, as CAP_TS says)
-  struct Held { std::shared_ptr<PortIo> io; uint8_t b[3]; uint8_t len; int64_t at; };
+  struct Held { std::shared_ptr<PortIo> io; uint64_t dev; uint8_t b[3]; uint8_t len; int64_t at; };
   static constexpr int kHeld = 256;
   std::unique_ptr<Held[]> held_;
   int nHeld_ = 0;
+  std::atomic<int> heldCount_{0};           // nHeld_ as the control thread may read it (engineStop's drain); written only by the sender (and engineStart / engineStop outside its life)
 };
+
+// A copy of s the JVM's NewStringUTF accepts (MODIFIED UTF-8): a 4-byte sequence becomes a surrogate pair of two 3-byte sequences, an invalid byte '?', U+0000 the two bytes C0 80.
+std::string toJniUtf8(const std::string& s);
 
 MidiHost& host();   // the process's one (the JNI layer's); function-local static
 
