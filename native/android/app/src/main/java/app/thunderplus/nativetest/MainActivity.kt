@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var readout: TextView
     private lateinit var runLines: TextView
     private lateinit var resultsBox: TextView
+    private lateinit var midiLine: TextView   // U36 T9: debug MIDI out
     private val green = Color.rgb(40, 200, 90)
     private val red = Color.rgb(235, 60, 60)
 
@@ -70,6 +71,7 @@ class MainActivity : Activity() {
                 val r = ThunderHost.results[l]
                 "$l: " + (if (r == null) (if (l == active) "running" else "not run yet") else (if (r.pass) "PASS" else "FAIL"))
             }
+            if (midiLine.visibility == View.VISIBLE) midiLine.text = MidiPorts.get(this@MainActivity).statusText()
             ui.postDelayed(this, 500)
         }
     }
@@ -80,6 +82,7 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1)
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
 
+        MidiPorts.get(this).start()   // U36 T9: hot-plug callback + first scan
         val root = FrameLayout(this)
         webView = WebView(this)
         root.addView(webView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -122,12 +125,22 @@ class MainActivity : Activity() {
             btn("COPY RESULTS") { copyResults() },
             btn("Bridge test") { webView.loadUrl(base + "bridge-test.html") },
             btn("App") { webView.loadUrl(base + "index.html") },
-            btn("Hide") { val v = if (readout.visibility == View.VISIBLE) View.GONE else View.VISIBLE; readout.visibility = v; runLines.visibility = v; resultsBox.visibility = if (v == View.GONE) View.GONE else resultsBox.visibility })
+            btn("Hide") { val v = if (readout.visibility == View.VISIBLE) View.GONE else View.VISIBLE; readout.visibility = v; runLines.visibility = v; midiLine.visibility = v; resultsBox.visibility = if (v == View.GONE) View.GONE else resultsBox.visibility })
+        // U36 T9 DEBUG (no live song host yet): MIDI out test = two bars of notes + MIDI clock to port A through the real scheduler / pump / sink; "MIDI A: next" picks the device.
+        val midiRow = row(
+            btn("MIDI out test") { midiLine.text = MidiPorts.get(this).runTest(this) },
+            btn("MIDI A: next device") { midiLine.text = MidiPorts.get(this).cycleA() },
+            btn("COPY MIDI") {
+                val t = MidiPorts.get(this).statusText()
+                try { (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("MIDI out", t)); Toast.makeText(this, "MIDI status copied", Toast.LENGTH_SHORT).show() }
+                catch (e: Exception) { Toast.makeText(this, "The clipboard refused", Toast.LENGTH_LONG).show() }
+            })
+        midiLine = TextView(this).apply { setTextColor(Color.rgb(120, 220, 255)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); text = "MIDI out: -" }
         verdict = TextView(this).apply { setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); typeface = Typeface.DEFAULT_BOLD; text = "ready" }
         readout = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f) }
         runLines = TextView(this).apply { setTextColor(Color.LTGRAY); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f) }
         resultsBox = TextView(this).apply { setTextColor(Color.YELLOW); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); setTextIsSelectable(true); visibility = View.GONE }
-        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow)
+        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine)
         col.addView(android.widget.ScrollView(this).apply { addView(resultsBox); layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (120 * resources.displayMetrics.density).toInt()) })
         return col
     }
