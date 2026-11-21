@@ -16,7 +16,10 @@
 //   2. commit(p, mixer): audio side. The nodes the plan made are now the host's, what it replaced is in the plan (retiredPatches() / retiredNodes()). A second commit of the same plan does nothing. A plan that is
 //      refused as a whole (noop(): the patch was refused or the memory budget would be passed) commits as nothing.
 //   3. settle(p): control side, ONCE when the plan's fate is known, committed or not: a committed plan's nodes become the control view; an abandoned one leaves it as it was. Then delete p (frees what it still
-//      owns: nodes / patches it never gave away, and what commit retired). A plan must be settled before the next plan() (noop plans need no settle).
+//      owns: nodes / patches it never gave away, and what commit retired). A plan must be settled before the next plan() (noop plans need no settle). Deleting a plan WITHOUT settle() leaves inFlight_ set (no plan
+//      can be made again): ~ChainsPlan asserts against it.
+//   THREADED HOST (C2): the plan must come BACK from the audio side through a ring (release on push, acquire on pop) before the control side reads committed_ / the nodes in settle() or deletes the plan;
+//      until then the audio thread owns it.
 //
 // EVENTS (SongRenderer::dispatch -> event()): `chc` (the tracker's BYP b1..b15) and `tempo`. A tempo event moves the host's transport at once when no node exists; otherwise it and every chc wait in a fixed time-sorted
 // array (kChainsHostEvents, sized for the worst real tracker row; a full array drops the newest and counts it). Each event stores the FRAME it is due at, and beginBlock(frame) (called once per block BEFORE the

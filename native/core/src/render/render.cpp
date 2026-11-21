@@ -62,7 +62,6 @@ bool SongRenderer::setStem(int track) {
 static uint32_t noteTracksOf(const Song& S, const BusPlan& bp) {
   uint32_t m = 0;
   for (int t = 0; t < kSongNT; t++) {
-    if (bp.feedMask[t]) continue;
     bool any = false;
     for (int r = 0; r < kSongRows && !any; r++) {
       const int16_t* ch = S.chain(S.cell(r, t)); if (!ch) continue;

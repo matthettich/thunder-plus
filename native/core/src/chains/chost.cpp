@@ -1,6 +1,7 @@
 // C1: see chost.h.
 #include "chains/chost.h"
 
+#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <new>
@@ -10,6 +11,7 @@ namespace thunder {
 using chains::ChainsNode;
 
 ChainsPlan::~ChainsPlan() {
+  assert(settled_ || noop_);   // a plan destroyed while in flight leaves the host's inFlight_ set (chost.h, protocol 3)
   for (int i = 0; i < nTrk_; i++) { delete trk_[i].fresh; if (trk_[i].patch) chains::chains_free_patch(trk_[i].patch); }
   for (int i = 0; i < nOldNode_; i++) delete oldNode_[i];
   for (int i = 0; i < nOldPatch_; i++) if (oldPatch_[i]) chains::chains_free_patch(oldPatch_[i]);

@@ -188,6 +188,27 @@ static void testSeqEvents(const Case& c) {
   }
 }
 
+// G1: a BUS track that plays its own notes while its source has none is kept (the page's keepT: every audible track with notes, buses included): it gets its node and its chain sounds (an oscillator in the
+// bus's patch, no input at all). Without the fix (buses left out of the note tracks) the bus gets no node and is silent.
+static void testBusOwnNotes() {
+  Case c; for (int t = 0; t < kSongNT; t++) { c.mix[t] = {224, 128, 128, false, false}; c.chainOn[t] = t < 2; }
+  const std::string patch = "{\"format\":\"chains.patch\",\"version\":1,\"modules\":[{\"id\":\"i1\",\"type\":\"trackIn\",\"params\":{\"track\":1,\"pre\":0}},{\"id\":\"osc1\",\"type\":\"osc\",\"params\":{\"wave\":1,\"freq\":330,\"fm\":0,\"level\":0.5}},"
+    "{\"id\":\"mA\",\"type\":\"smixer\",\"params\":{\"chans\":2,\"level\":1,\"l1\":1,\"p1\":0,\"l2\":1,\"p2\":0}},{\"id\":\"o2\",\"type\":\"chainOut\",\"params\":{\"track\":2,\"level\":1}}],\"cables\":["
+    "{\"from\":[\"osc1\",\"out\"],\"to\":[\"mA\",\"in1\"]},{\"from\":[\"osc1\",\"out\"],\"to\":[\"mA\",\"in1R\"]},{\"from\":[\"i1\",\"out\"],\"to\":[\"mA\",\"in2\"]},{\"from\":[\"i1\",\"outR\"],\"to\":[\"mA\",\"in2R\"]},"
+    "{\"from\":[\"mA\",\"out\"],\"to\":[\"o2\",\"in\"]},{\"from\":[\"mA\",\"outR\"],\"to\":[\"o2\",\"inR\"]}]}";
+  JsonDoc pd; if (!pd.parse(patch)) { CHECK("G1 patch parses", false); return; } c.patch = pd.root();
+  const std::string text = songText(c, "[-1,0]", "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]"); Song song; JsonError je;   // track 0 (the source): no notes; track 1 (the bus): notes
+  if (!song.load(text.data(), text.size(), &je)) { CHECK("G1 song loads", false); return; }
+  SeqVars vars; RenderPads pads; SeqOpts so; so.row = song.renderFrom; so.once = true;
+  float peak[2] = {0, 0};
+  for (int on = 0; on < 2; on++) {
+    SongRenderer r(song, vars, pads, kSr, 128, so); CHECK("G1 setChains", r.setChains(on != 0) == 0);
+    std::vector<float> L(128), R(128); for (int b = 0; b < 40; b++) { r.block(L.data(), R.data(), 128); for (float v : L) peak[on] = std::max(peak[on], std::fabs(v)); }
+    if (on) CHECK("G1 the bus track with notes has a node", r.chainsHost() && r.chainsHost()->node(1) != nullptr);
+  }
+  CHECK("G1 the bus's own chain sounds (the oscillator), and without chains there is silence", peak[1] > 0.01f && peak[0] == 0.f);
+}
+
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("usage: test_chains_song <chains_song_cases.json> [name]\n"); return 2; }
   std::ifstream f(argv[1], std::ios::binary); std::ostringstream ss; ss << f.rdbuf(); const std::string text = ss.str();
@@ -205,7 +226,7 @@ int main(int argc, char** argv) {
     std::printf("%-28s %s\n", c.name.c_str(), g_fail == before ? "exact" : "FAILED");
   }
   for (size_t i = 0; i < cs.size() && !only; i++) { Case c = readCase(cs.at(i)); if (c.name == "a/electro") {
-    testSeqEvents(c);
+    testSeqEvents(c); testBusOwnNotes();
     Out never, on, off; runRenderer(c, &never, 0); runRenderer(c, &on, 1); runRenderer(c, &off, 2);   // setChains(false) after true: the render is the chains-off one again
     CHECK("setChains(false) after true: the render equals one that never had chains", off.hash == never.hash && on.hash != never.hash);
     break; } }
