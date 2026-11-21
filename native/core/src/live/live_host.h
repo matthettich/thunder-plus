@@ -329,6 +329,7 @@ class LiveHost {
   int stateA_ = THUNDER_LIVE_STATE_IDLE;             // the audio side's own copy of state_
   bool songOverDone_ = false; double endStopAt_ = -1;   // C4's songOver once; the MIDI stop 0.3 s later
   bool hadSeq_ = false;                              // AUDIO: a Seq was passed to beginQuantum and none has been reported gone since (-> seqGone() when the runner drops it)
+  bool ackPend_ = false; int64_t ackPendRev_ = 0;     // AUDIO: SongAcks of this quantum: one SONG record, the newest rev
   bool ackValid_ = false; int64_t ackRev_ = 0;       // AUDIO: a SongAck posted this rev; a play that adopts the snapshot of that rev does not post a second SONG
   bool posDirty_ = false; int32_t posRow_ = 0, posStep_ = 0, posCr_ = 0; int64_t posF_ = 0;   // AUDIO: the last played step's place, for the POS record
   uint32_t lateLast_[4] = {0, 0, 0, 0};              // AUDIO: the counters of the last LATE record

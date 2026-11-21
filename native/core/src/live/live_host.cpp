@@ -541,6 +541,7 @@ void LiveHost::applyCommands(int64_t qStart, int64_t qEnd) {
     cmdLate_++; if (!lateErr) { lateErr = true; thunder_live_ev_error e; std::memset(&e, 0, sizeof e); e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = qStart; e.where = THUNDER_LIVE_WHERE_CMD; post(&e, sizeof e); }   // at most one record a quantum
     applyOne(c, qStart);
   }
+  if (ackPend_) { ackPend_ = false; postSong(ackPendRev_, qStart); ackValid_ = true; ackRev_ = ackPendRev_; }
 }
 
 void LiveHost::dropSeq() {
@@ -555,7 +556,7 @@ void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
   const int64_t atF = c.at < qStart ? qStart : c.at;   // never before this quantum's start
   const double at = (double)atF / sr_;
   switch (c.type) {
-    case LiveCmdType::SongAck: postSong(c.i64a, qStart); ackValid_ = true; ackRev_ = c.i64a; break;
+    case LiveCmdType::SongAck: ackPend_ = true; ackPendRev_ = c.i64a; break;   // one SONG record for the newest of the quantum's acks (applyCommands)
     case LiveCmdType::Play: applyPlay(static_cast<PlayPlan*>(c.p), qStart); break;
     case LiveCmdType::Stop: {
       if (stalledPlay_) { giveBack(stalledPlay_); stalledPlay_ = nullptr; }   // a play that never started is cancelled too
@@ -609,6 +610,7 @@ bool LiveHost::tryStartPlay(PlayPlan* p, int64_t qStart) {
 void LiveHost::noteSongAdopted(int64_t qStart) {
   const SongSnap* sn = songSlot_.get();
   pub_[P_SONGADOPT].store(sn->ord, std::memory_order_relaxed);
+  ackPend_ = false;   // an ack of this quantum (an IDLE publish before the play) and the play's adoption are one record: the adoption's
   if (ackValid_ && ackRev_ == sn->rev) { ackValid_ = false; return; }
   ackValid_ = false; postSong(sn->rev, qStart);
 }
