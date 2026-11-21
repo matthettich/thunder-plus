@@ -126,6 +126,7 @@ class ChainsHost {
 
  private:
   struct Ev { int64_t due; uint8_t type; int8_t track; int8_t p; double v, tks; };
+  ChainsPlan* planImpl(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song);
   bool put(const Ev& e);
   void applyTransport(chains::ChainsNode& n);
   double sr_, q_;                                  // q_ = 128.0 / sr in double, as the page's `q`

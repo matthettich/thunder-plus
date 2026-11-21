@@ -36,6 +36,13 @@ static double docBytes(Json patch, double sr) {
 
 // ---- control thread --------------------------------------------------------------------------------------------------------------------
 ChainsPlan* ChainsHost::plan(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song) {
+#if defined(__cpp_exceptions)
+  try { return planImpl(chainPatch, chainOn, heard, song); } catch (const std::bad_alloc&) { return nullptr; }   // everything planImpl made is freed by its unique_ptr; the control view and inFlight_ are touched only at its very end
+#else
+  return planImpl(chainPatch, chainOn, heard, song);
+#endif
+}
+ChainsPlan* ChainsHost::planImpl(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song) {
   if (inFlight_) { st_.busyRefused++; return nullptr; }
   // the first call of the module tables makes static data (cdef / cinfo / the registry): do it here, so the audio thread never meets a first call
   (void)chains::cinfo_count(); (void)chains::chainsTable(); (void)chains::cdef("trackIn"); (void)chains::cdef("chainOut"); (void)chains::cdef("smixer");
@@ -51,9 +58,7 @@ ChainsPlan* ChainsHost::plan(Json chainPatch, const bool* chainOn, uint32_t hear
   { double total = 0; for (int t = 0; t < kSongNT; t++) if (want >> t & 1u) total += (ctlNode_[t] ? 2 * pb : pb) + (double)kChainsNodeOverhead; P.bytes_ = (size_t)total;
     if (total > (double)budget_) { P.overBudget_ = P.noop_ = true; st_.overBudget++; st_.refused++; return pl.release(); } }
   bool refused = false;
-#if defined(__cpp_exceptions)
-  try {
-#endif
+  {
     for (int t = 0; t < kSongNT && !refused; t++) {
       ChainsPlan::Trk* k = nullptr;
       if (want >> t & 1u) {
@@ -70,9 +75,7 @@ ChainsPlan* ChainsHost::plan(Json chainPatch, const bool* chainOn, uint32_t hear
         if (k && P.bus_.nFeeds[t] > 0) { k->nBus = P.bus_.nFeeds[t] < kMixFeedMax ? P.bus_.nFeeds[t] : kMixFeedMax; for (int j = 0; j < k->nBus; j++) k->busMap[j] = P.bus_.feeds[t][j]; }
       } else if (ctlNode_[t]) { k = &P.trk_[P.nTrk_++]; k->track = t; k->remove = true; }
     }
-#if defined(__cpp_exceptions)
-  } catch (const std::bad_alloc&) { return nullptr; }   // the plan's destructor frees what was made; the control view was never touched
-#endif
+  }
   if (!refused) P.nodeMask_ = want;
   if (refused) {   // one document, refused: nothing of this plan is used (the destructor frees what it made)
     for (int i = 0; i < P.nTrk_; i++) { delete P.trk_[i].fresh; P.trk_[i].fresh = nullptr; if (P.trk_[i].patch) chains::chains_free_patch(P.trk_[i].patch); P.trk_[i].patch = nullptr; }

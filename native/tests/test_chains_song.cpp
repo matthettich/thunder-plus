@@ -24,7 +24,7 @@ static int g_fail = 0;
 static const double kSr = 48000;
 
 struct Case {
-  std::string name; Json song, patch, expect; int stem = -1, quanta = 400; std::vector<std::pair<int, bool>> inputs; std::vector<SeqEvent> events; std::string hash, qh; Json ctl;
+  std::string name; Json song, patch, expect; int stem = -1, quanta = 400; std::vector<std::pair<int, bool>> inputs; uint32_t noteTracks = 0; std::vector<SeqEvent> events; std::string hash, qh; Json ctl;
   bool chainOn[kSongNT] = {}; struct M { double vol, trim, pan; bool mute, solo; } mix[kSongNT];
   int bpm = 120, lpb = 4, ticks = 6, master = 255, mout = 255;
 };
@@ -33,6 +33,7 @@ static std::string show(const std::vector<int>& v) { std::string s = "["; for (s
 static Case readCase(Json c) {
   Case k; k.name = std::string(c.str("name")); k.song = c.get("song"); k.patch = k.song.get("chainPatch"); k.expect = c.get("expect"); k.quanta = (int)c.num("quanta", 400);
   k.stem = c.get("stem").isNum() ? (int)c.get("stem").asNum() : -1; k.hash = std::string(c.str("hash")); k.qh = std::string(c.str("qh")); k.ctl = c.get("controls");
+  { Json nt = c.get("noteTracks"); for (size_t i = 0; i < nt.size(); i++) k.noteTracks |= 1u << (int)nt.at(i).asNum(); }
   Json in = c.get("inputs"); for (size_t i = 0; i < in.size(); i++) k.inputs.push_back({(int)in.at(i).num("t"), in.at(i).boolean("mono")});
   Json ev = c.get("events");
   for (size_t i = 0; i < ev.size(); i++) {
@@ -74,8 +75,8 @@ static bool checkPlan(const Case& c, uint32_t heard, uint32_t nodes, const BusPl
   return ok;
 }
 
-// the tracks that play notes in a case: the ones that have an input, and are not buses (the page's sequencer plays no note on a bus)
-static uint32_t noteTracksOf(const Case& c, const BusPlan& bp) { uint32_t m = 0; for (auto& q : c.inputs) if (!bp.feedMask[q.first]) m |= 1u << q.first; return m; }
+// the tracks that have notes: the golden's own `noteTracks` (the page's notes.some(e => e.track === t)). The renderer's song plays a note on each of them that is not a bus (the sequencer plays no note on a bus)
+static uint32_t noteTracksOf(const Case& c) { return c.noteTracks; }
 
 struct Out { std::string hash, qh; };
 static void hashQuantum(uint32_t& h, std::string& qh, const float* L, const float* R) {
@@ -103,7 +104,7 @@ static bool runMixer(const Case& c, Out* out) {
     for (bool more = true; more;) { more = false; for (int b = 0; b < kSongNT; b++) if ((m >> b & 1u) && (bp.feedMask[b] & aud & ~m)) { m |= bp.feedMask[b] & aud; more = true; } }
     mix.setHeard(m);
   }
-  const uint32_t heard = c.stem >= 0 ? (uint32_t)mix.audibleMask() : ChainsHost::keepMask(bp, (uint32_t)mix.audibleMask(), noteTracksOf(c, bp));
+  const uint32_t heard = c.stem >= 0 ? (uint32_t)mix.audibleMask() : ChainsHost::keepMask(bp, (uint32_t)mix.audibleMask(), noteTracksOf(c));
   ChainsHost host(kSr); ChainsSongTransport tp; tp.tempo = c.bpm; tp.lpb = c.lpb; tp.ticks = c.ticks;
   std::unique_ptr<ChainsPlan> plan(host.plan(c.patch, c.chainOn, heard, tp));
   if (!plan) { std::printf("FAIL %s: plan() returned null\n", c.name.c_str()); g_fail++; return false; }
@@ -131,11 +132,12 @@ static void tapFn(void* user, const float* const* inL, const float* const* inR, 
   Tap* tp = (Tap*)user; const size_t q = (size_t)(frame0 / 128); (void)frames;
   for (size_t k = 0; k < tp->c->inputs.size(); k++) { const int t = tp->c->inputs[k].first; std::memcpy(const_cast<float*>(inL[t]), tp->in->L[k].data() + q * 128, 128 * sizeof(float)); if (!tp->c->inputs[k].second) std::memcpy(const_cast<float*>(inR[t]), tp->in->R[k].data() + q * 128, 128 * sizeof(float)); }
 }
-static std::string songText(const Case& c, const std::string& songRow = "[0]", const char* row0 = "[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]") {   // a silent song (no pad is handed in) that carries the case's mixer, CHN flags and patch
+static std::string songText(const Case& c, const std::string& songRow = "[0]", const char* row0 = "[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]", const char* row0b = nullptr) {   // row0b: a second chain (index 1) of one phrase with that row   // a silent song (no pad is handed in) that carries the case's mixer, CHN flags and patch
   std::string s = "{\"v\":6,\"bpm\":" + std::to_string(c.bpm) + ",\"lpb\":" + std::to_string(c.lpb) + ",\"ticks\":" + std::to_string(c.ticks) + ",\"master\":" + std::to_string(c.master) + ",\"mout\":" + std::to_string(c.mout) +
-    ",\"ntr\":8,\"song\":[" + std::string(songRow) + "],\"chains\":[[[0,0]]],\"plen\":[8],\"phrases\":[[";
+    ",\"ntr\":8,\"song\":[" + std::string(songRow) + "],\"chains\":[[[0,0]]" + std::string(row0b ? ",[[1,0]]" : "") + "],\"plen\":[8" + std::string(row0b ? ",8" : "") + "],\"phrases\":[[";
   for (int i = 0; i < 8; i++) s += std::string(i ? "," : "") + (i == 0 ? row0 : "[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]");
-  s += "]],\"mix\":[";
+  s += "]"; if (row0b) { s += ",["; for (int i = 0; i < 8; i++) s += std::string(i ? "," : "") + (i == 0 ? row0b : "[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]"); s += "]"; }
+  s += "],\"mix\":[";
   for (int t = 0; t < kSongNT; t++) { char b[160]; std::snprintf(b, sizeof b, "%s{\"vol\":%g,\"trim\":%g,\"pan\":%g,\"mute\":%s,\"solo\":%s}", t ? "," : "", c.mix[t].vol, c.mix[t].trim, c.mix[t].pan, c.mix[t].mute ? "true" : "false", c.mix[t].solo ? "true" : "false"); s += b; }
   s += "],\"chainOn\":["; for (int t = 0; t < kSongNT; t++) s += std::string(t ? "," : "") + (c.chainOn[t] ? "true" : "false");
   s += "],\"chainPatch\":" + json_write(c.patch) + "}";
@@ -143,7 +145,7 @@ static std::string songText(const Case& c, const std::string& songRow = "[0]", c
 }
 // chainsOn: 0 never, 1 on, 2 on and then off again (before the first block). The song plays a note on every non-bus input track (a pad is not handed in: silent), so noteTracksOf() in the renderer finds them.
 static bool runRenderer(const Case& c, Out* out, int chainsOn = 1, bool inject = true) {
-  const BusPlan bp = bus_plan(c.patch, c.chainOn); const uint32_t nt = noteTracksOf(c, bp);
+  const BusPlan bp = bus_plan(c.patch, c.chainOn); uint32_t nt = noteTracksOf(c); for (int t = 0; t < kSongNT; t++) if (bp.feedMask[t]) nt &= ~(1u << t);
   std::string row = "["; for (int t = 0; t < kSongNT; t++) row += std::string(t ? "," : "") + ((nt >> t & 1u) ? "0" : "-1"); row += "]";
   const std::string text = songText(c, row, "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]"); Song song; JsonError je;
   if (!song.load(text.data(), text.size(), &je)) { std::printf("FAIL %s: the test song did not load (%s)\n", c.name.c_str(), je.msg ? je.msg : "?"); g_fail++; return false; }
@@ -169,7 +171,7 @@ static bool runRenderer(const Case& c, Out* out, int chainsOn = 1, bool inject =
 // the dispatch cases: a song whose bus track (track 3 of case a/electro) plays a row with BYP (command 38, value 0x11: switch 1 bypassed) and TPO (command 19, value 90): both reach the chains host through
 // SongRenderer::dispatch, the node's tempo becomes 90, and the chc is not counted as ignored (the tempo still is: the Players see it too)
 static void testSeqEvents(const Case& c) {
-  const std::string text = songText(c, "[-1,-1,-1,0]", "[60,-1,-1,-1,-1,0,38,17,19,90,-1,-1]"); Song song; JsonError je;
+  const std::string text = songText(c, "[1,1,1,0]", "[60,-1,-1,-1,-1,0,38,17,19,90,-1,-1]", "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]"); Song song; JsonError je;
   if (!song.load(text.data(), text.size(), &je)) { std::printf("FAIL: the event song did not load (%s)\n", je.msg ? je.msg : "?"); g_fail++; return; }
   SeqVars vars; RenderPads pads; SeqOpts so; so.row = song.renderFrom; so.once = true;
   int ign0 = 0;
