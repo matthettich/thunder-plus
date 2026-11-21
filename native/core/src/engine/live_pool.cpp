@@ -24,6 +24,8 @@ class LiveEngT final : public LiveEng {
   void setRateFeed(const Auto* a, double sr) override { sh_.setRateFeed(a, sr); }
   void setEngFeed(const EngFeed* f) override { sh_.setEngFeed(f); }
   size_t bytes() const override { return sizeof(*this); }
+  uint32_t shellDropped() const override { return sh_.dropped(); }
+  uint32_t shellForced() const override { return sh_.forced(); }
  private:
   SH sh_;
 };
@@ -71,6 +73,7 @@ void LivePool::rebuildActive() {
   for (auto& v : byTrack_) v.clear();
   for (Node* n : active_) byTrack_[n->track].push_back(n);
 }
+LiveStats LivePool::stats() const { LiveStats s = st_; for (const Node* n : active_) { s.queueDropped += n->eng->shellDropped(); s.forcedOff += n->eng->shellForced(); } return s; }
 uint32_t LivePool::failedNodes() const { uint32_t k = 0; for (const Node* n : active_) if (n->eng->failed()) k++; return k; }
 
 // ---- the timeline ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -80,25 +83,61 @@ void LivePool::cancelFrom(Node& n, int64_t T) {   // AudioParam.cancelScheduledV
 }
 void LivePool::book(Node& n, const TEv& e) {
   if (n.ntl >= kTimeline) {
-    if (e.type != LiveEvType::NoteOff) { st_.queueDropped++; return; }   // L5: a NoteOn (and a Bpm / Wob event) is dropped and counted
+    if (e.type != LiveEvType::NoteOff && e.type != LiveEvType::End) { st_.queueDropped++; return; }   // L5: a NoteOn (and a Bpm / Wob event) is dropped and counted
     // a note-off always wins: it discards what is booked at or after it and is kept
     st_.forcedOff++;
     int w = 0; for (int i = 0; i < n.ntl; i++) { if (n.tl[i].T < e.T) n.tl[w++] = n.tl[i]; else st_.queueDropped++; }
     n.ntl = w;
-    if (n.ntl >= kTimeline) { n.ntl--; st_.queueDropped++; }   // (all of it is earlier: the latest booked event gives way)
+    if (n.ntl >= kTimeline) {   // (all of it is earlier: the latest rate / tempo / wobble event gives way, else the latest event; counted)
+      int v = n.ntl - 1; for (int i = n.ntl - 1; i >= 0; i--) if (n.tl[i].type != LiveEvType::NoteOn && n.tl[i].type != LiveEvType::NoteOff) { v = i; break; }
+      for (int i = v; i + 1 < n.ntl; i++) n.tl[i] = n.tl[i + 1];
+      n.ntl--; st_.queueDropped++;
+    }
   }
   int pos = n.ntl; while (pos > 0 && n.tl[pos - 1].T > e.T) { n.tl[pos] = n.tl[pos - 1]; pos--; }
   n.tl[pos] = e; n.ntl++;
 }
 
+// F4 (the pool's entry): what reaches a core. A field the JS would have thrown on or an AudioParam cannot hold (NaN, Inf) is refused: a feature's flag is cleared (the bend, the vibrato, `mul`, cut, rel, wob, arp, a gain / pan step), the rest of the event stands;
+// a magnitude is clamped to +-1e6 (gain, bendMul, mul, vibSpd, vibDep); each refusal is counted (LiveStats::refused). The time of an off / stp / mod must be finite, else the event is refused whole. rate, gain, pan and the slide of a NOTE are
+// refused whole (the JS throws in liveStart). Clamps the JS has stay where they were (rate 0..256 in the shell, bpm 10..999, wob 0..64).
+static inline double mag(double v) { return v < -1e6 ? -1e6 : v > 1e6 ? 1e6 : v; }
+void LivePool::sanitize(SeqEvent& e, const double* arp) {
+  const auto f = [](double v) { return std::isfinite(v); };
+  auto drop = [&](uint32_t bit) { e.has &= ~bit; st_.refused++; };
+  if ((e.has & SH_GAIN) && !f(e.gain)) drop(SH_GAIN);
+  if ((e.has & SH_PAN) && !f(e.pan)) drop(SH_PAN);
+  if ((e.has & SH_MUL) && !f(e.mul)) drop(SH_MUL);
+  if ((e.has & SH_BEND) && (!f(e.bendMul) || !f(e.bendT1))) drop(SH_BEND);
+  if ((e.has & SH_VIB) && (!f(e.vibSpd) || !f(e.vibDep) || !f(e.vibT1))) drop(SH_VIB);
+  if ((e.has & SH_CUT) && !f(e.cut)) drop(SH_CUT);
+  if ((e.has & SH_REL) && !f(e.rel)) drop(SH_REL);
+  if ((e.has & SH_WOB) && !f(e.wob)) drop(SH_WOB);
+  if (e.has & SH_ARP) { bool ok = arp && e.arpN >= 0 && e.arpN <= 4096; for (int q = 0; ok && q < 2 * e.arpN; q++) if (!f(arp[q])) ok = false; if (!ok) drop(SH_ARP); }
+  if (f(e.gain)) e.gain = mag(e.gain);
+  if (f(e.mul)) e.mul = mag(e.mul);
+  if (f(e.bendMul)) e.bendMul = mag(e.bendMul);
+  if (f(e.vibSpd)) e.vibSpd = mag(e.vibSpd);
+  if (f(e.vibDep)) e.vibDep = mag(e.vibDep);
+}
+
+// D7 (cancelAndHoldAtTime, index.html bassNote): the lane keeps the value it has at t, and a ramp that is still running is cut THERE (it goes on gliding up to t); the core's Auto::hold would drop the ramp's end event and
+// leave the lane at the ramp's start value until a step at t.
+static void holdRamp(Auto& a, double t) {
+  const double v = a.at(t); bool ramp = false;
+  for (int i = 0; i < a.size(); i++) { const AutoEv& e = a.event(i); if (e.t >= t) { ramp = e.k == 1; break; } }
+  a.cancel(t); if (ramp) a.lin(v, t); else a.set(v, t);
+}
+
 // ---- notes -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-bool LivePool::note(const SeqEvent& e, int pad, double bpm, const double* arp, int choke, bool* poly) {
+bool LivePool::note(const SeqEvent& e0, int pad, double bpm, const double* arp, int choke, bool* poly) {
   if (poly) *poly = false;
   if (!has(pad)) return false;
   PadSlot& ps = pads_[pad];
-  Node* n = e.track >= 0 && e.track < kVoiceTracks ? ps.byTrack[e.track] : nullptr;
+  Node* n = e0.track >= 0 && e0.track < kVoiceTracks ? ps.byTrack[e0.track] : nullptr;
   if (!n) { st_.noNode++; return false; }
-  if (!std::isfinite(e.rate) || !std::isfinite(e.gain) || !std::isfinite(e.pan) || ((e.has & SH_SLIDE) && (!std::isfinite(e.slideFrom) || !std::isfinite(e.slideDur)))) return false;   // (the JS would throw inside liveStart: nothing is booked)
+  if (!std::isfinite(e0.t) || !std::isfinite(e0.rate) || !std::isfinite(e0.gain) || !std::isfinite(e0.pan) || ((e0.has & SH_SLIDE) && (!std::isfinite(e0.slideFrom) || !std::isfinite(e0.slideDur)))) { st_.refused++; return false; }   // (the JS would throw inside liveStart: nothing is booked)
+  SeqEvent e = e0; sanitize(e, arp);
   if (ps.kind == LiveKind::Vox && e.poly) { if (poly) *poly = true; curChoke_ = choke; return polyVox(e, ps, bpm, arp); }
   // the mono branch (liveNote): every voice of the track but this node's own gives way (its gate goes low at the note), the list is cleared, then the choke group of the other tracks
   for (Node* o : byTrack_[e.track]) { if (o != n && o->inT) kill(*o, e.t); o->inT = false; }
@@ -136,7 +175,7 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* a
   cancelFrom(n, T);                                                    // gate, trig, leg
   // the rate: hold, then the slide or the step (the list is folded like the sampler's rather than a point dropped: P5)
   if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(now_); if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(t); n.rate.cancel(t); } }
-  n.rate.hold(t);
+  holdRamp(n.rate, t);   // D7: the page's cancelAndHoldAtTime
   if (leg) { n.rate.set(e.slideFrom, t); n.rate.lin(e.rate, t + e.slideDur); } else n.rate.set(e.rate, t);
   if (n.kind == LiveKind::Bass && std::isfinite(bpm) && bpm != n.lastBpm) { bookCtl(n, LiveEvType::Bpm, t, bpm); n.lastBpm = bpm; }   // P4: the bpm lane follows the tempo (SEV_TEMPO comes after its step's notes, never before the first)
   TEv on; on.T = T; on.type = LiveEvType::NoteOn; on.leg = leg; on.acc = n.kind != LiveKind::Bass && n.kind != LiveKind::Vox && e.acc;
@@ -208,12 +247,15 @@ void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {
   if (n.kind == LiveKind::Bass && (e.has & SH_WOB) && std::isfinite(e.wob)) bookCtl(n, LiveEvType::Wob, e.t, e.wob);
 }
 
-void LivePool::mod(const SeqEvent& e, const double* arp) {
-  if (e.track < 0 || e.track >= kVoiceTracks) return;
+void LivePool::mod(const SeqEvent& e0, const double* arp) {
+  if (e0.track < 0 || e0.track >= kVoiceTracks) return;
+  if (!std::isfinite(e0.t)) { st_.refused++; return; }
+  SeqEvent e = e0; sanitize(e, arp);
   for (Node* n : byTrack_[e.track]) if (n->inT && n->curLive && !(n->curStop && n->stopAt <= e.t)) modVoice(*n, e, arp);   // live1
 }
 void LivePool::off(const SeqEvent& e) {
   if (e.track < 0 || e.track >= kVoiceTracks) return;
+  if (!std::isfinite(e.t)) { st_.refused++; return; }
   for (Node* n : byTrack_[e.track]) {
     if (!n->inT) continue;
     if ((e.has & SH_COLS) && !(n->curCol >= 0 && n->curCol < 8 && ((e.cols >> n->curCol) & 1))) continue;
@@ -221,10 +263,11 @@ void LivePool::off(const SeqEvent& e) {
   }
 }
 void LivePool::stp(const SeqEvent& e) {
+  if (!std::isfinite(e.t)) { st_.refused++; return; }
   for (int k = 0; k < kVoiceTracks; k++) if (e.flag || k == e.track) for (Node* n : byTrack_[k]) if (n->inT) { kill(*n, e.t); n->inT = false; }
 }
 void LivePool::tempo(double t, double bpm) {
-  if (!std::isfinite(bpm)) return;
+  if (!std::isfinite(bpm) || !std::isfinite(t)) { st_.refused++; return; }
   for (Node* n : active_) if (n->kind == LiveKind::Bass) { bookCtl(*n, LiveEvType::Bpm, t, bpm); n->lastBpm = bpm; }
 }
 void LivePool::stopAll(double at) {   // stopAll(at): every node's voice lets go at `at`; what is booked at or after it is taken back, the gate goes low; the syllable counters and voxG start again

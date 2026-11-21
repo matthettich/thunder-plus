@@ -1,6 +1,6 @@
 // LIVE ROUTE gate L10 (b): the live pool against the JS. The sequences of tools/engine-u26-dump.mjs `seqRender` (the live rule of the real core; its committed Linux hashes, golden/engine_u26_golden.inc) are turned back into the
 // SEQUENCER EVENTS that would make them (a note with its rate, a slide for a legato note or a ramp, an off), played through Players::dispatch on a live pad, and each node's engine output BEFORE gain / pan (LivePool::setTap)
-// must hash to the JS's, bit for bit. A sequence is played only if the sequencer can say it: a rate event rides on the note at its sample (a note's rate, or its slide), a ramp only on a legato note, no bpm / wob lane events,
+// must hash to the JS's, bit for bit. A sequence is played only if the sequencer can say it: a rate event rides on the note at its sample (a note's rate, a slide, or a bend) or is a `mod` (`mul`, a bend) on the held voice, tempo is SEV_TEMPO, wob a `mod` with SH_WOB,
 // no note-off in the sample of a note-on (the one expected difference: the pool takes the off back, D4 / C3; the JS's seqRender does not), vox: the syllable and `same` lanes the node's own counter gives. The rest are listed with the reason.
 //   test_live_jsparity <refDir> (the cases.json of engine-u26-dump.mjs)
 #include <algorithm>
@@ -58,30 +58,47 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < E.size(); i++) { Json e = E.at(i); Ev v; v.t = e.num("t"); v.type = std::string(e.str("type")); v.v = e.num("v", 0); v.dur = e.num("dur", 0); v.leg = e.get("leg").asBool(); v.acc = e.get("acc").asBool(); v.same = e.get("same").asBool(); v.syl = e.num("syl", 0); for (int k = 0; k < 5; k++) v.c[k] = e.get("c").isArr() && e.get("c").at((size_t)k).isNum() ? e.get("c").at((size_t)k).asNum() : std::nan(""); for (int k = 0; k < 7; k++) v.o[k] = e.get("o").isArr() && e.get("o").at((size_t)k).isNum() ? e.get("o").at((size_t)k).asNum() : std::nan(""); if (v.t < (double)N) evs.push_back(v); }
     std::stable_sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) { return a.t < b.t; });
     // the translation; `why` names what the sequencer cannot say
-    std::vector<SeqEvent> out; std::string why; double v0 = 1, t0 = 0, v1 = 1, t1 = 0;
+    std::vector<SeqEvent> out; std::string why; double v0 = 1, t0 = 0, v1 = 1, t1 = 0, base = 1; bool held = false;   // base: the rate of the last note (the pool's `base`); held: a note is sounding
     auto at = [&](double t) { return t >= t1 ? v1 : v0 + (v1 - v0) * ((t - t0) / (t1 - t0)); };
     for (size_t i = 0; i < evs.size() && why.empty();) {
       size_t j = i; while (j < evs.size() && evs[j].t == evs[i].t) j++;
-      int nOn = 0, nOff = 0; const Ev* rateEv = nullptr; const Ev* ramp = nullptr; const Ev* on = nullptr; bool laneAfterOn = false;
+      int nOn = 0, nOff = 0; const Ev* rateEv = nullptr; const Ev* ramp = nullptr; const Ev* on = nullptr; const Ev* bpmEv = nullptr; const Ev* wobEv = nullptr; bool laneAfterOn = false;
       for (size_t k = i; k < j; k++) { const Ev& e = evs[k];
         if (e.type == "on") { nOn++; if (!on) on = &e; } else if (e.type == "off") nOff++;
-        else if (e.type == "rate") { rateEv = &e; if (on) laneAfterOn = true; } else if (e.type == "ramp") { ramp = &e; if (on) laneAfterOn = true; } else if (e.type == "eng") {} else why = "a " + e.type + " event"; }
+        else if (e.type == "rate") { rateEv = &e; if (on) laneAfterOn = true; } else if (e.type == "ramp") { ramp = &e; if (on) laneAfterOn = true; }
+        else if (e.type == "eng") {} else if (e.type == "bpm") bpmEv = &e; else if (e.type == "wob") wobEv = &e; else why = "a " + e.type + " event"; }
       if (!why.empty()) break;
       if (nOn && nOff) { why = "a note-off in the sample of a note-on (D4: expected difference)"; break; }
       if (laneAfterOn) { why = "a rate event after the note in its sample"; break; }
-      if ((rateEv || ramp) && nOn != 1) { why = "a rate event without exactly one note"; break; }
-      if (ramp && !on->leg) { why = "a ramp on a note that is not legato"; break; }
+      if ((rateEv || ramp) && nOn > 1) { why = "a rate event with more than one note"; break; }
+      if (wobEv && nOn) { why = "a wob event in the sample of a note"; break; }
       if (kind == "vox" && nOn && on->same != on->leg) { why = "vox: `same` is not the slide"; break; }
-      for (size_t k = i; k < j; k++) { const Ev& g = evs[k];   // the group's events in their order (an eng before or after the note keeps its place)
-        if (g.type == "on" && &g == on) {
-          SeqEvent e; e.type = SEV_NOTE; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; e.pad = 0; e.gain = 1; e.pan = 128; e.poly = false; e.acc = on->acc;
-          double from = rateEv ? rateEv->v : at(evs[i].t);   // the lane's value when the note starts
-          if (ramp) { e.rate = ramp->v; e.has |= SH_SLIDE; e.slideFrom = from; e.slideDur = ramp->dur / sr; }
-          else { e.rate = rateEv ? rateEv->v : from; if (on->leg) { e.has |= SH_SLIDE; e.slideFrom = e.rate; e.slideDur = 0.001; } }
-          out.push_back(e);
-        } else if (g.type == "off") { SeqEvent e; e.type = SEV_OFF; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; out.push_back(e); }
-        else if (g.type == "eng") { SeqEvent e; e.type = SEV_ENG; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; for (int q = 0; q < 5; q++) e.engC[q] = g.c[q]; for (int q = 0; q < 7; q++) e.engO[q] = g.o[q]; out.push_back(e); } }
-      if (!nOn && !nOff && (rateEv || ramp)) { why = "a rate event with no note"; break; }
+      const double tm = sample_time((int64_t)evs[i].t, sr);
+      // SEV_TEMPO: the sequencer's tempo event (the Seq's own tempo follows it, as it does in a song); `wob`: a mod with SH_WOB on the held voice
+      if (bpmEv) { SeqEvent e; e.type = SEV_TEMPO; e.t = tm; e.v = bpmEv->v; out.push_back(e); }
+      if (wobEv) { if (!held) { why = "a wob event while no note is held"; break; } SeqEvent e; e.type = SEV_MOD; e.t = tm; e.track = 0; e.has |= SH_WOB; e.wob = wobEv->v; out.push_back(e); }
+      size_t onK = j; for (size_t k = i; k < j; k++) if (&evs[k] == on) { onK = k; break; }   // (the group's eng events keep their place relative to the note)
+      auto pushEng = [&](size_t from, size_t to) { for (size_t k = from; k < to; k++) { const Ev& g = evs[k]; if (g.type != "eng") continue; SeqEvent e; e.type = SEV_ENG; e.t = tm; e.track = 0; for (int q = 0; q < 5; q++) e.engC[q] = g.c[q]; for (int q = 0; q < 7; q++) e.engO[q] = g.o[q]; out.push_back(e); } };
+      pushEng(i, onK);
+      if (nOn) {
+        SeqEvent e; e.type = SEV_NOTE; e.t = tm; e.track = 0; e.pad = 0; e.gain = 1; e.pan = 128; e.poly = false; e.acc = on->acc;
+        double from = rateEv ? rateEv->v : at(evs[i].t);   // the lane's value when the note starts
+        if (ramp && !on->leg) {   // a ramp on a note that is not legato: the note's rate, then a bend to the target (pitchMods: set(base), lin(base * bendMul, bendT1))
+          if (!(from != 0)) { why = "a bend from rate 0"; break; }
+          e.rate = from; e.has |= SH_BEND; e.bendMul = ramp->v / from; e.bendT1 = tm + ramp->dur / sr; }
+        else if (ramp) { e.rate = ramp->v; e.has |= SH_SLIDE; e.slideFrom = from; e.slideDur = ramp->dur / sr; }
+        else { /* legato with no ramp: a slide too short for a later rate event to land inside it */ e.rate = rateEv ? rateEv->v : from; if (on->leg) { e.has |= SH_SLIDE; e.slideFrom = e.rate; e.slideDur = 1e-9; } }
+        base = e.rate; held = true;
+        out.push_back(e);
+      } else if (nOff) { SeqEvent e; e.type = SEV_OFF; e.t = tm; e.track = 0; out.push_back(e); held = false; }
+      else if (rateEv || ramp) {   // the lane moves with no note: a mod on the held voice (`mul` = the rate over the note's, a bend from where the lane is)
+        if (!held) { why = "a rate event while no note is held"; break; }
+        SeqEvent e; e.type = SEV_MOD; e.t = tm; e.track = 0; double cur = at(evs[i].t);
+        if (rateEv) { if (!(base != 0)) { why = "a rate event on a note of rate 0"; break; } e.has |= SH_MUL; e.mul = rateEv->v / base; cur = rateEv->v; }
+        if (ramp) { if (!(cur != 0)) { why = "a bend from rate 0"; break; } e.has |= SH_BEND; e.bendMul = ramp->v / cur; e.bendT1 = tm + ramp->dur / sr; }
+        out.push_back(e);
+      }
+      pushEng(onK < j ? onK + 1 : i, j);
       for (size_t k = i; k < j; k++) { const Ev& e = evs[k]; if (e.type == "rate") { v0 = v1 = e.v; t0 = t1 = e.t; } else if (e.type == "ramp") { const double cur = at(e.t); v0 = cur; t0 = e.t; v1 = e.v; t1 = e.t + e.dur; } }
       i = j;
     }
@@ -96,12 +113,13 @@ int main(int argc, char** argv) {
     if (kind == "bass") { cfg.kind = LiveKind::Bass; applyBass(cfg.bass, p); } else if (kind == "vox") { cfg.kind = LiveKind::Vox; applyVox(cfg.vox, p); } else if (kind == "acid") { cfg.kind = LiveKind::Acid; applyAcid(cfg.acid, p); } else { cfg.kind = LiveKind::Mach; applyMach(cfg.mach, p); }
     if (!pl.live().addPad(0, cfg)) { CHECKF(false, "%s: addPad", name.c_str()); continue; }
     const int64_t total = (N + 127) / 128 * 128; Tapped T; T.L.assign((size_t)total, 0.f); T.R.assign((size_t)total, 0.f); pl.live().setTap(tapFn, &T); pl.live().bookEnd(N);   // (seqRender's last control block ends at N)
+    seq.setBpm(120);
     std::vector<LiveTraceRec> trace; trace.reserve(1024); pl.live().setTrace(&trace);
     std::vector<float> bl(128), br(128); float* inL[kVoiceTracks] = {}; float* inR[kVoiceTracks] = {}; inL[0] = bl.data(); inR[0] = br.data();
     std::vector<char> done(out.size(), 0);
     for (int64_t q0 = 0; q0 < total; q0 += 128) {
       const double t0q = (double)q0 / sr; pl.setTime(t0q, q0);
-      for (size_t i = 0; i < out.size(); i++) if (!done[i] && out[i].t - 0.25 <= t0q) { done[i] = 1; pl.dispatch(out[i], seq, song); }
+      for (size_t i = 0; i < out.size(); i++) if (!done[i] && out[i].t - 0.25 <= t0q) { done[i] = 1; if (out[i].type == SEV_TEMPO) seq.setBpm(out[i].v); pl.dispatch(out[i], seq, song); }
       std::fill(bl.begin(), bl.end(), 0.f); std::fill(br.begin(), br.end(), 0.f); pl.render(inL, inR, 128, t0q, q0);
     }
     if (const char* dn = std::getenv("JSP_TRACE")) if (name == dn) { for (const LiveTraceRec& r : trace) std::printf("  trace %c t %.9g T %lld v %g leg %d\n", r.what, r.t, (long long)r.T, r.v, (int)r.leg); for (const SeqEvent& e : out) std::printf("  ev type %d t %.9g rate %g slide %d from %g dur %g\n", (int)e.type, e.t, e.rate, (int)((e.has & SH_SLIDE) != 0), e.slideFrom, e.slideDur); for (const Ev& e : evs) std::printf("  js %s t %g v %g leg %d\n", e.type.c_str(), e.t, e.v, (int)e.leg); }

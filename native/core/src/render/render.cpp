@@ -44,7 +44,9 @@ bool SongRenderer::setStem(int track) {
   if (track < 0 || track >= kSongNT) return false;
   const uint32_t aud = mix_.audibleMask();   // mute / solo as the song has them (not yet forced)
   uint32_t m = 1u << track;
-  m |= mix_.plan().feedMask[track] & aud;   // a bus's stem plays its audible sources with it (pass's k2, :24228: from the patch's plan, as the page, whether or not a chains host has made the bus yet)
+  // a bus's stem plays its audible sources with it, and theirs through any depth (busClosure: a walk over the feeds that adds a track only when it is audible, so a muted middle bus
+  // does not pull in what only feeds it); from the patch's plan, as the page, whether or not a chains host has made the bus yet
+  for (bool more = true; more;) { more = false; for (int b = 0; b < kSongNT; b++) if ((m >> b & 1u) && (mix_.plan().feedMask[b] & aud & ~m)) { m |= mix_.plan().feedMask[b] & aud; more = true; } }
   stem_ = track; mchain_.reset(); mix_.setMasterFx(nullptr, nullptr);
   mix_.setHeard(m);
   return true;
@@ -112,7 +114,7 @@ RenderStats SongRenderer::stats() const {
   const PlayerStats& p = players_->stats(); const VoicePool& pool_ = players_->pool(); const sf::SfPool& sfpool_ = players_->sfPool();
   s.notes = p.notes; s.notesPlayed = p.notesPlayed; s.notesNoPad = p.notesNoPad; s.notesMidiOnly = p.notesMidiOnly; s.notesShapedRev = p.notesShapedRev;
   s.notesLive = p.notesLive; s.notesSf = p.notesSf; s.notesSfPlayed = p.notesSfPlayed; s.notesVar = p.notesVar; s.notesVarMissing = p.notesVarMissing; s.notesUnshaped = p.notesUnshaped; s.notesStretched = p.notesStretched;
-  s.notesLivePlayed = p.notesLivePlayed; { const LiveStats& l = players_->live().stats(); s.liveNoNode = l.noNode; s.liveLate = l.late; s.liveQueueDropped = l.queueDropped; s.liveForcedOff = l.forcedOff; s.liveFailed = players_->live().failedNodes(); }
+  s.notesLivePlayed = p.notesLivePlayed; { const LiveStats l = players_->live().stats(); s.liveNoNode = l.noNode; s.liveLate = l.late; s.liveQueueDropped = l.queueDropped; s.liveForcedOff = l.forcedOff; s.liveFailed = players_->live().failedNodes(); s.liveRefused = l.refused; }
   s.peakVoices = pool_.peakVoices(); s.peakVoiceLane = pool_.peakEvents(); s.peakMixLane = mix_.peakEvents();
   s.voiceDropped = pool_.dropped(); s.voiceOverflow = pool_.tOverflow(); s.voiceAutoDropped = pool_.autoDropped(); s.mixAutoDropped = mix_.autoDropped(); s.seqDropped = seq_->dropped();
   s.seqChopped = seq_->chopped(); s.seqChopSkipped = seq_->chopSkipped(); s.seqChopNoHits = seq_->chopNoHits(); s.sfVoiceDropped = sfpool_.dropped(); s.sfVoiceOverflow = sfpool_.tOverflow(); s.sfVoiceAutoDropped = sfpool_.autoDropped(); s.peakVoicesAll = std::max(p.peakAll, pool_.peakVoices());

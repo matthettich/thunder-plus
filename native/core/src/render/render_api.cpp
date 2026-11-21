@@ -304,7 +304,8 @@ int thunder_render_stem_tracks(thunder_render* r, int32_t* out, int cap) {
     const BusPlan& P = r->R->mixer().plan();   // the patch's plan, as the page's busPlan(): a bus is a track with sources (BP.feeds), a pure source plays only through its bus
     const uint32_t aud = mix_audible(P, mute, solo);
     uint32_t keep = aud & has;
-    for (int b = 0; b < kSongNT; b++) if (P.feedMask[b] && !(keep >> b & 1u) && (aud >> b & 1u) && (P.feedMask[b] & keep)) keep |= 1u << b;
+    for (bool more = true; more;) { more = false;   // busStemPlan: until nothing is added (a bus that only a bus feeds is in too)
+      for (int b = 0; b < kSongNT; b++) if (P.feedMask[b] && !(keep >> b & 1u) && (aud >> b & 1u) && (P.feedMask[b] & keep)) { keep |= 1u << b; more = true; } }
     uint32_t list = keep;
     for (int t = 0; t < kSongNT; t++) if ((keep >> t & 1u) && (P.pure >> t & 1u) && (P.targets[t] & keep)) list &= ~(1u << t);   // inside its bus's stem
     int n = 0;
@@ -353,9 +354,9 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.voices_refused = t.voiceDropped; s.voice_track_full = t.voiceOverflow; s.voice_auto_dropped = t.voiceAutoDropped; s.mix_auto_dropped = t.mixAutoDropped; s.seq_dropped = t.seqDropped;
   s.notes_live = t.notesLive; s.notes_sf = t.notesSf; s.notes_var = t.notesVar; s.notes_var_missing = t.notesVarMissing; s.notes_unshaped = t.notesUnshaped; s.events_ignored = t.eventsIgnored; s.notes_sf_played = t.notesSfPlayed;
   s.notes_stretched = t.notesStretched; s.seq_chopped = t.seqChopped; s.seq_chop_skipped = t.seqChopSkipped; s.seq_chop_no_hits = t.seqChopNoHits;
-  s.notes_live_played = t.notesLivePlayed; s.live_no_node = t.liveNoNode; s.live_late = t.liveLate; s.live_queue_dropped = t.liveQueueDropped; s.live_forced_off = t.liveForcedOff; s.live_failed = t.liveFailed;
   s.sf_voices_refused = t.sfVoiceDropped; s.sf_voice_track_full = t.sfVoiceOverflow; s.sf_voice_auto_dropped = t.sfVoiceAutoDropped; s.peak_voices_all = t.peakVoicesAll;
   s.stem = r->stem; s.heard_mask = r->R->heardMask();
+  s.notes_live_played = t.notesLivePlayed; s.live_no_node = t.liveNoNode; s.live_late = t.liveLate; s.live_queue_dropped = t.liveQueueDropped; s.live_forced_off = t.liveForcedOff; s.live_failed = t.liveFailed; s.live_refused = t.liveRefused;
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
   return 0;

@@ -59,6 +59,8 @@ struct BusPlan {
   int nFeeds[kSongNT];                   // how many of them (the JS list's length, capped at kMixFeedMax)
   int feedLen[kSongNT];                  // the JS list's full length
   uint32_t feedMask[kSongNT], targets[kSongNT];
+  uint32_t loopTo[kSongNT];              // bus into bus: loopTo[t] bit b = the cable from t to bus b was left out (it would close a loop); the web's loopEdges
+  uint32_t srcAll[kSongNT], busAll[kSongNT];   // closures: every track upstream of t / every bus downstream of t (solo follows the chain)
   uint32_t pure = 0, pre = 0;
   bool loop = false;
   BusPlan();

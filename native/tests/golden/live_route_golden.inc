@@ -6,15 +6,16 @@ static const LiveRouteGolden kLiveRouteGolden[] = {
   {"bass_kill_back", 0x9be8c58ebe2db32bull},
   {"bass_same_sample", 0x07e750288ab7ab5bull},
   {"acid_mach", 0x5748109a6006d700ull},
-  {"vox_mono", 0x42c55514c68e047bull},
+  {"vox_mono", 0x1c8dbba5df115b04ull},
   {"vox_poly", 0x8cc34592026515d9ull},
   {"vox_idle_gap", 0x654f7b286d81a435ull},
   {"pump_lanes", 0x2696ab9a42a4533cull},
   {"waves_live", 0x612d1bf8c2d3690cull},
   {"takeover", 0xd38991123dbfdff5ull},
   {"choke_cross", 0xf02069e396d582aeull},
+  {"vox_samecol", 0xe67801cbe25f7891ull},
   {"poly_cap", 0x3b8b3eda3ffa676full},
-  {"mod_stp", 0x5eae7c756c4b8671ull},
+  {"mod_stp", 0x5146f6567847e624ull},
   {"stop_all", 0xd8a8bfa99803c9beull},
   {"eng_basic", 0xde7ebc7ddd2cbd0cull},
   {"eng_late_bind", 0xc5f6ab576914603dull},
@@ -24,4 +25,4 @@ static const LiveRouteGolden kLiveRouteGolden[] = {
   {"no_node", 0xc0121fdc165bdc12ull},
   {"late", 0x16593146c775dab3ull},
 };
-static const int kLiveRouteGoldenN = 21;
+static const int kLiveRouteGoldenN = 22;

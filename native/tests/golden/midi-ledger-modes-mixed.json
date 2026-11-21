@@ -1,0 +1,20 @@
+{
+ "case": "modes-mixed",
+ "mode": "native",
+ "why": "OUTPUT modes in one song: 0 PAD (no MIDI), 1 MIDI (gear only: the pad never sees the note), 2 PAD+MIDI (both); the pad log shows which notes the pad would play",
+ "setup": {"bpm":120,"swing":50,"lpb":4,"ticks":6,"ports":["A"],"clock":[],"gearDelayMs":[0,0,0,0],"outputLatencyS":0,"pdcT":0,"masteringOn":false,"playAtMs":500,"play":"song","playOpts":{},"actions":[],"endMs":2000,"insts":{"0":{"mo":0},"1":{"mo":1,"mch":1,"mpt":0,"pbr":2},"2":{"mo":2,"mch":2,"mpt":0,"pbr":2}},"tracks":[0,1,2]},
+ "seqEvents": {"beat":4,"note":3,"off":3},
+ "counts": {"on":2,"off":2,"cc":2},
+ "droppedByClear": 0,
+ "drops": [{"sent":1258,"port":"A","what":"clear","dropped":0}],
+ "pad": [{"t":0.58,"track":0,"ii":0},{"t":0.58,"track":2,"ii":2}],
+ "findings": [],
+ "msgs": [
+  {"ms":583,"sent":500,"p":0,"id":"A","k":"ev","b":[145,62,127]},
+  {"ms":583,"sent":500,"p":0,"id":"A","k":"ev","b":[146,64,127]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[129,62,0]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[130,64,0]},
+  {"ms":1258,"sent":1258,"p":0,"id":"A","k":"release","b":[177,123,0]},
+  {"ms":1258,"sent":1258,"p":0,"id":"A","k":"release","b":[178,123,0]}
+ ]
+}

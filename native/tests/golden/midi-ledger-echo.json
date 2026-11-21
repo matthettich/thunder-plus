@@ -1,0 +1,31 @@
+{
+ "case": "echo",
+ "mode": "native",
+ "why": "ECHO on a MIDI instrument: ECO 3 repeats ECR 0.5 beat apart, 30 % softer each, 2 semitones higher each; an echo is dropped while a real note holds its key",
+ "setup": {"bpm":120,"swing":50,"lpb":4,"ticks":6,"ports":["A"],"clock":[],"gearDelayMs":[0,0,0,0],"outputLatencyS":0,"pdcT":0,"masteringOn":false,"playAtMs":500,"play":"song","playOpts":{},"actions":[],"endMs":4000,"insts":{"0":{"mo":1,"mch":0,"mpt":0,"pbr":2,"eco":3,"ecr":0.5,"ecf":30,"ecp":2}},"tracks":[0]},
+ "seqEvents": {"beat":16,"note":2},
+ "counts": {"on":8,"off":8,"cc":1},
+ "droppedByClear": 0,
+ "drops": [{"sent":2771,"port":"A","what":"clear","dropped":0}],
+ "pad": [],
+ "findings": [],
+ "msgs": [
+  {"ms":583,"sent":500,"p":0,"id":"A","k":"ev","b":[144,60,127]},
+  {"ms":833,"sent":750,"p":0,"id":"A","k":"echo","b":[144,62,89]},
+  {"ms":1058,"sent":975,"p":0,"id":"A","k":"echo","b":[128,62,0]},
+  {"ms":1083,"sent":1000,"p":0,"id":"A","k":"echo","b":[144,64,62]},
+  {"ms":1308,"sent":1225,"p":0,"id":"A","k":"echo","b":[128,64,0]},
+  {"ms":1333,"sent":1250,"p":0,"id":"A","k":"echo","b":[144,66,44]},
+  {"ms":1583,"sent":1350,"p":0,"id":"A","k":"ev","b":[128,60,0]},
+  {"ms":1583,"sent":1350,"p":0,"id":"A","k":"ev","b":[144,72,127]},
+  {"ms":1558,"sent":1475,"p":0,"id":"A","k":"echo","b":[128,66,0]},
+  {"ms":1833,"sent":1750,"p":0,"id":"A","k":"echo","b":[144,74,89]},
+  {"ms":2058,"sent":1975,"p":0,"id":"A","k":"echo","b":[128,74,0]},
+  {"ms":2083,"sent":2000,"p":0,"id":"A","k":"echo","b":[144,76,62]},
+  {"ms":2308,"sent":2225,"p":0,"id":"A","k":"echo","b":[128,76,0]},
+  {"ms":2333,"sent":2250,"p":0,"id":"A","k":"echo","b":[144,78,44]},
+  {"ms":2558,"sent":2475,"p":0,"id":"A","k":"echo","b":[128,78,0]},
+  {"ms":2771,"sent":2771,"p":0,"id":"A","k":"release","b":[128,72,0]},
+  {"ms":2771,"sent":2771,"p":0,"id":"A","k":"release","b":[176,123,0]}
+ ]
+}

@@ -321,6 +321,8 @@ static void testSongOver() {
   thunder_render_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; CHECK(thunder_render_stats_get(r, &st) == 0);
   CHECKF(got > 0 && got <= cap, "the render did not end (%lld frames)", (long long)got);
   CHECKF(st.voices_active == 0 && st.song_over, "voices_active %d song_over %d", (int)st.voices_active, (int)st.song_over);
+  // C4 pinned: the song is 1.0 s; the held note is released AT its end (not later) and the voice ends 4096 quiet samples after its tail has gone under 1e-5 (the page's window): a late release or a shorter quiet window moves the end
+  CHECKF(got >= (int64_t)(1.10 * 48000) && got <= (int64_t)(1.25 * 48000), "the render ended after %.3f s (the song is 1 s: expected about 1.15)", (double)got / 48000);
   std::printf("unknown length: ended after %.2f s\n", (double)got / 48000);
   thunder_render_free(r);
 }

@@ -1,0 +1,19 @@
+{
+ "case": "muted-solo",
+ "mode": "native",
+ "why": "a muted track sends no notes (its gear goes quiet: moOff); a soloed other track mutes this one too",
+ "setup": {"bpm":120,"swing":50,"lpb":4,"ticks":6,"ports":["A"],"clock":[],"gearDelayMs":[0,0,0,0],"outputLatencyS":0,"pdcT":0,"masteringOn":false,"playAtMs":500,"play":"song","playOpts":{},"actions":[],"endMs":1800,"insts":{"0":{"mo":1,"mch":0,"mpt":0,"pbr":2},"1":{"mo":1,"mch":1,"mpt":0,"pbr":2}},"tracks":[0,1]},
+ "seqEvents": {"beat":4,"note":4},
+ "counts": {"on":2,"off":2,"cc":1},
+ "droppedByClear": 0,
+ "drops": [{"sent":1258,"port":"A","what":"clear","dropped":0}],
+ "pad": [],
+ "findings": [],
+ "msgs": [
+  {"ms":583,"sent":500,"p":0,"id":"A","k":"ev","b":[145,72,127]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[129,72,0]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[145,74,127]},
+  {"ms":1258,"sent":1258,"p":0,"id":"A","k":"release","b":[129,74,0]},
+  {"ms":1258,"sent":1258,"p":0,"id":"A","k":"release","b":[177,123,0]}
+ ]
+}

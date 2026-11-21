@@ -1,0 +1,25 @@
+{
+ "case": "note-len",
+ "mode": "native",
+ "why": "NOTE LEN (mlen): a MIDI instrument's notes end after N ticks unless OFF / KIL / the next note come first",
+ "setup": {"bpm":120,"swing":50,"lpb":4,"ticks":6,"ports":["A"],"clock":[],"gearDelayMs":[0,0,0,0],"outputLatencyS":0,"pdcT":0,"masteringOn":false,"playAtMs":500,"play":"song","playOpts":{},"actions":[],"endMs":4000,"insts":{"0":{"mo":1,"mch":0,"mpt":0,"pbr":2,"mlen":3}},"tracks":[0]},
+ "seqEvents": {"beat":12,"note":5,"off":1},
+ "counts": {"on":5,"off":5,"cc":1},
+ "droppedByClear": 0,
+ "drops": [{"sent":2261,"port":"A","what":"clear","dropped":0}],
+ "pad": [],
+ "findings": [],
+ "msgs": [
+  {"ms":583,"sent":500,"p":0,"id":"A","k":"ev","b":[144,60,127]},
+  {"ms":645.5,"sent":500,"p":0,"id":"A","k":"ev","b":[128,60,0]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[144,62,127]},
+  {"ms":853.833333,"sent":600,"p":0,"id":"A","k":"ev","b":[128,62,0]},
+  {"ms":1083,"sent":850,"p":0,"id":"A","k":"ev","b":[144,64,127]},
+  {"ms":1145.5,"sent":850,"p":0,"id":"A","k":"ev","b":[128,64,0]},
+  {"ms":1333,"sent":1100,"p":0,"id":"A","k":"ev","b":[144,65,127]},
+  {"ms":1395.5,"sent":1100,"p":0,"id":"A","k":"ev","b":[128,65,0]},
+  {"ms":1458,"sent":1225,"p":0,"id":"A","k":"ev","b":[144,67,127]},
+  {"ms":1520.5,"sent":1225,"p":0,"id":"A","k":"ev","b":[128,67,0]},
+  {"ms":2261,"sent":2261,"p":0,"id":"A","k":"release","b":[176,123,0]}
+ ]
+}
