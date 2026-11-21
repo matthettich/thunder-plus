@@ -156,5 +156,4 @@ then `node native/tools/seq-golden-web.mjs --live-only --edit --chop` (compare),
 4. Takeover and buses: the successor's bus set comes from its own song, but `hearT_` (which LFOs are heard) stays the PLAY's (the page's rebus only re-reads busT); the live host needs no extra call for a cable edit (a new snapshot is the call).
 
 ## STATUS
-- 21 Nov: items 1-5 built and tested. Full ctest: 195/195 pass before the merge, 202/202 pass (1 skipped: pumpsynth_refused, as on native) after merging origin/native 658b114.
-- PR #267 (`SeqStep::bpm0`) was not yet in origin/native at that merge: re-merge and re-run at least seq_*, chop and takeover tests if it lands before this PR is merged.
+- 21 Nov: items 1-5 built and tested. Full ctest after merging origin/native 8055034 (includes #267 bpm0): 100% pass (1 skipped: pumpsynth_refused, as on native).
