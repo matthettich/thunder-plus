@@ -106,7 +106,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME rt_midi COMMAND rt_midi)
   add_test(NAME rt_midi_selftest COMMAND rt_midi --selftest)
 endif()
-# U36 T9: the Android shell's MIDI out, the part with no Android in it (native/android/.../cpp/midi_out.cpp), against a fake port: the real scheduler, pump and port table, a real-time fake audio callback (about 40 s).
+# U36 T9: the Android shell's MIDI out, the part with no Android in it (native/android/.../cpp/midi_out.cpp), against a fake port: the real scheduler, pump and port table, a real-time fake audio callback (about 25 s).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_executable(test_android_midi_sink test_android_midi_sink.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/midi_out.cpp)
   target_link_libraries(test_android_midi_sink PRIVATE thunder_core Threads::Threads)
