@@ -229,7 +229,7 @@ int main() {
       CHECK("7a the abandoned plan gave back everything it made", g_live == live0);
 #endif
       CHECK("7a abandoned: no node", h.node(3) == nullptr && mix->busMask() == 0);
-      std::unique_ptr<ChainsPlan> p2(planOf(h, pb)); CHECK("7a the next plan is a fresh node", p2 && p2->nodeMask() == (1u << 3));
+      std::unique_ptr<ChainsPlan> p2(planOf(h, pb)); CHECK("7a the next plan is a fresh node (one set of patch bytes, not a swap's two)", p2 && p2->nodeMask() == (1u << 3) && p2->bytes() == p2->patchBytes() + kChainsNodeOverhead);
       adopt(h, p2.get(), *mix); CHECK("7a node made, nothing retired", h.node(3) != nullptr && p2->retiredPatches() == 0 && p2->retiredNodes() == 0);
     }
     {   // 7b. one plan in flight: a second plan() is null and counted; after the first is settled planning goes on
@@ -276,7 +276,7 @@ int main() {
     CHECK("the patch has a cost from cmem.inc", pbytes > 1024 && one > pbytes && one == pbytes + kChainsNodeOverhead);
     CHECK("default budget 1.5 GiB", probe.budget() == (size_t)1536 << 20);
     { ChainsHost h(kSr, one + 100); CHECK("budget settable", h.budget() == one + 100); auto mix = mkMixer(); std::unique_ptr<ChainsPlan> p1(planOf(h, pa)); CHECK("one node fits", p1 && !p1->overBudget()); adopt(h, p1.get(), *mix); chains::ChainsNode* n = h.node(3);
-      std::unique_ptr<ChainsPlan> p2(planOf(h, pb));   // a swap holds two patches at once: over
+      std::unique_ptr<ChainsPlan> p2(planOf(h, pa));   // a swap holds two patches at once: over (the same patch: one set fits, two do not)
       CHECK("the swap counts the second set: over budget, refused whole", p2 && p2->overBudget() && p2->noop() && p2->nodeMask() == (1u << 3) && h.stats().overBudget == 1);
       adopt(h, p2.get(), *mix); CHECK("the playing chains stay", h.node(3) == n && p2->retiredPatches() == 0);
       std::unique_ptr<ChainsPlan> p3(planOf(h, pa)); CHECK("a refused plan leaves nothing in flight", p3 != nullptr && h.stats().busyRefused == 0); h.settle(p3.get()); }

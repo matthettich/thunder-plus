@@ -154,7 +154,7 @@ static bool runRenderer(const Case& c, Out* out, int chainsOn = 1, bool inject =
   SongRenderer r(song, vars, pads, kSr, 128, so);
   if (c.stem >= 0) r.setStem(c.stem);
   if (chainsOn) { const int rc = r.setChains(true); if (rc) { std::printf("FAIL %s: setChains returned %d\n", c.name.c_str(), rc); g_fail++; return false; } }
-  if (chainsOn == 2) r.setChains(false);
+  if (chainsOn == 2) { r.setChains(false); CHECK("setChains(false): the mixer has no bus and no hook again", r.mixer().busMask() == 0 && r.chainsHost() == nullptr); }
   if (chainsOn == 1) { CHECK("setStem is refused once chains are on", !r.setStem(0)); }
   if (chainsOn == 1 && inject) for (const SeqEvent& e : c.events) r.chainsHost()->event(e);   // what dispatch does with the sequencer's events
   for (auto& q : c.inputs) if (q.second) r.mixer().setMono(q.first, true);
