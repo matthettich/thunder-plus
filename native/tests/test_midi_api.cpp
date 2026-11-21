@@ -140,9 +140,33 @@ static void threads() {
   std::printf("threads: %ld commands, %ld records\n", posted.load(), drained.load());
 }
 
+// T2 / T3: thunder_midi_process forwards block_sec to the scheduler (the outbox releases a message when it is within lead + block of now) and rejects block_sec > 1 without touching anything.
+// A live key with 100 ms of FX latency is a note due 101 ms ahead: with the default 60 ms lead it waits in the outbox for a block of 0 and is released at once for a block of 80 ms.
+static int countOn(thunder_midi* h) { thunder_midi_msg b[64]; int n = 0; for (;;) { const int64_t k = thunder_midi_drain(h, b, 64); if (k <= 0) break; for (int64_t i = 0; i < k; i++) if ((b[i].b[0] & 0xF0) == 0x90 && b[i].b[2] > 0) n++; } return n; }
+static void blockForwarding() {
+  const std::string song = readSong(); int released[2] = {-1, -1};
+  for (int v = 0; v < 2; v++) {
+    thunder_midi* h = thunder_midi_create(48000, nullptr, 0);
+    CHECK(h && thunder_midi_set_song(h, (const uint8_t*)song.data(), song.size()) == 0 && thunder_midi_set_port(h, 0, 1, 0, 0, 0) == 0 && thunder_midi_set_fx_latency(h, 0.1) == 0, "T2: setup");
+    CHECK(thunder_midi_process(h, 0.0, 0.0, 0.0, 120, 0) == 3, "T2: the three setup commands are applied");
+    CHECK(thunder_midi_key_on(h, 5, 0, 60, 100) == 0, "T2: key on");
+    CHECK(thunder_midi_process(h, 0.0, v ? 0.08 : 0.0, 0.0, 120, 0) == 1, "T2: the key command is applied");
+    released[v] = countOn(h);
+    if (v == 0) { CHECK(thunder_midi_process(h, 0.05, 0.0, 0.05, 120, 0) == 0, "T2: process again"); CHECK(countOn(h) == 1, "T2: with a block of 0 the note is released once it is within the 60 ms lead"); }
+    thunder_midi_free(h);
+  }
+  CHECK(released[0] == 0 && released[1] == 1, "T2: block_sec reaches the scheduler: a note 101 ms ahead is held for block 0 (%d released) and released for block 0.08 (%d released)", released[0], released[1]);
+  thunder_midi* h = thunder_midi_create(48000, nullptr, 0);
+  CHECK(thunder_midi_set_port(h, 0, 1, 0, 0, 0) == 0, "T3: setup");
+  CHECK(thunder_midi_process(h, 0.0, 1.0000001, 0.0, 120, 0) == THUNDER_MIDI_E_ARG && thunder_midi_process(h, 0.0, 1e9, 0.0, 120, 0) == THUNDER_MIDI_E_ARG && thunder_midi_process(h, 0.0, 2.0, 0.0, 120, 0) == THUNDER_MIDI_E_ARG, "T3: block_sec above 1 s is E_ARG");
+  CHECK(thunder_midi_process(h, 0.0, -0.001, 0.0, 120, 0) == THUNDER_MIDI_E_ARG && thunder_midi_process(h, 0.0, NAN, 0.0, 120, 0) == THUNDER_MIDI_E_ARG, "T3: negative / NaN block_sec is E_ARG");
+  CHECK(thunder_midi_process(h, 0.0, 1.0, 0.0, 120, 0) == 1, "T3: the rejected calls applied nothing (the posted command is still there), and exactly 1 s is accepted");
+  thunder_midi_free(h);
+}
+
 int main(int argc, char** argv) {
   const bool tsanOnly = argc > 1 && std::string(argv[1]) == "--threads";
-  if (!tsanOnly) { hostileC(); fuzzEntryPoints(); }
+  if (!tsanOnly) { hostileC(); fuzzEntryPoints(); blockForwarding(); }
   threads();
   std::printf("%d failures\n", fails);
   return fails ? 1 : 0;

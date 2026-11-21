@@ -712,6 +712,7 @@ int Seq::step(SeqEvent* evs, int cap, SeqStep* out) {
         chaseChance(y); } } }
   const double t0 = base_ + rel0, sw = (double)ci(S_.swing, 50, 75) / 100; const int swB = ci(S_.swingB ? S_.swingB : 2, 1, 7);
   for (int t = 0; t < kSeqTracks; t++) pos[t] = SeqPos();
+  const double bpm0 = bpm_;   // the tempo this step is timed with (line = 60 / bpm_ / lpb below); nb is applied only at the end
   double nb = bpm_, pdl = 0; bool nHasGrv = hasGrv_; int ngrv[2] = {grv_[0], grv_[1]}; const int tks0 = tks_;
   // the song position in beats at this step
   if (!hasBtT_) { hasBtT_ = true; btT_ = t0; bt_ = 0; } else { bt_ += (t0 - btT_) * bpm_ / 60; btT_ = t0; }
@@ -975,7 +976,7 @@ int Seq::step(SeqEvent* evs, int cap, SeqStep* out) {
   bpm_ = nb; hasGrv_ = nHasGrv; grv_[0] = ngrv[0]; grv_[1] = ngrv[1];
   time_ = base_ + (nx == kInf ? rel0 : nx);
   if (c.n > maxEvs_) maxEvs_ = c.n;
-  if (out) { out->t = t0; out->n = c.n; out->tks = tks_; out->line = 60 / bpm_ / (S_.lpb ? S_.lpb : 4); out->dropped = c.dropped; }
+  if (out) { out->bpm0 = bpm0; out->t = t0; out->n = c.n; out->tks = tks_; out->line = 60 / bpm_ / (S_.lpb ? S_.lpb : 4); out->dropped = c.dropped; }
   return c.n;
 }
 

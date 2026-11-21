@@ -117,7 +117,7 @@ struct SeqEvent {
 // Where a track was on this step (the JS's `pos`: the playhead, the piano's sounding notes).
 struct SeqPos { bool valid = false; int row = 0, cr = 0, step = 0, sect = -1, phrase = -1; bool off = false; uint8_t offc = 0; int nsc = 0; int8_t scCol[4] = {0, 0, 0, 0}; double scNote[4] = {0, 0, 0, 0};
   bool hasPd = false; double pd = 0; };
-struct SeqStep { double t = 0; int n = 0; int tks = 0; double line = 0; uint32_t dropped = 0; SeqPos pos[kSeqTracks]; };
+struct SeqStep { double bpm0 = 0; /* the tempo in force when the step STARTED: the bpm_ that timed its rows and the interval to the next step, before the step's own TPO (FU N1) */ double t = 0; int n = 0; int tks = 0; double line = 0; uint32_t dropped = 0; SeqPos pos[kSeqTracks]; };
 
 struct SeqCountChunk { uint32_t nth[kSeqTracks * kSeqChunkSlots]; uint32_t gen[kSeqTracks * kSeqChunkSlots]; uint32_t c1[kSeqTracks * kSeqChunkSlots]; };
 

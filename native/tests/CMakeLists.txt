@@ -979,6 +979,12 @@ target_link_libraries(test_render_stems_bus PRIVATE thunder_core)
 target_include_directories(test_render_stems_bus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME render_stems_bus COMMAND test_render_stems_bus)
 
+add_executable(test_players test_players.cpp)
+target_link_libraries(test_players PRIVATE thunder_core)
+target_include_directories(test_players PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_players PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME players COMMAND test_players)
+
 add_executable(test_render_dispatch test_render_dispatch.cpp)
 target_link_libraries(test_render_dispatch PRIVATE thunder_core)
 target_include_directories(test_render_dispatch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})

@@ -82,7 +82,9 @@ void pump(thunder_render* r) {
   if (r->skipLeft > 0) { const int64_t d = std::min<int64_t>(r->skipLeft, kRenderQuantum); r->qPos = (int)d; r->skipLeft -= d; }
   if (!r->useFrames && !r->ended) {
     const int64_t avail = std::max<int64_t>(0, r->raw - r->skip);   // the output so far, if nothing is cut
-    const bool over = r->R->songOver() && r->R->voices() == 0;
+    // FU1: the sequencer runs `lead` (0.25 s) AHEAD of the audio clock, so songOver() can be true while the audio is still before the song's end (seqTime()). Ending then cut the
+    // render's trailing empty rows (up to 0.25 s). The end now also waits for the audio clock to reach the sequencer's end, so the length is never below length_estimate.
+    const bool over = r->R->songOver() && r->R->voices() == 0 && (double)r->raw >= r->R->seqTime() * r->sr;
     if (over || avail >= r->maxFrames) {
       // The output ends exactly at max_frames: the last quantum is cut to it (not rounded up to the quantum), and hit_limit is set whenever
       // something was cut: the song was still going (not over), or it ended inside this quantum beyond max_frames.
@@ -304,7 +306,9 @@ int thunder_render_stem_tracks(thunder_render* r, int32_t* out, int cap) {
     const BusPlan& P = r->R->mixer().plan();   // the patch's plan, as the page's busPlan(): a bus is a track with sources (BP.feeds), a pure source plays only through its bus
     const uint32_t aud = mix_audible(P, mute, solo);
     uint32_t keep = aud & has;
-    for (bool more = true; more;) { more = false;   // busStemPlan: until nothing is added (a bus that only a bus feeds is in too)
+    // FU3: the page's busStemPlan repeats until nothing is added (a bus that only a bus feeds is in too), so the result does not depend on the order the buses are visited in
+    // (the JS walks a Map, native ascending track numbers: a downstream bus with a LOWER number than its upstream bus needs a second pass).
+    for (bool more = true; more;) { more = false;
       for (int b = 0; b < kSongNT; b++) if (P.feedMask[b] && !(keep >> b & 1u) && (aud >> b & 1u) && (P.feedMask[b] & keep)) { keep |= 1u << b; more = true; } }
     uint32_t list = keep;
     for (int t = 0; t < kSongNT; t++) if ((keep >> t & 1u) && (P.pure >> t & 1u) && (P.targets[t] & keep)) list &= ~(1u << t);   // inside its bus's stem
