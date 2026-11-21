@@ -22,6 +22,7 @@
 // U08 brings fdlibm's (their results are rounded to a byte or to 1/1000 before anything sees them).
 #include "seq/seq.h"
 #include "seq/session.h"
+#include "mix/mix.h"
 
 #include <algorithm>
 #include <cmath>
@@ -309,33 +310,10 @@ void Seq::buildParts() {
 // busPlan(): which tracks are buses (feeds' keys) and what each track feeds (targets), then makeSeq's busT and hearT
 void Seq::buildBus() {
   for (int t = 0; t < NT; t++) busT_[t] = false;
+  // BUS INTO BUS (19 Nov): the one plan the mixer uses (mix/mix.cpp bus_plan: ownRet, edges in (source, bus) order), not a second copy of it
+  const BusPlan P = bus_plan(S_.chainPatch, S_.chainOn);
   std::map<int, std::vector<int>> targets; std::set<int> feeds;
-  const Json d = S_.chainPatch;
-  if (truthy(d) && d.get("format").isStr() && d.get("format").asStr() == "chains.patch" && d.get("modules").isArr()) {
-    const Json mods = d.get("modules"), cables = d.get("cables");
-    std::vector<std::string> order; std::map<std::string, Json> by;
-    for (size_t i = 0; i < mods.size(); i++) { const Json m = mods.at(i); if (!truthy(m) || nullish(m.get("id"))) continue; const std::string k = idKey(m.get("id")); if (!by.count(k)) order.push_back(k); by[k] = m; }
-    std::map<std::string, std::vector<std::string>> nx;
-    for (size_t i = 0; i < cables.size(); i++) { const Json c = cables.at(i); if (!truthy(c) || !truthy(c.get("from")) || !truthy(c.get("to"))) continue; nx[idKey(c.get("from").at(0))].push_back(idKey(c.get("to").at(0))); }
-    const auto trk = [](Json m) { const double k = jint(truthy(m.get("params")) ? m.get("params").get("track") : Json(), 1); return k >= 1 && k <= NT ? (int)k - 1 : -1; };
-    std::set<int> chainsTracks; for (size_t i = 0; i < mods.size(); i++) { const Json m = mods.at(i); if (truthy(m) && m.get("type").isStr() && m.get("type").asStr() == "chainOut") { const int k = trk(m); if (k >= 0) chainsTracks.insert(k); } }
-    const auto isType = [](Json m, const char* ty) { return m.get("type").isStr() && m.get("type").asStr() == ty; };
-    std::set<int> ownIn; for (const std::string& k : order) if (isType(by[k], "trackIn")) { const int t = trk(by[k]); if (t >= 0) ownIn.insert(t); }
-    std::map<int, std::vector<int>> adj;
-    const auto reaches = [&](int a, int b) { std::set<int> seen{a}; std::vector<int> w{a}; while (!w.empty()) { const int x = w.back(); w.pop_back(); if (x == b) return true; for (int y : adj[x]) if (!seen.count(y)) { seen.insert(y); w.push_back(y); } } return false; };
-    for (const std::string& k : order) { const Json m = by[k];
-      if (!isType(m, "trackIn")) continue;
-      const int t = trk(m); if (t < 0 || !S_.chainOn[t]) continue;
-      std::set<std::string> seen{k}; std::vector<std::string> w{k}; std::set<int> outs;
-      while (!w.empty()) { const std::string id = w.back(); w.pop_back(); const auto it = by.find(id); if (it != by.end() && isType(it->second, "chainOut")) { const int o = trk(it->second); if (o >= 0) outs.insert(o); }
-        const auto nit = nx.find(id); if (nit != nx.end()) for (const std::string& y : nit->second) if (!seen.count(y)) { seen.insert(y); w.push_back(y); } }
-      for (int b : outs) {   // (a std::set: ascending, as the JS sorts them)
-        if (b == t || ownIn.count(b) || !(S_.chainOn[b] && chainsTracks.count(b))) continue;
-        if (reaches(b, t)) continue;   // (P.loop)
-        adj[t].push_back(b); feeds.insert(b); targets[t].push_back(b);
-      }
-    }
-  }
+  for (int t = 0; t < NT; t++) { if (P.feedLen[t]) feeds.insert(t); for (int b = 0; b < NT; b++) if (P.targets[t] >> b & 1u) targets[t].push_back(b); }
   for (int b : feeds) busT_[b] = true;
   hasHear_ = false; for (int t = 0; t < kSeqTracks; t++) hearT_[t] = false;
   if (mode_ != SeqMode::Song || o_.hasOnly) { hasHear_ = true; std::vector<int> w;
