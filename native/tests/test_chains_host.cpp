@@ -10,7 +10,9 @@
 #include <new>
 #include <string>
 #include <vector>
+#if !defined(_WIN32)
 #include <unistd.h>
+#endif
 #if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__)
 #define ALLOC_AUDIT 1
 #endif
