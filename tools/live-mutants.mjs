@@ -16,6 +16,7 @@ const opt = (n, d) => { const i = args.indexOf(n); return i < 0 ? d : args[i + 1
 const BUILD = path.resolve(opt('--build', path.join(ROOT, 'native/build')));
 const ONLY = opt('--only', null);
 const SRC = { pool: 'native/core/src/engine/live_pool.cpp', shell: 'native/core/src/engine/live_shell.h', render: 'native/core/src/render/render.cpp', vox: 'native/core/src/engine/vox_core.cpp', engt: 'native/core/src/engine/eng_targets.h' };
+const TESTS_WITH_SHELL = ['test_live_review', 'test_live_idle', 'test_live_pool'];   // the tests whose own TU instantiates the shell / the eng tables: recompiled against a mutated header too (else their inline copies would shadow the mutant at link time)
 const HDR = { shell: 'live_shell.h', engt: 'eng_targets.h' };   // the header mutants: compiled against a mutated copy found first on the include path
 const text = Object.fromEntries(Object.entries(SRC).map(([k, v]) => [k, fs.readFileSync(path.join(ROOT, v), 'utf8')]));
 
@@ -63,6 +64,9 @@ const M = [
   ['I03', 'fastForward leaves the rings as they were', 'shell', '      for (uint64_t i = 0; i < cnt; i++) { ringL_[(last - 1 - i) & (kRing - 1)] = 0.0f; ringR_[(last - 1 - i) & (kRing - 1)] = 0.0f; }\n', ''],
   ['I04', 'fastForward does one control block too many', 'shell', 'const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk : 0;', 'const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk + 1 : 0;'],
   ['I05', 'the skip does not look at the rate lane', 'pool', 'if (n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) {', 'if (true || n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) {'],
+  ['I18', 'verify-272 F1: the skip does not wait for the host to be handed the last live block\'s tail', 'shell', ' && clock_ >= lastLive_ + latency(); }', '; }'],
+  ['I19', 'verify-272 F1: the tail wait is one sample short', 'shell', ' && clock_ >= lastLive_ + latency(); }', ' && clock_ + 1 >= lastLive_ + latency(); }'],
+  ['I20', 'verify-272 F2: the shell reads the lane\'s own value (0) before its first event', 'shell', 'return first_ && t < *first_ ? 1.0 : clampRate(feed_->at(t)); }', 'return clampRate(feed_->at(t)); }'],
   ['I17', 'a booking does not wake the node', 'pool', 'void LivePool::book(Node& n, const TEv& e) {\n  wake(n);', 'void LivePool::book(Node& n, const TEv& e) {'],
   ['I08', 'a mod (a rate lane write with nothing booked) does not wake the node', 'pool', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {\n  wake(n);', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {'],
   ['I11', 'the skipped node is brought to the wrong clock (the last quantum\'s start)', 'pool', 'eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));', 'eng.fastForward((uint64_t)(lastQ0_ + (int64_t)lat));'],
@@ -96,7 +100,7 @@ for (const [id, what, file, from, to] of M) {
   let killedBy = null;
   for (const t of tests) {
     let tobj = `CMakeFiles/${t}.dir/${t}.cpp.o`, extra = '';
-    if (file === 'shell' && (t === 'test_live_review' || t === 'test_live_idle')) {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
+    if (HDR[file] && TESTS_WITH_SHELL.includes(t)) {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
       const tf = fs.readFileSync(path.join(tdir, 'CMakeFiles', t + '.dir/flags.make'), 'utf8'), g = k => ((tf.match(new RegExp('^' + k + ' = (.*)$', 'm')) || [])[1] || '').split(/\s+/).filter(Boolean);
       const o = path.join(tmp, t + '.mut.o'); const c2 = run('c++', ['-I' + path.join(tmp, 'inc'), ...g('CXX_DEFINES'), ...g('CXX_INCLUDES'), ...g('CXX_FLAGS'), '-c', path.join(ROOT, 'native/tests', t + '.cpp'), '-o', o]);
       if (c2.status) { console.error(c2.stderr.split('\n').slice(0, 8).join('\n')); process.exit(2); } tobj = o; }

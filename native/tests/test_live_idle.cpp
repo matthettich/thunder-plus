@@ -54,23 +54,26 @@ static LivePadConfig cfgOf(LiveKind kind, double voxGlide) {
 
 struct Result { bool equal = true; uint32_t maxIdle = 0, idleOther = 0; int64_t firstDiff = -1; int wakeFail = 0; };
 // Runs the script on a skipping and on a processing pool, quantum by quantum, and compares the two mixes bit for bit (both channels of tracks 0 and 2) and the counters.
-static Result runPair(LiveKind kind, const Script& sc) {
-  LivePool A(SR), B(SR); const LivePadConfig cfg = cfgOf(kind, sc.voxGlide);
+static Result runPair(LiveKind kind, const Script& sc, int hostBlock = 128, const LivePadConfig* cfgIn = nullptr) {
+  LivePool A(SR), B(SR); const LivePadConfig cfg = cfgIn ? *cfgIn : cfgOf(kind, sc.voxGlide);
   CHECK(A.addPad(0, cfg)); CHECK(B.addPad(0, cfg)); B.setIdleSkip(false);
   Result r; std::vector<char> doneA(sc.evs.size(), 0);
   std::vector<float> al(128), ar(128), a2l(128), a2r(128), bl(128), br(128), b2l(128), b2r(128);
   float* ia[kVoiceTracks] = {}; float* ra[kVoiceTracks] = {}; float* ib[kVoiceTracks] = {}; float* rb[kVoiceTracks] = {};
   ia[0] = al.data(); ra[0] = ar.data(); ia[2] = a2l.data(); ra[2] = a2r.data(); ib[0] = bl.data(); rb[0] = br.data(); ib[2] = b2l.data(); rb[2] = b2r.data();
   const int64_t total = (int64_t)(sc.secs * SR);
-  for (int64_t q0 = 0; q0 < total; q0 += 128) {
+  for (int64_t q0 = 0; q0 < total; q0 += hostBlock) {   // host blocks of any size; the pool renders them in chunks of up to 128 frames (one quantum each), as the song renderer does
     const double t0 = (double)q0 / SR; A.setTime(t0); B.setTime(t0);
     for (size_t i = 0; i < sc.evs.size(); i++) if (!doneA[i] && sc.evs[i].first <= t0) { doneA[i] = 1; const uint32_t before = A.idleNodes(); sc.evs[i].second(A); sc.evs[i].second(B);
       if (std::find(sc.mustWake.begin(), sc.mustWake.end(), i) != sc.mustWake.end() && !(A.idleNodes() < before)) r.wakeFail++; }
-    for (auto* v : {&al, &ar, &a2l, &a2r, &bl, &br, &b2l, &b2r}) std::fill(v->begin(), v->end(), 0.f);
-    A.render(ia, ra, 128, q0); B.render(ib, rb, 128, q0);
-    r.maxIdle = std::max(r.maxIdle, A.idleNodes()); r.idleOther += B.idleNodes();
-    if (r.equal && (std::memcmp(al.data(), bl.data(), 512) || std::memcmp(ar.data(), br.data(), 512) || std::memcmp(a2l.data(), b2l.data(), 512) || std::memcmp(a2r.data(), b2r.data(), 512))) {
-      r.equal = false; r.firstDiff = q0;
+    for (int off = 0; off < hostBlock && q0 + off < total; off += 128) {
+      const int n = std::min(128, hostBlock - off);
+      for (auto* v : {&al, &ar, &a2l, &a2r, &bl, &br, &b2l, &b2r}) std::fill(v->begin(), v->end(), 0.f);
+      A.render(ia, ra, n, q0 + off); B.render(ib, rb, n, q0 + off);
+      r.maxIdle = std::max(r.maxIdle, A.idleNodes()); r.idleOther += B.idleNodes();
+      if (r.equal && (std::memcmp(al.data(), bl.data(), (size_t)n * 4) || std::memcmp(ar.data(), br.data(), (size_t)n * 4) || std::memcmp(a2l.data(), b2l.data(), (size_t)n * 4) || std::memcmp(a2r.data(), b2r.data(), (size_t)n * 4))) {
+        r.equal = false; r.firstDiff = q0 + off;
+      }
     }
   }
   const LiveStats sa = A.stats(), sb = B.stats();
@@ -123,6 +126,50 @@ static void expect(LiveKind kind, const char* what, const Script& sc) {
   CHECKF(r.maxIdle > 0, "%s / %s: the skip was never engaged (the test is not testing)", nameOf(kind), what);
   CHECKF(r.wakeFail == 0, "%s / %s: an event that must end the skip of a node did not (%d)", nameOf(kind), what, r.wakeFail);
   CHECKF(r.idleOther == 0, "%s / %s: the processing pool skipped", nameOf(kind), what);
+}
+
+
+// ---- verify-272 F1: the skip must not change one sample. Random scripts, all four engines, host blocks of 1 / 128 / 480 / 4096 frames; and the reproducer as a named case ---------------------------------------------------------
+static uint32_t g_rng = 20261121;
+static double rnd() { g_rng = g_rng * 1664525u + 1013904223u; return (g_rng >> 8) / 16777216.0; }
+static Script randomScript(LiveKind kind, double secs) {
+  Script s; s.secs = secs; s.voxGlide = rnd() < 0.5 ? 80 : 400;
+  double t = 0.02 + rnd() * 0.3; const int notes = 2 + (int)(rnd() * 5);
+  for (int i = 0; i < notes && t < secs - 0.3; i++) {
+    const int tr = rnd() < 0.5 ? 0 : 2; const double rate = 0.3 + rnd() * 2.2, len = 0.02 + rnd() * (rnd() < 0.3 ? 1.2 : 0.3);
+    const bool poly = kind == LiveKind::Vox && rnd() < 0.3, slide = rnd() < 0.25;
+    at(s, t, N(t, tr, rate, poly, (int)(rnd() * 3), slide, 0.05 + rnd() * 0.3));
+    if (rnd() < 0.85) at(s, t + len, O(t + len, tr));
+    const double u = rnd(); const double tm = t + rnd() * len;
+    if (u < 0.15) at(s, tm, MUL(tm, tr, 0.5 + rnd() * 1.5)); else if (u < 0.3) at(s, tm, WOB(tm, tr, rnd() * 2)); else if (u < 0.4) at(s, tm, TEMPO(tm, 70 + rnd() * 100));
+    else if (u < 0.55) at(s, tm, ENG(tm, tr, rnd() * 100, rnd() * 100, (rnd() - 0.5) * 60)); else if (u < 0.62) at(s, t + len + rnd() * 0.5, STOPALL(t + len + rnd() * 0.5));
+    t += len + (rnd() < 0.5 ? rnd() * 0.15 : 0.1 + rnd() * 1.1);   // gaps from none to over a second (the skip needs the voice to end and 4096 quiet samples)
+  }
+  return s;
+}
+static int g_random = 0;
+static void randomScripts(LiveKind kind, int count) {
+  const int blocks[4] = {1, 128, 480, 4096};
+  for (int i = 0; i < count; i++) {
+    const int hb = blocks[i % 4]; const Script sc = randomScript(kind, hb == 1 ? 1.6 : 3.5);
+    LivePadConfig dc; dc.kind = kind; dc.trackMask = (1u << 0) | (1u << 2);   // (the pads' defaults: long releases, the verifier's setting)
+    const Result r = runPair(kind, sc, hb, &dc); g_random++;
+    CHECKF(r.equal, "%s: random script %d (host block %d) differs from the processing pool (first at sample %lld)", nameOf(kind), i, hb, (long long)r.firstDiff);
+    CHECKF(r.idleOther == 0, "%s: random script %d: the processing pool skipped", nameOf(kind), i);
+  }
+}
+// the verifier's smallest reproducer: ONE bass note and its off (default pad): the skip used to zero the last 26 samples of the voice's tail (the shell runs latency() samples ahead of the mixer)
+static void reproducerBass() {
+  // (whether the tail is caught depends on where the voice's last live block ends against the quantum, and on the level: the same note at 43 alignments (a sample step of 3 across the quantum) and three levels; the verifier's own times are k = 0)
+  int engaged = 0, runs = 0;
+  for (double gain : {1.0, 0.1, 0.01}) for (int k = 0; k < 128; k += 3) {
+    const double t0 = 1.726963 + k / SR, t1 = 1.795206 + k / SR;
+    Script s; s.secs = 5.0; SeqEvent e = mkNote(t0, 0, 0.612); e.col = 2; e.gain = gain; s.evs.push_back({t0 - 0.25, [e](LivePool& lp) { bool p; lp.note(e, 0, 120, nullptr, 0, &p); }}); at(s, t1, O(t1, 0));
+    LivePadConfig c; c.kind = LiveKind::Bass; c.trackMask = 1;
+    const Result r = runPair(LiveKind::Bass, s, 128, &c); g_random++; runs++; if (r.maxIdle > 0) engaged++;
+    CHECKF(r.equal, "verify-272 F1: one bass note + its off (gain %g, alignment +%d samples): the skipping pool differs from the processing one (first at sample %lld)", gain, k, (long long)r.firstDiff);
+  }
+  CHECKF(engaged > runs * 9 / 10, "verify-272 F1: the skip was engaged in only %d of %d runs", engaged, runs);
 }
 
 int main(int argc, char** argv) {
@@ -199,7 +246,9 @@ int main(int argc, char** argv) {
     at(s, 5.5, N(5.5, 0, 1.1)); at(s, 5.7, O(5.7, 0)); at(s, 7.0, N(7.0, 0, 1.3, true, 3)); at(s, 7.2, O(7.2, 0)); at(s, 8.0, N(8.0, 0, 0.6));
     at(s, 3.2, ENG(3.2, 0, 60, 0.2, 9));
     expect(LiveKind::Vox, "poly nodes and the syllable counter", s); }
-  std::printf("idle skip: %d skipping / processing pairs compared bit for bit\n", g_runs);
+  reproducerBass();
+  for (LiveKind kind : kinds) randomScripts(kind, 80);
+  std::printf("idle skip: %d skipping / processing pairs compared bit for bit (%d random scripts at host blocks 1 / 128 / 480 / 4096, all four kinds, and the one-bass-note reproducer)\n", g_runs + g_random, g_random);
   if (g_fail) { std::printf("%d FAILED\n", g_fail); return 1; }
   std::printf("PASS\n");
   return 0;

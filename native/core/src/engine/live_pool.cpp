@@ -376,9 +376,9 @@ void LivePool::setIdleSkip(bool on) { if (!on) for (Node* n : active_) wake(*n);
 uint32_t LivePool::idleNodes() const { return skipped_; }
 
 void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float* const* inR) {
-  if (n.skip) return;
+  if (n.skip) { if (tap_) { std::memset(scr_.get(), 0, 2 * kQuantum * sizeof(float)); tap_(tapUser_, n.track, n.pad, n.j, scr_.get(), scr_.get() + kQuantum, frames, q0); } return; }   // (a skipped node's engine output is silence: a tap reads zeros, so the JS parity runs with the skip on)
   LiveEng& eng = *n.eng; const uint32_t lat = eng.latency();
-  if (!n.started && idleSkip_ && !tap_ && n.ntl == 0) { n.skip = true; skipped_++; return; }   // (a node nothing was ever booked on)
+  if (!n.started && idleSkip_ && n.ntl == 0) { n.skip = true; skipped_++; if (tap_) { std::memset(scr_.get(), 0, 2 * kQuantum * sizeof(float)); tap_(tapUser_, n.track, n.pad, n.j, scr_.get(), scr_.get() + kQuantum, frames, q0); } return; }   // (a node nothing was ever booked on)
   float* sL = scr_.get(); float* sR = scr_.get() + kQuantum;
   LiveEvent ev[kTimeline + 1]; uint32_t nev = 0;
   if (!n.started) {   // the first call: the shell starts at this quantum and runs lat samples of pre-roll, so that it is lat ahead of the mixer
@@ -396,7 +396,7 @@ void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float
       if (n.quiet >= 4096 || (double)(end - n.stopT) >= 4 * sr_) n.done = true;
     }
   }
-  if (idleSkip_ && !tap_ && n.ntl == 0 && (!n.curLive || n.done) && eng.idle()) {   // the idle skip: the rate lane must stay as it is (the idle core latches the pitch from it)
+  if (idleSkip_ && n.ntl == 0 && (!n.curLive || n.done) && eng.idle()) {   // the idle skip: the rate lane must stay as it is (the idle core latches the pitch from it)
     double rv; const int64_t t0 = (int64_t)eng.clock() - 2 * (int64_t)(lat + 1);
     if (n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) { n.skip = true; skipped_++; }
   }

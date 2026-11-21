@@ -372,6 +372,9 @@ function seqCases(E) {
   for (const [pn, p] of [['init', {}], ['alt', null]]) for (const [sn, evs] of Object.entries(ES)) {
     const alt = { bass: bassOf('Reese (DnB)'), vox: voxOf('Choir'), acid: AP.fast, mach: MP.ens };
     for (const kd of ['bass', 'vox', 'acid', 'mach']) add('seq_eng_' + kd + '_' + pn + '_' + sn, kd, p === null ? alt[kd] : p, 7000, kd === 'vox' ? evs.map(e => e.type === 'on' ? { ...e, syl: 0 } : e) : evs); }
+  // parameters OUTSIDE the target's range, one target (the cutoff) moved: the untouched ones must not be clamped or rescaled by the swap (the `c < 0 && o == 0` skip of eng_targets.h, mutant E14)
+  const OOR = { bass: { atk: 3000, dec: 5000, rel: 6000 }, vox: { atk: 500, rel: 4000 }, acid: { ampDec: 5000, rel: 2000 }, mach: { atk: 3000, dec: 5000, rel: 6000 } };
+  for (const kd of ['bass', 'vox', 'acid', 'mach']) { const evs = [on(0), eng(300, [120], []), eng(1800, [], [-40]), off(3600)]; add('seq_eng_' + kd + '_oor_cutonly', kd, OOR[kd], 7000, kd === 'vox' ? evs.map(e => e.type === 'on' ? { ...e, syl: 0 } : e) : evs); }
   for (const [pn, p] of Object.entries(AP)) for (const [sn, evs] of Object.entries(XS)) add('seq_acid_' + pn + '_' + sn, 'acid', p, 7000, evs);
   for (const [pn, p] of Object.entries(MP)) for (const [sn, evs] of Object.entries(XS)) add('seq_mach_' + pn + '_' + sn, 'mach', p, 7000, evs);
   return out;

@@ -784,6 +784,10 @@ static const U26CaseGolden kU26CaseGolden[] = {
   {"seq_eng_vox_alt_held", "7a4682ecb0300ff22aa82ea8fd64eff5b4cc543de4f44f1cfade86827ccf525b", 7000},
   {"seq_eng_acid_alt_held", "f66012588e9dae36ba53c739893a0f20402ccd0db9248bf58e964b3686f75434", 7000},
   {"seq_eng_mach_alt_held", "dbf1fd28f523739d8d588a4aef264ff0bf88bd16243fc77491ff9b0f6dd9e294", 7000},
+  {"seq_eng_bass_oor_cutonly", "6b32ceba718f799073be1cd99ba7c459e37b8fd79915c3018cb4fce9c1bc8604", 7000},
+  {"seq_eng_vox_oor_cutonly", "9a691e4a21ff0c6f3df488053ea4a6262fd77ad4f3386a78c27107290029590b", 7000},
+  {"seq_eng_acid_oor_cutonly", "7da2cc8d56342934b9c7f05082e0475b4b9bc4fd7e0329ea5b6c39ed430efb96", 7000},
+  {"seq_eng_mach_oor_cutonly", "8a56e7f964af7c578154b499980ca89bb97d6d11f663b2857ba11481291d11b7", 7000},
   {"seq_acid_init_slidecut", "97f718c7d9c7eb14748bd515c1cde698b6adaf77e142e0d5db14e7722f1d552c", 7000},
   {"seq_acid_init_single", "9704fc1de34111970f6684b42bf927f78120eaa83f7fd062630692a4637af60b", 7000},
   {"seq_acid_init_legato", "c6aa150267ad05e320ce2ec25a3abe65cb2f49ee5cc017c230431f080cdb46de", 7000},
@@ -821,4 +825,4 @@ static const U26CaseGolden kU26CaseGolden[] = {
   {"seq_mach_lfo_glide", "040a69cb0d3d8baac24a526912ae3d50f3602d84412e258549c966e01f49194b", 7000},
   {"seq_mach_lfo_offsets", "e208b11edb09d79c98242e29fdf67e8dd5f57e978e906e3b099626a879a41cfa", 7000},
 };
-static const int kU26CaseGoldenN = 818;
+static const int kU26CaseGoldenN = 822;
