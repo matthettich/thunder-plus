@@ -21,8 +21,9 @@ static const LiveRouteGolden kLiveRouteGolden[] = {
   {"eng_late_bind", 0xc5f6ab576914603dull},
   {"eng_vox_poly", 0xbdb2854938b6c05eull},
   {"eng_stop_all", 0x80a320545688ee2cull},
+  {"eng_default_off", 0x4318b684dc4aec02ull},
   {"eng_partial", 0xe9839036814d9808ull},
   {"no_node", 0xc0121fdc165bdc12ull},
   {"late", 0x16593146c775dab3ull},
 };
-static const int kLiveRouteGoldenN = 22;
+static const int kLiveRouteGoldenN = 23;

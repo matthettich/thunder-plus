@@ -103,6 +103,8 @@ const CASES = {
     [0, note({ t: FB(8), pad: 1 })], [1, eng(FB(10), { rel: 40 }, { cut: 33 })] ] },
   eng_stop_all: { tracks: [0], evs: [
     [0, note({ t: FB(1) })], [0, eng(FB(2), { cut: 80 }, { res: 10 })], [0, eng(FB(4), { cut: 90 }, { res: 20 })], [5, { op: 'stopAll', at: FB(8) }], [6, note({ t: FB(10) })], [6, eng(FB(12), { res: 5 }, { cut: 5 })] ] },
+  eng_default_off: { tracks: [0], evs: [   // a default state reaches a node only while its targets are on: not before the first real eng, again after it, not after stopAll
+    [0, note({ t: FB(1) })], [0, eng(FB(3), {}, {})], [0, eng(FB(5), { cut: 70 }, {})], [0, eng(FB(7), {}, {})], [5, { op: 'stopAll', at: FB(9) }], [6, eng(FB(11), {}, {})], [6, eng(FB(13), { res: 30 }, {})] ] },
   eng_partial: { tracks: [0], evs: [   // keys that are missing are not numbers: nothing is put for them, and the state is not the default
     [0, note({ t: FB(1) })], [0, { type: 'eng', t: FB(2), track: 0, c: { cut: 50 }, o: {} }], [0, { type: 'eng', t: FB(4), track: 0, c: {}, o: { res: 9 } }], [0, { type: 'eng', t: FB(6), track: 0, c: { cut: -1 }, o: {} }] ] },
   no_node: { tracks: [], evs: [[0, note({ t: FB(1), pad: 0 })], [0, note({ t: FB(2), pad: 1, poly: true })]] },   // no node registered: liveNote is false, the page plays

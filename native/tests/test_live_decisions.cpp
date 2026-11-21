@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
   Song song; const std::string sj = songJson(); if (!song.load(sj.data(), sj.size(), &je)) return 2;
   SeqVars vars; SeqOpts so; so.row = song.renderFrom; so.once = true; Seq seq(song, vars, SeqMode::Song, so);
   // the cases of this stage; the rest are listed
-  const std::set<std::string> run = {"bass_mono", "bass_kill_back", "bass_same_sample", "acid_mach", "vox_mono", "vox_poly", "vox_samecol", "vox_idle_gap", "mod_stp", "no_node", "late", "stop_all", "takeover", "choke_cross", "poly_cap", "eng_basic", "eng_late_bind", "eng_vox_poly", "eng_stop_all", "eng_partial"};
+  const std::set<std::string> run = {"bass_mono", "bass_kill_back", "bass_same_sample", "acid_mach", "vox_mono", "vox_poly", "vox_samecol", "vox_idle_gap", "mod_stp", "no_node", "late", "stop_all", "takeover", "choke_cross", "poly_cap", "eng_basic", "eng_late_bind", "eng_vox_poly", "eng_stop_all", "eng_default_off", "eng_partial"};
   std::vector<float> dc((size_t)(SR * 3), 0.25f);   // the sampler pads' buffer (pads 5 and 7): voices that stay for the case
   int ran = 0, skipped = 0, compared = 0;
   Json root = doc.root();

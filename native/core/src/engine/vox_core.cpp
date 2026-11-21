@@ -331,11 +331,9 @@ void VoxCore::step(const Ck& c, double dt) {
   if (p_.glide > 0.5) lf_ += (c.lt - lf_) * c.kg; else lf_ = c.lt;
   vt_ += dt;
 }
-// A core with no sound and nothing to walk: every further block (full length, the rate unchanged) changes only the state idleBlocks() advances
+// A core with no sound and nothing left to walk (see below): every further block (full length, the rate unchanged) changes only the state idleBlocks() advances
 bool VoxCore::idle() const {
-  if (env_ != 0 || envT_ != 0) return false;
-  const Seg* g = si_ < nsegs_ ? &segs_[si_] : nullptr;
-  return !(g && g->d >= 0 && (double)si_ < (double)nsegs_ - 1);   // (the plan could still advance: enter() would change the targets)
+  return env_ == 0 && envT_ == 0;   // (envT_ is set to 0 only by a rest or by the plan's last segment, kEnd: nothing is left to walk)
 }
 void VoxCore::idleBlocks(uint64_t nb, double rate) {   // the same as nb blocks of kBlk samples rendered while idle(), at `rate` (the pitch latches from it: lf_)
   if (!nb) return;

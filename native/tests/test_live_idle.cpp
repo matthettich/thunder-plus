@@ -26,14 +26,15 @@ static int g_fail = 0;
 static const double SR = 48000;
 
 using Act = std::function<void(LivePool&)>;
-struct Script { std::vector<std::pair<double, Act>> evs; double secs = 6; };   // (the time an event is handed over at, what it does)
+struct Script { std::vector<std::pair<double, Act>> evs; double secs = 6; double voxGlide = 80; };   // (the time an event is handed over at, what it does)
 
 static SeqEvent mkNote(double t, int track, double rate) { SeqEvent e; e.type = SEV_NOTE; e.t = t; e.track = track; e.pad = 0; e.rate = rate; e.gain = 1; e.pan = 128; return e; }
-static Act N(double t, int tr, double rate, bool poly = false, int col = 0, bool slide = false, double slideDur = 0.15) {
+static Act N(double t, int tr, double rate, bool poly = false, int col = 0, bool slide = false, double slideDur = 0.15, int choke = 0) {
   SeqEvent e = mkNote(t, tr, rate); e.poly = poly; e.col = col; if (slide) { e.has |= SH_SLIDE; e.slideFrom = rate * 0.5; e.slideDur = slideDur; }
-  return [e](LivePool& lp) { bool p; lp.note(e, 0, 120, nullptr, 0, &p); };
+  return [e, choke](LivePool& lp) { bool p; lp.note(e, 0, 120, nullptr, choke, &p); };
 }
 static Act O(double t, int tr) { SeqEvent e; e.type = SEV_OFF; e.t = t; e.track = tr; return [e](LivePool& lp) { lp.off(e); }; }
+static Act MUL(double t, int tr, double m) { SeqEvent e; e.type = SEV_MOD; e.t = t; e.track = tr; e.has |= SH_MUL; e.mul = m; return [e](LivePool& lp) { lp.mod(e, nullptr); }; }
 static Act WOB(double t, int tr, double w) { SeqEvent e; e.type = SEV_MOD; e.t = t; e.track = tr; e.has |= SH_WOB; e.wob = w; return [e](LivePool& lp) { lp.mod(e, nullptr); }; }
 static Act ENG(double t, int tr, double cut, double res, double ofs) {
   SeqEvent e; e.type = SEV_ENG; e.t = t; e.track = tr; for (int k = 0; k < 5; k++) e.engC[k] = -1; e.engC[0] = cut; e.engC[1] = res; for (int k = 0; k < 7; k++) e.engO[k] = 0; e.engO[0] = ofs; e.engO[6] = ofs * 0.5;
@@ -43,17 +44,17 @@ static Act TEMPO(double t, double bpm) { return [t, bpm](LivePool& lp) { lp.temp
 static Act STOPALL(double t) { return [t](LivePool& lp) { lp.stopAll(t); }; }
 static void at(Script& s, double t, Act a) { s.evs.push_back({t - 0.25, std::move(a)}); }   // handed over 0.25 s ahead, as the sequencer does
 
-static LivePadConfig cfgOf(LiveKind kind) {
+static LivePadConfig cfgOf(LiveKind kind, double voxGlide) {
   LivePadConfig c; c.kind = kind; c.trackMask = (1u << 0) | (1u << 2);
   if (kind == LiveKind::Bass) { c.bass.rel = 40; c.bass.glide = 60; }
-  if (kind == LiveKind::Vox) { c.vox.txt = "la di da ne"; c.vox.glide = 80; c.vox.rel = 90; }
+  if (kind == LiveKind::Vox) { c.vox.txt = "la di da ne"; c.vox.glide = voxGlide; c.vox.rel = 90; }
   return c;
 }
 
 struct Result { bool equal = true; uint32_t maxIdle = 0, idleOther = 0; int64_t firstDiff = -1; };
 // Runs the script on a skipping and on a processing pool, quantum by quantum, and compares the two mixes bit for bit (both channels of tracks 0 and 2) and the counters.
 static Result runPair(LiveKind kind, const Script& sc) {
-  LivePool A(SR), B(SR); const LivePadConfig cfg = cfgOf(kind);
+  LivePool A(SR), B(SR); const LivePadConfig cfg = cfgOf(kind, sc.voxGlide);
   CHECK(A.addPad(0, cfg)); CHECK(B.addPad(0, cfg)); B.setIdleSkip(false);
   Result r; std::vector<char> doneA(sc.evs.size(), 0);
   std::vector<float> al(128), ar(128), a2l(128), a2r(128), bl(128), br(128), b2l(128), b2r(128);
@@ -130,6 +131,22 @@ int main(int argc, char** argv) {
     { Script s; s.secs = 8;
       at(s, 0.10, N(0.10, 0, 1.2, false, 0, true, 3.0)); at(s, 0.30, O(0.30, 0)); at(s, 2.0, N(2.0, 0, 0.8)); at(s, 2.2, O(2.2, 0)); at(s, 6.0, N(6.0, 0, 1.5)); at(s, 6.2, O(6.2, 0));
       expect(kind, "a slide that outlasts the voice", s); }
+    // 4c. a voice another track's note choked is over, but it is still in its track's list (a mod reaches it): a `mul` writes its rate lane while the node idles, with nothing booked (the lane is not constant any more)
+    { Script s; s.secs = 7;
+      at(s, 0.10, N(0.10, 0, 1.0, false, 0, false, 0.15, 1)); at(s, 0.50, N(0.50, 2, 1.0, false, 0, false, 0.15, 1)); at(s, 0.70, O(0.70, 2));
+      at(s, 2.0, MUL(2.0, 0, 2.0)); at(s, 4.0, N(4.0, 0, 1.3));  at(s, 4.2, O(4.2, 0));
+      expect(kind, "a mod on a choked, idle node", s); }
+    // 4d. the first note of a node handed over right after the pool's first quantum (the node ran no quantum yet: its first idle blocks are the wake's), and a very slow glide (the pitch latch has not converged: the number of idle blocks counts)
+    { Script s; s.secs = 3; s.voxGlide = 900;
+      at(s, 0.25 + 128.0 / SR + 0.0007, N(0.25 + 128.0 / SR + 0.0007, 2, 1.3)); at(s, 0.5, O(0.5, 2));
+      at(s, 0.10, N(0.10, 0, 0.5)); at(s, 0.30, O(0.30, 0)); at(s, 1.9, N(1.9, 0, 1.7)); at(s, 2.1, O(2.1, 0));
+      expect(kind, "the first note of a node right after the first quantum, a slow glide", s); }
+    // 4e. the first note after the stretch at every alignment of the ring of the shell (512 samples) and of the control block: the shell's output ring must hold silence where the idle blocks would have written it
+    for (int k = 0; k < 60; k++) {
+      Script s; s.secs = 1.6; const double T2 = 0.55 + k * 0.0063;
+      at(s, 0.05, N(0.05, 0, 1.0)); at(s, 0.15, O(0.15, 0)); at(s, T2, N(T2, 0, 1.4)); at(s, T2 + 0.1, O(T2 + 0.1, 0));
+      expect(kind, "a short stretch at one of 60 alignments", s);
+    }
     // 5. a note that is never released before the stretch cannot be skipped (the voice has not ended), and a long hold ends only with its off
     { Script s; s.secs = 6;
       at(s, 0.10, N(0.10, 0, 1.0)); at(s, 2.0, O(2.0, 0)); at(s, 4.0, N(4.0, 0, 0.7)); at(s, 4.2, O(4.2, 0));

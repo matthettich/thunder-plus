@@ -172,7 +172,6 @@ bool LivePool::polyVox(const SeqEvent& e, PadSlot& ps, double bpm, const double*
 }
 
 void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* arp, double fk, bool hasFk) {
-  wake(n);
   const double t = std::isfinite(e.t) ? std::max(e.t, now_) : now_;   // Math.max(ev.t, currentTime)
   const int64_t T = sample_at_or_after(t, sr_);
   const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
@@ -200,22 +199,22 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* a
 
 // engEv / engPut (core-processor.js :386-399): the track's state, then the twelve lanes of each node of the track that exists. A `set` for the commands, a ramp from the last point for the offsets once the node has the targets on.
 void LivePool::engPut(Node& n, const double c[5], const double o[7], double at, bool ramp) {
-  wake(n);
   const bool rp = ramp && n.engOn; n.feed.on = true;
   for (int k = 0; k < 5; k++) if (std::isfinite(c[k])) { AutoN<kAutoEng>& A = n.engL->a[k]; if (A.size() + 2 > A.capacity()) A.prune(now_); A.set(c[k], at); }
   for (int k = 0; k < 7; k++) if (std::isfinite(o[k])) { AutoN<kAutoEng>& A = n.engL->a[5 + k]; if (A.size() + 2 > A.capacity()) A.prune(now_); if (rp) A.lin(o[k], at); else A.set(o[k], at); }
   n.engOn = true;
 }
 void LivePool::eng(const SeqEvent& e) {
-  if (e.track < 0 || e.track >= kVoiceTracks) return;
-  const double at = std::isfinite(e.t) ? std::max(e.t, now_) : now_;
+  if (e.track < 0 || e.track >= kVoiceTracks) { st_.refused++; return; }   // F4 (the new entry point): a track that is not one, a time that is not a number: refused whole, counted
+  if (!std::isfinite(e.t)) { st_.refused++; return; }
+  { bool bad = false; for (int k = 0; k < 5; k++) if (!std::isfinite(e.engC[k])) bad = true; for (int k = 0; k < 7; k++) if (!std::isfinite(e.engO[k])) bad = true; if (bad) st_.refused++; }   // (a value that is not a number is not put: an AudioParam cannot hold it; the rest of the event stands; once an event)
+  const double at = std::max(e.t, now_);
   bool def = true; for (int k = 0; k < 5; k++) if (!(e.engC[k] < 0)) def = false; for (int k = 0; k < 7; k++) if (e.engO[k] != 0 && e.engO[k] == e.engO[k]) def = false;   // (!(c < 0): NaN is not a default; a falsy offset is 0 or NaN)
   EngSt& es = engSt_[e.track]; es.has = !def; if (!def) { for (int k = 0; k < 5; k++) es.c[k] = e.engC[k]; for (int k = 0; k < 7; k++) es.o[k] = e.engO[k]; }
   for (Node* n : byTrack_[e.track]) { if (!n->bound) continue; if (def && !n->engOn) continue; engPut(*n, e.engC, e.engO, at, true); }
 }
 
 void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {
-  wake(n);
   TEv e; e.T = sample_at_or_after(std::max(t, now_), sr_); e.type = type; e.v = v; book(n, e);
 }
 
@@ -283,7 +282,7 @@ void LivePool::stopAll(double at) {   // stopAll(at): every node's voice lets go
     if (n->curLive && !(n->curStop && n->stopAt <= at)) { n->curStop = true; n->stopAt = at; n->stopT = T; }
     if (n->used) { cancelFrom(*n, T); TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(*n, off); rec(*n, 'o', t, 0, T); }
     n->sylN = 0; n->inT = false;
-    if (n->bound && n->feed.on) { wake(*n); for (int k = 0; k < 12; k++) { AutoN<kAutoEng>& A = n->engL->a[k]; A.cancel(at); A.set(k < 5 ? -1 : 0, at); } }   // ENGINE TARGETS: the twelve back to their defaults
+    if (n->bound && n->feed.on) { for (int k = 0; k < 12; k++) { AutoN<kAutoEng>& A = n->engL->a[k]; A.cancel(at); A.set(k < 5 ? -1 : 0, at); } }   // ENGINE TARGETS: the twelve back to their defaults
     n->engOn = false;
   }
   for (EngSt& s : engSt_) s = EngSt();
@@ -337,7 +336,6 @@ int LivePool::active() const { int c = 0; for (const Node* n : active_) if (n->c
 void LivePool::releaseHeld(double at) { for (Node* n : active_) if (n->curLive && !n->curStop) kill(*n, at); }
 
 void LivePool::kill(Node& n, double at) {   // kill(v, at) for a live voice: the gate goes low at `at`; a stop before a booked later note takes that note back
-  wake(n);
   if (!n.curLive || (n.curStop && n.stopAt <= at)) return;
   n.curStop = true; n.stopAt = at;
   const double t = std::max(at, now_); const int64_t T = sample_at_or_after(t, sr_); n.stopT = T;
@@ -359,8 +357,8 @@ void LivePool::deliver(Node& n, uint32_t count, LiveEvent* out, uint32_t* nout) 
 }
 
 // The idle skip (LIVE ROUTE 1b). A node whose voice has ended and whose output is silent (nothing booked, the core idle, the rate lane constant) is not processed: it adds exact zeros, so nothing is mixed. Whatever
-// processing it would have done is done at once by wake() when something is next booked on it (a note, a rate / engine / tempo / wobble / off event): the shell's clock and control-block grid, the core's carried state
-// (the vox pitch latch), the lanes' pruning. The tests compare a skipping pool with a processing one bit for bit.
+// processing it would have done is done at once by wake() when something is next booked on it (book(): a note, an off, a tempo / wobble event) or its rate lane is written without a booking (modVoice): the shell's clock and control-block grid, the core's carried state
+// (the vox pitch latch). The tests compare a skipping pool with a processing one bit for bit.
 void LivePool::pruneLanes(Node& n, int64_t q0) {
   const double tb0 = (double)q0 / sr_;
   n.g.prune(tb0); n.pn.prune(tb0); { const int64_t keep = (int64_t)n.eng->clock() - 2 * (int64_t)LiveBass::kBlk; if (keep > 0) n.rate.prune((double)keep / sr_); if (n.feed.on) for (int k = 0; k < 12; k++) n.engL->a[k].prune((double)keep / sr_); }   // (the shell's next control block starts at or after clock - kBlk)
@@ -369,9 +367,8 @@ void LivePool::wake(Node& n) {
   if (!n.skip) return;
   n.skip = false; skipped_--;
   LiveEng& eng = *n.eng; const uint32_t lat = eng.latency();
-  if (!n.started) { eng.seek((uint64_t)n.firstQ0); n.started = true; float* sL = scr_.get(); float* sR = scr_.get() + kQuantum; eng.process(sL, sR, lat, nullptr, 0); }   // (the first call's pre-roll)
-  eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));
-  pruneLanes(n, lastQ0_);
+  if (!n.started) { eng.seek((uint64_t)n.firstQ0); n.started = true; }   // (the first call's pre-roll runs no whole control block: nothing to do for it)
+  eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));   // (the lanes are pruned by the next quantum that runs: the lists' values do not depend on when)
 }
 void LivePool::setIdleSkip(bool on) { if (!on) for (Node* n : active_) wake(*n); idleSkip_ = on; }
 uint32_t LivePool::idleNodes() const { return skipped_; }

@@ -63,17 +63,11 @@ const M = [
   ['I03', 'fastForward leaves the rings as they were', 'shell', '      for (uint64_t i = 0; i < cnt; i++) { ringL_[(last - 1 - i) & (kRing - 1)] = 0.0f; ringR_[(last - 1 - i) & (kRing - 1)] = 0.0f; }\n', ''],
   ['I04', 'fastForward does one control block too many', 'shell', 'const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk : 0;', 'const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk + 1 : 0;'],
   ['I05', 'the skip does not look at the rate lane', 'pool', 'if (n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) {', 'if (true || n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) {'],
-  ['I06', 'engPut does not wake the node', 'pool', 'void LivePool::engPut(Node& n, const double c[5], const double o[7], double at, bool ramp) {\n  wake(n);', 'void LivePool::engPut(Node& n, const double c[5], const double o[7], double at, bool ramp) {'],
-  ['I07', 'a tempo / wobble event does not wake the node', 'pool', 'void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {\n  wake(n);', 'void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {'],
-  ['I08', 'a mod does not wake the node', 'pool', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {\n  wake(n);', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {'],
-  ['I09', 'a note does not wake the node before its lanes are written', 'pool', 'bool hasFk) {\n  wake(n);', 'bool hasFk) {'],
-  ['I10', 'an off does not wake the node', 'pool', 'void LivePool::kill(Node& n, double at) {   // kill(v, at) for a live voice: the gate goes low at `at`; a stop before a booked later note takes that note back\n  wake(n);', 'void LivePool::kill(Node& n, double at) {'],
+  ['I17', 'a booking does not wake the node', 'pool', 'void LivePool::book(Node& n, const TEv& e) {\n  wake(n);', 'void LivePool::book(Node& n, const TEv& e) {'],
+  ['I08', 'a mod (a rate lane write with nothing booked) does not wake the node', 'pool', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {\n  wake(n);', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {'],
   ['I11', 'the skipped node is brought to the wrong clock (the last quantum\'s start)', 'pool', 'eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));', 'eng.fastForward((uint64_t)(lastQ0_ + (int64_t)lat));'],
   ['I12', 'a node that never ran starts at the wrong quantum', 'pool', 'n.skip = true; n.firstQ0 = q0; skipped_++; return; }', 'n.skip = true; n.firstQ0 = q0 + 128; skipped_++; return; }'],
   ['I13', 'a voice that has not ended may be skipped', 'pool', '&& (!n.curLive || n.done) && eng.idle()', '&& eng.idle()'],
-  ['I14', 'wake does not prune the lanes', 'pool', '  eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));\n  pruneLanes(n, lastQ0_);', '  eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));'],
-  ['I15', 'the vox idle test ignores a plan that still walks', 'vox', 'return !(g && g->d >= 0 && (double)si_ < (double)nsegs_ - 1);', 'return true;'],
-  ['I16', 'the first call\'s pre-roll is not run at wake', 'pool', 'float* sR = scr_.get() + kQuantum; eng.process(sL, sR, lat, nullptr, 0); }', 'float* sR = scr_.get() + kQuantum; (void)sL; (void)sR; }'],
 ];
 
 if (args.includes('--list')) { for (const [id, what] of M) console.log(id.padEnd(8), what); process.exit(0); }

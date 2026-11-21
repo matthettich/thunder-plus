@@ -148,12 +148,37 @@ static void testBpmAtNote() {
   CHECKF(nb == 2 && v0 == 140 && v1 == 90, "bpm events %d (%g, %g): want 140 once, then 90", nb, v0, v1);
 }
 
+// ---- 1b: hostile numbers in an ENGINE TARGETS event (SEV_ENG) -------------------------------------------------------------------------------------------------------------------------------------
+static void testEngHostile() {
+  const double nan = std::numeric_limits<double>::quiet_NaN(), inf = std::numeric_limits<double>::infinity();
+  const double vals[] = {nan, inf, -inf, 1e300, -1e300};
+  const LiveKind kinds[] = {LiveKind::Bass, LiveKind::Vox, LiveKind::Acid, LiveKind::Mach};
+  int runs = 0, refused = 0, nonFinite = 0;
+  for (LiveKind kind : kinds) for (int field = 0; field < 14; field++) for (double v : vals) {   // 0..4 engC, 5..11 engO, 12 t, 13 track (as a double cast)
+    SeqEvent e; e.type = SEV_ENG; e.t = 0.05; e.track = 0; for (int k = 0; k < 5; k++) e.engC[k] = -1; for (int k = 0; k < 7; k++) e.engO[k] = 0; e.engC[0] = 60; e.engO[0] = 5;
+    if (field < 5) e.engC[field] = v; else if (field < 12) e.engO[field - 5] = v; else if (field == 12) e.t = v; else e.track = (int32_t)(std::isfinite(v) ? (v > 0 ? 1000 : -1000) : -77);
+    PoolRun r(kind, 128 * 40);
+    std::vector<std::pair<double, Act>> evs;
+    evs.push_back({0.0, [&](LivePool& lp) { lp.note(mkNote(0.01, 0, 0, 1), 0, 120, nullptr); }});
+    evs.push_back({0.0, [&](LivePool& lp) { lp.eng(e); }});
+    evs.push_back({0.3, [&](LivePool& lp) { lp.note(mkNote(0.4, 0, 0, 1), 0, 120, nullptr); }});   // (a node bound later reads the kept state)
+    r.run(evs); runs++;
+    bool fin = true; for (float x : r.L) if (!std::isfinite(x)) fin = false;
+    if (!fin) { nonFinite++; CHECKF(false, "kind %d eng field %d value %g: the output is not finite", (int)kind, field, v); }
+    const bool bad = (field < 12 && !std::isfinite(v)) || (field == 12 && !std::isfinite(v)) || field == 13;   // a magnitude (1e300) is clamped by the lane read, not refused
+    if (bad) { if (r.lp->stats().refused > 0) refused++; else CHECKF(false, "kind %d eng field %d value %g: not counted as refused", (int)kind, field, v); }
+    else CHECKF(r.lp->stats().refused == 0, "kind %d eng field %d value %g: a finite value was refused", (int)kind, field, v);
+  }
+  std::printf("hostile eng numbers: %d runs, %d with a non-finite output, %d refusals counted\n", runs, nonFinite, refused);
+}
+
 int main() {
   testBpmAtNote();
   testShell();
   testPoolOverflow();
   testTimelineForcedOff();
   testHostile();
+  testEngHostile();
   if (g_fail) { std::printf("live_review: %d FAILED\n", g_fail); return 1; }
   std::printf("live_review: all checks passed\n"); return 0;
 }
