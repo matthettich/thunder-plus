@@ -602,12 +602,14 @@ static int run_live_host() {
     if (H->padsPublish()) return fail("LiveHost pads publish");
     thunder_live_play_opts po; std::memset(&po, 0, sizeof po); po.size = sizeof po; po.t0 = THUNDER_LIVE_NOW; po.spp = -1; if (H->play(po)) return fail("LiveHost play");
     static float L[1024], R[1024]; uint32_t rng = 7; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
-    int64_t frame = 0; int calls = 0; bool finite = true; double peak = 0; uint8_t buf[512]; char js[16384]; long dumped = 0; uint64_t recs = 0;
+    int64_t frame = 0; int calls = 0; bool finite = true; double peak = 0; uint8_t buf[512]; char js[16384]; long dumped = 0; uint64_t recs = 0; int endedSeen = 0, stoppedSeen = 0, heldSeen = 0;
     while (frame < 48000 * 25) {
       static const int sizes[] = {128, 128, 480, 1, 64, 1024, 333, 128, 512};
       const int n = sizes[(int)(rnd() * 9)];
       // control side, between blocks
-      const int k = calls % 97;
+      const bool quiet = calls >= 2600 && calls < 3700;   // no stop / play meanwhile: the armed hold reaches a pattern edge (HELD)
+      if (calls == 2600) H->hold(THUNDER_LIVE_NOW);
+      const int k = (quiet && (calls % 97 == 61 || calls % 97 == 67 || calls % 97 == 79 || calls % 97 == 83 || calls % 97 == 89)) ? -1 : calls % 97;
       if (k == 5) H->bpm(80 + (int)(rnd() * 80), THUNDER_LIVE_NOW);
       else if (k == 11) H->bpm(100, frame + 20000);
       else if (k == 17) H->loop(rnd() < 0.5, 0, 4, THUNDER_LIVE_NOW);
@@ -621,19 +623,23 @@ static int run_live_host() {
       else if (k == 61 && calls > 1000) { H->hold(THUNDER_LIVE_NOW); }
       else if (k == 67 && calls > 1000) { H->play(po); }
       else if (k == 71 && calls % 3 == 0) { H->stopTrack((int)(rnd() * 8), THUNDER_LIVE_NOW); }
+      else if (k == 79 && calls > 600 && calls % 2 == 0) { H->stop(THUNDER_LIVE_NOW); }   // stop (voices let go, waiting list cleared), the play above restarts it
+      else if (k == 83 && calls > 600) { thunder_live_play_opts pe = po; pe.has_only = 1; pe.only = 0; H->play(pe); }   // a song that ends at once: Players::songOver, ENDED, the 0.3 s timer, STOPPED
+      else if (k == 89 && calls > 600 && calls % 4 == 1) { H->bpm(90, frame + 5000); H->stop(frame + 9000); }   // a timed command and a timed stop
       else if (k == 73) { for (int i = 0; i < 20; i++) H->mixSet(i, THUNDER_LIVE_MIX_VOL, 100.0 + i, 0, frame + i * 300); }
-      int64_t f0 = frame; if (calls == 700) f0 += 777;   // one re-anchor
+      int64_t f0 = frame; if (calls == 700) f0 += 777; if (calls == 1500) f0 = frame / 2; if (calls == 2200) f0 = frame + 123456;   // three re-anchors: forward, backward, forward
       { rt_guard g; if (H->process(L, R, n, f0, 0)) return fail("LiveHost::process"); }
       frame = f0 + n; calls++;
       for (int i = 0; i < n; i++) { if (!(L[i] == L[i]) || !(R[i] == R[i])) finite = false; peak = std::max(peak, (double)std::fabs(L[i])); }
-      for (int r; (r = H->poll(buf, sizeof buf)) > 0;) recs++;
+      for (int r; (r = H->poll(buf, sizeof buf)) > 0;) { int o2 = 0; while (o2 < r) { thunder_live_ev_head hd; std::memcpy(&hd, buf + o2, sizeof hd); recs++; if (hd.type == THUNDER_LIVE_EV_STATE) { thunder_live_ev_state es; std::memcpy(&es, buf + o2, sizeof es); if (es.state == THUNDER_LIVE_ST_ENDED) endedSeen++; if (es.state == THUNDER_LIVE_ST_STOPPED) stoppedSeen++; } if (hd.type == THUNDER_LIVE_EV_HELD) heldSeen++; o2 += hd.bytes; } }
       if (pass) for (int r; (r = H->dumpStep(js, sizeof js)) > 0;) dumped++;
     }
     thunder_live_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; H->statsGet(&st);
     if (!finite || peak < 0.01) return fail("LiveHost run: silent or non-finite");
-    if (st.reanchors != 1 || st.quanta < 5000 || st.steps < 100 || st.cmds_applied < 50) return fail("LiveHost run did too little (re-anchors, quanta, steps or commands)");
+    if (st.reanchors != 3 || st.quanta < 5000 || st.steps < 100 || st.cmds_applied < 50) return fail("LiveHost run did too little (3 re-anchors, quanta, steps or commands)");
+    if (endedSeen < 1 || stoppedSeen < 2 || heldSeen < 1) return fail("LiveHost run never ended a song or never stopped (ENDED / STOPPED / HELD paths not exercised)");
     if (pass && dumped < 50) return fail("LiveHost step dump delivered too little");
-    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records, %ld dumped steps, no allocation in process\n", pass ? " (with the step dump)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, dumped);
+    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records (%d ENDED, %d STOPPED, %d HELD), %ld dumped steps, no allocation in process\n", pass ? " (with the step dump)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, endedSeen, stoppedSeen, heldSeen, dumped);
     delete H;
   }
   return 0;
