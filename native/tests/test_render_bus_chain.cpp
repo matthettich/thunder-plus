@@ -30,16 +30,17 @@ static std::string song(bool chain, const char* m0 = "{}", const char* m1 = null
   return s + "}";
 }
 struct Stereo { std::vector<float> L, R; };
-static thunder_render* make(const std::string& js, int stem, int64_t frames, const PadSet& ps) {
+// live: a hook on every bus (a live host: a muted bus still exists, busSync); not live: only on the heard ones (the web's offline pass(): routeTrack for `keep` only)
+static thunder_render* make(const std::string& js, int stem, int64_t frames, const PadSet& ps, bool live = false) {
   thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.use_frames = 1; o.frames = frames; o.stem = stem;
   thunder_render* r = thunder_render_create((const uint8_t*)js.data(), js.size(), &o, nullptr, 0); if (!r) { std::printf("create failed\n"); g_fail++; return nullptr; }
   installPads(r, ps);
   const uint32_t heard = r->R->heardMask();
-  for (int t = 0; t < 8; t++) if ((heard >> t & 1u) && r->R->mixer().plan().feedMask[t]) r->R->mixer().setChain(t, standIn, nullptr);
+  for (int t = 0; t < 8; t++) if ((live || (heard >> t & 1u)) && r->R->mixer().plan().feedMask[t]) r->R->mixer().setChain(t, standIn, nullptr);
   return r;
 }
 static Stereo readAll(thunder_render* r, int64_t n) { Stereo s; s.L.assign((size_t)n, 0); s.R.assign((size_t)n, 0); int64_t got = 0; while (got < n) { const int64_t k = thunder_render_read(r, s.L.data() + got, s.R.data() + got, std::min<int64_t>(4096, n - got)); if (k <= 0) break; got += k; } return s; }
-static Stereo render(const std::string& js, int stem, int64_t N, const PadSet& ps) { thunder_render* r = make(js, stem, N, ps); Stereo s; if (r) { s = readAll(r, N); thunder_render_free(r); } return s; }
+static Stereo render(const std::string& js, int stem, int64_t N, const PadSet& ps, bool live = false) { thunder_render* r = make(js, stem, N, ps, live); Stereo s; if (r) { s = readAll(r, N); thunder_render_free(r); } return s; }
 static double peakOf(const Stereo& s) { double p = 0; for (float v : s.L) p = std::max(p, (double)std::fabs(v)); for (float v : s.R) p = std::max(p, (double)std::fabs(v)); return p; }
 // max |a - k b| over both channels
 static double diff(const Stereo& a, const Stereo& b, double k) { double e = 0; for (size_t i = 0; i < a.L.size() && i < b.L.size(); i++) e = std::max(e, std::max(std::fabs(a.L[i] - k * b.L[i]), std::fabs(a.R[i] - k * b.R[i]))); return e; }
@@ -67,11 +68,13 @@ int main() {
     CHECK("solo on the last bus: the whole chain upstream stays", diff(s2, mix, 1) <= 1e-9);
     Stereo s1 = render(song(true, "{}", ("{\"solo\":true,\"vol\":" + std::to_string(kVolA) + "}").c_str(), ("{\"vol\":" + std::to_string(kVolB) + "}").c_str()), 0, N, ps);
     CHECK("solo on the middle bus: its source and the bus after it stay", diff(s1, mix, 1) <= 1e-9);
-    Stereo sm = render(song(true, "{\"solo\":true}", nullptr, ("{\"mute\":true,\"vol\":" + std::to_string(kVolB) + "}").c_str()), 0, N, ps);
-    CHECK("solo on the source with the last bus muted: silent (mute wins)", peakOf(sm) == 0); }
-  // a muted middle bus: it is heard only through the next bus, so the mix is silent
-  { Stereo mm = render(song(true, "{}", ("{\"mute\":true,\"vol\":" + std::to_string(kVolA) + "}").c_str(), ("{\"vol\":" + std::to_string(kVolB) + "}").c_str()), 0, N, ps);
-    CHECK("a muted middle bus: nothing reaches the master", peakOf(mm) == 0); }
+    Stereo sm = render(song(true, "{\"solo\":true}", nullptr, ("{\"mute\":true,\"vol\":" + std::to_string(kVolB) + "}").c_str()), 0, N, ps, true);
+    CHECK("solo on the source with the last bus muted: silent (mute wins; the buses exist)", peakOf(sm) == 0); }
+  // a muted middle bus is heard only through the next bus, so a host that keeps the buses (live) is silent ...
+  { const std::string mj = song(true, "{}", ("{\"mute\":true,\"vol\":" + std::to_string(kVolA) + "}").c_str(), ("{\"vol\":" + std::to_string(kVolB) + "}").c_str());
+    CHECK("a muted middle bus (buses kept): nothing reaches the master", peakOf(render(mj, 0, N, ps, true)) == 0);
+    // ... and the web's offline pass routes only the heard tracks, so there the source of a muted bus plays directly (the quirk noted in the spec; native does the same, not fixed)
+    CHECK("offline, as the web: the source of a muted middle bus is heard directly", diff(render(mj, 0, N, ps), ref, 1) <= 1e-6 * pk); }
   // stems: the bus B stem is the mix; the middle bus's stem is the source through bus A alone (bus B is not heard); the source's own stem is the source alone
   { const Stereo sb = render(js, 3, N, ps);
     CHECK("stem of the last bus = the mix", diff(sb, mix, 1) <= 1e-9);

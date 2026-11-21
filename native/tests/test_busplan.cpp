@@ -33,6 +33,9 @@ int main(int argc, char** argv) {
     } else { Json S = C.get("S"); patch = S.get("chainPatch"); for (int t = 0; t < kSongNT; t++) { chainOn[t] = S.arr("chainOn").at((size_t)t).asBool(); Json m = S.arr("mix").at((size_t)t); if (m.boolean("mute")) mute |= 1u << t; if (m.boolean("solo")) solo |= 1u << t; } }
     const BusPlan P = bus_plan(patch, chainOn);
     std::string why;
+    if (id == "cross") {   // SUPERSEDED by bus into bus: the old web (this checkout's index.html) said "a track with a Track In is no bus"; now 1 -> 4 is kept and 4 -> 1 (the higher source) is left out
+      if (P.feedMask[3] != 1u || P.targets[0] != 8u || P.targets[3] != 0u || P.feedMask[0] != 0u || P.pure != 1u || !P.loop || P.loopTo[3] != 1u) why += " (bus-into-bus loop rule)";
+      std::printf("%-28s superseded by bus into bus (loop: the closing cable of the higher source is left out)%s\n", id.c_str(), why.empty() ? "  ok" : ("  FAIL" + why).c_str()); if (!why.empty()) fails++; continue; }
     for (int t = 0; t < kSongNT; t++) {
       if ((double)P.feedMask[t] != W.arr("feeds").at((size_t)t).asNum()) why += " feeds[" + std::to_string(t) + "]";
       if ((double)P.targets[t] != W.arr("targets").at((size_t)t).asNum()) why += " targets[" + std::to_string(t) + "]";
@@ -53,7 +56,8 @@ int main(int argc, char** argv) {
       for (size_t j = 0; j < LE.size(); j++) { const int a = (int)LE.at(j).at(0).asNum(), b = (int)LE.at(j).at(1).asNum(); if (a < 0 || a >= kSongNT || b < 0 || b >= kSongNT || !(P.loopTo[a] >> b & 1u)) why += " loopEdges"; }
     }
     if ((double)chains_feed(patch, chainOn) != W.num("chainsFeed")) why += " chainsFeed";
-    if ((double)mix_audible(P, mute, solo) != W.num("audible")) why += " audible";
+    { const uint32_t nm = W.get("srcAll").missing() ? 0xffffffffu : 0xffffu;   // the bus-into-bus fixture was made with 16 tracks
+      if ((double)(mix_audible(P, mute, solo) & nm) != W.num("audible")) why += " audible"; }
     int buses = 0, srcs = 0; for (int t = 0; t < kSongNT; t++) { if (P.feedLen[t]) buses++; if (P.targets[t]) srcs++; }
     std::printf("%-28s %d bus(es), %d source(s)%s%s\n", id.c_str(), buses, srcs, why.empty() ? "  ok" : ("  DIFFERS:" + why).c_str(), why.empty() ? "" : "  FAIL");
     if (!why.empty()) fails++;
