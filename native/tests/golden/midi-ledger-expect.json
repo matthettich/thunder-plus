@@ -1,0 +1,288 @@
+{
+ "note": "Expected differences between the web app's MIDI ledgers and the native MidiSched (owner's decision, 19 Nov 20:45: suspected web bugs are FIXED in the native port, the ledgers stay the web's truth). Each rule: case, B number, op, why, count (the exact number of web messages it touches). Ops: gear/stop (the web's message is expected shifted), drop (a web message native does not send), add (a native message the web does not send), move (a web message expected at another time), zone (clock ticks checked by the B2 rule). test_midi_ledger.cpp applies them and checks every count; an unlisted difference fails.",
+ "rules": [
+  {
+   "case": "start-midway",
+   "B": "B8",
+   "op": "move",
+   "p": 0,
+   "ms": 3542.333333,
+   "to": 3503,
+   "bytes": "fc",
+   "count": 1,
+   "why": "the Stop is at the stop time + FX latency (web: at the last tick it had booked ahead, a phantom gap after the stop)"
+  },
+  {
+   "case": "loop",
+   "B": "B8",
+   "op": "move",
+   "p": 0,
+   "ms": 5542.333333,
+   "to": 5503,
+   "bytes": "fc",
+   "count": 1,
+   "why": "the Stop is at the stop time + FX latency (web: at the last tick it had booked ahead, a phantom gap after the stop)"
+  },
+  {
+   "case": "start-stop",
+   "B": "B8",
+   "op": "move",
+   "p": 0,
+   "ms": 1938.166667,
+   "to": 1903,
+   "bytes": "fc",
+   "count": 1,
+   "why": "the Stop is at the stop time + FX latency (web: at the last tick it had booked ahead, a phantom gap after the stop)"
+  },
+  {
+   "case": "two-ports",
+   "B": "B3",
+   "op": "stop",
+   "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
+   "count": 2
+  },
+  {
+   "case": "tempo-clock",
+   "B": "B3",
+   "op": "stop",
+   "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
+   "count": 1
+  },
+  {
+   "case": "tempo-live",
+   "B": "B3",
+   "op": "stop",
+   "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
+   "count": 1
+  },
+  {
+   "case": "song-end",
+   "B": "B3",
+   "op": "stop",
+   "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
+   "count": 1
+  },
+  {
+   "case": "clock-port-toggle",
+   "B": "B3",
+   "op": "stop",
+   "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
+   "count": 1
+  },
+  {
+   "case": "fx-latency",
+   "B": "B3",
+   "op": "stop",
+   "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
+   "count": 1
+  },
+  {
+   "case": "two-ports",
+   "B": "B3",
+   "op": "gear",
+   "bytes0": [
+    "f8",
+    "fa",
+    "fb",
+    "f2"
+   ],
+   "why": "Start and the clock ticks get the port's Gear delay like the notes (web: none), so the first note never precedes Start",
+   "count": 86
+  },
+  {
+   "case": "fx-latency",
+   "B": "B3",
+   "op": "gear",
+   "bytes0": [
+    "f8",
+    "fa",
+    "fb",
+    "f2"
+   ],
+   "why": "Start and the clock ticks get the port's Gear delay like the notes (web: none), so the first note never precedes Start",
+   "count": 31
+  },
+  {
+   "case": "chan-share",
+   "B": "B4",
+   "op": "add",
+   "p": 0,
+   "ms": 708,
+   "bytes": "823c00",
+   "count": 1,
+   "why": "two tracks, one port + channel, the same pitch: the second track's retrigger sends an OFF first (web: a bare second ON)"
+  },
+  {
+   "case": "chan-share",
+   "B": "B4",
+   "op": "drop",
+   "p": 0,
+   "ms": 833,
+   "bytes": "823c00",
+   "count": 1,
+   "why": "the first track's OFF ends only its own hold: the other track still holds the pitch (web: one OFF ended both); the OFF goes out when the last holder lets go (1083, as the web)"
+  },
+  {
+   "case": "velocity",
+   "B": "B1",
+   "op": "move",
+   "p": 0,
+   "ms": 1333,
+   "to": 1208,
+   "bytes": "804000",
+   "count": 1,
+   "why": "a silent note (vol 00) ends the mono note that was sounding at its own time (web: at the next note, 125 ms later)"
+  },
+  {
+   "case": "start-stop",
+   "B": "B9",
+   "op": "drop",
+   "p": 0,
+   "ms": 1900,
+   "bytes": "804100",
+   "count": 1,
+   "why": "no OFF for a note whose ON the STOP dropped (web: an OFF at the stop for a note that never started)"
+  },
+  {
+   "case": "start-stop",
+   "B": "B9",
+   "op": "drop",
+   "p": 0,
+   "ms": 2084,
+   "bytes": "804100",
+   "count": 1,
+   "why": "the same note's own OFF, booked ahead (web: sent as an OFF with no ON)"
+  },
+  {
+   "case": "loop",
+   "B": "B9",
+   "op": "drop",
+   "p": 0,
+   "ms": 5500,
+   "bytes": "803c00",
+   "count": 1,
+   "why": "no OFF for a note whose ON the STOP dropped (web: an OFF at the stop for a note that never started)"
+  },
+  {
+   "case": "loop",
+   "B": "B9",
+   "op": "drop",
+   "p": 0,
+   "ms": 5584,
+   "bytes": "803c00",
+   "count": 1,
+   "why": "the same note's own OFF, booked ahead (web: sent as an OFF with no ON)"
+  },
+  {
+   "case": "start-midway",
+   "B": "B9",
+   "op": "drop",
+   "p": 0,
+   "ms": 3500,
+   "bytes": "803c00",
+   "count": 1,
+   "why": "no OFF for a note whose ON the STOP dropped (web: an OFF at the stop for a note that never started)"
+  },
+  {
+   "case": "start-midway",
+   "B": "B9",
+   "op": "drop",
+   "p": 0,
+   "ms": 3584,
+   "bytes": "803c00",
+   "count": 1,
+   "why": "the same note's own OFF, booked ahead (web: sent as an OFF with no ON)"
+  },
+  {
+   "case": "tempo-clock",
+   "B": "B2",
+   "op": "zone",
+   "p": 0,
+   "from": 2355,
+   "until": 2570,
+   "ms": 20.8333,
+   "to": 27.7778,
+   "count": 10,
+   "why": "ticks around the TPO 90 (120 -> 90 bpm): the web's ticks before the change are already at the new, slower spacing and irregular; native integrates the tempo map forward: regular 120 spacing until the change takes effect, then 90; monotonic, every interval between the two tick lengths",
+   "count2": 10
+  },
+  {
+   "case": "tempo-clock",
+   "B": "B12",
+   "op": "realign",
+   "p": 0,
+   "from": 2575,
+   "until": 8000,
+   "count": 90,
+   "count2": 92,
+   "why": "clock realigned after TPO: the web integrates the new tempo over the interval that was timed at the old one, so every tick after the TPO is 1.5 ticks (about 42 ms at 120 bpm) behind the notes for good; native integrates each interval with the tempo in force when its step started, so tick k is on beat k/24 through any number of TPOs"
+  },
+  {
+   "case": "tempo-live",
+   "B": "B2",
+   "op": "zone",
+   "p": 0,
+   "from": 2055,
+   "until": 2340,
+   "ms": 17.857,
+   "to": 20.8333,
+   "count": 15,
+   "why": "live tempo change 120 -> 140: same rule (web ticks bunch up before the change takes effect)",
+   "count2": 14
+  },
+  {
+   "case": "tempo-live",
+   "B": "B2",
+   "op": "zone",
+   "p": 0,
+   "from": 3005,
+   "until": 3300,
+   "ms": 17.857,
+   "to": 25.641,
+   "count": 15,
+   "why": "live tempo change 140 -> 97.5: same rule",
+   "count2": 16
+  },
+  {
+   "case": "start-stop",
+   "B": "B9",
+   "op": "add",
+   "p": 0,
+   "ms": 1900,
+   "bytes": "804000",
+   "count": 1,
+   "why": "companion to B9, found while building: the note that was sounding at the STOP lost its own OFF to the clear; the web leaves it to All Notes Off (CC 123), native sends the OFF for every note that really sounds, so a synth that ignores CC 123 does not hang"
+  },
+  {
+   "case": "start-midway",
+   "B": "B9",
+   "op": "add",
+   "p": 0,
+   "ms": 3500,
+   "bytes": "804000",
+   "count": 1,
+   "why": "companion to B9, found while building: the note that was sounding at the STOP lost its own OFF to the clear; the web leaves it to All Notes Off (CC 123), native sends the OFF for every note that really sounds, so a synth that ignores CC 123 does not hang"
+  },
+  {
+   "case": "loop",
+   "B": "B9",
+   "op": "add",
+   "p": 0,
+   "ms": 5500,
+   "bytes": "804300",
+   "count": 1,
+   "why": "companion to B9, found while building: the note that was sounding at the STOP lost its own OFF to the clear; the web leaves it to All Notes Off (CC 123), native sends the OFF for every note that really sounds, so a synth that ignores CC 123 does not hang"
+  },
+  {
+   "case": "clock-port-toggle",
+   "B": "B3",
+   "op": "move",
+   "p": 1,
+   "ms": 0,
+   "to": 2600,
+   "bytes": "fc",
+   "count": 1,
+   "why": "the web's cable-change Stop is sent with no timestamp (the ledger shows ms 0): immediately, at 2600; native stamps it at the change"
+  }
+ ]
+}

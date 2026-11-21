@@ -1,0 +1,21 @@
+{
+ "case": "chan-share",
+ "mode": "native",
+ "why": "two tracks, two instruments, ONE channel and port: MIDI cannot tell their notes apart (the same key: one OFF ends both)",
+ "setup": {"bpm":120,"swing":50,"lpb":4,"ticks":6,"ports":["A"],"clock":[],"gearDelayMs":[0,0,0,0],"outputLatencyS":0,"pdcT":0,"masteringOn":false,"playAtMs":500,"play":"song","playOpts":{},"actions":[],"endMs":4000,"insts":{"0":{"mo":1,"mch":2,"mpt":0,"pbr":2},"1":{"mo":1,"mch":2,"mpt":0,"pbr":2}},"tracks":[0,1]},
+ "seqEvents": {"beat":8,"note":3,"off":2},
+ "counts": {"on":3,"off":3,"cc":1},
+ "droppedByClear": 0,
+ "drops": [{"sent":1768,"port":"A","what":"clear","dropped":0}],
+ "pad": [],
+ "findings": [],
+ "msgs": [
+  {"ms":583,"sent":500,"p":0,"id":"A","k":"ev","b":[146,60,127]},
+  {"ms":708,"sent":500,"p":0,"id":"A","k":"ev","b":[146,60,127]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[130,60,0]},
+  {"ms":958,"sent":725,"p":0,"id":"A","k":"ev","b":[146,62,127]},
+  {"ms":1083,"sent":850,"p":0,"id":"A","k":"ev","b":[130,60,0]},
+  {"ms":1768,"sent":1768,"p":0,"id":"A","k":"release","b":[130,62,0]},
+  {"ms":1768,"sent":1768,"p":0,"id":"A","k":"release","b":[178,123,0]}
+ ]
+}

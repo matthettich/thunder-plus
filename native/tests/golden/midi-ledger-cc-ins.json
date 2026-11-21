@@ -1,0 +1,21 @@
+{
+ "case": "cc-ins",
+ "mode": "native",
+ "why": "the INS command picks the instrument a CC / PGM goes to (another port and channel), on a row with no note",
+ "setup": {"bpm":120,"swing":50,"lpb":4,"ticks":6,"ports":["A","B"],"clock":[],"gearDelayMs":[0,0,0,0],"outputLatencyS":0,"pdcT":0,"masteringOn":false,"playAtMs":500,"play":"song","playOpts":{},"actions":[],"endMs":2000,"insts":{"0":{"mo":1,"mch":0,"mpt":0,"pbr":2},"1":{"mo":1,"mch":7,"mpt":1,"pbr":2,"cc":[1,2,3,4]}},"tracks":[0]},
+ "seqEvents": {"beat":4,"mpg":1,"mcc":2,"note":1},
+ "counts": {"pgm":1,"cc":4,"on":1,"off":1},
+ "droppedByClear": 0,
+ "drops": [{"sent":1258,"port":"A","what":"clear","dropped":0},{"sent":1258,"port":"B","what":"clear","dropped":0}],
+ "pad": [],
+ "findings": [],
+ "msgs": [
+  {"ms":582,"sent":500,"p":1,"id":"B","k":"ev","b":[199,9]},
+  {"ms":583,"sent":500,"p":1,"id":"B","k":"ev","b":[183,1,33]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[176,74,11]},
+  {"ms":833,"sent":600,"p":0,"id":"A","k":"ev","b":[144,60,127]},
+  {"ms":1258,"sent":1258,"p":0,"id":"A","k":"release","b":[128,60,0]},
+  {"ms":1258,"sent":1258,"p":1,"id":"B","k":"release","b":[183,123,0]},
+  {"ms":1258,"sent":1258,"p":0,"id":"A","k":"release","b":[176,123,0]}
+ ]
+}
