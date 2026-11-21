@@ -29,8 +29,8 @@ using Act = std::function<void(LivePool&)>;
 struct Script { std::vector<std::pair<double, Act>> evs; double secs = 6; };   // (the time an event is handed over at, what it does)
 
 static SeqEvent mkNote(double t, int track, double rate) { SeqEvent e; e.type = SEV_NOTE; e.t = t; e.track = track; e.pad = 0; e.rate = rate; e.gain = 1; e.pan = 128; return e; }
-static Act N(double t, int tr, double rate, bool poly = false, int col = 0, bool slide = false) {
-  SeqEvent e = mkNote(t, tr, rate); e.poly = poly; e.col = col; if (slide) { e.has |= SH_SLIDE; e.slideFrom = rate * 0.5; e.slideDur = 0.15; }
+static Act N(double t, int tr, double rate, bool poly = false, int col = 0, bool slide = false, double slideDur = 0.15) {
+  SeqEvent e = mkNote(t, tr, rate); e.poly = poly; e.col = col; if (slide) { e.has |= SH_SLIDE; e.slideFrom = rate * 0.5; e.slideDur = slideDur; }
   return [e](LivePool& lp) { bool p; lp.note(e, 0, 120, nullptr, 0, &p); };
 }
 static Act O(double t, int tr) { SeqEvent e; e.type = SEV_OFF; e.t = t; e.track = tr; return [e](LivePool& lp) { lp.off(e); }; }
@@ -126,6 +126,10 @@ int main(int argc, char** argv) {
     { Script s; s.secs = 5;
       at(s, 0.10, N(0.10, 0, 1.0)); at(s, 0.3, O(0.3, 0)); at(s, 1.0, ENG(1.0, 2, 55, 0.6, 7)); at(s, 1.5, TEMPO(1.5, 100)); at(s, 2.7, N(2.7, 2, 0.8)); at(s, 2.9, O(2.9, 2)); at(s, 4.0, N(4.0, 2, 1.2)); at(s, 4.1, O(4.1, 2));
       expect(kind, "a node that never ran", s); }
+    // 4b. a slide that outlasts the voice: the rate lane is still moving while the node is idle (the vox core latches the pitch from it every idle block), so the skip must wait until the lane is constant
+    { Script s; s.secs = 8;
+      at(s, 0.10, N(0.10, 0, 1.2, false, 0, true, 3.0)); at(s, 0.30, O(0.30, 0)); at(s, 2.0, N(2.0, 0, 0.8)); at(s, 2.2, O(2.2, 0)); at(s, 6.0, N(6.0, 0, 1.5)); at(s, 6.2, O(6.2, 0));
+      expect(kind, "a slide that outlasts the voice", s); }
     // 5. a note that is never released before the stretch cannot be skipped (the voice has not ended), and a long hold ends only with its off
     { Script s; s.secs = 6;
       at(s, 0.10, N(0.10, 0, 1.0)); at(s, 2.0, O(2.0, 0)); at(s, 4.0, N(4.0, 0, 0.7)); at(s, 4.2, O(4.2, 0));
