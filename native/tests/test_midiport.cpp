@@ -482,7 +482,9 @@ struct TokSink {
   }
   static void clearFn(void*, uint64_t) {}
 };
-static void threadsDevs(bool renumber) {
+// order 0: the shell's contract (clock_map BEFORE thunder_midi_process of the block: the pair is known in advance); order 1: the old order with a 3 ms gap after the FIRST process (midiout_flake): the first records are
+// drained before any map exists and are dropped, counted in dropped_nomap, and the ledger still balances.
+static void threadsDevs(bool renumber, int order = 0) {
   thunder_midi* h = thunder_midi_create(48000, nullptr, 0); TokSink ts; thunder_midiout_sink sk; sk.user = &ts; sk.now_ns = TokSink::nowFn; sk.send = TokSink::sendFn; sk.clear = TokSink::clearFn; sk.caps = 0;
   thunder_midiout* o = thunder_midiout_create(h, 48000, &sk);
   thunder_midiout_dev dv[2]; std::memset(dv, 0, sizeof dv); std::strcpy(dv[0].id, "X"); std::strcpy(dv[0].name, "X"); dv[0].token = 10; std::strcpy(dv[1].id, "Y"); std::strcpy(dv[1].name, "Y"); dv[1].token = 11;
@@ -492,7 +494,10 @@ static void threadsDevs(bool renumber) {
   std::atomic<bool> stop{false}; const int64_t t0 = TokSink::nowFn(nullptr);
   std::thread audio([&] { int64_t b = 1; while (!stop.load()) { const double now = (double)b * 128 / 48000; const int64_t due = t0 + (int64_t)(now * 1e9);
     while (TokSink::nowFn(nullptr) < due && !stop.load()) std::this_thread::sleep_for(std::chrono::microseconds(100));
-    thunder_midi_process(h, now, 128.0 / 48000, now, 120, 0); thunder_midiout_clock_map(o, b * 128, due); b++; } });
+    if (order == 0) thunder_midiout_clock_map(o, b * 128, due);
+    thunder_midi_process(h, now, 128.0 / 48000, now, 120, 0);
+    if (order == 1) { if (b == 1) std::this_thread::sleep_for(std::chrono::milliseconds(3)); thunder_midiout_clock_map(o, b * 128, due); }
+    b++; } });
   std::thread sender([&] { while (!stop.load()) { thunder_midiout_pump(o, nullptr); std::this_thread::sleep_for(std::chrono::microseconds(200)); } });
   uint64_t posted = 0; int k = 0; const auto c0 = std::chrono::steady_clock::now(); auto lastPost = c0;
   while (std::chrono::steady_clock::now() - c0 < std::chrono::milliseconds(1500)) {
@@ -505,8 +510,13 @@ static void threadsDevs(bool renumber) {
   double now = (double)(TokSink::nowFn(nullptr) - t0) / 1e9;
   for (int i = 0; i < 400; i++) { thunder_midi_process(h, now, 128.0 / 48000, now, 120, 0); thunder_midiout_clock_map(o, (int64_t)std::llround(now * 48000), TokSink::nowFn(nullptr)); thunder_midiout_pump(o, nullptr); std::this_thread::sleep_for(std::chrono::milliseconds(1)); now = (double)(TokSink::nowFn(nullptr) - t0) / 1e9; }
   const auto st = statsOf(o);
-  CHECK(posted > 500 && ts.sent.load() == posted, "L1%s: every posted note reached the sink once (posted %llu, sent %llu, %d list swaps)", renumber ? "/L2 renumbered" : "", (unsigned long long)posted, (unsigned long long)ts.sent.load(), k);
+  if (order == 1) { CHECK(st.dropped_nomap > 0 && ts.sent.load() + st.dropped_nomap == posted, "midiout_flake: with the old order the first records are dropped as no-map and counted (posted %llu, sent %llu, no-map %llu)", (unsigned long long)posted, (unsigned long long)ts.sent.load(), (unsigned long long)st.dropped_nomap); }
+  else CHECK(posted > 500 && st.dropped_nomap == 0 && ts.sent.load() == posted, "L1%s: every posted note reached the sink once (posted %llu, sent %llu, no-map %llu, %d list swaps)", renumber ? "/L2 renumbered" : "", (unsigned long long)posted, (unsigned long long)ts.sent.load(), (unsigned long long)st.dropped_nomap, k);
   CHECK(st.dropped_gone == 0 && st.send_errors == 0 && st.dropped_cleared == 0, "L1%s: nothing was dropped as gone (%llu), no send error (%llu)", renumber ? "/L2 renumbered" : "", (unsigned long long)st.dropped_gone, (unsigned long long)st.send_errors);
+  { thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; thunder_midi_stats_get(h, &cs);   // THE LEDGER: every record the core made is sent, or in exactly one drop counter (no CLEAR in this run, no CAP_TS: nothing is counted twice)
+    const uint64_t made = cs.sent, accounted = st.sent + st.dropped_gone + st.dropped_cleared + st.dropped_nomap + st.dropped_late_ticks + st.queue_full;
+    CHECK(cs.ring_full == 0 && made == accounted, "L1%s ledger: the core made %llu records (ring full %llu); sent %llu + gone %llu + cleared %llu + no-map %llu + late ticks %llu + queue full %llu = %llu", renumber ? "/L2" : "", (unsigned long long)made, (unsigned long long)cs.ring_full,
+          (unsigned long long)st.sent, (unsigned long long)st.dropped_gone, (unsigned long long)st.dropped_cleared, (unsigned long long)st.dropped_nomap, (unsigned long long)st.dropped_late_ticks, (unsigned long long)st.queue_full, (unsigned long long)accounted); }
   CHECK(ts.wrong.load() == 0, "L2%s: no message reached the wrong device token (%llu)", renumber ? " renumbered" : "", (unsigned long long)ts.wrong.load());
   std::printf("L1/L2 (%s): %llu notes posted, %llu sent, %d set_devices, dropped_gone %llu\n", renumber ? "renumbered" : "same list", (unsigned long long)posted, (unsigned long long)ts.sent.load(), k, (unsigned long long)st.dropped_gone);
   thunder_midiout_free(o); thunder_midi_free(h);
@@ -626,7 +636,7 @@ static void testReview() {
 }
 
 int main(int argc, char** argv) {
-  if (argc > 1 && std::strcmp(argv[1], "--threads") == 0) { threadsOnce(0); threadsOnce(THUNDER_MIDIOUT_CAP_TS); threadsDevs(false); threadsDevs(true); std::printf(fails ? "midiport threads: FAILED\n" : "midiport threads: ok\n"); return fails ? 1 : 0; }
+  if (argc > 1 && std::strcmp(argv[1], "--threads") == 0) { threadsOnce(0); threadsOnce(THUNDER_MIDIOUT_CAP_TS); threadsDevs(false); threadsDevs(true); threadsDevs(false, 1); std::printf(fails ? "midiport threads: FAILED\n" : "midiport threads: ok\n"); return fails ? 1 : 0; }
   test12(); test6(); testTokens(); testGoneToken(); testRates(); testReview(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
   std::printf(fails ? "midiport: %d FAILED\n" : "midiport: all passed\n", fails);
   return fails ? 1 : 0;

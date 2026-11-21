@@ -9,8 +9,10 @@
              lock of its own, or a copy swapped atomically; the core takes none). Nothing else needs a lock: clock_map stays lock-free, for the audio callback.
              A send that returns < 0 marks the device's cable gone UNTIL THE NEXT set_devices (which gives it another chance): a shell that lists only on hot-plug must call set_devices again to revive it.
    BEFORE THE FIRST MAP Everything the pump drains before the first thunder_midiout_clock_map is dropped (dropped_nomap), a Start included: the shell must call clock_map once before PLAY
-             (thunder_midi_start). clock_map is meant to be called from the audio callback, right after thunder_midi_process (the floor compares the callback's clock with the last block start);
-             from a timer it adds up to the age of the pair to the floor's shift.
+             (thunder_midi_start). In the audio callback call clock_map BEFORE thunder_midi_process (or midi_begin) of the block, not after it: the pair (the frame the block starts at, the host time it is heard) is
+             known in advance, and a pump that runs between the block's process and its clock_map would drain the block's records (the first PLAY's Start and first notes) while no map exists and drop them
+             (midiport_threads flake, 21 Nov: 4 notes in 2996, all in dropped_nomap). After the first map the order does not matter (the floor compares the callback's clock with the last block start, so the
+             pair is at most one block older). From a timer it adds up to the age of the pair to the floor's shift.
    LIFETIME  thunder_midiout_free: after BOTH the sender thread (pump) and every thread that calls clock_map (the audio callback) have stopped.
    THREADS   CONTROL: create, free, set_devices, assign, set_clock, set_gear, set_playing, set_out_latency, get_port: the ONE thread that also calls the thunder_midi_set_* calls
              (single producer); set_devices, assign, set_clock, set_gear and set_playing re-sync the scheduler's ports and return THUNDER_MIDIOUT_E_BUSY if its command ring was full (the table is
