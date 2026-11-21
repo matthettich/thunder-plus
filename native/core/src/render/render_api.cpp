@@ -302,7 +302,8 @@ int thunder_render_stem_tracks(thunder_render* r, int32_t* out, int cap) {
     const BusPlan& P = r->R->mixer().plan();   // the patch's plan, as the page's busPlan(): a bus is a track with sources (BP.feeds), a pure source plays only through its bus
     const uint32_t aud = mix_audible(P, mute, solo);
     uint32_t keep = aud & has;
-    for (int b = 0; b < kSongNT; b++) if (P.feedMask[b] && !(keep >> b & 1u) && (aud >> b & 1u) && (P.feedMask[b] & keep)) keep |= 1u << b;
+    for (bool more = true; more;) { more = false;   // busStemPlan: until nothing is added (a bus that only a bus feeds is in too)
+      for (int b = 0; b < kSongNT; b++) if (P.feedMask[b] && !(keep >> b & 1u) && (aud >> b & 1u) && (P.feedMask[b] & keep)) { keep |= 1u << b; more = true; } }
     uint32_t list = keep;
     for (int t = 0; t < kSongNT; t++) if ((keep >> t & 1u) && (P.pure >> t & 1u) && (P.targets[t] & keep)) list &= ~(1u << t);   // inside its bus's stem
     int n = 0;
