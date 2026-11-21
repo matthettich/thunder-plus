@@ -180,6 +180,8 @@ else()
   add_test(NAME mix COMMAND test_mix)
   add_test(NAME busplan COMMAND test_busplan)
 endif()
+# bus into bus (web build 651): the plan against the web's own answers, committed (no Node needed)
+add_test(NAME busplan_bib COMMAND test_busplan ${CMAKE_CURRENT_SOURCE_DIR}/golden/bus-into-bus-native.json)
 
 # U10: latency compensation. pdc_plan against the web app's own pdcPlan (tools/pdc-dump.mjs, a Node vm, hand-made songs and sounds/).
 add_executable(test_pdc test_pdc.cpp)
@@ -1031,3 +1033,9 @@ target_link_libraries(test_render_sf_oom PRIVATE thunder_core)
 target_include_directories(test_render_sf_oom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(test_render_sf_oom PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME render_sf_oom COMMAND test_render_sf_oom)
+
+# bus into bus: a two-bus chain through the offline renderer (analytic reference), transitive solo, stems through any depth
+add_executable(test_render_bus_chain test_render_bus_chain.cpp)
+target_link_libraries(test_render_bus_chain PRIVATE thunder_core)
+target_include_directories(test_render_bus_chain PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME render_bus_chain COMMAND test_render_bus_chain)

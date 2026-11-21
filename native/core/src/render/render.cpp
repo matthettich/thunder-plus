@@ -44,7 +44,9 @@ bool SongRenderer::setStem(int track) {
   if (track < 0 || track >= kSongNT) return false;
   const uint32_t aud = mix_.audibleMask();   // mute / solo as the song has them (not yet forced)
   uint32_t m = 1u << track;
-  m |= mix_.plan().feedMask[track] & aud;   // a bus's stem plays its audible sources with it (pass's k2, :24228: from the patch's plan, as the page, whether or not a chains host has made the bus yet)
+  // a bus's stem plays its audible sources with it, and theirs through any depth (busClosure: a walk over the feeds that adds a track only when it is audible, so a muted middle bus
+  // does not pull in what only feeds it); from the patch's plan, as the page, whether or not a chains host has made the bus yet
+  for (bool more = true; more;) { more = false; for (int b = 0; b < kSongNT; b++) if ((m >> b & 1u) && (mix_.plan().feedMask[b] & aud & ~m)) { m |= mix_.plan().feedMask[b] & aud; more = true; } }
   stem_ = track; mchain_.reset(); mix_.setMasterFx(nullptr, nullptr);
   mix_.setHeard(m);
   return true;
