@@ -45,4 +45,6 @@ Each was applied to the code, the named test went red, and the change was undone
 
 ## Test results so far
 - Release, full ctest: 213 of 213 passed (1 skipped: pumpsynth_refused) before the four new tests were registered; the four (live_transport, live_events, live_pads, live_threads) and live_equals_render, live_step_dump, live_pads_epoch pass (217 registered). rt_core (the harness incl. LiveHost with and without the dump) passes.
-- Checkpoint: the whole of scope A and B is built and green in Release. NEXT: ASan+UBSan run of the tests whose names contain live, render, players, seq, voice, mix, rt_ (reconfigure with -DTHUNDER_SANITIZE=ON, `ctest -R`), TSan run of live_threads and live_pads_epoch, then the PR into `native` (REST), delete the build dir.
+- ASan + UBSan (THUNDER_SANITIZE=ON, tests whose names contain live, render, players, seq, voice, mix, rt_): 60 of 60 passed, including rt_core, live_equals_render, live_step_dump, live_transport, live_events, live_pads, live_threads, live_pads_epoch.
+- TSan (-fsanitize=thread, `-fno-sanitize=vptr`): live_threads and live_pads_epoch pass, no report.
+- Complete: scope A and B. Remaining for later units: scope C (see above). The PR into `native` is open from this branch.
