@@ -1,0 +1,115 @@
+# Verification of PR #278 (`n1/midiout-norecall`, head 13b9a3d6, base `native`)
+
+**VERDICT: MERGE AFTER FIXES.** No blocking finding for the Android beta: on a stamped Android port with a realistic song the Stop now leaves nothing sounding, and a recalling sink is byte-identical to before except in the already-due race. Two should-fix items before the CoreMIDI / WinMM sinks are written (F1 the 256-slot ring can lose a release; F2 the `clear` contract text steers a sink writer into a lost-message bug) and a set of test gaps (F5). Nothing was changed on the PR's branch.
+
+Method: read the diff against `origin/native`; built `test_midiout_norecall` and `test_midiport` (both pass, Release, `-j1`); wrote a verifier harness (NOT committed; random raw note scripts through the real scheduler, `thunder_midiout` pump and clock map on a fake clock, two devices, four sink modes, restart + second Stop, CC bursts, about 40,000 runs) and a deterministic repro; mutated `applyClear` 15 ways and ran the builder's test and the harness against each. Harness sources were in `/home/claude/v278/` (fuzz.cpp, repro.cpp), not part of this branch.
+
+## Findings
+
+### F1 (should-fix) The 256-slot `hand[]` ring can miss a post-Stop note-on: stuck note when the effective latency is negative and the stream is dense
+`native/core/src/midi/midiport.cpp` pump step 3, the line `if (early && at > now) { ... h.done = false; ... }` (about :422), and `applyClear` :189-:196 / :213-:228 (the set P is built only from `hand[]`).
+
+Facts from the code: a message is recorded in `hand[]` only when handed over early (`at > now` after the send). The slot guard (`slot.live && slot.at > now` -> not early, about :401) means a slot is overwritten only when its message is already due. So a note-on that is still in the future can never be evicted; the ring can only lose a note-on that is already due, or one that was sent without being recorded (history full, so it went out in the 0.5 ms spin window, or the first-seen-already-due path).
+
+For that to matter the CLEAR must be pushed AFTER the pump has already sent a note-on whose frame is after the marker. That needs a negative effective latency: marker frame earlier (in host time) than the moment the Stop is pushed, i.e. `output latency + Gear + (0 for a user Stop, 10 ms for engineStop)` below zero. Gear goes down to -50 ms and the Fold's measured output latency is 26 ms, so Gear <= -36 ms (engineStop) or <= -26 ms (user Stop) is a legal and plausible setting for a slow synth.
+
+Sequence (deterministic repro, one device, sink `clear` returns INT64_MAX, latency 0): note-on e at marker + 2 ms; Stop pushed 14 ms AFTER the marker's host time (negMs 24 = Gear -24 incl. the engineStop +10); 300 CCs stamped over the next 30 ms (about 10k msg/s):
+- 0..260 CCs: e is released (`released_after_stop` 1).
+- 300 CCs: note-ons 1, note-offs 0, `released_after_stop` 0, `may_hang` 0. STUCK NOTE, nothing in the stats says so.
+- With a positive effective latency, or 300 CCs over 60 ms, it does not happen. Threshold is about 270 hand-overs after e (ring 256 + the 20 ms horizon).
+Same result on all four sink modes (NULL, INT64_MAX, R in the middle, R = 0 since e is already due). In the random harness 6 of 2000 runs failed at 100 extra CCs, 159 of 2000 at 500.
+
+How realistic for a 33-track song: see item 9 below. Not realistic for plain note songs; possible with ramp / LFO / pitch-bend lanes on many tracks at once combined with a negative effective latency. Before this PR the same notes were stuck, so this is not a regression; it is the remaining hole in a change whose purpose is "a Stop never leaves a note sounding".
+
+Fix: keep a second, small structure for notes only, recorded for EVERY note message the pump sends to a TS sink (early or not, at <= now too): either a ring of 256 note messages (a CC / bend burst cannot evict it) or, better, a table indexed by (cable, channel, note) holding the last sent message's {frame, stamp, is_on, token}: 4 cables-by-ports x 16 x 128 entries is under 100 KB and fixed. At CLEAR: for each entry whose last message is a note-on with frame > marker frame and stamp <= R, send the release. That also removes the nested `last` scan (O(256^2) worst case), the `done` bookkeeping and F3. Add a test: latency 0, Gear -50, 300 CCs in 30 ms.
+
+### F2 (should-fix) The `clear` comment in `midiport.h` is not exact for a later CoreMIDI / WinMM sink, and one sentence is wrong
+`native/core/include/thunder/midiport.h:75-81`.
+1. "A sink that recalls only part must return INT64_MAX": wrong direction. INT64_MAX tells the core nothing was recalled: it does not replay anything. A flush that really dropped messages (CoreMIDI `MIDIFlushOutput` drops everything pending, pre-marker note-offs included) and then returned INT64_MAX loses those messages and leaves their notes on. The safe answer for a flush-everything sink is R = the time of the flush (0 is fine), never INT64_MAX. State it: "return INT64_MAX only if you did not drop anything".
+2. The contract is a partition: stamp > R was dropped, stamp <= R was delivered. A real flush cannot guarantee that for stamps in (core's clock read, the flush instant]: those may be sent, dropped or in flight. Say which way the sink must err and where to read the clock. For pre-marker messages the safe side is an earlier R (replay, at worst a duplicate); for post-marker note-ons the safe side is a later R (they get a release; at worst a harmless extra note-off). A single R cannot serve both; the text should say "read the clock immediately BEFORE the flush; messages stamped within one flush latency after it may be replayed (duplicate) and a post-marker note-on in that window will be dropped by the core without a release" or, better, have `clear` return two numbers, or have the core release every post-marker note-on regardless of R (cheap: an extra note-off).
+3. "R in the past" is silently clamped to t (:191). The text says "0 or any time not after the core's own clock"; it should say a sink must not return a past R when it actually recalled something stamped before the core's clock, because those messages are then treated as played and never replayed.
+4. "R far in the future" = INT64_MAX in effect; not stated. Thread: stated ("on the pump thread") correctly. The text does not say `clear` must not drop already-due messages or messages of another device.
+5. `stats.may_hang` doc (:106) was not updated: a failed release send now sets it (F4).
+
+### F3 (should-fix, low) A release is not recorded in `hand[]`, so a later flush can drop it
+`midiport.cpp:222-227`: the release is sent with stamp `max(e.at + 1 ms, t)` (up to 21 ms in the future on a TS sink) but never stored. A second CLEAR for the same device on a sink that recalls part (R in the middle, or a CoreMIDI sink whose R is about t) recalls stamps after its R, which includes the pending release; nothing replays it; the note stays on. Window: from the first CLEAR until the release's stamp (<= 1 ms for R = 0 and for the Android unstamped port; up to R - t + 1 ms for a middle R). Not reachable on the Android shell today (no flush; the unstamped port's held release is dropped only by a second `clearDev` within about 1 ms). Fix: store each release in `hand[]` (live, done = true, frame = e's frame so it counts as "before" a later marker) so the existing replay covers it; with the F1 table this falls out.
+
+### F4 (note) Failed release path
+`midiport.cpp:224`: after the first failed release the loop keeps sending a release for every other note-on (the replay loop short-circuits with `failed`; this one does not): N syscalls and N counts of `send_errors` / `dropped_gone` on a gone device. It sets `may_hang = 1` (the shell then sends PANIC to a device that is gone: harmless) and `markGone(devs[k])`: with the token that failed, a replug with a new token is not muted (checked: `resolve` compares the mark's token); a transient failure on the still-current token mutes the cable until the next `set_devices`, as the replay path already does. Fix: short-circuit after the first failure; document `may_hang` (F2.5).
+
+### F5 (note, but read item 8) Test gaps
+The builder's test cannot kill 12 of 15 mutants I tried (list in item 8); no test covers the unstamped Android port with R = now + 50 us (note-on sent under the 50 us rule, `flushDeferred`), an R in the middle, a CLEAR with two devices, a second CLEAR, ring wrap, a failing release, or an old-size (96 byte) `stats_get` caller. `Result.clears`, `.cleared`, `.sent` are filled and never checked.
+
+### F6 (note) 1 ms gap
+See item 7. The test models arrival order as the tie-break for equal stamps, so a gap of 0 passes (mutant M8 survives); nothing checks `release.at - note_on.at >= GAP`.
+
+## What I checked and found OK, by item
+
+### 1. Stuck notes
+Harness (raw notes: channels 0 and 1, same pitch twice, same pitch twice inside the window, vel-0 and 0x80 offs, offs handed or recalled, two devices on two ports, CC bursts up to 400, a restart after the first Stop and a second Stop, pump delay 0..15 ms, latency 0/5/19/26 ms, effective latency down to -50 ms, sink modes NULL / INT64_MAX / R = 0 recalling / R = now + {50 us, 3 ms, 10 ms}): final state of every note by (stamp, arrival) is an off, no duplicate note-on, in about 40,000 runs, EXCEPT the F1 ring-wrap case. By reading:
+- Same pitch on two channels: `last` compares channel (`:217`) and pitch; OK (killed by my harness when mutated, not by the builder's test).
+- Same pitch re-triggered inside the window: the earlier on is not "last", the later gets the one release; consistent with the scheduler's one-off-per-pitch rule (`cnt_`, B4). A synth that stacks note-ons would keep one voice per extra on; same as the scheduler's own policy.
+- Note-on velocity 0: skipped as a release candidate (:214) and counted as an "off" for the `last` test (:217-218); OK.
+- Note-on whose off was already handed over: not released (OK); whose off was recalled (stamp > R): off dropped, the note-on is released (OK, and an improvement for R = 0 sinks).
+- Two cables / a CLEAR for cable A with B in the ring: P filters `h.m.cable == m.cable` and `h.dev == devs[k]`; harness two-device runs clean. Hot-plug (token changes): release goes to the token that was handed the note-on (`devs[k]`), not the cable's current token; a gone old token fails the send: counted, `may_hang`, mark is for the old token only, the new token is not muted (:178-182). OK. A shell that recycles token values would send an extra note-off to a different device: harmless.
+- Entries `done` then a second CLEAR: harness restart + second Stop clean; `done` is reset by the pump on reuse (:422); mutant M14 (reset removed) is killed by my harness and NOT by the builder's test.
+- A release that fails: F4.
+- Late pump drain: a pump that stalls cannot hand over anything either (the pump drains the CLEAR before it hands over), so a late drain alone cannot wrap the ring; only the negative effective latency can (F1).
+- Second Stop within 1 ms with a held/OS-pending release: F3.
+- New note after the release gap: a restart whose first note-on of that pitch is stamped inside `(e.at, e.at + 1 ms)` would be cut by the release. Needs Stop-Play-note within 1 ms of the old note: not reachable by a person; a transport restart in code (loop) with a pitch repeated at the loop point is worth one device test.
+
+### 2. Is the recalling sink byte-identical?
+Line by line against `origin/native` (`git diff origin/native...HEAD -- native/core/src/midi/midiport.cpp`):
+- `if (!CAP_TS || !clear) return` -> `if (!CAP_TS) return`: only changes a NULL `clear` (intended).
+- device list: now also includes devices whose post-marker entries are all due (`ask` false). `clear()` is called exactly when it was before (an entry after the marker with `h.at > t`), with the same device order. For a recalling sink the extra devices only reach the release pass.
+- `R = max(sink R, t)`: for a sink returning 0 R = t: the replay condition `h.at <= R` is the old `h.at <= t`. Same replay, same order, same `failed` handling, same `dropped_cleared`.
+- release pass: for R = t, P = after-marker, live, not done, stamp <= t entries: the already-due race. A note-on there gets an off stamped `max(on + 1 ms, t)`, which before this PR was a stuck note. No other message changes. `done` marks only those entries.
+- `S_SENT` / `S_RELEASED` / `S_HANG` change only in that race. Struct grew; `Hand` gained a bool (padding, no size change expected).
+So yes: byte-identical except the already-due race. Can an unchanged test notice? No. Evidence: I removed the whole release loop (note-on test replaced by `continue`) and `test_midiport` still passed. The ledger tests (`test_midi_ledger`, `test_midi_glue`) drive `midi_drive.h`'s own fake shell, not `applyClear`; the midiport / verify_274 sinks return 0 and nothing there creates an already-due post-marker note-on. Only `midiout_norecall`'s late-drain block (recalling mode, 16 releases in 1800 runs) exercises the new line for a recalling sink.
+
+### 3. Contract
+See F2. Clock domain stated (`now_ns`); thread stated. `R < t -> R = t` is right for a sink that cannot recall what is due; wrong (loses messages) for a sink that returns a past R after flushing; and ambiguous in `(t, flush instant]`.
+
+### 4. Stats
+`released_after_stop` appended at offset 96 (checked: 8 + 11 x 8 = 96; the C test asserts 104 bytes and the offset). `thunder_midiout_stats_get` echoes `size`, copies `min(size, sizeof)` (:433-435), rejects size < 16: an old caller with 96 bytes is honoured by reading; no test calls it with 96. `sent` includes releases (documented in the notes, "messages the sink accepted": accurate). `dropped_cleared` counts queue removals and recalled hand-over entries only (`n++` at :199 and :183); a played message is never counted: OK. `may_hang`: F2.5 / F4.
+
+### 5. Real-time rules
+`applyClear` is on the pump thread only; `hand[]`, `st[]` pump-only (single writer, atomics as before); nothing shared with the audio thread is touched differently (`now_ns`, already required to be callable anywhere). No allocation, no lock. Stack: `devs[256]` 2 KB + `ask[256]` 256 B. Worst case: per device one 256-pass replay + 256-pass release scan + up to 255-step inner `last` scan per note-on in P: bounded by about 256 x 256 / 2 = 33k lambda evaluations in total (the inner scan only runs for note-ons, and all devices together hold 256 entries) plus up to 256 replay sends and 256 release sends. The loops are small; the cost to watch is `sink.send` itself (an AMidi write per message): a Stop with 256 release candidates is 256 writes on the sender thread. Realistic Stops release a few notes. OK.
+
+### 6. Android shell
+`clearDev`: stamped port returns INT64_MAX and recalls nothing (OK: the core then releases, F1 aside). Port without stamps: drops held messages with `h.at > R`, sends those `<= R` now, returns R = now + 50 us read inside `clearDev` (after the core's `t`, so R >= t + the call latency: consistent with sendTo's `at <= now + 50 us` rule and `flushDeferred`, so nothing the shell sent is replayed and everything it dropped is). A message sent between the core's clock read and the call is covered because R is read later than `t`. A held release (stamp > now + 50 us) is held up to 1 ms: F3. The swallow list is gone: its two jobs (do not replay what was sent, SysEx) are covered: the core's messages are at most 3 bytes (`thunder_midi_msg.b[3]`), so `earlyLong` (SysEx) cannot occur from the core; the `deferFull` path (held array 256 = the ring's size; only releases, which are not in the ring, can exceed it) sends a release early, which is harmless. Engine stop: final `thunder_midiout_pump` drains the last CLEAR (`applyClear` and `clearDev` run) and `flushAllHeld` sends held messages in array order immediately; for a stamped port the releases are stamped up to about 21 ms ahead and are in the OS's hands when the engine returns: device test (below).
+
+### 7. 1 ms release gap
+The note-off is 1 ms after a note-on the device is about to play: a synth with a slow attack makes a silent blip, a drum / sample voice plays a full hit (it plays up to `20 ms + L` after the Stop: that is the unavoidable cost of not recalling). A device that ignores a 1 ms note on a drum trigger just plays it. One USB MIDI frame apart is enough for order on USB. Bluetooth MIDI: timestamps are 1 ms resolution and a connection interval of 7.5-30 ms usually packs both messages together; order is by timestamp then position in the packet: fine at 1 ms, would break at 0 (mutant M8). A device test should look for: after Stop with the sequencer playing a dense pad / drum track at 5 random offsets, (1) no note keeps sounding after 2 s, (2) MIDI monitor timestamps of every release are > its note-on, (3) retrigger of the same pitch inside 1 ms does not cut the new note, (4) behaviour with a mono synth that retriggers (a note-on while a note is held).
+
+### 8. Tests
+Grid (3 sink modes x 5 latencies x 3 Gear x 31 Stop offsets, plus late drains 3 delays): Stop offset sweeps the note-on across the marker and across the hand-over horizon (before the marker = replay, after = release, within 20 ms = handed or not); latency 0/5/19/20/26 moves the 20 ms hand-over horizon against the note; Gear +30/-20 shifts frames against the marker and gives negative effective latency (-20 + 5 = -15 ms is where already-due notes occur); sink mode: NULL and INT64_MAX are asserted equal (the same code path: one of them is redundant), recalling must release nothing on the main grid; pump delay creates the already-due race. One channel, one device, distinct pitches, the song's 4 notes, no CCs: so nothing about channels, pitch matching, devices, ring wrap, a second CLEAR.
+
+Mutants of `applyClear` and the pump that NO builder test kills (I ran each against `midiout_norecall`; the builder says one):
+1. M1: drop `!h.done` in `inP` / the device scan.
+2. M2: ignore the channel in `last`.
+3. M3: ignore the pitch in `last` (any later on/off hides the release).
+4. M4: release a velocity-0 note-on.
+5. M5: a later note-on does not count as a later message (`fty == 0x80` only).
+6. M6: drop `h.dev == devs[k] && h.m.cable == m.cable` from `inP`.
+7. M7: stamp `at` instead of `max(at, t)`.
+8. M8: `RELEASE_GAP_NS` = 0 (the checker breaks ties by arrival order, so it cannot see it).
+9. M10: drop `markGone` / keep going after a failed release send.
+10. M11: never set `done`.
+11. M12: call `clear()` for every device (drop the `ask` gate).
+12. M14: remove `h.done = false` in the pump (stale `done` after ring reuse: a later Stop misses the notes).
+13. M18: `last` always true (a release for every note-on even when its off is in the ring).
+My harness (not committed) additionally kills M2, M3, M6, M14; M1, M11 (only an extra off), M4, M5, M7, M8, M10, M12, M18 survive both (M1/M11/M18 are close to equivalent: they only add offs; a count check `released_after_stop == number of live notes` would kill them). Killed by the builder: dropping `if (R < t) R = t` (516 failures) and replaying with `h.at <= t` (273), and putting back `h.at > t` (48 runs, as the notes say).
+Checks that cannot fail: `R.cleared`, `R.clears`, `R.sent` are filled and never compared; the dup check only sees two note-ons with identical stamp and bytes; in mode 0 vs 1 the equality of the release totals can only fail if one mode is broken, and both go through the same line.
+Missing: a non-TS sink, a CLEAR for a device that has nothing handed over, an unstamped Android port with R = now + 50 us (the 50 us rule and `flushDeferred`), a second Stop.
+
+### 9. What the 256-slot ring cannot see: smallest realistic situation
+A note-on after the marker that is already due when the Stop is pushed (needs effective latency = output latency + Gear + (10 ms for engineStop) below 0: Gear -50 with the Fold's 26 ms, so Gear <= -36 ms on engineStop) followed by at least about 270 hand-overs within the following 20 ms plus the negative-latency window, so about 270 messages in about 50 ms. On a 33-track song that is about 5,400 msg/s all ports together: not a note song (33 tracks of 16th notes are under 300 msg/s), but 20-30 tracks of ramp / LFO / pitch-bend lanes sending a CC every 5 ms plus clock ticks reaches it; so it is a real but narrow hole, only with a negative effective latency; with a positive one the ring cannot lose a note-on at all (a slot is never reused before its message is due, and the drain of the CLEAR precedes every hand-over).
+
+## What only a device can show
+1. Android: Stop at 10-20 random offsets with a dense song, stamped (USB / AMidi with timestamps) and unstamped ports: after 2 s no stuck note on the synth; monitor shows each release after its note-on.
+2. Engine stop and app close within 20 ms of a Stop: whether AMidi delivers stamped messages (the release, 1-21 ms ahead) after `engineStop` or when the port is closed. If closing a port drops queued timestamped writes, a Stop followed by an immediate close hangs a note.
+3. A synth that ignores a 1 ms gate, a mono synth with retrigger, Bluetooth MIDI: order of a note-on and a note-off 1 ms apart.
+4. Gear -36 to -50 with the dense song (F1): a Stop on a downbeat of a dense lane song, the device's hung-note count.
+5. Hot-plug during a Stop (unplug at the moment of the Stop): counts in `send_errors` / `may_hang`, PANIC is sent, no crash.
+6. The sender thread's `clearDev` + 256 releases: pump latency (`stats.late`) on the Fold during a Stop of a 33-track song.
