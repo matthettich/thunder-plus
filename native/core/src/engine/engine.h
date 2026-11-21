@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 #include "engine/layer_params.h"
 #include "engine/layer_pe_params.h"
@@ -60,7 +61,7 @@ enum class LType : uint8_t { Sine, Tri, Saw, Square, Pulse, White, Pink, Brown, 
 LType eng_layer_type(const char* name, size_t n);   // the layer's `type` string; Other for a type this unit does not port (the JS's own names for all of them: see TYPES)
 bool eng_type_supported(LType t);
 
-constexpr double kEngNoLines = __builtin_nan("");   // an absent `...L` key
+constexpr double kEngNoLines = std::numeric_limits<double>::quiet_NaN();   // an absent `...L` key
 
 struct EngLayer {                       // freshLayer's fields that render (the rest of the JS object is for other layer types and the UI)
   bool on = false;

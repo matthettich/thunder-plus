@@ -146,7 +146,7 @@ No unexplained change.
 ## Tests (how to run)
 `cmake -S native -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j1 && ctest --test-dir build`. New or changed: `seq_chop` (7 goldens + `testWebFollow`), `seq_takeover` (edit-bus re-recorded), `seq_edit_current` / `seq_chop_current`
 (Node: the pinned web code still gives the committed goldens, live-clock and edit and chop), `voice` / `voice_golden_current` (stp_msg), `envlines` / `envlines_current`, `stptrack`. To move to a newer beta: `git archive origin/beta index.html core | tar -x -C DIR; node native/tools/web-pin.mjs DIR <sha>`,
-then `node native/tools/seq-golden-web.mjs --live-only --edit --chop` (compare), `--update` only after reading the diff, `node native/tools/voice-dump.mjs --golden`, `node native/tools/envlines-dump.mjs`.
+then `node native/tools/seq-golden-web.mjs --edit` (live + edit comparisons) and, separately, `node native/tools/seq-golden-web.mjs --chop` (compare), `--update` only after reading the diff, `node native/tools/voice-dump.mjs --golden`, `node native/tools/envlines-dump.mjs`.
 
 ## For the lead
 1. The repository root of `native` still carries the OLD web snapshot (`core/seq-core.js`, `index.html`, `tools/seq-golden.mjs`): these tools were not touched (outside `native/` and `docs/port/`). `mix-dump.mjs` (`mix_golden_current`, `busplan`),
@@ -157,3 +157,10 @@ then `node native/tools/seq-golden-web.mjs --live-only --edit --chop` (compare),
 
 ## STATUS
 - 21 Nov: items 1-5 built and tested. Full ctest after merging origin/native 8055034 (includes #267 bpm0): 100% pass (1 skipped: pumpsynth_refused, as on native).
+
+## CodeRabbit review of PR #271: taken and declined
+Taken: portable NaN (`std::numeric_limits`, MSVC); the unchanged-voice check in `test_envlines` compares real fields (the `memcmp(.., 0)` compared nothing); `web-pin.mjs` now also pins `core-processor.js` from the same archive; the edit check returns before writing goldens if the two `patch` handlers differ; `THUNDER_WEB_REF=root` no longer mixes with the beta excerpt (the excerpt throws, the commit reads `root-snapshot`); the `--chop` / `--edit` commands are documented as two runs; the PRT comment (sequencer-wide).
+Declined, with reasons:
+- stopTrack misses a mono-displaced voice still booked / canceled future voices keep their slot until their start time: the web does the same (its handler walks the track's list, `kill(.., stop=true)` sets the end to the start time and the slot frees when the voice is reached); native mirrors the JS, quirks included. Worth a ruling if the lead wants a deliberate deviation.
+- "live-engine pool must also stop": native `Players` has two pools (sampler, SoundFont); there is no live-engine pool in this tree. Nothing to forward to.
+- golden harness read-only compare mode, edit case "differ" assertion, adding `lines` to an instrument that lacks it, multi-line `instBeats`: reasonable hardening of a test tool, not needed for the goldens to be right (the C++ tests compare against the committed files and the counts are asserted); left for a follow-up.

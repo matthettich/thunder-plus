@@ -199,6 +199,7 @@ function editCases() {
   }
   const patchBody = t => t.slice(t.indexOf("case 'patch': {"), t.indexOf("case 'vars':"));
   if (patchBody(cp) !== patchBody(sc)) { console.log('FAIL the patch handler of core-processor.js and core/seq-core.js differ'); bad = true; }
+  if (bad) return false;   // never write edit goldens from a reference that does not check out
   for (const C of EDIT_SONGS) {
     const base = clone(j0.song), orig = clone(j0.song); if (C.base) C.base(base);
     const baseOps = diffOps(orig, base), mode = C.mode || 'song', opt = { ...(C.optx || {}) }; if (C.phraseOf) opt.phrase = C.phraseOf(base); if (C.loop) opt.loop = C.loop;
@@ -309,7 +310,7 @@ function chopSong(variant) {
     cmd(7, 4, 0, 'TPO', 100); cmd(5, 7, 0, 'TPO', 140);
   }
   // WEB-FOLLOW: PERFORM parts. Track 7 plays through PART 1 (PRT 1 on its first row); the part's instrument 0 (what instrument 7 falls back to, IS[ii] || IS[0]) has lines, SLICES + SMODE + OLDSCHOOL with a ramp,
-  // and is the page's normalised form (normParts: sync 0..3, sxLoad). Track 6 stays on the song's own instruments (a part is per track).
+  // and is the page's normalised form (normParts: sync 0..3, sxLoad). PRT is sequencer-wide: after PRT 1 every track's later notes resolve through the part's instruments (track 6 included); the golden is the web's own result either way.
   if (variant === 'parts') {
     cmd(7, 0, 0, 'PRT', 1); cmd(7, 9, 0, 'TPO', 80);
     S.parts = [{ n: 'P1', mix: [], fx: {}, insts: [{ tsp: 0, vol: 255, pan: 128, ofs: 0, pad: 2, slc: 4, smode: 1, sync: 3, beats: 4, lines: 13, grain: 1, sx: 1, og: 3.5, ou: 0, orp: 1, ox: 5, opt: 2 }] }];

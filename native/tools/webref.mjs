@@ -8,5 +8,5 @@ const env = process.env.THUNDER_WEB_REF;
 export const REF_DIR = env && env !== 'root' ? path.resolve(env) : path.join(ROOT, 'native/tests/web-ref');
 export const seqCorePath = () => env === 'root' ? path.join(ROOT, 'core/seq-core.js') : path.join(REF_DIR, 'seq-core.js');
 export const seqCoreText = () => fs.readFileSync(seqCorePath(), 'utf8').replace(/\r\n/g, '\n');
-export const excerptText = () => fs.readFileSync(path.join(REF_DIR, 'index-excerpt.js'), 'utf8').replace(/\r\n/g, '\n');
-export const betaCommit = () => fs.readFileSync(path.join(REF_DIR, 'BETA-COMMIT'), 'utf8').trim();
+export const excerptText = () => env === 'root' ? (() => { throw new Error('THUNDER_WEB_REF=root has no index excerpt: use the beta pin'); })() : fs.readFileSync(path.join(REF_DIR, 'index-excerpt.js'), 'utf8').replace(/\r\n/g, '\n');
+export const betaCommit = () => env === 'root' ? 'root-snapshot' : fs.readFileSync(path.join(REF_DIR, 'BETA-COMMIT'), 'utf8').trim();

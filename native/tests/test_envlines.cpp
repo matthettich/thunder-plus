@@ -43,7 +43,8 @@ int main(int argc, char** argv) {
     CHECK(same(eng_voice_grel_ms(V0, bpm, lpb), out.num("grel")), "case %zu: gRel %.17g, JS %.17g", ci, eng_voice_grel_ms(V0, bpm, lpb), out.num("grel"));
     const bool fit = eng_env_lines_fit(V, &hold, bpm, lpb);
     CHECK(fit == out.boolean("fit"), "case %zu: fit %d, JS %d", ci, (int)fit, (int)out.boolean("fit"));
-    if (!fit) { CHECK(std::memcmp(&V, &V0, 0) == 0 && same(V.len, V0.len) && same(hold, c.num("hold")), "case %zu: a voice without lines was changed", ci); continue; }
+    if (!fit) { bool layersSame = true;  for (size_t i = 0; i < 8; i++) { const EngLayer &a = V.layers[i], &b = V0.layers[i]; if (!(same(a.atk, b.atk) && same(a.hold, b.hold) && same(a.dec, b.dec) && same(a.rel, b.rel) && same(a.fAtk, b.fAtk) && same(a.fDec, b.fDec))) layersSame = false; } 
+      CHECK(same(V.gAtk, V0.gAtk) && same(V.gHold, V0.gHold) && same(V.gDec, V0.gDec) && same(V.gRel, V0.gRel) && layersSame && same(V.len, V0.len) && same(hold, c.num("hold")), "case %zu: a voice without lines was changed", ci); continue; }
     nFit++;
     const Json L = out.arr("layers");
     for (size_t i = 0; i < L.size(); i++) { const Json q = L.at(i); const EngLayer& e = V.layers[i];
