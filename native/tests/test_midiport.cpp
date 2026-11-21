@@ -262,7 +262,12 @@ static void test4() {
     F = Fn += 100; got = atOf(r, F); CHECK(got == want(off, F), "4: a jump back over 50 ms is taken at once (%lld vs %lld)", (long long)got, (long long)want(off, F));
     // a map that has not been refreshed for 2 s: still used, and counted in `late`
     const auto s0 = statsOf(r.o); r.raw(0, {0x90, 60, 100}, 0.0); r.proc(); r.fk.now.store(host + 2500000000LL); r.pump(); const auto s1 = statsOf(r.o);
-    CHECK(s1.late > s0.late && s1.sent > s0.sent, "4: a stale map is kept and counted (late %llu -> %llu)", (unsigned long long)s0.late, (unsigned long long)s1.late); }
+    CHECK(s1.late > s0.late && s1.sent > s0.sent, "4: a stale map is kept and counted (late %llu -> %llu)", (unsigned long long)s0.late, (unsigned long long)s1.late);
+    // the same with a note that is ON TIME at the new clock: it is sent when due, and counted late only because the map is stale
+    const int64_t nowH = host + 2500000000LL; const int64_t Fs = (int64_t)std::ceil((double)(nowH - off) * sr / 1e9); const int64_t at = want(off, Fs);
+    if (r.now < (double)Fs / sr - 0.03) r.now = (double)Fs / sr - 0.03;
+    r.raw(0, {0x90, 62, 100}, (double)Fs / sr - r.now); r.proc(); r.fk.now.store(at); const size_t nr = r.fk.rec.size(); const auto s2 = statsOf(r.o); r.pump(); const auto s3 = statsOf(r.o);
+    CHECK(r.fk.rec.size() == nr + 1 && r.fk.rec.back().at == at && s3.late == s2.late + 1, "4: an on-time note on a stale map reaches the sink and counts late (sent %zu, late %llu -> %llu)", r.fk.rec.size() - nr, (unsigned long long)s2.late, (unsigned long long)s3.late); }
   { // the floor: never sooner than the reported latency. Engine block start 10.0 s; frame 479000 is heard "now": the engine leads it by 20.83 ms < the reported 30 ms
     Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.now = 10.0; r.proc();   // midi_last_now = 10.0
     CHECK(thunder_midiout_set_out_latency(r.o, 30000000) == 0, "4: set_out_latency"); const int64_t frame0 = 479000, host0 = 77000000000LL; r.fk.now.store(host0);
@@ -545,6 +550,13 @@ static void testReview() {
     CHECK(nx != INT64_MAX && nx > r.host0, "review: the rest wakes the pump when a slot is free");
     r.fk.now.store(r.fk.rec.back().at + 2000000); r.pump(&nx);
     CHECK(r.fk.rec.size() == 300 && statsOf(r.o).sent == 300, "review: the rest is sent once the first ones are due (%zu)", r.fk.rec.size()); }
+  for (int pass = 0; pass < 2; pass++) {   // a CLEAR flushes the OS only for a device that holds something after the marker: pass 0 holds a note before it, pass 1 a note after it
+    Rig r(THUNDER_MIDIOUT_CAP_TS); setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc(); thunder_midiout_clock_map(r.o, 0, r.host0);
+    r.raw(0, {0x90, 60, 100}, pass ? 0.015 : 0.003); r.proc(); r.fk.now.store(r.host0); r.pump();
+    CHECK(r.fk.rec.size() == 1, "review: the note is handed to the OS early (pass %d)", pass);
+    r.proc(); r.proc(); thunder_midi_stop(r.h); r.proc(); r.pump();
+    CHECK(r.fk.clears[0] == (pass ? 1 : 0), "review: CLEAR flushes the device only if it holds a message after the marker (pass %d: %d flushes)", pass, r.fk.clears[0]);
+  }
   { std::string song; readFile(std::string(THUNDER_ROOT) + "/native/tests/golden/midi-ledger-mono-notes.song.json", song);
     thunder_midi* h = thunder_midi_create(48000, nullptr, 0); thunder_midi_set_song(h, (const uint8_t*)song.data(), song.size()); thunder_midi_set_port(h, 0, 1, 0, 0, 0);
     thunder_midi_key_on(h, 0, 0, 48, 100);                                              // posted BEFORE the first block, which brings the host's FX latency 0.1 s

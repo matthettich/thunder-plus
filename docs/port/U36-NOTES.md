@@ -68,7 +68,15 @@ Nothing in `native/core/src/render/` or `src/mix/` was touched; `midisched.cpp` 
 
 ## How to run
 ```
-cmake -S native -B build-u36a -DCMAKE_BUILD_TYPE=Release && cmake --build build-u36a -j1 --target test_midiport test_midi_ledger test_midi_sched test_midi_api rt_midi
+cmake -S native -B build-u36a -DCMAKE_BUILD_TYPE=Release && cmake --build build-u36a -j1 --target test_midiport test_midiport_c test_midiport_verify test_midi_ledger test_midi_sched test_midi_api rt_midi
 cd build-u36a && ctest -R 'midiport|midi_ledger|midi_sched|midi_api|rt_midi' --output-on-failure
 ```
 `U36_DEBUG=1 ./tests/test_midiport` prints the hot-plug test's messages for the returning device. `./tests/test_midiport --threads` is the control / audio / sender test (TSan in CI).
+
+## CodeRabbit round 2 (head 0ed54731)
+
+Fixed: CLEAR flushes a device only if it holds something after the marker (applyClear); a failed replay send counts gone, marks the cable gone (same token rule as a normal send) and drops the rest of that device's history; the pump re-reads the map when a record is drained while it was invalid (a Start published by the audio thread between the pump's read and its drain is no longer lost); a failed send refreshes the pump clock first and only marks the cable gone if the cable still holds the token that failed; `resolve` treats a set `cabPurge` flag as "the slot was just reused" (a queued old record is never sent to the replacement device) and the epoch sweep takes the flags with `exchange` (a flag set during the sweep is kept for the next one); CAP_TS spin that ends before the stamp with the history full leaves the message queued; `stats_get` copies the counters by name; `now_ns` and `free` contracts in `midiport.h`; the build line in "How to run".
+
+Known residual (not built): between `resolve` returning a token and the sink's `send` returning, control can replace that device; the send then fails for the OLD token (the sink answers an unknown token with < 0) and is counted, the new device is not marked gone. The cable of a reused slot drops what the scheduler produces for it between `set_devices` and the pump's next sweep (counted in `dropped_gone`). The CAP_TS spin case above needs a history slot later than a queued message, which the time-sorted queue makes very unlikely; it is defensive and has no test.
+
+Not changed: test_midiport.cpp T2 raw-stream compare (the CLEAR frame is captured by `Drive::shell` in `tests/midi_drive.h`, PR #267's file); verify-268.md is the verifier's record and stays as it was.

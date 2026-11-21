@@ -92,7 +92,8 @@ static void f5() {
   s.now = 1000000000 + 14200000;                                 // the CC is 1.5 ms late, the tick 1 ms late
   thunder_midiout_pump(o, nullptr);
   bool tickSent = false; for (uint8_t b : s.got) tickSent = tickSent || b == 0xF8;
-  BUG("F5", tickSent, "after a 25 ms send the next tick (now 26 ms late) was still sent: `now` is not refreshed inside the loop (late counted %llu)", (unsigned long long)o->st[S_LATE].load());
+  bool ccSent = false; for (uint8_t b : s.got) ccSent = ccSent || b == 0xB0;
+  BUG("F5", tickSent || !ccSent || o->st[S_LATETICK].load() != 1, "after a 25 ms send the next tick (now 26 ms late) was still sent: `now` is not refreshed inside the loop (late counted %llu)", (unsigned long long)o->st[S_LATE].load());
   thunder_midiout_free(o); thunder_midi_free(h);
 }
 

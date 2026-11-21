@@ -157,7 +157,7 @@ void enqueue(thunder_midiout* o, const thunder_midi_msg& m) {
 
 bool listed(const thunder_midiout* o, int cable) { return cable >= 0 && cable < kCabs && o->cabLive[cable].load(std::memory_order_acquire) != 0; }
 bool resolve(const thunder_midiout* o, int cable, uint64_t& tok) {   // the cable's device token, false if it is not listed (or the sink said it is gone)
-  if (!listed(o, cable) || o->cabGone[cable].load(std::memory_order_relaxed)) return false;
+  if (!listed(o, cable) || o->cabGone[cable].load(std::memory_order_relaxed) || o->cabPurge[cable].load(std::memory_order_acquire)) return false;   // a purge flag: the slot was just reused, a record that is still queued belongs to the old device
   tok = o->cabTok[cable].load(std::memory_order_relaxed); return true;
 }
 
@@ -169,14 +169,19 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
   if (!(o->sink.caps & THUNDER_MIDIOUT_CAP_TS) || !o->sink.clear) { if (n) bump(o, S_CLEARED, n); return; }
   const int64_t t = o->sink.now_ns(o->sink.user); (void)now;
   uint64_t devs[kHand]; int nd = 0;
-  for (int i = 0; i < kHand; i++) { const auto& h = o->hand[i]; if (h.live && h.m.cable == m.cable && h.at > t) { bool seen = false; for (int k = 0; k < nd; k++) seen = seen || devs[k] == h.dev; if (!seen) devs[nd++] = h.dev; } }
+  for (int i = 0; i < kHand; i++) { const auto& h = o->hand[i]; if (h.live && h.m.cable == m.cable && h.m.frame > m.frame && h.at > t) {   // only a device that holds something this CLEAR cancels is flushed
+    bool seen = false; for (int k = 0; k < nd; k++) seen = seen || devs[k] == h.dev; if (!seen) devs[nd++] = h.dev; } }
   for (int k = 0; k < nd; k++) {
-    o->sink.clear(o->sink.user, devs[k]);
+    o->sink.clear(o->sink.user, devs[k]); bool failed = false;
     for (int i = 0; i < kHand; i++) {   // the ring is in send order: the ones before the marker are sent again, in that order
       auto& h = o->hand[(o->handN + i) % kHand];
       if (!h.live || h.dev != devs[k] || h.at <= t) continue;
       if (h.m.cable == m.cable && h.m.frame > m.frame) { h.live = false; n++; continue; }
-      if (o->sink.send(o->sink.user, h.dev, h.m.b, h.m.len, h.at) < 0) { h.live = false; bump(o, S_ERR); }
+      if (failed) { h.live = false; bump(o, S_GONE); continue; }   // the device failed during this replay: what is left of its history is lost with it
+      if (o->sink.send(o->sink.user, h.dev, h.m.b, h.m.len, h.at) < 0) {
+        h.live = false; failed = true; bump(o, S_ERR); bump(o, S_GONE);
+        uint64_t cur; if (resolve(o, h.m.cable, cur) && cur == h.dev) o->cabGone[h.m.cable].store(1, std::memory_order_relaxed);   // the same rule as a normal send
+      }
     }
   }
   if (n) bump(o, S_CLEARED, n);
@@ -313,7 +318,10 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     if (n <= 0) break;
     for (int64_t i = 0; i < n; i++) {
       if (buf[i].flags & THUNDER_MIDI_F_CLEAR) { applyClear(o, buf[i], now); continue; }
-      if (!map.valid) { bump(o, S_NOMAP); continue; }
+      if (!map.valid) {   // the first map may have been published while this pump ran: look again before a record is given up
+        Snap m2; if (readMap(o, m2) && m2.valid) { map = m2; o->lastSnap.ok = true; o->lastSnap.off = m2.off; o->lastSnap.host = m2.host; }
+        else { bump(o, S_NOMAP); continue; }
+      }
       enqueue(o, buf[i]);
     }
   }
@@ -321,9 +329,9 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   const uint32_t ep = o->epoch.load(std::memory_order_acquire);
   if (ep != o->seenEpoch) {
     o->seenEpoch = ep; uint64_t n = 0;
-    for (int i = o->tail - 1; i >= o->head; i--) if (!listed(o, o->q[i].cable) || o->cabPurge[o->q[i].cable].load(std::memory_order_acquire)) { qRemove(o, i); n++; }
+    uint8_t pg[kCabs]; for (int i = 0; i < kCabs; i++) pg[i] = o->cabPurge[i].exchange(0, std::memory_order_acq_rel) ? 1 : 0;   // take the flags first: a flag set after this is for the next epoch (and resolve() sees it meanwhile)
+    for (int i = o->tail - 1; i >= o->head; i--) if (!listed(o, o->q[i].cable) || pg[o->q[i].cable]) { qRemove(o, i); n++; }
     if (n) bump(o, S_GONE, n);
-    for (auto& g : o->cabPurge) if (g.load(std::memory_order_relaxed)) g.store(0, std::memory_order_relaxed);
   }
   if (!map.valid) return 0;
   { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // the drain and the CLEARs took time
@@ -344,15 +352,20 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     if (!early && at > now) {                                   // no stamps: the pump itself waits out the last 0.5 ms
       int64_t t = now; for (int it = 0; it < kSpinCap && t < at; it++) t = o->sink.now_ns(o->sink.user);
       if (t > now) now = t;
+      if (ts && at > now) { if (next_ns) *next_ns = now; break; }   // CAP_TS, history full and the time not reached: it stays queued, never sent with a future stamp the history cannot restore
     }
     o->head++;
     const int64_t late = now - at;
     if (m.b[0] == 0xF8 && late > THUNDER_MIDIOUT_TICK_LATE_NS) { bump(o, S_LATE); bump(o, S_LATETICK); continue; }   // B7: a late tick is dropped, never sent in a burst
     if (late > THUNDER_MIDIOUT_LATE_NS || stale) bump(o, S_LATE);
     const int r = o->sink.send(o->sink.user, dev, m.b, m.len, at);
-    if (r < 0) { bump(o, S_ERR); bump(o, S_GONE); o->cabGone[m.cable].store(1, std::memory_order_relaxed); continue; }
+    { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // a slow send (a failed one too) must count against the next message's lateness
+    if (r < 0) {
+      bump(o, S_ERR); bump(o, S_GONE);
+      uint64_t cur; if (resolve(o, m.cable, cur) && cur == dev) o->cabGone[m.cable].store(1, std::memory_order_relaxed);   // only the token that failed: a replacement for the same id is not marked
+      continue;
+    }
     bump(o, S_SENT); sent++;
-    { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // a slow send must count against the next message's lateness
     if (early && at > now) { auto& h = o->hand[o->handN]; h.m = m; h.at = at; h.dev = dev; h.live = true; o->handN = (o->handN + 1) % kHand; }
   }
   if (o->head == o->tail) { o->head = o->tail = 0; }
@@ -362,7 +375,10 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
 int thunder_midiout_stats_get(const thunder_midiout* o, thunder_midiout_stats* out) {
   if (!o || !out || out->size < 16) return THUNDER_MIDIOUT_E_ARG;
   thunder_midiout_stats t; std::memset(&t, 0, sizeof t); t.size = out->size;
-  uint64_t* f = &t.sent; for (int i = 0; i < 10; i++) f[i] = o->st[i].load(std::memory_order_relaxed);
+  t.sent = o->st[S_SENT].load(std::memory_order_relaxed); t.dropped_gone = o->st[S_GONE].load(std::memory_order_relaxed); t.dropped_cleared = o->st[S_CLEARED].load(std::memory_order_relaxed);
+  t.dropped_nomap = o->st[S_NOMAP].load(std::memory_order_relaxed); t.late = o->st[S_LATE].load(std::memory_order_relaxed); t.queue_full = o->st[S_QFULL].load(std::memory_order_relaxed);
+  t.max_queue = o->st[S_MAXQ].load(std::memory_order_relaxed); t.send_errors = o->st[S_ERR].load(std::memory_order_relaxed); t.dropped_late_ticks = o->st[S_LATETICK].load(std::memory_order_relaxed);
+  t.may_hang = o->st[S_HANG].load(std::memory_order_relaxed);
   { thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; if (thunder_midi_stats_get(o->core, &cs) == THUNDER_MIDI_OK && cs.may_hang) t.may_hang = 1; }   // the scheduler's own ring lost a note-off / Stop too
   const size_t n = out->size < sizeof t ? out->size : sizeof t; std::memcpy(out, &t, n);
   return THUNDER_MIDIOUT_OK;

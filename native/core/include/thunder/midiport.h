@@ -64,7 +64,7 @@ typedef struct thunder_midiout_dev {         /* one physical output, as the shel
 
 typedef struct thunder_midiout_sink {        /* implemented by the shell */
   void* user;
-  int64_t (*now_ns)(void* user);             /* the host clock the times are in (Android CLOCK_MONOTONIC, Mac mach host time as ns, Windows QPC as ns); callable from any thread */
+  int64_t (*now_ns)(void* user);             /* the host clock the times are in (Android CLOCK_MONOTONIC, Mac mach host time as ns, Windows QPC as ns); callable from any thread, and from the AUDIO thread (clock_map calls it): bounded, no allocation, no lock, no throw, no I/O */
   int (*send)(void* user, uint64_t dev, const uint8_t* b, int len, int64_t at_ns);   /* dev = a thunder_midiout_dev.token; at_ns <= now: send now; 0 on success, < 0 = the device is gone */
   void (*clear)(void* user, uint64_t dev);   /* optional (NULL): drop what the OS still holds for the device (CoreMIDI MIDIFlushOutput); called only with CAP_TS, when a CLEAR meets a stamped message not yet due */
   uint32_t caps;                             /* THUNDER_MIDIOUT_CAP_TS or 0 */
@@ -96,7 +96,7 @@ typedef struct thunder_midiout_stats {       /* all counted since create */
 
 /* CONTROL. NULL on a bad argument (null core_midi / sink / now_ns / send, a rate outside 8000..384000) or no memory. The core_midi and the sink must outlive it. */
 thunder_midiout* thunder_midiout_create(thunder_midi* core_midi, double sample_rate, const thunder_midiout_sink* sink);
-void thunder_midiout_free(thunder_midiout* o);   /* NULL is fine; after the pump thread has stopped */
+void thunder_midiout_free(thunder_midiout* o);   /* NULL is fine. Only after the pump thread has stopped AND no new call to clock_map / stats_get / any other function can start, and every call in flight has returned (the audio callback included) */
 
 /* CONTROL. The whole device list (after every scan and every hot-plug): replaces the list; the four ports are re-resolved by id. n 0..32. */
 int thunder_midiout_set_devices(thunder_midiout* o, const thunder_midiout_dev* devs, int n);
