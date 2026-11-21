@@ -76,3 +76,8 @@ Kept. The real host (`opts.chains = 1`, Track In -> Chain Out) gives the stand-i
 - The static note-track scan is a superset of the page's (see Design). A song whose only note on a CHN source is never played (muted by CND / a mute that is not a track mute) keeps that source heard.
 - `commit` returns void: what it replaced is in the plan (`retiredPatches()` / `retiredNodes()`), freed by deleting the plan after `settle`.
 - `chc` for the same switch on two events in one quantum: the later wins (stable order); pinned by the same-frame test for tempo.
+
+## Verification (final, round 2)
+- Full Release ctest: 216 tests, 0 failed (1 skipped: pumpsynth_refused).
+- ASan+UBSan (THUNDER_SANITIZE=ON) on the 39 tests whose name has chains / render / mix / bus: all pass; chains_mem and chains_alloc skip themselves under a sanitizer (the allocation audit and the bad_alloc / leak counts of chains_host run in the Release build, where glibc malloc is wrapped).
+- STATUS: round 2 DONE; nothing half done.
