@@ -27,6 +27,7 @@ namespace sf {
 struct SfPad {
   const Font* font = nullptr; const Preset* pr = nullptr; const PresetPcm* pcm = nullptr;
   PadParams P;   // bank, prog (informational), trans, velo, atk, rel, level, len
+  uint64_t epoch = 0;   // U37 P1: the PadBuf that keeps font / pr / pcm alive (render/pads_snap.h); the voice records it. 0: not tracked
 };
 
 class SfPool {
@@ -61,6 +62,9 @@ class SfPool {
   void render(float* const* outL, float* const* outR, int frames, uint64_t frame0);
   void render(float* L, float* R, int frames, uint64_t frame0);   // every track onto one pair
 
+  // U37 P1: VoicePool::epochVoices, same contract (the voices' zones point into the pad's PresetPcm).
+  void epochVoices(uint64_t* out) const { for (int ai = 0; ai < nAlive_; ai++) { const int vi = alive_[ai]; out[vi] = V_[(size_t)vi].ep; } }
+
   int active() const { return nAlive_; }
   int capacity() const { return cap_; }
   uint32_t dropped() const { return dropped_; }
@@ -80,6 +84,7 @@ class SfPool {
     Zn z[kZones]; int nz = 0; bool st = false;
     AutoN<kAutoR> r{0}; AutoN<kAutoGFP> g{0}, f{1}, pn{0};
     double base = 0, rate = 0, rel = 0, end = 0, t0 = 0, stopAt = 0; int choke = 0, col = 0, track = 0; uint64_t ser = 0; bool ended = false, hasStop = false;
+    uint64_t ep = 0;   // the PadBuf the zones' PCM belongs to (SfPad::epoch), for epochVoices
   };
   double relTc(const Voice& v) const { return v.rel / 4.6; }   // syn is always true for these voices
   bool live1(const Voice& v, double at) const { return !v.ended && !(v.hasStop && v.stopAt <= at); }
