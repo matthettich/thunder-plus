@@ -525,6 +525,7 @@ void LiveHost::quantum() {
 // that CONTAINS its `at`. A 65th waiting command (list full) is applied at once instead and counted (stats.cmd_late). live_host.h says the list is "ordered by at"; it is kept in RING order instead, which is what
 // live.h's step 1 says commands are applied in (a stop at 3000 sent before a mix_set at 2950 must not be reordered): notes, departure 2.
 void LiveHost::applyCommands(int64_t qStart, int64_t qEnd) {
+  bool lateErr = false;
   // (a) the commands that were waiting (sent before everything in the ring now): apply the due ones in order, keep the rest in order
   int w = 0;
   for (int i = 0; i < nPend_; i++) {
@@ -537,7 +538,8 @@ void LiveHost::applyCommands(int64_t qStart, int64_t qEnd) {
   while (cmds_.pop(c)) {
     if (c.at < 0 || c.at < qEnd) { applyOne(c, qStart); continue; }
     if (nPend_ < kLiveCmdWait) { pend_[nPend_++] = c; continue; }
-    cmdLate_++; applyOne(c, qStart);
+    cmdLate_++; if (!lateErr) { lateErr = true; thunder_live_ev_error e; std::memset(&e, 0, sizeof e); e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = qStart; e.where = THUNDER_LIVE_WHERE_CMD; post(&e, sizeof e); }   // at most one record a quantum
+    applyOne(c, qStart);
   }
 }
 
