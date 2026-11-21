@@ -55,7 +55,7 @@ Section 4 of the draft (the 20 state changes):
 | 14 | Loop | `loop` |
 | 15 | STOP / hold / song end | `stop`, `hold`; STATE and HELD records |
 | 16 | PERFORM | `perf` |
-| 17 | Live transpose `lxp` | NOT COVERED: LXR is not wired (U04 seam; "NOT IN THIS API") |
+| 17 | Live transpose `lxp` | NOT COVERED: the U04 drum module is not wired (U04 seam; "NOT IN THIS API") |
 | 18 | MIDI settings | `midi` (handle: `thunder_midi_set_port` ... by the shell), `song_publish` (instruments), `midi_lead` |
 | 19 | Lead | `lead`, `midi_lead` |
 | 20 | Latency comp mode | `pdc_set` (and `pdc_mode` of `play`) |
