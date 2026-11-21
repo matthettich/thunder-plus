@@ -95,6 +95,8 @@ int main(int argc, char** argv) {
   if (s.hit_limit) std::printf("  the render was cut at its length limit (1260 s)\n");
   const bool lost = s.voices_refused || s.voice_track_full || s.voice_auto_dropped || s.mix_auto_dropped || s.seq_dropped;
   if (lost) std::printf("  LOST: voices refused %u, track lists full %u, voice automation %u, mixer automation %u, sequencer %llu\n", s.voices_refused, s.voice_track_full, s.voice_auto_dropped, s.mix_auto_dropped, (unsigned long long)s.seq_dropped);
+  if (s.chains_events_dropped || s.chains_events_bad || s.chains_chc_no_node || s.chains_failed_blocks || s.chains_feed_mismatch || s.chains_refused)   // (silent when all 0)
+    std::fprintf(stderr, "thunder-render: chains: applied %llu, dropped %llu, bad %llu, chc without a node %llu, failed blocks %llu, feed mismatches %llu, refused %llu\n", (unsigned long long)s.chains_events_applied, (unsigned long long)s.chains_events_dropped, (unsigned long long)s.chains_events_bad, (unsigned long long)s.chains_chc_no_node, (unsigned long long)s.chains_failed_blocks, (unsigned long long)s.chains_feed_mismatch, (unsigned long long)s.chains_refused);
   if (!emptied || !s.song_over) return 3;
   return lost ? 4 : 0;
 }

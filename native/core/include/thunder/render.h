@@ -152,6 +152,14 @@ typedef struct thunder_render_stats {
   uint32_t live_forced_off;     /* note-offs that had to discard queued events to be kept */
   uint32_t live_failed;         /* live nodes whose core refused (the JS would have thrown): silent from then on */
   uint32_t live_refused;        /* live note / mod fields refused at the pool's entry (non-finite or absurd: see LIVE-ROUTE-NOTES.md, the rule per field); the event or the field is not applied */
+  /* appended with the chains host (C1); 0 without opts.chains */
+  uint64_t chains_events_applied;   /* chc / tempo events applied to the chains nodes */
+  uint64_t chains_events_dropped;   /* events the host's queue (4096) had no room for */
+  uint64_t chains_events_bad;       /* events with a track / switch / time / value that cannot be applied */
+  uint64_t chains_chc_no_node;      /* chc events for a track with no chains node (the page: nothing) */
+  uint64_t chains_failed_blocks;    /* node blocks in which the engine failed: that track is silent for the block */
+  uint64_t chains_feed_mismatch;    /* bus feeds that were not the bus map's (a host bug; 0 in a correct build) */
+  uint64_t chains_refused;          /* plans the host refused (patch, memory budget, a plan in flight) */
 } thunder_render_stats;
 
 /* Parses the song and builds the renderer. song: the app's song JSON (a .thunder file's bytes or a song message), not NUL-terminated, copied.

@@ -136,7 +136,10 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
   r->R.reset(new SongRenderer(r->song, r->vars, r->pads, sr, kRenderQuantum, so));
   r->R->pool().setPageTiming(o.page_timing != 0);
   if (o.stem > 0) r->R->setStem(o.stem - 1);   // first: a stem has no master effects and no master chain (the calls below leave the master alone)
-  if (o.chains) r->R->setChains(true);   // after setStem (the hooks go on the heard tracks), before setEffects
+  if (o.chains) {   // after setStem (the hooks go on the heard tracks), before setEffects
+    const int cr = r->R->setChains(true);
+    if (cr) { setErr(err, cap, cr == SongRenderer::kChainsRefused ? "chains: the engine refused the song's chain patch" : cr == SongRenderer::kChainsOverBudget ? "chains: the song's chains need more memory than the host's budget (1.5 GiB)" : "chains: out of memory making the chains host"); return nullptr; }
+  }
   if (o.effects) r->R->setEffects(true);
   if (o.master_chain) r->R->setMasterChain(master_chain_from_song(r->song.mst, r->song.limiter));
   if (o.pdc_mode) {
@@ -362,6 +365,7 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.sf_voices_refused = t.sfVoiceDropped; s.sf_voice_track_full = t.sfVoiceOverflow; s.sf_voice_auto_dropped = t.sfVoiceAutoDropped; s.peak_voices_all = t.peakVoicesAll;
   s.stem = r->stem; s.heard_mask = r->R->heardMask();
   s.notes_live_played = t.notesLivePlayed; s.live_no_node = t.liveNoNode; s.live_late = t.liveLate; s.live_queue_dropped = t.liveQueueDropped; s.live_forced_off = t.liveForcedOff; s.live_failed = t.liveFailed; s.live_refused = t.liveRefused;
+  s.chains_events_applied = t.chainsEventsApplied; s.chains_events_dropped = t.chainsEventsDropped; s.chains_events_bad = t.chainsEventsBad; s.chains_chc_no_node = t.chainsChcNoNode; s.chains_failed_blocks = t.chainsFailedBlocks; s.chains_feed_mismatch = t.chainsFeedMismatch; s.chains_refused = t.chainsRefused;
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
   return 0;

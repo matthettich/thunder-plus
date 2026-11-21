@@ -188,7 +188,7 @@ bool ChainsEngine::handleMessage(Json m) {
   }
   if (op == "busmap") {
     Json v = m.get("value"); busMap_.clear();
-    if (v.isArr()) for (size_t i = 0; i < v.size(); i++) { Json e = v.at(i); if (e.isNum() && e.asNum() >= 0 && e.asNum() < kChannels) busMap_.push_back((int)e.asNum()); }   // (a fraction is cut: the JS addresses by it)
+    if (v.isArr()) for (size_t i = 0; i < v.size() && (int)busMap_.size() < kMaxFeeds; i++) { Json e = v.at(i); if (e.isNum() && e.asNum() >= 0 && e.asNum() < kChannels) busMap_.push_back((int)e.asNum()); }   // (a fraction is cut: the JS addresses by it)
     return true;
   }
   return true;
