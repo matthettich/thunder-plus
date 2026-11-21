@@ -1,0 +1,4 @@
+// D7: the page cuts a rate lane at the next note with the browser's AudioParam.cancelAndHoldAtTime (index.html bassNote, `b.rate.cancelAndHoldAtTime(t)`): a ramp that is running at t goes on gliding to the value it has at t,
+// then the lane holds. The core's Auto.hold (core/seq-core.js) drops the ramp's end event and leaves the lane at the ramp's start, so the decision-log tool (live-route-dump.mjs) replaces it with this. The browser's call is not
+// code of the app, so the replacement is PROVEN against Chrome's real AudioParam by native/tools/hold-vs-chrome.mjs (which imports this very string): every sample of the lane, thousands of random lanes and hold times.
+export const D7_HOLD = '\n;Auto.prototype.hold = function (t) { const v = this.at(t), A = this.ev; let ramp = false; for (let q = 0; q < A.length; q++) if (A[q].t >= t) { ramp = A[q].k === 1; break; } this.cancel(t); if (ramp) this.lin(v, t); else this.set(v, t); };';

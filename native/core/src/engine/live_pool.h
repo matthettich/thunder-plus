@@ -55,6 +55,8 @@ class LiveEng {   // one engine as the pool uses it (a LiveShell of one of the f
   virtual size_t bytes() const = 0;
   virtual uint32_t shellDropped() const = 0;   // events the shell's own queue dropped or refused (LiveShell::dropped / rejected)
   virtual uint32_t shellForced() const = 0;    // note-offs the shell's queue kept by discarding later events
+  virtual bool idle() const = 0;               // LiveShell::idle (the idle skip)
+  virtual void fastForward(uint64_t H) = 0;    // LiveShell::fastForward
 };
 
 class LivePool {
@@ -109,6 +111,9 @@ class LivePool {
   using Tap = void (*)(void* user, int track, int pad, int j, const float* L, const float* R, int frames, int64_t q0);
   void setTap(Tap f, void* user) { tap_ = f; tapUser_ = user; }
 
+  // LIVE ROUTE 1b: the idle skip (on by default; off: every node is processed every quantum, as before). Nodes in the skip now (for tests / the host's meter).
+  void setIdleSkip(bool on);
+  uint32_t idleNodes() const;
   LiveStats stats() const;   // the pool's counters plus the nodes' shells' queue counters
   uint32_t failedNodes() const;
 
@@ -127,6 +132,7 @@ class LivePool {
     bool used = false;                  // a note was ever booked on this node (stopAll acts on used nodes)
     double lastBpm = -1;                // the bass node's bpm lane as last set
     bool started = false;
+    bool skip = false; int64_t firstQ0 = 0;   // the idle skip: the node is not processed (its voice has ended and its output is silent); firstQ0: where its first call would have been (a node that never ran)
     struct EngLanes { AutoN<kAutoEng> a[12]; EngLanes() { for (int i = 0; i < 12; i++) a[i].reset(i < 5 ? -1 : 0); } };   // the twelve engine targets (seconds): c* default -1, o* default 0
     std::unique_ptr<EngLanes> engL; EngFeed feed;   // (allocated with the node; the lanes exist from the first put on: feed.on)
     bool engOn = false, bound = false;               // the JS's L.engOn; the node exists in the JS (a note was started on it: it is in the track's engine list)
@@ -159,6 +165,9 @@ class LivePool {
   void cancelFrom(Node& n, int64_t T);
   void book(Node& n, const TEv& e);
   void runNode(Node& n, int64_t q0, int frames, float* const* inL, float* const* inR);
+  void wake(Node& n);   // the idle skip ends: the node is brought to where processing it would have left it (before anything is booked on it)
+  void pruneLanes(Node& n, int64_t q0);
+  bool idleSkip_ = true; int64_t qEnd_ = 0, lastQ0_ = 0; uint32_t skipped_ = 0;
   void deliver(Node& n, uint32_t count, LiveEvent* out, uint32_t* nout);
 
   Tap tap_ = nullptr; void* tapUser_ = nullptr;

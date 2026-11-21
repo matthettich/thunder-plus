@@ -18,7 +18,8 @@ struct EngFeed { const Auto* a[12] = {nullptr, nullptr, nullptr, nullptr, nullpt
 inline void engRead(const EngFeed& f, double t, double v[12]) {   // eg(A, d): the lane's value at t, the default where it is not a number; a param's range clamps it
   for (int i = 0; i < 12; i++) {
     const double d = i < 5 ? -1 : 0, lo = i < 5 ? -1 : -255; double x = f.a[i] ? f.a[i]->at(t) : d;
-    if (!(x == x)) x = d; v[i] = x < lo ? lo : x > 255 ? 255 : x;
+    if (!(x == x)) { x = d; }
+    v[i] = x < lo ? lo : x > 255 ? 255 : x;
   }
 }
 

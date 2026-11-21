@@ -19,6 +19,7 @@ class AcidCore {
   void off();
   void reset();                          // back to a fresh core's state, the parameters kept; no allocation (LIVE ROUTE C1)
   void render(float* L, float* R, size_t len, double a, double b, double rate);
+  bool idle() const { return stage_ == 0 && env_ == 0; }   // block() returns at once: the live shell may skip it (LIVE ROUTE 1b)
   const AcidP& p() const { return p_; }
   AcidP& pm() { return p_; }   // the engine targets swap values in for one control block (eng_targets.h)
  private:
@@ -37,6 +38,7 @@ class MachCore {
   void off();
   void reset();                          // back to a fresh core's state, the parameters kept; no allocation (LIVE ROUTE C1)
   void render(float* L, float* R, size_t len, double a, double b, double rate);
+  bool idle() const { return stage_ == 0 && env_ == 0; }   // block() returns at once: the live shell may skip it (LIVE ROUTE 1b)
   bool bad() const { return bad_; }      // the JS would have thrown (a TypeError: the Ensemble chord index is NaN) or never finished (a Swarm voice count above 1e4): the render is refused
   const MachP& p() const { return p_; }
   MachP& pm() { return p_; }

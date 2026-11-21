@@ -39,16 +39,16 @@ struct LiveEvent {
 // ---- the four cores as the shell uses them -----------------------------------------------------------------------------------------------------------------------------------------------------------
 struct BassLive { using Core = BassCore; static constexpr uint32_t kBlk = 32;
   static bool on(Core& c, const LiveEvent& e) { c.on(e.leg); return true; }
-  static void off(Core& c) { c.off(); } static void bpm(Core& c, double v) { c.bpm = v; } static void wob(Core& c, double v) { c.wob = v; } static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapBass(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapBass(), sv); } static bool bad(const Core& c) { return c.bad(); } };
+  static void off(Core& c) { c.off(); } static void bpm(Core& c, double v) { c.bpm = v; } static void wob(Core& c, double v) { c.wob = v; } static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapBass(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapBass(), sv); } static bool bad(const Core& c) { return c.bad(); } static bool idle(const Core& c) { return c.idle(); } static void idleBlocks(Core&, uint64_t, double) {} };
 struct VoxLive { using Core = VoxCore; static constexpr uint32_t kBlk = 16;
   static bool on(Core& c, const LiveEvent& e) { return c.on(e.leg, js_round(e.v), e.same); }
-  static void off(Core& c) { c.off(); } static void bpm(Core&, double) {} static void wob(Core&, double) {} static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapVox(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapVox(), sv); } static bool bad(const Core&) { return false; } };
+  static void off(Core& c) { c.off(); } static void bpm(Core&, double) {} static void wob(Core&, double) {} static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapVox(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapVox(), sv); } static bool bad(const Core&) { return false; } static bool idle(const Core& c) { return c.idle(); } static void idleBlocks(Core& c, uint64_t nb, double rate) { c.idleBlocks(nb, rate); } };
 struct AcidLive { using Core = AcidCore; static constexpr uint32_t kBlk = 16;
   static bool on(Core& c, const LiveEvent& e) { c.on(e.leg, e.acc); return true; }
-  static void off(Core& c) { c.off(); } static void bpm(Core&, double) {} static void wob(Core&, double) {} static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapAcid(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapAcid(), sv); } static bool bad(const Core&) { return false; } };
+  static void off(Core& c) { c.off(); } static void bpm(Core&, double) {} static void wob(Core&, double) {} static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapAcid(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapAcid(), sv); } static bool bad(const Core&) { return false; } static bool idle(const Core& c) { return c.idle(); } static void idleBlocks(Core&, uint64_t, double) {} };
 struct MachLive { using Core = MachCore; static constexpr uint32_t kBlk = 16;
   static bool on(Core& c, const LiveEvent& e) { c.on(e.leg); return true; }
-  static void off(Core& c) { c.off(); } static void bpm(Core&, double) {} static void wob(Core&, double) {} static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapMach(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapMach(), sv); } static bool bad(const Core& c) { return c.bad(); } };
+  static void off(Core& c) { c.off(); } static void bpm(Core&, double) {} static void wob(Core&, double) {} static bool engIn(Core& c, const double v[12], double sv[7]) { return engSwapIn(c.pm(), engMapMach(), v, sv); } static void engOut(Core& c, const double sv[7]) { engSwapOut(c.pm(), engMapMach(), sv); } static bool bad(const Core& c) { return c.bad(); } static bool idle(const Core& c) { return c.idle(); } static void idleBlocks(Core&, uint64_t, double) {} };
 
 // The rate lane: a Web Audio AudioParam as far as the page uses it: a step (setValueAtTime) or a linear ramp (linearRampToValueAtTime) from the value the lane has when the ramp's event is reached.
 struct LiveRateLane {
@@ -95,6 +95,20 @@ class LiveShell {
   }
   void seek(uint64_t clock) { clock_ = clock; rendered_ = clock; origin_ = clock; head_ = 0; cnt_ = 0; }
   uint64_t clock() const { return clock_; }
+  // LIVE ROUTE 1b, the idle skip. idle(): nothing queued and the core would only render silence (every further control block changes nothing but what the core's idleBlocks() advances). fastForward(H): the shell as process() would leave it
+  // after running with no events up to the host clock H: the whole control blocks that end by H are done without rendering them (the core's idleBlocks at the rate lane's value), the rings hold silence, the clock is H. Needs the rate lane constant from here on.
+  bool idle() const { return cnt_ == 0 && (failed_ || A::idle(core_)); }
+  void fastForward(uint64_t H) {
+    if (H <= clock_) return;
+    const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk : 0;
+    if (nb) {
+      if (!failed_) A::idleBlocks(core_, nb, feed_ ? clampRate(feed_->at((double)rendered_ / feedSr_)) : lane_.at((double)rendered_));
+      const uint64_t last = rendered_ + nb * kBlk, cnt = nb * kBlk < kRing ? nb * kBlk : kRing;
+      for (uint64_t i = 0; i < cnt; i++) { ringL_[(last - 1 - i) & (kRing - 1)] = 0.0f; ringR_[(last - 1 - i) & (kRing - 1)] = 0.0f; }
+      rendered_ = last;
+    }
+    clock_ = H;
+  }
   // LIVE ROUTE (P5): the rate lane from an automation list in SECONDS (the pool's, with the sampler's folding) instead of RateSet / RateRamp events: each control block reads it at its first sample, s / sr. Null: the shell's own lane.
   void setRateFeed(const Auto* a, double sr) { feed_ = a; feedSr_ = sr; }
   // LIVE ROUTE 1b: the twelve engine-target lanes (seconds), read at each control block's first sample like the rate; null / !on: no targets (nothing runs)

@@ -310,6 +310,41 @@ double VoxCore::src1(double ph, double inc, double rob) const {   // one period 
   return gl * (1 - rob) + saw * rob * 0.8;
 }
 
+
+// The control part of a block, in two pieces so that idleBlocks() runs exactly the same arithmetic: prep() holds the transcendental functions (constant over blocks of one length while the segment and the rate stand), step() the state update.
+VoxCore::Ck VoxCore::prep(const Seg* g, double dt, double rate) const {
+  const VoxP& p = p_; Ck c;
+  const double tfm = g && (g->k == kHold || g->k == kGlide) ? 24 : g && g->k == kSon ? 16 : 10;
+  c.kf = 1 - js_exp(-dt * 1000 / (tfm / mx(0.3, p.cons))); c.ka = 1 - js_exp(-dt * 1000 / 4);
+  // frication fades in over ~8 ms and out over ~12 ms; P T K bursts stay sharp
+  c.kn1 = 1 - js_exp(-dt * 1000 / 8); c.kn2 = 1 - js_exp(-dt * 1000 / 12); c.burst = g && g->k == kBurst;
+  // pitch: C4 at C-4, with glide and vibrato (which fades in after Vibrato delay)
+  const double target = 261.626 * js_pow(2, p.oct + p.tune / 12) * rate; c.lt = js_log2(mx(20, target));
+  c.kg = p.glide > 0.5 ? 1 - js_exp(-dt * 1000 / p.glide) : 0;
+  return c;
+}
+void VoxCore::step(const Ck& c, double dt) {
+  Ctl& K = k_; const Ctl& T = tg_;
+  K.f1 += (T.f1 - K.f1) * c.kf; K.f2 += (T.f2 - K.f2) * c.kf; K.f3 += (T.f3 - K.f3) * c.kf;
+  K.av += (T.av - K.av) * c.ka; K.an += (T.an - K.an) * (c.burst ? c.ka : T.an > K.an ? c.kn1 : c.kn2); K.ah += (T.ah - K.ah) * c.ka; K.nf += (T.nf - K.nf) * c.ka; K.nb += (T.nb - K.nb) * c.ka; K.nz += (T.nz - K.nz) * c.ka;
+  if (go_ || lf_ <= 0) lf_ = c.lt;
+  if (p_.glide > 0.5) lf_ += (c.lt - lf_) * c.kg; else lf_ = c.lt;
+  vt_ += dt;
+}
+// A core with no sound and nothing to walk: every further block (full length, the rate unchanged) changes only the state idleBlocks() advances
+bool VoxCore::idle() const {
+  if (env_ != 0 || envT_ != 0) return false;
+  const Seg* g = si_ < nsegs_ ? &segs_[si_] : nullptr;
+  return !(g && g->d >= 0 && (double)si_ < (double)nsegs_ - 1);   // (the plan could still advance: enter() would change the targets)
+}
+void VoxCore::idleBlocks(uint64_t nb, double rate) {   // the same as nb blocks of kBlk samples rendered while idle(), at `rate` (the pitch latches from it: lf_)
+  if (!nb) return;
+  const double n = kBlk, dt = n / sr_; const Seg* g = si_ < nsegs_ ? &segs_[si_] : nullptr;
+  if (g && g->k == kHold) hold_ = true;
+  const Ck c = prep(g, dt, rate);
+  for (uint64_t i = 0; i < nb; i++) { st_ += n; step(c, dt); }
+}
+
 void VoxCore::render(float* L, float* R, size_t len, double a, double b, double rate) { for (double i = a; i < b; i += kBlk) block(L, R, len, i, mn(b, i + kBlk), rate); }
 
 void VoxCore::block(float* L, float* R, size_t len, double a, double b, double rate) {
@@ -321,20 +356,12 @@ void VoxCore::block(float* L, float* R, size_t len, double a, double b, double r
   while (g && g->d >= 0 && st_ >= g->d && (double)si_ < (double)nsegs_ - 1) { si_++; st_ = 0; g = &segs_[si_]; enter(); }
   if (g && g->k == kHold) hold_ = true;
   st_ += n;
-  const double tfm = g && (g->k == kHold || g->k == kGlide) ? 24 : g && g->k == kSon ? 16 : 10;
-  const double kf = 1 - js_exp(-dt * 1000 / (tfm / mx(0.3, p.cons))), ka = 1 - js_exp(-dt * 1000 / 4); Ctl& K = k_; const Ctl& T = tg_;
-  K.f1 += (T.f1 - K.f1) * kf; K.f2 += (T.f2 - K.f2) * kf; K.f3 += (T.f3 - K.f3) * kf;
-  // frication fades in over ~8 ms and out over ~12 ms; P T K bursts stay sharp
-  const double kn1 = 1 - js_exp(-dt * 1000 / 8), kn2 = 1 - js_exp(-dt * 1000 / 12);
-  K.av += (T.av - K.av) * ka; K.an += (T.an - K.an) * (g && g->k == kBurst ? ka : T.an > K.an ? kn1 : kn2); K.ah += (T.ah - K.ah) * ka; K.nf += (T.nf - K.nf) * ka; K.nb += (T.nb - K.nb) * ka; K.nz += (T.nz - K.nz) * ka;
+  const Ck ck = prep(g, dt, rate); const Ctl& K = k_;
   // amplitude envelope
   const double er = envT_ > env_ ? 1 - js_exp(-dt * 1000 / mx(0.5, p.atk)) : 1 - js_exp(-dt * 1000 * 4.6 / mx(1, p.rel));
   env_ += (envT_ - env_) * er; if (envT_ == 0 && env_ < 1e-4) env_ = 0;
-  // pitch: C4 at C-4, with glide and vibrato (which fades in after Vibrato delay)
-  const double target = 261.626 * js_pow(2, p.oct + p.tune / 12) * rate, lt = js_log2(mx(20, target));
-  if (go_ || lf_ <= 0) lf_ = lt;
-  if (p.glide > 0.5) lf_ += (lt - lf_) * (1 - js_exp(-dt * 1000 / p.glide)); else lf_ = lt;
-  vt_ += dt; const double vd = mn(1, mx(0, (vt_ * 1000 - p.vibDelay) / 300));
+  step(ck, dt);   // the formant / noise controls, the pitch (with glide) and the vibrato clock: what an idle block does too (idleBlocks)
+  const double vd = mn(1, mx(0, (vt_ * 1000 - p.vibDelay) / 300));
   const double hs = mx(0, p.hiss) * 2, cl = p.clar;
   const double vc = mx(0, mn(1, p.voice)), fs = js_pow(2, p.form * 0.35), bwm = (0.6 + p.bw * 0.9) * (1.3 - cl * 0.6), rob = p.robot, br = p.breath, lv = js_pow(10, orz(p.level) / 20) * 0.32;
   const double kb = 1 - js_exp(-2 * kPi * (1200 * js_pow(10, p.bright)) / sr), dr = orz(p.drive) * 6, dn = truthy(dr) ? 1 / js_tanh(dr) : 1;

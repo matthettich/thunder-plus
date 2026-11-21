@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { D7_HOLD } from './d7-hold.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SR = 48000, NT = 32, N = 128;
@@ -116,7 +117,7 @@ function makeCore() {
   vm.runInContext('Math.random = () => 0;', ctx);
   // D7 (verify-265 F3): the PAGE cuts a rate ramp at the next note with cancelAndHoldAtTime (index.html bassNote: the ramp goes on gliding up to the note); the core's Auto.hold drops the ramp's end event and leaves the lane at the ramp's start
   // (a core fault, reported to the owner). The log is the page's: hold() here keeps a ramp that is still running as a ramp to the value it has at t.
-  const D7 = '\n;Auto.prototype.hold = function (t) { const v = this.at(t), A = this.ev; let ramp = false; for (let q = 0; q < A.length; q++) if (A[q].t >= t) { ramp = A[q].k === 1; break; } this.cancel(t); if (ramp) this.lin(v, t); else this.set(v, t); };';
+  const D7 = D7_HOLD;
   vm.runInContext(src + D7 + '\n;globalThis.__lr = { bufs: coreBufs, setS(s){ S = s; } };', ctx, { filename: 'seq-core.js' });
   return { ctx, proc: new Cls(), U: ctx.__lr };
 }
