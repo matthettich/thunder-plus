@@ -15,7 +15,7 @@
 
    THE QUANTUM  The core renders in fixed quanta of THUNDER_LIVE_QUANTUM = 128 frames, whatever the size of the host's call. A quantum is rendered when its first
      sample is needed and handed out from a small buffer, so the samples are the same for every call size (1, 64, 128, 480, 4096) and no latency is added. The grid
-     of quanta is anchored at the `frame0` of the first thunder_live_process call (a multiple of 128 in the web: quanta are then the worklet's blocks). One quantum
+     of quanta is anchored at the first thunder_live_process call (engine frame 0; see TIME). In the web the worklet's blocks are quanta when frame0 is a multiple of 128. One quantum
      runs these NINE STEPS in this order (SongRenderer::quantum, render.cpp:93, is the template; the live host differs where marked NEW):
        1. APPLY COMMANDS (NEW). Pop the command ring into the waiting list; apply, in ring order, every command due in this quantum (see TIME), among them play
           (which first adopts the song snapshot it needs), stop, hold, loop, bpm, lead, perf, stop_track, mix_set, fx_commit, fx_param, meters.
@@ -36,15 +36,21 @@
        9. AFTER THE BLOCK. Post the events (clock, position, meters, state ...), publish the statistics. The host then drains MIDI records and, in a shell that runs
           the core's own MIDI pump, calls thunder_midiout_clock_map (midiport.h:119: AFTER the block).
 
-   TIME         Every time is a FRAME on the HOST's timeline (int64), never seconds, never a wall clock: ruling D11. The core's frame counter IS the host's: the host
-                passes the frame of the first sample of every call to thunder_live_process (`frame0`): `currentFrame` in the worklet, the callback's running count in a
-                shell. seconds = frame / sample_rate. A call's frame0 must equal the previous call's frame0 + its frames; a call that does not is a RE-ANCHOR (the quantum
-                buffer is dropped, the grid restarts at the new frame0, counted in stats.reanchors, reported as an ERROR record); this is how a shell that lost
-                callbacks says so. A suspended context that does not advance currentFrame leaves no hole.
-                A command carries `at`: a frame on that timeline, or THUNDER_LIVE_NOW (-1). Without `at` / with an `at` in the past it is applied at the top of the next
-                quantum. With a future `at` it waits in a list of 64 and is applied at the top of the quantum that CONTAINS `at` (so up to 127 frames early); the commands
-                that carry a time on into the sound (stop, stop_track, mix_set, fx_param) use `at` sample-accurately from there. Commands of one `at` apply in the order sent.
-                A 65th waiting command is applied at once instead and counted (stats.cmd_late). play has no `at`: its `t0` is its time.
+   TIME         THE API SPEAKS HOST FRAMES; THE ENGINE RUNS ITS OWN GAPLESS COUNT (ruling D11 holds at the boundary). A host frame is an int64 on the HOST's timeline (`currentFrame` in the worklet, the callback's running
+                count in a shell): never seconds, never a wall clock. The engine counts the frames IT has rendered from 0, and every time it works with (the sequencer, the voices, the mixer, the timers) is
+                engine frame / sample_rate; the host's frame of an engine frame is engine + one offset, set by the first thunder_live_process call (engine frame 0 = its frame0) and CHANGED by a re-anchor. So the
+                song's audio is bit-for-bit the same whatever frame0 the host starts at (0, 37, 2^31, 10^12).
+                A call's frame0 must equal the previous call's frame0 + its frames; a call that does not is a RE-ANCHOR: nothing inside the engine moves (no step is skipped or repeated, no silence, no burst, the
+                output across the seam is the uninterrupted run), the offset changes so that this frame0 names the next sample, it is counted in stats.reanchors and reported as an ERROR record (where REANCHOR,
+                value = frame0 - the expected frame, may be negative). A forward gap's frames never happen; a backward jump replays host frame numbers. A suspended context that does not advance currentFrame leaves
+                no hole. frame0, t0 and `at` above 2^62 are E_ARG (process: E_ARG, the outputs zeroed).
+                A command carries `at`: a HOST frame, or THUNDER_LIVE_NOW (-1). It is converted to engine time at the moment it is judged, with the offset then in force: so a timed command that waits across
+                a re-anchor is judged against the new mapping, and a command whose `at` fell in a skipped gap is due at the next quantum and applied there. Without `at` / with an `at` in the past it is applied
+                at the top of the next quantum. With a future `at` it waits in a list of 64 and is applied at the top of the quantum that CONTAINS `at` (so up to 127 frames early); the commands that carry a time
+                on into the sound (stop, stop_track, mix_set, fx_param) use `at` sample-accurately from there. Commands are applied in the order sent (RING ORDER), whatever their `at`: a due command is never
+                held behind a later-sent one. A 65th waiting command is applied at once instead and counted (stats.cmd_late; one ERROR record a quantum at most). A STOP and a PLAY CLEAR the waiting list
+                (stats.cmds_cleared counts the commands dropped): a timed bpm / loop / perf / stop / mix_set of the old play never lands in the next. play has no `at`: its `t0` (a host frame) is its time.
+                Every record's `f`, stats.frames and stats.frame_origin are HOST frames (converted with the offset in force when the record is posted).
 
    ERRORS       int functions return 0 or a negative THUNDER_LIVE_E_*; thunder_live_create returns NULL and writes its err text. A failed call changes nothing, unless
                 its own comment says so. E_BUSY (a fixed ring is full) changes nothing and loses nothing: THE CALLER OWNS THE RETRY. It must keep the message and call
@@ -187,7 +193,7 @@ int thunder_live_process(thunder_live* L, float* out_l, float* out_r, int frames
      hold                          IDLE, none (armed)     PLAYING, none (armed)    HELD, none (no-op)       ENDED, none (armed, no effect)
      a step at an edge, hold armed -                      HELD, HELD (positions)   -                        -
      the sequencer runs out        -                      ENDED, ENDED             -                        -                     (Players::songOver; arms the 0.3 s timer)
-     0.3 s after ENDED             -                      -                        -                        IDLE, STOPPED arg 1   (MidiSched::stop)
+     0.3 s after ENDED             -                      -                        -                        IDLE, STOPPED arg 1   (MidiSched::stop; the 0.3 s runs from the SONG's end, max(quantum start, end time), not from the quantum that found the end)
    A play on a host that is PLAYING or HELD does not stop the old song's voices or its MIDI first (the page stops first, as tStop does). */
 typedef struct thunder_live_stats {
   uint32_t size;
@@ -224,7 +230,8 @@ typedef struct thunder_live_stats {
   uint32_t live_late;           /* live events that arrived inside the look-ahead */
   uint32_t thread_prepares;     /* times a process call prepared its thread's workspace (1 normally; more: the audio thread changed) */
   uint32_t evt_crit_dropped;    /* critical records (STATE, HELD, ERROR, SONG, PADS) the critical ring refused: see EVENTS; also counted in evt_dropped */
-  uint32_t reserved[2];         /* 0 */
+  uint32_t cmds_cleared;        /* waiting timed commands dropped by a stop or a play (see TIME) */
+  uint32_t cmds_no_seq;         /* bpm / loop / perf commands applied with no sequencer running: dropped and counted here (they are also in cmds_applied) */
 } thunder_live_stats;
 int thunder_live_stats_get(const thunder_live* L, thunder_live_stats* out);
 
@@ -347,10 +354,11 @@ typedef struct thunder_live_play_opts {   /* the Seq's options (SeqOpts, seq.h) 
   int32_t has_only;
   int32_t spp;                  /* Song Position Pointer in 16ths for the MIDI Start: 0 .. 16383; -1: the host computes it from `row` (midi_spp_for: it STEPS A SEQ, allocates, control-side) */
   int32_t pdc_mode;             /* latency compensation: 0 off, 1 auto, 2 on (pdc_mode_of); the plan is built here from the song's effects */
+  int32_t test_once, test_sim;  /* TEST ONLY (the goldens of tools/seq-golden.mjs are made with once / sim on): SeqOpts::once / sim. 0, 0: a live play's (loops; no sim). A product leaves them 0 */
 } thunder_live_play_opts;
 
 /* CONTROL. Allocates (a fresh SeqSession for this PLAY and its starting Seq, the Players-side plans, the effects plans of the song, the master chain's configuration, the PDC plan) and uses the LAST
-   PUBLISHED song and vars. Then queues the play command; at the top of the next quantum the audio side (1) adopts the new snapshot (the runner starts on its Seq: SeqRunner::start; a Seq that was running is
+   PUBLISHED song and vars. Then queues the play command (BEFORE it publishes the snapshot, and the audio side holds every adoption back until the play that owns the new session has started: an older play's runner never meets the new session's unstarted Seq); the play CLEARS the waiting list of timed commands when it starts (stats.cmds_cleared); at the top of the next quantum the audio side (1) adopts the new snapshot (the runner starts on its Seq: SeqRunner::start; a Seq that was running is
    dropped, its voices are NOT cut: the page stops first, or calls stop_track / stop), (2) Seq::setTime(t0), (3) mixer.load(song) at once (every level as the song has it, no ramp) + songLanesReset + clockStop,
    (4) commits the song's track and master effects, the master chain configuration and the PDC plan, (5) starts the MIDI scheduler (MidiSched::start(spp, t0), D-1: called by the audio side right after midi_begin of the same quantum (see MIDI), so the Start never lands after the first step), (6) seeds the tempo consumers from Seq::bpm() (SEV_TEMPO is not emitted at the start: seq.cpp:995 emits it only on a change: the mixer's beat clock, FxBank::setBpm, LivePool::tempo), (7) posts a STATE record PLAYING. The seed is applied: Seq options as given, `chop` = the current pads snapshot's table (set again every
    quantum by PadsHost::beginQuantum). The host's own rules (ruling D-4): Players::setDropLate(true) is set once at create: a note more than 0.15 s late is not played (counted in stats.notes_late).
@@ -359,7 +367,7 @@ typedef struct thunder_live_play_opts {   /* the Seq's options (SeqOpts, seq.h) 
    E_BUSY (ring full: the SeqSession built for it is discarded; retry rebuilds it). The caller's `o` is copied. */
 int thunder_live_play(thunder_live* L, const thunder_live_play_opts* o);
 
-/* CONTROL. STOP. Queues the stop. Applied at the quantum containing `at` (THUNDER_LIVE_NOW: the next): SeqRunner::stop; Players::stopAll(at) (every voice of every pool lets go at `at`, booked notes are taken back);
+/* CONTROL. STOP. Queues the stop. Applied at the quantum containing `at` (THUNDER_LIVE_NOW: the next), and it CLEARS the waiting list of timed commands (stats.cmds_cleared): SeqRunner::stop; Players::stopAll(at) (every voice of every pool lets go at `at`, booked notes are taken back);
    mixer.songLanesReset() + clockStop(at); the Seq is dropped and PadsHost::seqGone() is called at the top of the next quantum, before beginQuantum (step 2); the MIDI scheduler is stopped (MidiSched::stop(t0): all notes off, CLEAR, clock Stop: D-2; applied right after midi_begin of that quantum, see MIDI); a STATE record STOPPED. The host goes IDLE (THE STATE MACHINE). Effects tails are NOT cut.
    A song_publish issued after this call returns no longer reaches the sequencer. Stop on an IDLE host: 0, harmless (it still stops MIDI). The silence never waits for the core: a host also mutes its own output. */
 int thunder_live_stop(thunder_live* L, int64_t at);
@@ -368,16 +376,16 @@ int thunder_live_stop(thunder_live* L, int64_t at);
    HELD record with that step's time and the positions of the tracks, and the state becomes HELD. Voices ring out. The page then decides (usually: thunder_live_stop). Armed with no sequencer: the flag is set anyway. */
 int thunder_live_hold(thunder_live* L, int64_t at);
 
-/* CONTROL. The loop (Seq::setLoop, seq.h:146: rows clamped to the mode's range): has 0 / 1, y0 .. y1. Applied at `at`; the sequencer takes it at its next step. E_ARG: y0 > y1 or negative. */
+/* CONTROL. The loop (with no sequencer running the command is dropped and counted in stats.cmds_no_seq) (Seq::setLoop, seq.h:146: rows clamped to the mode's range): has 0 / 1, y0 .. y1. Applied at `at`; the sequencer takes it at its next step. E_ARG: y0 > y1 or negative. */
 int thunder_live_loop(thunder_live* L, int has, int y0, int y1, int64_t at);
 
-/* CONTROL. The tempo (Seq::setBpm: a value that is not finite or not > 0 is E_ARG here; one finite and positive is clamped to [1e-3, 1e6] by the Seq and counted in Seq::badSets). Heard from the Seq's next step after `at`. */
+/* CONTROL. The tempo (with no sequencer running the command is dropped and counted in stats.cmds_no_seq) (Seq::setBpm: a value that is not finite or not > 0 is E_ARG here; one finite and positive is clamped to [1e-3, 1e6] by the Seq and counted in Seq::badSets). Heard from the Seq's next step after `at`. */
 int thunder_live_bpm(thunder_live* L, double bpm, int64_t at);
 
 /* CONTROL. The sequencer's look-ahead in seconds, 0.05 .. 2 (SongRenderer::lead): the page's 0.25, 0.6 for 1.5 s after PLAY, up to 1.2 hidden. NOT the MIDI outbox's (thunder_live_midi_lead). */
 int thunder_live_lead(thunder_live* L, double seconds, int64_t at);
 
-/* CONTROL. PERFORM's live state: what = THUNDER_LIVE_PERF_XF (v: the crossfader, finite), _MACRO (index 0 .. 7, v finite), _FILL (v 0 / 1). Heard from the Seq's next step after `at`. */
+/* CONTROL. PERFORM's live state (with no sequencer running the command is dropped and counted in stats.cmds_no_seq): what = THUNDER_LIVE_PERF_XF (v: the crossfader, finite), _MACRO (index 0 .. 7, v finite), _FILL (v 0 / 1). Heard from the Seq's next step after `at`. */
 #define THUNDER_LIVE_PERF_XF 0
 #define THUNDER_LIVE_PERF_MACRO 1
 #define THUNDER_LIVE_PERF_FILL 2
@@ -396,9 +404,11 @@ int thunder_live_stop_track(thunder_live* L, int track, int64_t at);
 #define THUNDER_LIVE_MIX_SOLO 4    /* value 0 / 1 */
 #define THUNDER_LIVE_MIX_OUT 6     /* MixKey::Out (track 32 only: OUT). 5 (Send) is not a thing this mixer has: E_ARG */
 
-/* CONTROL. mix.set (CORE-BRIDGE section 3): Mixer::set(MixSet) (mix.h:132). track 0 .. 32; value 0 .. 255 (mute / solo 0 / 1); `ramp` in FRAMES: < 0: the page's law (a 12 ms approach; MASTER VOL jumps), 0: at once,
-   > 0: linear over that many frames (the MUTE crossfade). Applied at the quantum containing `at`, sample-accurately from there (MixSet::at = at / sr). Mute / solo re-aim the audible mask the MIDI scheduler reads
-   each block (gear goes quiet). The same change must also be in the next song text (the Seq reads S.mix for TVA / TPN): the host does not copy it there. Errors: E_ARG, E_BUSY. */
+/* CONTROL. mix.set (CORE-BRIDGE section 3): Mixer::set(MixSet) (mix.h:80-90). track 0 .. 32. THE VALUE RANGE IS PER KEY, as the mixer takes it (mix.h:84 "00..FF"; mix.cpp mix_curve, mix_track_gain,
+   mix_trim_gain, mix_pan): VOL, TRIM, OUT 0 .. 255 (finite; the mixer clamps); PAN 0 .. 255 with 128 the centre (mix_pan = clamp((v - 128) / 127, -1, +1): a left pan is BELOW 128, never negative); MUTE, SOLO 0 or 1.
+   Anything else is E_ARG. MUTE and SOLO are tracks 0 .. 31 only; TRIM and PAN too; the master has VOL and OUT. `ramp` in FRAMES: < 0: the page's law (a 12 ms approach; MASTER VOL jumps), 0: at once,
+   > 0: linear over that many frames (the MUTE crossfade). Applied at the quantum containing `at` (a host frame), sample-accurately from there (MixSet::at = engine time of `at`). Mute / solo re-aim the audible
+   mask the MIDI scheduler reads each block (gear goes quiet). The same change must also be in the next song text (the Seq reads S.mix for TVA / TPN): the host does not copy it there. Errors: E_ARG, E_BUSY. */
 int thunder_live_mix_set(thunder_live* L, int track, int key, double value, double ramp, int64_t at);
 
 /* CONTROL. Allocates. THE PDC PLAN (latency compensation; pdc_plan + Mixer::setDelays, mix.h:117): builds the plan from the song's bus plan and the latency of the effects plans as last COMMITTED (or, for a plan
@@ -467,9 +477,9 @@ int thunder_live_midi_lead(thunder_live* L, double seconds);
 /* ---- 8. EVENTS TO THE HOST -------------------------------------------------------------------------------------------------------------------------------- */
 /* ONE consumer thread (any non-audio thread; the worklet's process() after the block in the web). Records are PACKED, little-endian, 8-byte aligned, of the fixed sizes below, the same on wasm32 and 64-bit.
    Every record starts with thunder_live_ev_head; `bytes` is the record's whole size (a reader skips a type it does not know by it); `f` is the frame the event refers to on the host's timeline. Rates (CORE-BRIDGE section 4):
-   CLOCK 10 a second, POS 30 a second while playing, METERS at the wanted rate (<= 30), ROWS per tracker row, the others when they happen. TWO RINGS, ONE ORDER. The CRITICAL records (STATE, HELD, ERROR, SONG, PADS: each is the only report of something that happened, and at most a few come per quantum) have their own ring of 64 records, so that
-   a flood of POS / ROWS / METERS / CLOCK can never push one out; the rest share the big ring (1024 records). thunder_live_poll merges the two by `seq`, so the reader sees them in the order they were posted. A full ring refuses
-   the NEWEST record of its kind and counts it (stats.evt_dropped; the next CLOCK carries the total; a critical one is also in stats.evt_crit_dropped): a consumer that stops polling for 64 critical records loses the 65th, and
+   CLOCK 10 a second, POS 30 a second while playing, METERS at the wanted rate (<= 30), ROWS per tracker row, the others when they happen. TWO RINGS, ONE ORDER. The CRITICAL records (STATE, HELD, SONG, PADS, and an ERROR with fatal = 1: each changes the state machine the page follows, or is the only report of something it must not lose, and at most a few come per quantum) have their own ring of 64 records, so that
+   a flood of POS / ROWS / METERS / CLOCK can never push one out; the rest (CLOCK, POS, ROWS, METERS, LATE and every NON-FATAL ERROR: REANCHOR, CMD, SESSION, VOICES; REANCHOR and CMD at most one a quantum) share the big ring (1024 records). thunder_live_poll merges the two by `seq`, so the reader sees them STRICTLY in the order they were posted. A full ring refuses
+   the NEWEST record of its kind and counts it (stats.evt_dropped; the next CLOCK carries the total; a critical one is also in stats.evt_crit_dropped): a consumer that stops polling for 64 critical records loses the 65th (a jittery host that re-anchors on every call can no longer cause it), and
    knows it by the gap in `seq` and by the counter. Nothing is dropped silently. A consumer polls at least once every 100 ms (a worklet: once per block or per message). */
 #define THUNDER_LIVE_EV_CLOCK 1
 #define THUNDER_LIVE_EV_POS 2
@@ -547,7 +557,7 @@ typedef struct thunder_live_ev_pads {     /* 24 bytes: the audio side now reads 
 #define THUNDER_LIVE_WHERE_FATAL 6        /* the handle is dead (E_INTERNAL inside): fatal = 1; the page stops, drops the node and uses the JS core (ruling D14) */
 typedef struct thunder_live_ev_error {    /* 32 bytes */
   thunder_live_ev_head h;
-  int32_t where, code, fatal, reserved;
+  int32_t where, code, fatal, value;      /* value: REANCHOR: the frames skipped (negative: backwards); VOICES: the cumulative count; else 0 */
 } thunder_live_ev_error;
 
 typedef struct thunder_live_ev_late {     /* 40 bytes: the late / lost counters, cumulative, posted when one changed and at most 4 a second (the playback report's lines) */

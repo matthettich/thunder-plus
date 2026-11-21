@@ -23,11 +23,16 @@
 
 namespace thunder {
 
+static_assert(sizeof(thunder_live_ev_head) == 16 && sizeof(thunder_live_ev_clock) == 48 && sizeof(thunder_live_ev_pos) == 32 && sizeof(thunder_live_ev_rows) == 24 && sizeof(thunder_live_ev_rowent) == 8
+              && sizeof(thunder_live_ev_state) == 24 && sizeof(thunder_live_ev_song) == 24 && sizeof(thunder_live_ev_pads) == 24 && sizeof(thunder_live_ev_error) == 32 && sizeof(thunder_live_ev_late) == 40
+              && sizeof(thunder_live_ev_meters) == 304, "the record layouts of live.h (the same on wasm32 and 64-bit)");
+
 namespace {
 // stats.* of the audio side, in pub_[]: the audio thread stores each once a quantum (relaxed), any thread loads (relaxed)
 enum Pub { P_FRAMES, P_ORIGIN, P_QUANTA, P_CALLS, P_STEPS, P_EVENTS, P_SEQDROP, P_SKIPS, P_CMDS, P_DUMPDROP, P_VOICES, P_PEAKV, P_NOTES, P_NPLAYED, P_NLATE, P_NNOPAD, P_NLIVE, P_NSF, P_NVARMISS,
-  P_NSTRETCH, P_EVIGN, P_CMDLATE, P_EVTDROP, P_EVTCRIT, P_REANCH, P_PREP, P_LIVEFAIL, P_LIVELATE, P_SONGADOPT, P_COUNT };
+  P_NSTRETCH, P_EVIGN, P_CMDLATE, P_EVTDROP, P_EVTCRIT, P_REANCH, P_PREP, P_LIVEFAIL, P_LIVELATE, P_SONGADOPT, P_CLEARED, P_NOSEQ, P_COUNT };
 constexpr double kEndStopSec = 0.3;          // the web's frame() rule: the MIDI stop 0.3 s after the song's end (live.h, THE STATE MACHINE)
+constexpr int64_t kMaxHostFrame = (int64_t)1 << 62;   // frame0, t0 and `at` above this are E_ARG: engine + offset arithmetic cannot overflow
 constexpr double kPlayDelaySec = 0.08;       // t0 < 0: the next quantum's start + 0.08 s (live.h, thunder_live_play_opts::t0)
 constexpr int kBudgetErr = THUNDER_LIVE_E_LIMIT;
 inline bool finite(double x) { return std::isfinite(x); }
@@ -136,7 +141,8 @@ int LiveHost::songPublish(const uint8_t* song, size_t n, const uint8_t* vars, si
     sp = std::shared_ptr<const Song>(own.release());
   } catch (...) { return THUNDER_LIVE_E_MEMORY; }
 
-  if (controlPlaying_ && sess_) {
+  // control's view of PLAYING follows the audio side (F6): a play not yet started / not yet collected (playOut_ > 0), or the published state PLAYING; HELD, ENDED and the timer's IDLE take the IDLE path (the song is kept for the next play)
+  if (controlPlaying_ && sess_ && (playOut_ > 0 || state_.load(std::memory_order_acquire) == THUNDER_LIVE_STATE_PLAYING)) {
     // PLAYING: a SUCCESSOR snapshot of the play's session (SeqSession::publish, written out here only to set `rev` / `ord` between make() and the slot's publish). Rolled back when the ring is full.
     std::unique_ptr<SongSnap> snap;
     try { snap = sess_->make(sp, sv); } catch (...) { sess_->rollback(); return THUNDER_LIVE_E_MEMORY; }
@@ -153,10 +159,10 @@ int LiveHost::songPublish(const uint8_t* song, size_t n, const uint8_t* vars, si
     refreshCtl();
     return THUNDER_LIVE_OK;
   }
-  // IDLE: keep the Song for the next play; nothing is built for the audio side. The SONG record is posted at the next quantum (a SongAck command).
-  songCur_ = sp; varsCur_ = sv; songRev_ = rev;
+  // IDLE: keep the Song for the next play; nothing is built for the audio side. The SONG record is posted at the next quantum (a SongAck command). The ack is queued FIRST: on E_BUSY nothing has changed (F5).
   LiveCmd c; c.type = LiveCmdType::SongAck; c.i64a = rev;
-  if (!cmds_.push(c)) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // the publish itself is kept (live_host.h)
+  if (!cmds_.push(c)) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }
+  songCur_ = sp; varsCur_ = sv; songRev_ = rev;
   return THUNDER_LIVE_OK;
 }
 
@@ -302,6 +308,7 @@ int LiveHost::padsPublish() {
 // CONTROL: transport
 // =========================================================================================================================================================================================================
 int LiveHost::push(const LiveCmd& c) {
+  if (c.type != LiveCmdType::Play && c.type != LiveCmdType::SongAck && c.at > kMaxHostFrame) return THUNDER_LIVE_E_ARG;   // live.h TIME: frames above 2^62
   if (!cmds_.push(c)) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // changed nothing, lost nothing: the caller owns the retry
   return THUNDER_LIVE_OK;
 }
@@ -309,12 +316,13 @@ int LiveHost::push(const LiveCmd& c) {
 int LiveHost::play(const thunder_live_play_opts& o) {
   if (o.reserved0 != 0 || o.mode < THUNDER_LIVE_MODE_SONG || o.mode > THUNDER_LIVE_MODE_PHRASE || o.row < 0 || o.row > 255 || o.track < 0 || o.track >= THUNDER_LIVE_TRACKS || o.sect < -1 || o.phrase < -1
       || (o.has_loop && (o.loop_y0 < 0 || o.loop_y1 < o.loop_y0)) || o.spp < -1 || o.spp > 16383 || o.pdc_mode < 0 || o.pdc_mode > 2) return THUNDER_LIVE_E_ARG;
+  if (o.t0 > kMaxHostFrame) return THUNDER_LIVE_E_ARG;
   if (!songCur_) return THUNDER_LIVE_E_STATE;                       // no song published
   collect();
-  if (cmds_.space() == 0 || playOut_ >= 8) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // checked BEFORE anything is built: the session of a refused play is never made
+  if (cmds_.space() == 0 || playOut_ >= 8 || songSlot_.room() == 0) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // checked BEFORE anything is built: the session of a refused play is never made
   SeqOpts so;
   so.row = o.row; so.hasLoop = o.has_loop != 0; so.loopY0 = o.loop_y0; so.loopY1 = o.loop_y1;
-  so.once = false; so.live = false; so.sim = false;                 // live.h / live_host.h: the page's play loops the song; an END command ends it
+  so.once = o.test_once != 0; so.live = false; so.sim = o.test_sim != 0;   // live.h: the page's play loops the song (test_once / test_sim: TEST ONLY, the goldens' options)
   so.hasOnly = o.has_only != 0; so.only = o.only; so.track = o.track; so.sect = o.sect; so.phrase = o.phrase;
   so.hasSeed = o.has_seed != 0; so.seed = o.seed; so.randomSeed = o.random_seed ? o.random_seed : 0x2545F491u;
   so.chop = nullptr;                                                // PadsHost::beginQuantum sets the table every quantum (pads_snap.h, precondition 3)
@@ -331,11 +339,15 @@ int LiveHost::play(const thunder_live_play_opts& o) {
   } catch (...) { if (sess) sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }
   plan->song = songCur_; plan->t0 = o.t0; plan->spp = o.spp; plan->pdcMode = o.pdc_mode == 0 ? PdcMode::Off : o.pdc_mode == 2 ? PdcMode::On : PdcMode::Auto; plan->sess = sess.get();
   snap->rev = songRev_; snap->ord = songOrd_ + 1;
-  if (!songSlot_.publish(snap.get())) { sess->rollback(); delete plan; delete bm; cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // (the SeqSession built for it is discarded; a retry rebuilds it)
+  // ORDER (verify-283 F9): the Play command goes into the ring FIRST, the snapshot is published SECOND. A quantum that runs between the two finds a Play whose snapshot is not there yet and keeps it stalled
+  // (tryStartPlay); the audio side adopts nothing else while a play is stalled (adopt()), so the running runner is never re-pointed at the unstarted Seq of a session whose Play has not been applied.
+  // Room in both rings was checked above and only this thread fills them, so neither push can fail.
+  LiveCmd c; c.type = LiveCmdType::Play; c.p = plan; c.i64a = o.t0; c.i0 = o.spp; c.i1 = o.pdc_mode;
+  const bool pushed = cmds_.push(c); assert(pushed); (void)pushed;
+  if (testSeam_) testSeam_(testSeamUser_);                         // TEST ONLY: a quantum can run here
+  const bool published = songSlot_.publish(snap.get()); assert(published); (void)published;
   snap.release(); sess->commit(); songOrd_++; songPublished_.store(songOrd_, std::memory_order_release);
   if (!busSlot_.publish(bm)) delete bm;
-  LiveCmd c; c.type = LiveCmdType::Play; c.p = plan; c.i64a = o.t0; c.i0 = o.spp; c.i1 = o.pdc_mode;
-  const bool pushed = cmds_.push(c); assert(pushed); (void)pushed;  // (space was checked above and only this thread pushes)
   playOut_++;
   sess_ = sess; controlPlaying_ = true; sessionFullSeen_ = false; sessionFullFlag_.store(0, std::memory_order_relaxed);
   refreshCtl();
@@ -399,12 +411,18 @@ int LiveHost::poll(void* buf, int cap) {
   if (!buf || cap < 0) return THUNDER_LIVE_E_ARG;
   uint8_t* out = static_cast<uint8_t*>(buf); int w = 0;
   for (;;) {
-    // peek both rings (consumer side: tail is ours; head acquires the producer's writes)
-    const bool hc = evCrit_.tail.load(std::memory_order_relaxed) != evCrit_.head.load(std::memory_order_acquire);
-    const bool hr = evRing_.tail.load(std::memory_order_relaxed) != evRing_.head.load(std::memory_order_acquire);
+    // STRICTLY in seq order (verify-283 F2). The two ring heads are not one atomic view, so: load the critical head, the ordinary head, the critical head again, and accept the view only when the critical head did not
+    // move. Any record posted before one we saw is then in the view: a critical record older than an ordinary one seen was published before it, so the second critical load (after the ordinary acquire) has it
+    // (and equals the first, or we retry); an ordinary record older than a critical one seen was published before it, and the ordinary load came after the first critical acquire.
+    uint32_t ch = 0, rh = 0; const uint32_t ct = evCrit_.tail.load(std::memory_order_relaxed), rt = evRing_.tail.load(std::memory_order_relaxed);
+    for (int tries = 0; tries < 16; tries++) {
+      ch = evCrit_.head.load(std::memory_order_acquire); rh = evRing_.head.load(std::memory_order_acquire);
+      if (evCrit_.head.load(std::memory_order_acquire) == ch) break;
+    }
+    const bool hc = ct != ch, hr = rt != rh;
     if (!hc && !hr) break;
-    const LiveEvSlot* sc = hc ? &evCrit_.buf[evCrit_.tail.load(std::memory_order_relaxed) & 63u] : nullptr;
-    const LiveEvSlot* sr = hr ? &evRing_.buf[evRing_.tail.load(std::memory_order_relaxed) & (kLiveEvRing - 1)] : nullptr;
+    const LiveEvSlot* sc = hc ? &evCrit_.buf[ct & 63u] : nullptr;
+    const LiveEvSlot* sr = hr ? &evRing_.buf[rt & (kLiveEvRing - 1)] : nullptr;
     uint32_t qc = 0, qr = 0;
     if (sc) std::memcpy(&qc, sc->data + offsetof(thunder_live_ev_head, seq), 4);
     if (sr) std::memcpy(&qr, sr->data + offsetof(thunder_live_ev_head, seq), 4);
@@ -457,7 +475,7 @@ bool LiveHost::statsGet(thunder_live_stats* out) const {
   s.cmd_busy = cmdBusy_.load(std::memory_order_relaxed); s.cmd_late = (uint32_t)P(P_CMDLATE); s.evt_dropped = (uint32_t)P(P_EVTDROP); s.reanchors = (uint32_t)P(P_REANCH);
   { const uint64_t pub = songPublished_.load(std::memory_order_acquire), ad = P(P_SONGADOPT); s.song_pending = pub > ad ? (uint32_t)(pub - ad) : 0; }
   s.session_full = sessionFullFlag_.load(std::memory_order_relaxed);
-  s.live_failed = (uint32_t)P(P_LIVEFAIL); s.live_late = (uint32_t)P(P_LIVELATE); s.thread_prepares = (uint32_t)P(P_PREP); s.evt_crit_dropped = (uint32_t)P(P_EVTCRIT);
+  s.live_failed = (uint32_t)P(P_LIVEFAIL); s.live_late = (uint32_t)P(P_LIVELATE); s.thread_prepares = (uint32_t)P(P_PREP); s.evt_crit_dropped = (uint32_t)P(P_EVTCRIT); s.cmds_cleared = (uint32_t)P(P_CLEARED); s.cmds_no_seq = (uint32_t)P(P_NOSEQ);
   const uint32_t n = std::min<uint32_t>(out->size, (uint32_t)sizeof s);
   const uint32_t keep = out->size; std::memcpy(out, &s, n); out->size = keep;
   return true;
@@ -469,11 +487,11 @@ bool LiveHost::statsGet(thunder_live_stats* out) const {
 int LiveHost::process(float* l, float* r, int frames, int64_t frame0, int64_t wallNs) {
   // validation: the outputs are ALWAYS written (zeros on an error)
   auto zero = [&]() { if (frames > 0 && frames <= maxBlock_) { if (l) std::memset(l, 0, (size_t)frames * sizeof(float)); if (r && r != l) std::memset(r, 0, (size_t)frames * sizeof(float)); } };
-  if (!l || !r || frames < 0 || frames > maxBlock_ || frame0 < 0 || (frames > 0 && l < r + frames && r < l + frames)) { zero(); return THUNDER_LIVE_E_ARG; }
+  if (!l || !r || frames < 0 || frames > maxBlock_ || frame0 < 0 || frame0 > kMaxHostFrame || (frames > 0 && l < r + frames && r < l + frames)) { zero(); return THUNDER_LIVE_E_ARG; }
   if (!pe_thread_ready()) { pe_prepare(); thread_prepares_++; }   // the one call that may allocate: this thread's Plaits / Elements workspace (live.h, create)
   calls_++; wallNs_ = wallNs;
   if (frames == 0) { publish(); return THUNDER_LIVE_OK; }        // the web's first handler: prepare only; no anchor, no quantum
-  if (!anchored_) { anchored_ = true; origin_ = qFrame_ = frame0; qRead_ = kLiveQuantum; nextClockAt_ = nextPosAt_ = nextLateAt_ = frame0; }
+  if (!anchored_) { anchored_ = true; off_ = origin_ = frame0; qFrame_ = 0; qRead_ = kLiveQuantum; nextClockAt_ = nextPosAt_ = nextLateAt_ = 0; }   // engine frame 0 is the first call's frame0
   else if (frame0 != nextFrame_) reanchor(frame0);               // a call that does not continue the last one (live.h, TIME)
   nextFrame_ = frame0 + frames;
   int done = 0;
@@ -487,15 +505,17 @@ int LiveHost::process(float* l, float* r, int frames, int64_t frame0, int64_t wa
   return THUNDER_LIVE_OK;
 }
 
+// A call that does not continue the last one (forward gap, backward jump, a restarted counter): NOTHING inside the engine moves. The engine frame of the next sample to be handed out is
+// qFrame_ - (samples still buffered); the host's frame0 now names it (off_), so the song continues sample for sample with no step skipped or repeated, no silence, no burst.
 void LiveHost::reanchor(int64_t frame0) {
   const int64_t skipped = frame0 - nextFrame_;
-  qRead_ = kLiveQuantum;                       // the buffered quantum is dropped
-  qFrame_ = origin_ = frame0;                  // the grid restarts here
+  const int64_t eNext = qFrame_ - (kLiveQuantum - qRead_);   // (qRead_ == kLiveQuantum: nothing buffered: the next quantum's start)
+  off_ = frame0 - eNext; origin_ = frame0;
   reanchors_++;
   thunder_live_ev_error e; std::memset(&e, 0, sizeof e);
-  e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = frame0; e.where = THUNDER_LIVE_WHERE_REANCHOR; e.code = 0; e.fatal = 0;
-  e.reserved = (int32_t)std::max<int64_t>(INT32_MIN, std::min<int64_t>(INT32_MAX, skipped));   // live.h gives the skipped-frames "value" no field of its own: carried in `reserved` (notes, departure 3)
-  post(&e, sizeof e);
+  e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = eNext; e.where = THUNDER_LIVE_WHERE_REANCHOR; e.code = 0; e.fatal = 0;   // (post() adds off_: the record's f is frame0)
+  e.value = (int32_t)std::max<int64_t>(INT32_MIN, std::min<int64_t>(INT32_MAX, skipped));
+  if (reanchorRecAt_ != (int64_t)quanta_) { reanchorRecAt_ = (int64_t)quanta_; post(&e, sizeof e); }   // at most one record a quantum (a jittery counter re-anchors on every call); every one is counted
 }
 
 void LiveHost::quantum() {
@@ -503,18 +523,20 @@ void LiveHost::quantum() {
   const double t0 = (double)qStart / sr_;
   // 1. APPLY COMMANDS
   retryStalledPlay(qStart);
+  if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)nPend_; nPend_ = 0; }   // (a stalled play that started now)
   applyCommands(qStart, qStart + kLiveQuantum);
   // 2. ADOPT: seq_adopt, then seqGone() if the Seq was dropped, then PadsHost::beginQuantum(players, runner's Seq) every quantum
   adopt(qStart);
   // 3. CLOCKS
   players_->setTime(t0, qStart); mix_->setTime(t0);
-  // 4. MIDI BEGIN (P4)
+  // 4. MIDI BEGIN (P4): midi_begin(engine frame qStart) goes HERE; a pending MIDI Start (play, spp) is issued right after it (pendMidiStartSpp_), never after the first step.
   // 5. STEP
   const SeqPump pr = stepLoop(t0, qStart);
-  // 6. MIDI END (P4)
+  // 6. MIDI END (P4): midi_end goes HERE; a pending MIDI stop (the Stop command, the song-over timer: pendMidiStop_) is issued right after it. Engine frames only: the shell maps them to its clock with the CLOCK records.
   // 7. SONG OVER, and the ENDED timer
   songEnded(t0, qStart, pr);
-  // 8. SOUND
+  // 8. SOUND. HOOK POINT for the next units (U37 P3 effects bank, C2 chains host, the master chain): call them from render() right after players_->render and before/around mix_->render, with the ENGINE frame
+  //    qStart (time t0 = qStart / sr_), never a host frame: the engine's timeline is gapless (a re-anchor changes off_ only), which is what the chains host and the effects bank rely on.
   render(t0, qStart);
   // 9. AFTER THE BLOCK (the counters first: stats.frames is the frame the NEXT quantum starts at)
   qFrame_ += kLiveQuantum; quanta_++;
@@ -526,20 +548,28 @@ void LiveHost::quantum() {
 // live.h's step 1 says commands are applied in (a stop at 3000 sent before a mix_set at 2950 must not be reordered): notes, departure 2.
 void LiveHost::applyCommands(int64_t qStart, int64_t qEnd) {
   bool lateErr = false;
-  // (a) the commands that were waiting (sent before everything in the ring now): apply the due ones in order, keep the rest in order
+  // (a) the commands that were waiting (sent before everything in the ring now): apply the due ones in order, keep the rest in order. A stop or a play that starts CLEARS what is still waiting (clearPend_).
   int w = 0;
   for (int i = 0; i < nPend_; i++) {
     const LiveCmd p = pend_[i];
-    if (p.at < 0 || p.at < qEnd) applyOne(p, qStart); else pend_[w++] = p;
+    if (p.at < 0 || p.at < qEnd + off_) {
+      applyOne(p, qStart);
+      if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)(w + (nPend_ - i - 1)); w = 0; break; }
+    } else pend_[w++] = p;
   }
   nPend_ = w;
   // (b) the ring, in ring order: due now: applied; not due: waits; the list is full (64): applied at once instead and counted
   LiveCmd c;
   while (cmds_.pop(c)) {
-    if (c.at < 0 || c.at < qEnd) { applyOne(c, qStart); continue; }
+    if (c.at < 0 || c.at < qEnd + off_) {   // `at` is a HOST frame, judged against the mapping in force now (a re-anchor in between: a gap's commands are due)
+      applyOne(c, qStart);
+      if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)nPend_; nPend_ = 0; }
+      continue;
+    }
     if (nPend_ < kLiveCmdWait) { pend_[nPend_++] = c; continue; }
     cmdLate_++; if (!lateErr) { lateErr = true; thunder_live_ev_error e; std::memset(&e, 0, sizeof e); e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = qStart; e.where = THUNDER_LIVE_WHERE_CMD; post(&e, sizeof e); }   // at most one record a quantum
     applyOne(c, qStart);
+    if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)nPend_; nPend_ = 0; }
   }
   if (ackPend_) { ackPend_ = false; postSong(ackPendRev_, qStart); ackValid_ = true; ackRev_ = ackPendRev_; }
 }
@@ -553,7 +583,7 @@ void LiveHost::giveBack(PlayPlan* p) { const bool ok = playBack_.push(p); assert
 
 void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
   cmdsApplied_++;
-  const int64_t atF = c.at < qStart ? qStart : c.at;   // never before this quantum's start
+  const int64_t atF = c.at < 0 || c.at - off_ < qStart ? qStart : c.at - off_;   // host -> ENGINE frame; never before this quantum's start
   const double at = (double)atF / sr_;
   switch (c.type) {
     case LiveCmdType::SongAck: ackPend_ = true; ackPendRev_ = c.i64a; break;   // one SONG record for the newest of the quantum's acks (applyCommands)
@@ -563,15 +593,15 @@ void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
       const int prev = stateA_;
       dropSeq();
       players_->stopAll(at); mix_->songLanesReset(); mix_->clockStop(at);
-      endStopAt_ = -1; stateA_ = THUNDER_LIVE_STATE_IDLE;
+      endStopAt_ = -1; stateA_ = THUNDER_LIVE_STATE_IDLE; clearPend_ = true;   // a stop clears the waiting list (live.h TIME)
       if (prev != THUNDER_LIVE_STATE_IDLE) postState(qStart, THUNDER_LIVE_ST_STOPPED, 0);   // from IDLE: no record
       break; }
     case LiveCmdType::Hold: runner_.hold(); break;   // arms the flag only, whatever the state (also with no Seq)
-    case LiveCmdType::Loop: if (runner_.seq()) runner_.seq()->setLoop(c.i0 != 0, c.i1, c.i2); break;
-    case LiveCmdType::Bpm: if (runner_.seq()) runner_.seq()->setBpm(c.x); break;
+    case LiveCmdType::Loop: if (runner_.seq()) runner_.seq()->setLoop(c.i0 != 0, c.i1, c.i2); else cmdsNoSeq_++; break;
+    case LiveCmdType::Bpm: if (runner_.seq()) runner_.seq()->setBpm(c.x); else cmdsNoSeq_++; break;
     case LiveCmdType::Lead: lead_ = c.x; break;
     case LiveCmdType::Perf:
-      if (runner_.seq()) { Seq* s = runner_.seq(); if (c.i0 == THUNDER_LIVE_PERF_XF) s->setXf(c.x); else if (c.i0 == THUNDER_LIVE_PERF_MACRO) s->setMac(c.i1, c.x); else s->setFill(c.x != 0); }
+      if (runner_.seq()) { Seq* s = runner_.seq(); if (c.i0 == THUNDER_LIVE_PERF_XF) s->setXf(c.x); else if (c.i0 == THUNDER_LIVE_PERF_MACRO) s->setMac(c.i1, c.x); else s->setFill(c.x != 0); } else cmdsNoSeq_++;
       break;
     case LiveCmdType::StopTrack: players_->stopTrack(c.i0, at); break;
     case LiveCmdType::MixSet: {
@@ -590,17 +620,18 @@ void LiveHost::applyPlay(PlayPlan* p, int64_t qStart) {
 void LiveHost::retryStalledPlay(int64_t qStart) { if (stalledPlay_ && tryStartPlay(stalledPlay_, qStart)) stalledPlay_ = nullptr; }
 
 bool LiveHost::tryStartPlay(PlayPlan* p, int64_t qStart) {
+  const uint64_t oldDropped = runner_.seq() ? runner_.seq()->dropped() : 0;   // read BEFORE the adopt rebinds the runner (F11)
   if (seq_adopt(songSlot_, runner_)) noteSongAdopted(qStart);
   const SongSnap* sn = songSlot_.get();
   if (!sn || sn->sess.get() != p->sess) return false;   // the adopt was held back (the return ring is full: the control side has not collected): try again next quantum; the old Seq is never started
-  dropSeq();                                            // a Seq that was running is dropped (its voices are NOT cut)
+  seqDropBase_ += oldDropped; runner_.stop();           // the Seq that was running is dropped (its voices are NOT cut); its dropped events stay counted
   runner_.start(sn->seq.get());
-  const double t0 = p->t0 >= 0 ? (double)p->t0 / sr_ : (double)(qStart + (int64_t)std::llround(kPlayDelaySec * sr_)) / sr_;
+  const double t0 = p->t0 >= 0 ? (double)(p->t0 - off_) / sr_ : (double)(qStart + (int64_t)std::llround(kPlayDelaySec * sr_)) / sr_;
   runner_.seq()->setTime(t0);
   if (busSlot_.adopt()) mix_->setPlan(busSlot_.get()->plan);
   mix_->load(*sn->song); mix_->songLanesReset(); mix_->clockStop((double)qStart / sr_);
   players_->live().tempo((double)qStart / sr_, runner_.seq()->bpm());   // the tempo consumers are seeded: SEV_TEMPO is emitted only on a change (seq.cpp:995)
-  endStopAt_ = -1; songOverDone_ = false; stateA_ = THUNDER_LIVE_STATE_PLAYING;
+  endStopAt_ = -1; songOverDone_ = false; stateA_ = THUNDER_LIVE_STATE_PLAYING; clearPend_ = true;   // a play that starts clears the waiting list
   postState(qStart, THUNDER_LIVE_ST_PLAYING, 0);
   giveBack(p);
   return true;
@@ -617,7 +648,7 @@ void LiveHost::noteSongAdopted(int64_t qStart) {
 
 // Step 2.
 void LiveHost::adopt(int64_t qStart) {
-  if (seq_adopt(songSlot_, runner_)) noteSongAdopted(qStart);   // the newest snapshot; the Seq that was running hands its state to it (takeOver)
+  if (!stalledPlay_ && seq_adopt(songSlot_, runner_)) noteSongAdopted(qStart);   // the newest snapshot; the Seq that was running hands its state to it (takeOver). Not while a play is stalled: only tryStartPlay adopts then (F9)
   // seqGone() BEFORE beginQuantum when the Seq was dropped (stop, held, song ended and timed out): then a pads snapshot may be adopted with a null Seq (pads_snap.h)
   if (hadSeq_ && !runner_.seq()) { padsHost_->seqGone(); hadSeq_ = false; }
   const bool padsNew = padsHost_->beginQuantum(*players_, runner_.seq());   // EVERY quantum: the scan of the voices' epochs, the adopt, the chop table
@@ -662,7 +693,7 @@ SeqPump LiveHost::stepLoop(double t0, int64_t qStart) {
 
 // the played step's place for the ROWS record (every step) and the POS record (30 a second): row / step = the highest of the valid tracks (what SeqRunner::pump computes), cr that track's chain row
 void LiveHost::notePos(const SeqStep& st) {
-  uint8_t buf[sizeof(thunder_live_ev_rows) + 8 * kSeqTracks];
+  alignas(8) uint8_t buf[sizeof(thunder_live_ev_rows) + 8 * kSeqTracks];
   thunder_live_ev_rows* rows = reinterpret_cast<thunder_live_ev_rows*>(buf);
   std::memset(rows, 0, sizeof *rows);
   int n = 0, row = -1, sp = -1, cr = 0;
@@ -681,7 +712,7 @@ void LiveHost::notePos(const SeqStep& st) {
 }
 
 void LiveHost::heldRecord(double heldT, int64_t) {
-  uint8_t buf[sizeof(thunder_live_ev_rows) + 8 * kSeqTracks];
+  alignas(8) uint8_t buf[sizeof(thunder_live_ev_rows) + 8 * kSeqTracks];
   thunder_live_ev_rows* rows = reinterpret_cast<thunder_live_ev_rows*>(buf);
   std::memset(rows, 0, sizeof *rows);
   const SeqPos* hp = runner_.heldPos(); int n = 0;
@@ -712,7 +743,7 @@ void LiveHost::songEnded(double t0, int64_t qStart, const SeqPump& pr) {
     songOverDone_ = true;
     const double endT = runner_.seq()->time();
     players_->songOver(endT);                      // C4: live voices still held let go at the song's end
-    stateA_ = THUNDER_LIVE_STATE_ENDED; endStopAt_ = t0 + kEndStopSec;
+    stateA_ = THUNDER_LIVE_STATE_ENDED; endStopAt_ = std::max(t0, endT) + kEndStopSec;   // from the SONG's end (engine time), not from the quantum that found it
     thunder_live_ev_state e; std::memset(&e, 0, sizeof e); e.h.type = THUNDER_LIVE_EV_STATE; e.h.f = toFrame(endT, sr_); e.state = THUNDER_LIVE_ST_ENDED; e.arg = 0;
     post(&e, sizeof e);
     return;                                        // (the timer is judged from the next quantum on)
@@ -757,13 +788,13 @@ void LiveHost::afterBlock(int64_t qStart) {
 void LiveHost::publish() {
   const PlayerStats& ps = players_->stats();
   auto S = [&](int i, uint64_t v) { pub_[i].store(v, std::memory_order_relaxed); };
-  S(P_FRAMES, (uint64_t)qFrame_); S(P_ORIGIN, (uint64_t)origin_); S(P_QUANTA, quanta_); S(P_CALLS, calls_); S(P_STEPS, steps_); S(P_EVENTS, events_);
+  S(P_FRAMES, (uint64_t)(qFrame_ + off_)); S(P_ORIGIN, (uint64_t)origin_); S(P_QUANTA, quanta_); S(P_CALLS, calls_); S(P_STEPS, steps_); S(P_EVENTS, events_);
   S(P_SEQDROP, std::max<uint64_t>(pub_[P_SEQDROP].load(std::memory_order_relaxed), seqDropBase_ + (runner_.seq() ? runner_.seq()->dropped() : 0)));
   S(P_SKIPS, runner_.skips()); S(P_CMDS, cmdsApplied_); S(P_DUMPDROP, dumpDropped_);
   S(P_VOICES, (uint64_t)players_->voices()); S(P_PEAKV, (uint64_t)ps.peakAll);
   S(P_NOTES, (uint64_t)ps.notes); S(P_NPLAYED, (uint64_t)ps.notesPlayed); S(P_NLATE, (uint64_t)ps.notesLate); S(P_NNOPAD, (uint64_t)ps.notesNoPad); S(P_NLIVE, (uint64_t)ps.notesLive); S(P_NSF, (uint64_t)ps.notesSf);
   S(P_NVARMISS, (uint64_t)ps.notesVarMissing); S(P_NSTRETCH, (uint64_t)ps.notesStretched); S(P_EVIGN, (uint64_t)st_.eventsIgnored);
-  S(P_CMDLATE, cmdLate_); S(P_EVTDROP, evtDropped_); S(P_EVTCRIT, evtCritDropped_); S(P_REANCH, reanchors_); S(P_PREP, (uint64_t)thread_prepares_);
+  S(P_CMDLATE, cmdLate_); S(P_CLEARED, cmdsCleared_); S(P_NOSEQ, cmdsNoSeq_); S(P_EVTDROP, evtDropped_); S(P_EVTCRIT, evtCritDropped_); S(P_REANCH, reanchors_); S(P_PREP, (uint64_t)thread_prepares_);
   const LiveStats ls = players_->live().stats(); S(P_LIVEFAIL, players_->live().failedNodes()); S(P_LIVELATE, ls.late);
 }
 
@@ -772,8 +803,9 @@ void LiveHost::publish() {
 // SONG, PADS, ERROR) or the ordinary one. A full ring refuses the NEWEST record and counts it (live.h, EVENTS). Audio thread: a stack copy and a release store, nothing else.
 void LiveHost::post(void* rec, int bytes) {
   thunder_live_ev_head* h = static_cast<thunder_live_ev_head*>(rec);
-  h->bytes = (uint16_t)bytes; h->seq = ++evSeq_;
-  const bool crit = h->type == THUNDER_LIVE_EV_STATE || h->type == THUNDER_LIVE_EV_HELD || h->type == THUNDER_LIVE_EV_SONG || h->type == THUNDER_LIVE_EV_PADS || h->type == THUNDER_LIVE_EV_ERROR;
+  h->bytes = (uint16_t)bytes; h->seq = ++evSeq_; h->f += off_;   // the one place an ENGINE frame becomes a HOST frame
+  const bool crit = h->type == THUNDER_LIVE_EV_STATE || h->type == THUNDER_LIVE_EV_HELD || h->type == THUNDER_LIVE_EV_SONG || h->type == THUNDER_LIVE_EV_PADS
+                    || (h->type == THUNDER_LIVE_EV_ERROR && static_cast<const thunder_live_ev_error*>(rec)->fatal != 0);   // non-fatal ERRORs share the ordinary ring (F3)
   LiveEvSlot s; s.bytes = (uint16_t)bytes; std::memcpy(s.data, rec, (size_t)bytes);
   const bool ok = crit ? evCrit_.push(s) : evRing_.push(s);
   if (!ok) { evtDropped_++; if (crit) evtCritDropped_++; }

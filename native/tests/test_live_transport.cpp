@@ -42,10 +42,10 @@ static void stateTable() {
   { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); po.has_only = 1; po.only = 0;   // nothing plays: the sequencer runs out at once -> ENDED, then 0.3 s later IDLE and STOPPED arg 1
     w.H->play(po); int64_t endedAt = -1; std::vector<std::vector<uint8_t>> all;
     for (int i = 0; i < 48000 / Q; i++) { w.run(Q); for (auto& r : w.ev()) all.push_back(r); }
-    auto s = states(all); bool sawEnded = false; int64_t stoppedF = -1, endedF = -1; for (auto& r : s) { if (stSt(r) == THUNDER_LIVE_ST_PLAYING) endedF = evF(r); if (stSt(r) == THUNDER_LIVE_ST_ENDED) sawEnded = true; if (stSt(r) == THUNDER_LIVE_ST_STOPPED && stArg(r) == 1) stoppedF = evF(r); }
+    auto s = states(all); bool sawEnded = false; int64_t stoppedF = -1, endedF = -1; for (auto& r : s) { if (stSt(r) == THUNDER_LIVE_ST_ENDED) { sawEnded = true; endedF = evF(r); } if (stSt(r) == THUNDER_LIVE_ST_STOPPED && stArg(r) == 1) stoppedF = evF(r); }
     (void)endedAt; CHECK(sawEnded, "ENDED record (%zu state records)", s.size());
     CHECK(s.size() == 3 && stSt(s[0]) == THUNDER_LIVE_ST_PLAYING && stSt(s[1]) == THUNDER_LIVE_ST_ENDED && stSt(s[2]) == THUNDER_LIVE_ST_STOPPED && stArg(s[2]) == 1, "PLAYING, ENDED, STOPPED(1) (%zu)", s.size());
-    CHECK(stoppedF >= 0 && endedF >= 0 && stoppedF - endedF >= 14400 - Q && stoppedF - endedF <= 14400 + 2 * Q, "STOPPED 0.3 s after the quantum that found the end, the same one as PLAYING here (%lld frames)", (long long)(stoppedF - endedF)); CHECK(w.state() == THUNDER_LIVE_STATE_IDLE, "IDLE at the end");
+    CHECK(stoppedF >= 0 && endedF >= 0 && stoppedF - endedF >= 14400 - Q && stoppedF - endedF <= 14400 + 2 * Q, "STOPPED 0.3 s after the SONG's end time (the ENDED record's f) (%lld frames)", (long long)(stoppedF - endedF)); CHECK(w.state() == THUNDER_LIVE_STATE_IDLE, "IDLE at the end");
     // ENDED + hold: nothing; ENDED + play cancels the timer; ENDED + stop -> STOPPED 0
     W v; v.H->play(po); v.run(Q * 4); auto e = states(v.ev()); CHECK(v.state() == THUNDER_LIVE_STATE_ENDED, "ENDED (state %d)", v.state());
     v.H->hold(THUNDER_LIVE_NOW); v.run(Q); e = v.ev(); CHECK(states(e).empty() && v.state() == THUNDER_LIVE_STATE_ENDED, "ENDED + hold: nothing");
@@ -145,9 +145,9 @@ static void reanchor() {
   auto st = stats(w.H.h); CHECK(st.reanchors == 0 && st.frame_origin == 0, "no re-anchor so far");
   std::vector<float> a(300), b(300); int64_t f = w.fr + 5000;   // a gap of 5000 frames (a held-up audio thread, a changed device)
   CHECK(w.H->process(a.data(), b.data(), 300, f, 0) == 0, "process after a gap"); st = stats(w.H.h); CHECK(st.reanchors == 1 && st.frame_origin == f && st.frames == f + 384, "re-anchored: origin %lld frames %lld (%u)", (long long)st.frame_origin, (long long)st.frames, st.reanchors);
-  auto e = W::of(w.ev(), THUNDER_LIVE_EV_ERROR); int n = 0; for (auto& r : e) { const auto x = evAs<thunder_live_ev_error>(r); if (x.where == THUNDER_LIVE_WHERE_REANCHOR) { n++; CHECK(x.reserved == 5000 && x.fatal == 0 && evF(r) == f, "REANCHOR record: skipped %d at %lld", x.reserved, (long long)evF(r)); } } CHECK(n == 1, "one REANCHOR record (%d)", n);
+  auto e = W::of(w.ev(), THUNDER_LIVE_EV_ERROR); int n = 0; for (auto& r : e) { const auto x = evAs<thunder_live_ev_error>(r); if (x.where == THUNDER_LIVE_WHERE_REANCHOR) { n++; CHECK(x.value == 5000 && x.fatal == 0 && evF(r) == f, "REANCHOR record: skipped %d at %lld", x.value, (long long)evF(r)); } } CHECK(n == 1, "one REANCHOR record (%d)", n);
   f += 300; CHECK(w.H->process(a.data(), b.data(), 300, f - 40, 0) == 0, "backwards"); st = stats(w.H.h); CHECK(st.reanchors == 2 && st.frame_origin == f - 40, "backwards re-anchor (%u)", st.reanchors);
-  e = W::of(w.ev(), THUNDER_LIVE_EV_ERROR); CHECK(e.size() == 1 && evAs<thunder_live_ev_error>(e[0]).reserved == -40, "negative skip %d", e.empty() ? 0 : evAs<thunder_live_ev_error>(e[0]).reserved);
+  e = W::of(w.ev(), THUNDER_LIVE_EV_ERROR); CHECK(e.size() == 1 && evAs<thunder_live_ev_error>(e[0]).value == -40, "negative skip %d", e.empty() ? 0 : evAs<thunder_live_ev_error>(e[0]).value);
   int64_t g = f - 40 + 300; CHECK(w.H->process(a.data(), b.data(), 128, g, 0) == 0 && stats(w.H.h).reanchors == 2, "the expected frame does not re-anchor");
   CHECK(w.H->process(a.data(), b.data(), 5000, g + 128, 0) == THUNDER_LIVE_E_ARG && w.H->process(nullptr, b.data(), 8, g + 128, 0) == THUNDER_LIVE_E_ARG && w.H->process(a.data(), b.data(), -1, g + 128, 0) == THUNDER_LIVE_E_ARG, "process args (max_block 4096)");
   CHECK(w.state() == THUNDER_LIVE_STATE_PLAYING, "still PLAYING after re-anchors");

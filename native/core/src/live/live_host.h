@@ -91,7 +91,7 @@ struct LiveBusMsg { BusPlan plan; };                 // built from the song's ch
 struct LiveMasterMsg { MasterChainConfig cfg; };
 
 // An event record waiting for poll(): fixed slots so that the audio side writes one without allocating. `bytes` of `data` are valid (thunder_live_ev_* of live.h).
-struct LiveEvSlot { uint16_t bytes = 0; uint8_t data[THUNDER_LIVE_EV_MAX] = {0}; };
+struct LiveEvSlot { uint16_t bytes = 0; alignas(8) uint8_t data[THUNDER_LIVE_EV_MAX] = {0}; };   // (the record is 8-aligned in the slot)
 constexpr uint32_t kLiveEvRing = 1024;               // 330 KB; a full ring refuses the NEWEST record (stats.evt_dropped); the critical ring is 64 records
 
 // One step of the test dump (F_DUMP_STEPS): the head says how many raw events follow in the event ring. Raw SeqEvent copies (456 B each); the control side turns them into JSON in dumpStep().
@@ -173,6 +173,7 @@ class LiveHost {
   // F_EFFECTS); pdc_plan(bus_plan(...), PdcSlot[] built from the FxPlan entries (FxPlan::entry(i): lat, bi >= 0, on; NOT FxBank::pdcSlots, which reads the audio thread's chain_), sr, mode) (pdc.h:39). Queues LiveCmd::Play.
   // controlPlaying_ = true. E_BUSY after the session was made: sess_ is dropped, the snapshot deleted by publish's rule (session.h:51), nothing else changed.
   int play(const thunder_live_play_opts& o);
+  void setTestSeam(void (*f)(void*), void* user) { testSeam_ = f; testSeamUser_ = user; }   // TEST ONLY: `f` runs inside play(), between the push of the Play command and the publish of its snapshot (verify-283 F9)
   // stop(): queues LiveCmd::Stop; controlPlaying_ = false (a later songPublish no longer reaches the sequencer).
   int stop(int64_t at);
   int hold(int64_t at);                              // LiveCmd::Hold
@@ -263,6 +264,7 @@ class LiveHost {
   JsonDoc varsDoc_; SeqVars varsCur_;                // the last published vars (SongSnap holds its own copy of SeqVars)
   BusPlan busCur_;                                   // bus_plan of songCur_ (pdcSet and play use it)
   std::shared_ptr<SeqSession> sess_;                 // THIS play's session; null while idle
+  void (*testSeam_)(void*) = nullptr; void* testSeamUser_ = nullptr;   // TEST ONLY: called in play() between the two statements of F9
   bool controlPlaying_ = false;                      // control's view: a play was issued and no stop
   FxPlan* stagedFx_[kSongNT + 1] = {nullptr};        // fxPlan() staged, fxCommit() moved to the ring
   std::unique_ptr<LiveFont> fonts_[THUNDER_LIVE_MAX_FONTS];
@@ -321,12 +323,18 @@ class LiveHost {
   std::unique_ptr<SeqStep> step_;
   std::unique_ptr<float[]> q_;                       // the last quantum: left then right (2 x 128)
   int qRead_ = kLiveQuantum;                         // how much of q_ the host has had (128: empty)
-  int64_t qFrame_ = 0, nextFrame_ = 0, origin_ = 0;  // the frame the next quantum starts at; the frame the next process call must start at; the grid's anchor
+  // THE ENGINE'S OWN TIMELINE (U37 P2 round 2): qFrame_ counts ENGINE frames from 0 (the frames the engine has rendered, gapless); every time the engine sees (Seq, players, mixer, bookings, timers) is engine frame / sr.
+  // The HOST's frame of an engine frame is engine + off_ (set at the first call, CHANGED by a re-anchor: nothing inside the engine moves). Conversions: process() (off_), applyCommands / applyOne / tryStartPlay (`at`, t0:
+  // host -> engine), post() (every record's `f`: engine -> host), publish() (stats.frames).
+  int64_t qFrame_ = 0;                               // the ENGINE frame the next quantum starts at
+  int64_t off_ = 0;                                  // hostFrame = engineFrame + off_
+  int64_t nextFrame_ = 0, origin_ = 0;               // HOST frames: where the next process call must start; the frame0 of the first call / last re-anchor (stats.frame_origin)
   bool anchored_ = false, peReady_ = false;
   int64_t wallNs_ = 0;                               // process()'s wall_ns, copied into the next CLOCK record
   LiveCmd pend_[kLiveCmdWait]; int nPend_ = 0;       // timed commands waiting for their frame, ordered by at (equal at: ring order); a 65th is applied at once and counted (cmdLate_)
   double lead_ = 0.25;                               // the runner's look-ahead (render.h:173)
   int stateA_ = THUNDER_LIVE_STATE_IDLE;             // the audio side's own copy of state_
+  bool clearPend_ = false; uint32_t cmdsCleared_ = 0, cmdsNoSeq_ = 0; int64_t reanchorRecAt_ = -1;   // AUDIO: a stop / a started play asks applyCommands to clear pend_; counters; the quantum of the last REANCHOR record
   bool songOverDone_ = false; double endStopAt_ = -1;   // C4's songOver once; the MIDI stop 0.3 s later
   bool hadSeq_ = false;                              // AUDIO: a Seq was passed to beginQuantum and none has been reported gone since (-> seqGone() when the runner drops it)
   bool ackPend_ = false; int64_t ackPendRev_ = 0;     // AUDIO: SongAcks of this quantum: one SONG record, the newest rev
@@ -338,7 +346,7 @@ class LiveHost {
   bool pendMidiStop_ = false; int pendMidiStartSpp_ = -1;   // set by step 1, done by midiBegin right after midi_begin (stop first, then start)
   int thread_prepares_ = 0;                          // process(): pe_prepare() on this thread's first call; stats.thread_prepares
   PlayerStats lastPlayerStats_;                      // for the LATE record (changed since last post)
-  int64_t nextClockAt_ = 0, nextPosAt_ = 0, nextLateAt_ = 0;   // frames: the next CLOCK / POS / LATE record is due at or after
+  int64_t nextClockAt_ = 0, nextPosAt_ = 0, nextLateAt_ = 0;   // ENGINE frames: the next CLOCK / POS / LATE record is due at or after
   uint32_t evSeq_ = 0, evtDropped_ = 0, evtCritDropped_ = 0, cmdLate_ = 0, reanchors_ = 0;
   uint64_t cmdsApplied_ = 0, quanta_ = 0, calls_ = 0, steps_ = 0, events_ = 0, dumpDropped_ = 0;
   uint64_t lastPadsId_ = 0;
