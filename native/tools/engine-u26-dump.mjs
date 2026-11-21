@@ -365,7 +365,8 @@ function seqCases(E) {
   const ES = {
     sweep: [on(0), eng(300, [120, 80, , 20], [, 40, -30]), eng(1500, [120, 80, , 20], [90, 40, -30, 0, 0, 0, 25]), eng(2600, [200, , 180, 60, 100], [-50, , , 30, , 8]), off(3600), on(4000), eng(5200, [], []), off(6500)],
     late: [eng(0, [60], [20, 10]), on(40), eng(900, [], [-70, 25]), on(2500, { leg: true }), eng(3400, [255, 255, 255, 255, 255], [255, 255, 255, 255, 255, 255, 255]), off(5000)],
-    held: [on(10), eng(10, [30, 0, 5, 200, 254], [-255, -255, -255, -255, -255, -255, -255]), eng(4000, [], []), eng(4001, [], []), off(5200)],
+    // (held starts at sample 0: a first note after an idle block would also test the rule's rate default 1 against the page's AudioParam default 0, which the vox core latches in its idle block: see LIVE-ROUTE-NOTES.md)
+    held: [on(0), eng(0, [30, 0, 5, 200, 254], [-255, -255, -255, -255, -255, -255, -255]), eng(4000, [], []), eng(4001, [], []), off(5200)],
   };
   for (const [pn, p] of [['init', {}], ['alt', null]]) for (const [sn, evs] of Object.entries(ES)) {
     const alt = { bass: bassOf('Reese (DnB)'), vox: voxOf('Choir'), acid: AP.fast, mach: MP.ens };
