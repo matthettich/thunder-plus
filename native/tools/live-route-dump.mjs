@@ -21,6 +21,8 @@ const FB = (b, o = 0) => F(b * N + o);
 const note = o => Object.assign({ type: 'note', t: 0, track: 0, poly: false, col: 0, pad: 0, rate: 1, gain: 0.8, pan: 128 }, o);
 const off = o => Object.assign({ type: 'off', t: 0, track: 0 }, o);
 const mod = o => Object.assign({ type: 'mod', t: 0, track: 0 }, o);
+const C0 = { cut: -1, res: -1, dec: -1, atk: -1, rel: -1 }, O0 = { cut: 0, res: 0, env: 0, atk: 0, dec: 0, sus: 0, rel: 0 };
+const eng = (t, c, o, track = 0) => ({ type: 'eng', t, track, c: Object.assign({}, C0, c), o: Object.assign({}, O0, o) });
 
 // the pads' kit rows (what the page sends as {op:'kit', kv}): lk = the live engine's kind
 const LK = {
@@ -85,6 +87,19 @@ const CASES = {
   stop_all: { tracks: [0, 1], evs: [
     [0, note({ t: FB(1), pad: 0 })], [0, note({ t: FB(30), pad: 0 })], [0, note({ t: FB(2), pad: 1, track: 1, poly: true, col: 0 })], [0, note({ t: FB(3), pad: 4, track: 1 })],
     [10, { op: 'stopAll', at: FB(12) }], [11, note({ t: FB(14), pad: 0 })], [11, note({ t: FB(14), pad: 1, track: 1, poly: true })] ] },
+  eng_basic: { tracks: [0], evs: [   // the targets reach a node that exists: set for the commands, set then ramps for the offsets; a default state with the targets on is put too; a note takes the state in force
+    [0, note({ t: FB(1) })], [0, eng(FB(2), { cut: 100, atk: 20 }, { res: 30, env: -40 })], [0, eng(FB(5), { cut: 140, atk: 20 }, { res: 60, env: -40, rel: 12 })],
+    [1, eng(FB(8), {}, {})], [1, note({ t: FB(10) })], [1, eng(FB(12), { dec: 200 }, { cut: -90 })], [2, note({ t: FB(14), rate: 1.5 })], [3, eng(FB(18), { dec: 200 }, { cut: 50 })] ] },
+  eng_late_bind: { tracks: [0], evs: [   // an eng before the node's first note: kept (engSt), put at the note; a default state with the targets off puts nothing; the next eng reaches the nodes that exist (acid and mach, not bass)
+    [0, eng(FB(1), { res: 90 }, { cut: 20 })], [0, note({ t: FB(3), pad: 2, acc: true })], [0, note({ t: FB(4), pad: 3 })], [1, eng(FB(6), { res: 10 }, { cut: -20, sus: 7 })],
+    [2, eng(FB(8), {}, {})], [2, eng(FB(9), {}, {})], [3, note({ t: FB(11), pad: 2 })] ] },
+  eng_vox_poly: { tracks: [0], evs: [   // a poly note makes the four nodes; the mono node does not exist until a mono note
+    [0, eng(FB(1), { atk: 30 }, { cut: 11 })], [0, note({ t: FB(2), pad: 1, poly: true, col: 0 })], [0, eng(FB(4), { atk: 60 }, { cut: 22, rel: 5 })], [0, note({ t: FB(6), pad: 1, poly: true, col: 1 })],
+    [0, note({ t: FB(8), pad: 1 })], [1, eng(FB(10), { rel: 40 }, { cut: 33 })] ] },
+  eng_stop_all: { tracks: [0], evs: [
+    [0, note({ t: FB(1) })], [0, eng(FB(2), { cut: 80 }, { res: 10 })], [0, eng(FB(4), { cut: 90 }, { res: 20 })], [5, { op: 'stopAll', at: FB(8) }], [6, note({ t: FB(10) })], [6, eng(FB(12), { res: 5 }, { cut: 5 })] ] },
+  eng_partial: { tracks: [0], evs: [   // keys that are missing are not numbers: nothing is put for them, and the state is not the default
+    [0, note({ t: FB(1) })], [0, { type: 'eng', t: FB(2), track: 0, c: { cut: 50 }, o: {} }], [0, { type: 'eng', t: FB(4), track: 0, c: {}, o: { res: 9 } }], [0, { type: 'eng', t: FB(6), track: 0, c: { cut: -1 }, o: {} }] ] },
   no_node: { tracks: [], evs: [[0, note({ t: FB(1), pad: 0 })], [0, note({ t: FB(2), pad: 1, poly: true })]] },   // no node registered: liveNote is false, the page plays
   late: { tracks: [0], evs: [[10, note({ t: FB(2), pad: 0 })], [10, note({ t: FB(9), pad: 0, rate: 2 })]] },   // delivered after its time: set at the block's time
 };

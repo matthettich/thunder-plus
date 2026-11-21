@@ -19,6 +19,7 @@ bool Players::dispatch(const SeqEvent& e, const Seq& seq, const Song& song) {
     case SEV_STP: pool_.stp(e); sfpool_.stp(e); live_.stp(e); return true;
     case SEV_OFF: if (e.track >= 0) { pool_.off(e); sfpool_.off(e); live_.off(e); } return true;
     case SEV_MOD: if (e.track >= 0) { const double* arp = seq.arp(e); pool_.mod(e, arp); sfpool_.mod(e, arp); live_.mod(e, arp); } return true;
+    case SEV_ENG: live_.eng(e); return false;   // (the live nodes take it; the sampler has nothing to do with it: still counted as ignored for the renderer, as before)
     case SEV_NOTE: note(e, seq, song); return true;
     case SEV_TEMPO: live_.tempo(e.t, e.v); return false;   // (the live bass nodes follow it; the event still counts as ignored for the renderer, as before)
     default: return false;

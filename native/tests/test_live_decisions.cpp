@@ -38,6 +38,10 @@ static JEv convert(Json j) {
   e.t = ev.num("t"); e.track = (int)ev.num("track", 0);
   if (ty == "note") {
     e.type = SEV_NOTE; e.pad = ev.num("pad"); e.poly = ev.boolean("poly"); e.col = (int)ev.num("col"); e.rate = ev.num("rate"); e.gain = ev.num("gain"); e.pan = ev.num("pan"); e.acc = ev.boolean("acc");
+  } else if (ty == "eng") {
+    e.type = SEV_ENG; static const char* cn[5] = {"cut", "res", "dec", "atk", "rel"}, *on[7] = {"cut", "res", "env", "atk", "dec", "sus", "rel"};
+    for (int k = 0; k < 5; k++) e.engC[k] = ev.get("c").get(cn[k]).isNum() ? ev.get("c").num(cn[k]) : std::nan("");   // (a key that is missing is not a number)
+    for (int k = 0; k < 7; k++) e.engO[k] = ev.get("o").get(on[k]).isNum() ? ev.get("o").num(on[k]) : std::nan("");
   } else if (ty == "off") { e.type = SEV_OFF; } else if (ty == "mod") { e.type = SEV_MOD; } else if (ty == "stp") { e.type = SEV_STP; e.flag = ev.boolean("all"); }
   if (ev.get("slide").isObj()) { e.has |= SH_SLIDE; e.slideFrom = ev.get("slide").num("from"); e.slideDur = ev.get("slide").num("dur"); }
   if (ev.get("wob").isNum()) { e.has |= SH_WOB; e.wob = ev.num("wob"); }
@@ -69,7 +73,7 @@ int main(int argc, char** argv) {
   Song song; const std::string sj = songJson(); if (!song.load(sj.data(), sj.size(), &je)) return 2;
   SeqVars vars; SeqOpts so; so.row = song.renderFrom; so.once = true; Seq seq(song, vars, SeqMode::Song, so);
   // the cases of this stage; the rest are listed
-  const std::set<std::string> run = {"bass_mono", "bass_kill_back", "bass_same_sample", "acid_mach", "vox_mono", "vox_poly", "vox_idle_gap", "mod_stp", "no_node", "late", "stop_all", "takeover", "choke_cross", "poly_cap"};
+  const std::set<std::string> run = {"bass_mono", "bass_kill_back", "bass_same_sample", "acid_mach", "vox_mono", "vox_poly", "vox_idle_gap", "mod_stp", "no_node", "late", "stop_all", "takeover", "choke_cross", "poly_cap", "eng_basic", "eng_late_bind", "eng_vox_poly", "eng_stop_all", "eng_partial"};
   std::vector<float> dc((size_t)(SR * 3), 0.25f);   // the sampler pads' buffer (pads 5 and 7): voices that stay for the case
   int ran = 0, skipped = 0, compared = 0;
   Json root = doc.root();
@@ -93,7 +97,7 @@ int main(int argc, char** argv) {
       // (straight into the live pool: an arpeggio's pairs are the case's, not the sequencer's table; the takeover of the other pools is B5's and is checked there)
       if (viaPlayers) { pl.dispatch(j.e, seq, song); continue; }
       const SeqEvent& e = j.e; const double* arp = j.arp.empty() ? nullptr : j.arp.data();
-      if (e.type == SEV_NOTE) pl.live().note(e, (int)e.pad, 120, arp); else if (e.type == SEV_OFF) pl.live().off(e); else if (e.type == SEV_MOD) pl.live().mod(e, arp); else if (e.type == SEV_STP) pl.live().stp(e);
+      if (e.type == SEV_NOTE) pl.live().note(e, (int)e.pad, 120, arp); else if (e.type == SEV_OFF) pl.live().off(e); else if (e.type == SEV_MOD) pl.live().mod(e, arp); else if (e.type == SEV_STP) pl.live().stp(e); else if (e.type == SEV_ENG) pl.live().eng(e);
     }
     ran++;
     Json nodes = C.get("nodes");
@@ -122,6 +126,8 @@ int main(int argc, char** argv) {
       CHECKF(autoEq(*d.rate, jsList(N.get("rate"))), "%s %s: the rate lists differ (pool %d events, JS %zu)", id.c_str(), key.c_str(), d.rate->size(), N.get("rate").size());
       CHECKF(autoEq(*d.g, jsList(N.get("g"))), "%s %s: the level lists differ", id.c_str(), key.c_str());
       CHECKF(autoEq(*d.pn, jsList(N.get("pn"))), "%s %s: the pan lists differ", id.c_str(), key.c_str());
+      { static const char* lane[12] = {"cCut", "cRes", "cDec", "cAtk", "cRel", "oCut", "oRes", "oEnv", "oAtk", "oDec", "oSus", "oRel"};   // the engine targets: the twelve lanes as the JS left them
+        for (int k = 0; k < 12; k++) { const std::vector<L> jl = jsList(N.get(lane[k])); if (d.eng[k]) CHECKF(autoEq(*d.eng[k], jl), "%s %s: the %s lane differs (pool %d events, JS %zu)", id.c_str(), key.c_str(), lane[k], d.eng[k]->size(), jl.size()); else CHECKF(jl.empty(), "%s %s: the pool has no %s lane, the JS has %zu events", id.c_str(), key.c_str(), lane[k], jl.size()); } }
       std::vector<std::pair<int64_t, double>> wg, ww; for (int i = 0; i < d.ntl; i++) if (d.tl[i].type == LiveEvType::Wob) wg.push_back({d.tl[i].T, d.tl[i].v});
       for (const L& x : jsList(N.get("wob"))) ww.push_back({sample_at_or_after(x.t, SR), x.v});
       CHECKF(wg == ww, "%s %s: wob differs", id.c_str(), key.c_str());

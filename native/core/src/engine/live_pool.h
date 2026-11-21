@@ -10,6 +10,7 @@
 // REAL-TIME RULES: addPad allocates; note() and render() allocate nothing.
 #ifndef THUNDER_ENGINE_LIVE_POOL_H
 #define THUNDER_ENGINE_LIVE_POOL_H
+#include "engine/eng_targets.h"
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -36,7 +37,7 @@ struct LiveTraceRec { int track = 0, pad = 0, j = 0; char what = 0; double t = 0
 
 struct LiveTEv { int64_t T = 0; LiveEvType type = LiveEvType::NoteOn; bool leg = false, acc = false, same = false; double v = 0; };   // one booked event of a node's timeline (the events not yet handed to the shell)
 // A read-only view of a node, for tests (the decision-log gate, LIVE-ROUTE L10(f)).
-struct LiveDebugNode { const LiveTEv* tl = nullptr; int ntl = 0; const Auto* rate = nullptr; const Auto* g = nullptr; const Auto* pn = nullptr; double sylN = 0, lastOn = -1; bool inT = false, curLive = false, curStop = false; double stopAt = 0; int curCol = 0; };
+struct LiveDebugNode { const Auto* eng[12] = {}; bool engBound = false, engOn = false; const LiveTEv* tl = nullptr; int ntl = 0; const Auto* rate = nullptr; const Auto* g = nullptr; const Auto* pn = nullptr; double sylN = 0, lastOn = -1; bool inT = false, curLive = false, curStop = false; double stopAt = 0; int curCol = 0; };
 
 struct LiveStats { uint32_t played = 0, noNode = 0, late = 0, queueDropped = 0, forcedOff = 0, failed = 0; };
 
@@ -49,12 +50,13 @@ class LiveEng {   // one engine as the pool uses it (a LiveShell of one of the f
   virtual uint32_t latency() const = 0;
   virtual bool failed() const = 0;
   virtual void setRateFeed(const Auto* a, double sr) = 0;
+  virtual void setEngFeed(const EngFeed* f) = 0;
   virtual size_t bytes() const = 0;
 };
 
 class LivePool {
  public:
-  static constexpr int kTimeline = 256, kAutoRate = 128, kAutoGP = 32, kQuantum = 128;
+  static constexpr int kTimeline = 256, kAutoRate = 128, kAutoGP = 32, kAutoEng = 10, kQuantum = 128;
   explicit LivePool(double sampleRate);
   ~LivePool();
   LivePool(const LivePool&) = delete;
@@ -90,6 +92,8 @@ class LivePool {
   void stp(const SeqEvent& e);
   void tempo(double t, double bpm);
   void stopAll(double at);
+  // ENGINE TARGETS (the sequencer's `eng` event: change-only, up to 4 points a step): the track's state is kept here (the JS's engSt) so a node started later takes it at its note; every started node of the track gets the twelve lanes (engPut).
+  void eng(const SeqEvent& e);
   // For tests: the value of a node's rate lane at time t (seconds); NaN when there is no such node.
   double debugRateAt(int track, int pad, int j, double t) const;
   bool debugNode(int track, int pad, int j, LiveDebugNode* out) const;
@@ -120,6 +124,9 @@ class LivePool {
     bool used = false;                  // a note was ever booked on this node (stopAll acts on used nodes)
     double lastBpm = -1;                // the bass node's bpm lane as last set
     bool started = false;
+    struct EngLanes { AutoN<kAutoEng> a[12]; EngLanes() { for (int i = 0; i < 12; i++) a[i].reset(i < 5 ? -1 : 0); } };   // the twelve engine targets (seconds): c* default -1, o* default 0
+    std::unique_ptr<EngLanes> engL; EngFeed feed;   // (allocated with the node; the lanes exist from the first put on: feed.on)
+    bool engOn = false, bound = false;               // the JS's L.engOn; the node exists in the JS (a note was started on it: it is in the track's engine list)
     uint64_t serial = 0;                // the voice's age in the track's list (the poly cap)
     int choke = 0;                      // the voice's choke group (the kit's, at its note-on)
     int64_t stopT = 0;                  // the sample the gate went low at (C4)
@@ -140,6 +147,9 @@ class LivePool {
   void bookCtl(Node& n, LiveEvType type, double t, double v);   // a Bpm / Wob event at the sample of time t
   bool polyVox(const SeqEvent& e, PadSlot& ps, double bpm, const double* arp);
   void kill(Node& n, double at);
+  void engPut(Node& n, const double c[5], const double o[7], double at, bool ramp);
+  struct EngSt { bool has = false; double c[5] = {-1, -1, -1, -1, -1}, o[7] = {0, 0, 0, 0, 0, 0, 0}; };
+  EngSt engSt_[kVoiceTracks];
   void chokeKill(int track, int ck, double t);
   int curChoke_ = 0;                 // the choke group of the note being started
   void cancelFrom(Node& n, int64_t T);

@@ -22,6 +22,7 @@ class LiveEngT final : public LiveEng {
   uint32_t latency() const override { return SH::latency(); }
   bool failed() const override { return sh_.failed(); }
   void setRateFeed(const Auto* a, double sr) override { sh_.setRateFeed(a, sr); }
+  void setEngFeed(const EngFeed* f) override { sh_.setEngFeed(f); }
   size_t bytes() const override { return sizeof(*this); }
  private:
   SH sh_;
@@ -47,8 +48,9 @@ bool LivePool::addPad(int pad, const LivePadConfig& cfg) {
       default: { auto* e = new LiveEngT<LiveMach>(sr_); n->eng.reset(e); e->shell().core().set(cfg.mach); break; }
     }
     if (!ok) return nullptr;
-    n->eng->setRateFeed(&n->rate, sr_);
-    fresh.bytes += sizeof(Node) + n->eng->bytes();
+    n->engL.reset(new Node::EngLanes()); for (int i = 0; i < 12; i++) n->feed.a[i] = &n->engL->a[i];
+    n->eng->setRateFeed(&n->rate, sr_); n->eng->setEngFeed(&n->feed);
+    fresh.bytes += sizeof(Node) + sizeof(Node::EngLanes) + n->eng->bytes();
     Node* raw = n.get(); fresh.nodes.push_back(std::move(n)); return raw;
   };
   for (int t = 0; t < kVoiceTracks; t++) {
@@ -111,6 +113,7 @@ bool LivePool::note(const SeqEvent& e, int pad, double bpm, const double* arp, i
 // that started longest ago (ties: the first); a note that would take the node that started at the very same time with none free is consumed and silent.
 bool LivePool::polyVox(const SeqEvent& e, PadSlot& ps, double bpm, const double* arp) {
   Node* nodes[kVoicePoly]; for (int j = 0; j < kVoicePoly; j++) { nodes[j] = ps.poly[(size_t)e.track * kVoicePoly + (size_t)j]; if (!nodes[j]) { st_.noNode++; return false; } }
+  for (int j = 0; j < kVoicePoly; j++) nodes[j]->bound = true;   // (lnode made all four)
   VoxG& G = ps.vg[(size_t)e.track];
   const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
   double kk;
@@ -143,11 +146,28 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* a
   if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_);
   n.g.set(e.gain, t); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), t);
   if (n.kind == LiveKind::Bass && (e.has & SH_WOB) && std::isfinite(e.wob)) bookCtl(n, LiveEvType::Wob, t, e.wob);
+  n.bound = true;
+  { const EngSt& es = engSt_[n.track]; if (es.has) engPut(n, es.c, es.o, t, false); }   // the track's commands and LFOs as they are now (cp:731)
   n.serial = nextSerial_; n.choke = curChoke_; n.done = false; n.quiet = 0;
   n.lastOn = t; n.curLive = true; n.curStop = false; n.curCol = e.col; n.base = e.rate; n.vrate = e.rate; n.inT = true; n.used = true;
   if (!leg) pitchMods(n, t, e.rate, e, arp);
   if (e.has & SH_CUT) kill(n, e.cut);
   if (e.has & SH_REL) kill(n, e.rel);
+}
+
+// engEv / engPut (core-processor.js :386-399): the track's state, then the twelve lanes of each node of the track that exists. A `set` for the commands, a ramp from the last point for the offsets once the node has the targets on.
+void LivePool::engPut(Node& n, const double c[5], const double o[7], double at, bool ramp) {
+  const bool rp = ramp && n.engOn; n.feed.on = true;
+  for (int k = 0; k < 5; k++) if (std::isfinite(c[k])) { AutoN<kAutoEng>& A = n.engL->a[k]; if (A.size() + 2 > A.capacity()) A.prune(now_); A.set(c[k], at); }
+  for (int k = 0; k < 7; k++) if (std::isfinite(o[k])) { AutoN<kAutoEng>& A = n.engL->a[5 + k]; if (A.size() + 2 > A.capacity()) A.prune(now_); if (rp) A.lin(o[k], at); else A.set(o[k], at); }
+  n.engOn = true;
+}
+void LivePool::eng(const SeqEvent& e) {
+  if (e.track < 0 || e.track >= kVoiceTracks) return;
+  const double at = std::isfinite(e.t) ? std::max(e.t, now_) : now_;
+  bool def = true; for (int k = 0; k < 5; k++) if (!(e.engC[k] < 0)) def = false; for (int k = 0; k < 7; k++) if (e.engO[k] != 0 && e.engO[k] == e.engO[k]) def = false;   // (!(c < 0): NaN is not a default; a falsy offset is 0 or NaN)
+  EngSt& es = engSt_[e.track]; es.has = !def; if (!def) { for (int k = 0; k < 5; k++) es.c[k] = e.engC[k]; for (int k = 0; k < 7; k++) es.o[k] = e.engO[k]; }
+  for (Node* n : byTrack_[e.track]) { if (!n->bound) continue; if (def && !n->engOn) continue; engPut(*n, e.engC, e.engO, at, true); }
 }
 
 void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {
@@ -213,7 +233,10 @@ void LivePool::stopAll(double at) {   // stopAll(at): every node's voice lets go
     if (n->curLive && !(n->curStop && n->stopAt <= at)) { n->curStop = true; n->stopAt = at; n->stopT = T; }
     if (n->used) { cancelFrom(*n, T); TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(*n, off); rec(*n, 'o', t, 0, T); }
     n->sylN = 0; n->inT = false;
+    if (n->bound && n->feed.on) { for (int k = 0; k < 12; k++) { AutoN<kAutoEng>& A = n->engL->a[k]; A.cancel(at); A.set(k < 5 ? -1 : 0, at); } }   // ENGINE TARGETS: the twelve back to their defaults
+    n->engOn = false;
   }
+  for (EngSt& s : engSt_) s = EngSt();
   for (PadSlot& p : pads_) for (VoxG& g : p.vg) g = VoxG();
 }
 double LivePool::debugRateAt(int track, int pad, int j, double t) const {
@@ -226,6 +249,7 @@ bool LivePool::debugNode(int track, int pad, int j, LiveDebugNode* o) const {
   if (pad < 0 || pad >= kLivePads || track < 0 || track >= kVoiceTracks) return false;
   const PadSlot& ps = pads_[pad]; const Node* n = j == 0 ? ps.byTrack[track] : (ps.poly.empty() ? nullptr : ps.poly[(size_t)track * kVoicePoly + (size_t)(j - 1)]);
   if (!n) return false;
+  if (n->feed.on) for (int k = 0; k < 12; k++) o->eng[k] = n->feed.a[k]; o->engBound = n->bound; o->engOn = n->engOn;
   o->tl = n->tl; o->ntl = n->ntl; o->rate = &n->rate; o->g = &n->g; o->pn = &n->pn; o->sylN = n->sylN; o->lastOn = n->lastOn; o->inT = n->inT; o->curLive = n->curLive; o->curStop = n->curStop; o->stopAt = n->stopAt; o->curCol = n->curCol;
   return true;
 }
@@ -305,7 +329,7 @@ void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float
   // the page's GainNode and StereoPanner after the node (__tcPost), then into the track's input
   float* oL = inL ? inL[n.track] : nullptr; float* oR = inR ? inR[n.track] : nullptr; if (!oL) return;
   const double dt = 1 / sr_, tb0 = (double)q0 / sr_, tb1 = tb0 + frames * dt;
-  n.g.prune(tb0); n.pn.prune(tb0); { const int64_t keep = (int64_t)eng.clock() - 2 * (int64_t)LiveBass::kBlk; if (keep > 0) n.rate.prune((double)keep / sr_); }   // (the shell's next control block starts at or after clock - kBlk)
+  n.g.prune(tb0); n.pn.prune(tb0); { const int64_t keep = (int64_t)eng.clock() - 2 * (int64_t)LiveBass::kBlk; if (keep > 0) n.rate.prune((double)keep / sr_); if (n.feed.on) for (int k = 0; k < 12; k++) n.engL->a[k].prune((double)keep / sr_); }   // (the shell's next control block starts at or after clock - kBlk)
   double gc = 0, pc = 0; const bool gok = n.g.constBlk(tb0, tb1, &gc), pok = n.pn.constBlk(tb0, tb1, &pc);
   for (int i = 0; i < frames; i++) {
     const double t = tb0 + i * dt, g = gok ? gc : n.g.at(t), p = pok ? pc : n.pn.at(t);

@@ -35,6 +35,7 @@ class VoxCore {
   void render(float* L, float* R, size_t len, double a, double b, double rate);
   size_t nSyl() const { return lyr_.syl.size(); }
   const VoxP& p() const { return p_; }
+  VoxP& pm() { return p_; }   // the engine targets swap values in for one control block (eng_targets.h)
   // a core that is not producing sound (envelope 0 and no target): the shell may skip it
  private:
   enum Kind : uint8_t { kHold, kGlide, kClo, kBurst, kFric, kAsp, kSon, kEnd };
