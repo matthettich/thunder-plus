@@ -120,3 +120,54 @@ Free rule (all listed interleavings, item 1); lifetime of SoundFont data (shared
 - The 213-test ctest, the wasm and Android/iOS builds (build scripts outside the repo tree I could see; `pads_snap.cpp` is added only in `core/CMakeLists.txt`, I found no other source list in the repo, but a script elsewhere that enumerates core sources would need it).
 - F3 was not run (read from `players.cpp:31,40`).
 - Behaviour on a weakly ordered CPU (aarch64): by reading only.
+
+---
+
+# Re-check of 0480a1e (round 2 of PR #276)
+
+**VERDICT: MERGE.** Nothing blocking. The per-voice board is exact and I found no interleaving that frees a buffer under a live or booked voice. Remaining items are notes for P2 (R2-1, R2-2) and test gaps that do not change the verdict (R2-3).
+
+Method: read the delta `e67ea4f..0480a1e` (`pads_snap.h/.cpp`, `players.cpp/.h`, `voice.h/.cpp`, `sf_live.h/.cpp`, the tests); built Release `test_live_pads_epoch` only (`-j1`, own build dir, deleted); 2117 checks, 0 failed; then 15 source mutations of `pads_snap.cpp`, one at a time, restored after each (PR worktree clean).
+
+## 1. The exact rule (per-voice board)
+OK. Walked with `pads_snap.cpp:194-215` (`beginQuantum`) and `:178-192` (`collect`).
+- Voice slot reused between two scans: slots are freed only when the voice ends or is taken over (`aliveErase`), so the older voice no longer reads; the newer voice is covered from its own first scan. If the same epoch sits in the slot before and after, the changed-only store skips it and the board keeps that epoch, which is correct. If the scan saw the slot free in between (stores 0) and the new voice starts after that scan, it is on a buffer of the current snapshot (refs > 0, not retired); the snapshot returns only inside a later `adopt()`, after the next scan stores the entry. Same argument as round 1.
+- Voice starting after the scan in the quantum whose adopt returns its snapshot: impossible, adopt precedes every note of the quantum (precondition 1), so such a voice is on the NEW snapshot.
+- `epochVoices` (`voice.h:103-106`, `sf_live.h`) writes `out[vi] = ep` only for alive voices; `beginQuantum` zeroes `scan_[0..nBoard_)` first (`pads_snap.cpp:199`); a voice on an untracked buffer has ep 0 and the entry 0 (holds nothing, as intended: offline pads outlive the renderer). `ep` is written in `note()` in the same call that puts the voice on the alive list.
+- `collect()` copies the board in one pass AFTER `slot_->collect()` (the pop, acquire) and compares each retired buffer to the local copy. A buffer retired at that moment is in no snapshot, so no voice can START on it after the pass; voices already on it were scanned before the push that let it retire, and keep a nonzero entry from that scan until they end. Confirmed.
+- Torn read: true. An entry only goes 0 -> e (voice on a non-retired buffer), e -> 0 (ended; its reads precede the later release store or the ring push), or e -> e' (slot reuse after the old voice ended). A reader seeing entries from different instants cannot miss a voice on a retired buffer. Changed-only store with a same-epoch reuse: no store, board still holds e, and the voice is on a buffer that is held by a snapshot at that point (see above) so nothing is lost; with a changed epoch the store happens at the next scan, before any return of that voice's snapshot.
+- Capacities: `create()` refuses `epochSlots() <= 0 || > kBoardMax` (`pads_snap.cpp:34-35`). Pool capacities are constant after construction (`cap_` set in the constructors only). A different Players: `assert(&pl == owner_)` in debug, `return false` in release (nothing adopted: safe). Only a Players destroyed and another constructed at the same address would pass the check; the board size would be wrong only if its capacities differ (then writes beyond `nBoard_` cannot happen: `epochVoices` writes `out[vi]` for vi < cap, and `scan_` has `kBoardMax` entries, so a larger pool than at create could overflow `scan_` only above 512). Note R2-4.
+
+## 2. The seam
+- Product build: `seam_` is null unless something calls `setSeam`; the only callers are the tests (grep). Nothing in `core/` sets it. It is a plain (non-atomic) pointer: `setSeam` while the audio thread runs would be a data race; the header says "before the first beginQuantum", not enforced (note).
+- Order and memory orders: unchanged. An indirect call is a compiler barrier, so with the seam compiled in it can only be stricter than without; the atomics are the same.
+- E8 (`test_live_pads_epoch.cpp:250-266`): a note started after the last scan, pad replaced and published, `collect()` at all five stages. Ran mutants: adopt above the scan (with the seam in its place): 3 failing checks; stores moved after `seam(3)`: 3 failing. It does NOT kill "stores placed immediately after `adopt()` and before `seam(3)`": there is no seam between the adopt's ring push and the stores in that arrangement, so the window is invisible to it (and E5 is too coarse, round 1 F1). That is a structural limit of a positional seam; a second seam inside the audio-thread path between the ring push and the next statement would need a hook in `SnapSlot::adopt`. Note R2-3.
+
+## 3. F3 (null guard, empty snapshot) and offline bit-identity
+- `players.cpp:30-33`: `if (!this->pads_) { notes++; notesNoPad++; return; }` placed after `e.track < 0`, before the deref; `create()` publishes an empty snapshot (`pads_snap.cpp:41`), so after the first `beginQuantum` the pointer is non-null; E0 tests both the pre-adopt note and the empty pad.
+- Path where `Players::note` runs on a snapshot that was returned: only between `adopt()` and `pl.setPads()` inside `beginQuantum`, where nothing dereferences (the seam at stage 3 lets a test `collect()` there; the test does not dispatch then). After `delete host` while a Players still points at the freed snapshot it dangles: `~PadsHost` precondition "the audio side has stopped", the rt_harness does `pl.setPads(nullptr)` first. Documented; a note for P2.
+- Offline bit-identity: agree. The only changed lines in the note path: one predictable branch on a non-null pointer (`players.cpp:31`, never taken in any render, where `pads_` is always set), the `const RenderPads&` binding moved below it, and `v.ep = c.epoch` (a store) in `voice.cpp:172` / `sf_live.cpp:154`. `epochVoices` is never called by `SongRenderer`. No sample-path code changed. The `slot`/`eslot` fields are gone, so the structs are smaller than round 1.
+
+## 4. F4 (`seqSeen_`, `seqGone()`, `orphanAdopts()`)
+- `seqSeen_` is set by the first non-null `seq` (`pads_snap.cpp:211`) and cleared only by `seqGone()`. All audio-thread state.
+- R2-1 (note, P2): a host that drops its Seq without calling `seqGone()` and then adopts with a null seq trips the debug `assert` (`:209`) falsely (an abort of the audio thread in a debug build), and counts a false orphan in release. Safe, but noisy: the host must call `seqGone()` BEFORE the `beginQuantum` of the quantum in which the Seq is gone.
+- R2-2 (note, P2, the one that matters): in a release build the assert is silent and the counter (`:210`) only reports AFTER the adopt. A host that still holds a Seq and passes null at an adopting quantum leaves `o_.chop` pointing into the snapshot just returned and the Seq dangles at its next step (`seq.cpp:556`). The counter is detection, not protection. Suggested fix, three lines: when `!seq && seqSeen_`, do not adopt (leave the snapshot pending, return false) until the host passes a Seq or calls `seqGone()`; then use-after-free is impossible by construction and `orphanAdopts()` counts stalled quanta. A Seq made and stepped but never passed is unaffected (it carries the session's chop, nullptr by convention).
+- Neither `seqGone()` nor `orphanAdopts()` is exercised by any test (see mutants A9, A10 below).
+
+## 5. Tests: round 1 mutants and new ones
+Killed now (ran): variation voices untracked (`rv.buf.epoch = 0`): 3 failing; identical-check ignoring variations: 2 failing; `setChop` only when a snapshot changed: 1 failing (E6(b)); adopt before the scan: 3 failing; stores after `seam(3)`: 3 failing; board compare limited to the first half: 2 failing; store only on increase (over-retention forever): 7 failing; SF entries ignored in `collect`: 2 failing. Also by reading: empty-pad / null-pads note (E0), stereo (E7), `setPad(frames 0)` removal, F6 quarantine (freed audio kept poisoned, so reuse cannot hide a read).
+Still uncaught (ran: 0 failing checks):
+1. A6: `setPad` no longer clears chop data when the pad changes (round 1 M5).
+2. A9: `orphan_++` removed; A10: `seqSeen_` never set (so the debug assert never fires): nothing tests F4's detection.
+3. A11: `collect()` loads the board BEFORE `slot_->collect()` (loses the acquire pairing with the ring pop: unsafe on a weakly ordered CPU; invisible single-threaded).
+4. A12: board store `release` -> `relaxed` (x86 hides; only a TSan run would show).
+5. Stores placed right after `adopt()` before `seam(3)` (section 2).
+6. Still not exercised: `create()` refusing a too-large Players (> kBoardMax); a second Players passed to `beginQuantum`; `clearSf`'s release.
+E5 remains stochastic and was not re-measured against the order mutants (E8 now owns that property).
+
+## 6. Anything new that should block the merge
+No. New notes only:
+- R2-3: the test gaps above (A6, A9-A12).
+- R2-4: `create()` sizes the board once; `scan_` is `kBoardMax` entries, so a Players that grows a pool after create (none can today) would overflow. Add `assert(pl.epochSlots() == nBoard_)` in `beginQuantum`.
+- `alignas(64)` members (`pads_snap.h`, board/scan/last) require aligned `new` (C++17, which the build sets); the host is allocated with `new (std::nothrow) PadsHost()`: fine on the toolchains in use; the wasm/Android/iOS builds were not checked.
+- Not verified: TSan/ASan runs, the full ctest, `rt_harness` (builder reports it green; its only change is `create(pl)`), other platforms' builds.
