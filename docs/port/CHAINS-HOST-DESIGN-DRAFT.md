@@ -473,7 +473,7 @@ but differ. (c) owner decides after hearing C1's render. **Recommend (a)**, FX1 
 **Not read, or only partly:** `chains/index.html` (the editor) not at all; `W:chains-worklet.js` `ThunderChains` / `ChainsEngine` (`:5784-6326`) read through `cengine.cpp` and `chains.h`, not line by line; `chains/clive.cpp` and `cmods*.cpp` skimmed; `fxpump.cpp` read only where it decides song reachability (the pump hosting itself was not reviewed); `docs/port/LIVE-ROUTE-DESIGN.md`, `reviews/prewire-19nov.md` and `WIRING-DOSSIER.md` not read (only grep'd through `U37-DESIGN-DRAFT.md`, which I read for the chain lines and `live_host.h` / `live.h`, not for ruling D1 in full); `docs/port/U37-DESIGN-DRAFT.md` section 12 only via grep.
 `TODAY.md` was read for U30 only. No code was compiled or run except `node` one-liners over the repo's songs and the generated tables. I could not check whether a Chrome / Playwright is available in this sandbox, so no Chrome render was attempted. Line counts in section 6 are estimates from the size of comparable units (`FxHost` 381 lines + `FxBank` 66; `ChainsLive` 223).
 
-## 9. The lead's rulings (21 Nov, 14:00; Fable, lead of 21 Nov)
+## 9. The lead's rulings (21 Nov, 12:55; Fable, lead of 21 Nov)
 
 Checked by the lead before ruling: `native/core/src/chains/` exists with the engine (`cengine.cpp`, `clive.cpp`, `cmods*.cpp`) and eight chains tests; `Mixer::setChain` has no caller outside `mix/`. Sections 4 and 5 to 7 read in full; the module tables (section 2) were not checked row by row.
 
@@ -481,6 +481,6 @@ All eleven decisions are ruled AS RECOMMENDED: D1 (a) `ChainsNode` per 128-frame
 
 C0: the one-line capacity change to `ChainsEngine::setBusMap` and the mixer tap API (`setTapMask` / `tapL`, C3) are allowed; the lead reads both.
 
-Order: C1g (the Node golden tool: no compiling) starts now; C1 and FX1 start as compiling slots free (two at most: U37 P1 round 2 and the MIDI no-recall PR held them at 14:00); C2 follows U37 P2. Stale line found: PICKUP.md's "Where the port stands" still lists U31 as not started; U31 (the …chains engine) is MERGED (#227). Only the host is missing.
+Order: C1g (the Node golden tool: no compiling) starts now; C1 and FX1 start as compiling slots free (two at most: U37 P1 round 2 and the MIDI no-recall PR held them at 12:55); C2 follows U37 P2. Stale line found: PICKUP.md's "Where the port stands" still lists U31 as not started; U31 (the …chains engine) is MERGED (#227). Only the host is missing.
 
 For the owner, kept short: questions 3 and 4 are decided by the lead (a click on a structural chain edit during play is accepted in the first version; chains and the missing effects are built in parallel). Still wanted from him: three songs for the first test (the files, so the census can be run on them) and whether he uses sidechain, Resample or pump mastering.
