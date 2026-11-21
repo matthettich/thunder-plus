@@ -1,4 +1,8 @@
 // U37 P2: LiveHost event records: sizes and layouts, `seq` numbering, the merge of the two rings by seq in poll, the critical ring (64) never pushed out by the ordinary one (1024), drops counted and visible as gaps, poll with a small buffer.
+#include <atomic>
+#include <chrono>
+#include <thread>
+
 #include "live_common.h"
 using namespace lt;
 constexpr int Q = THUNDER_LIVE_QUANTUM;
@@ -85,7 +89,32 @@ static void smallBuffer() {
   CHECK(H->poll(buf, 512) == 0, "empty: 0");
 }
 
+// F2: a consumer thread polling WHILE the audio thread posts both kinds of record sees strictly ascending seq (no record of the other ring overtaken)
+static void concurrentOrder() {
+  Host H(opts(0, 512)); PadSet ps; H.song(electro(), 1); H.loadPads(ps); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); H->play(po);
+  std::atomic<bool> stop{false}; std::thread audio([&] { std::vector<float> l(512), r(512); int64_t fr = 0; uint32_t k = 0; while (!stop.load(std::memory_order_acquire)) { H->process(l.data(), r.data(), 128, fr, 0); fr += 128; if ((++k % 5) == 0) { H->bpm(100 + (k % 50), THUNDER_LIVE_NOW); } if (k % 40 == 0) { H->hold(THUNDER_LIVE_NOW); thunder_live_play_opts p2 = playOpts(THUNDER_LIVE_NOW); H->play(p2); } } });
+  uint8_t buf[512]; uint32_t prev = 0; bool asc = true; long n = 0; auto t0 = std::chrono::steady_clock::now();
+  while (std::chrono::steady_clock::now() - t0 < std::chrono::seconds(4)) { for (int k; (k = H->poll(buf, sizeof buf)) > 0;) { int o = 0; while (o < k) { thunder_live_ev_head h; std::memcpy(&h, buf + o, sizeof h); if ((int32_t)(h.seq - prev) <= 0) asc = false; prev = h.seq; o += h.bytes; n++; } } }
+  stop.store(true); audio.join(); CHECK(asc && n > 500, "a polling thread sees strictly ascending seq (%ld records)", n);
+}
+// F3: non-fatal ERRORs (REANCHOR) do not use the critical ring: a jittery host cannot push a STATE out; at most one record a quantum
+static void jitter() {
+  Host H(opts(0, 512)); PadSet ps; H.song(electro(), 1); H.loadPads(ps); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); H->play(po); std::vector<float> l(128), r(128); int64_t fr = 0;
+  for (int i = 0; i < 300; i++) { H->process(l.data(), r.data(), 128, fr, 0); fr += 128 + (i % 2 ? 3 : -3 + 3); if (i % 3 == 0) fr += 5; }   // every call re-anchors (or nearly)
+  H->stop(THUNDER_LIVE_NOW); H->process(l.data(), r.data(), 128, fr, 0);
+  const auto st = stats(H.h); CHECK(st.reanchors > 150 && st.evt_crit_dropped == 0, "300 jittery calls: %u re-anchors, no critical record lost (%u)", st.reanchors, st.evt_crit_dropped);
+  auto all = H.poll(); int err = 0, stopped = 0, playing = 0; for (auto& rec : all) { if (evType(rec) == THUNDER_LIVE_EV_ERROR) err++; if (evType(rec) == THUNDER_LIVE_EV_STATE) { if (evAs<thunder_live_ev_state>(rec).state == THUNDER_LIVE_ST_STOPPED) stopped++; if (evAs<thunder_live_ev_state>(rec).state == THUNDER_LIVE_ST_PLAYING) playing++; } }
+  CHECK(stopped == 1 && playing == 1, "PLAYING and STOPPED both arrive (%d, %d)", playing, stopped); CHECK(err <= 301, "the REANCHOR records are rate-limited (%d)", err);
+}
+// the 2^32 wrap of seq: records numbered across it are still delivered in order by the wrap-safe compare
+static void seqWrap() {
+  Host H(opts(0, 512)); PadSet ps; H.song(electro(), 1); H.loadPads(ps); H.h->testSetEvSeq(0xFFFFFF00u); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); H->play(po); int64_t fr = 0; Recs all;
+  for (int i = 0; i < 30; i++) { H.run(48000 / 5, 512, fr); H->hold(THUNDER_LIVE_NOW); H.run(Q, Q, fr); thunder_live_play_opts p2 = playOpts(THUNDER_LIVE_NOW); H->play(p2); H.run(Q, Q, fr); for (auto& r : H.poll()) all.push_back(r); }
+  bool asc = true, wrapped = false; uint32_t prev = 0; for (auto& r : all) { const uint32_t s = evSeq(r); if (prev && (int32_t)(s - prev) <= 0) asc = false; if (prev > 0x80000000u && s < 0x1000u) wrapped = true; prev = s; }
+  CHECK(asc && wrapped && all.size() > 300, "seq crosses 2^32 and stays in order (%zu records)", all.size());
+}
+
 int main() {
-  layoutsAndSeq(); songCoalesce(); overflow(); critOverflow(); smallBuffer();
+  layoutsAndSeq(); songCoalesce(); overflow(); critOverflow(); smallBuffer(); concurrentOrder(); jitter(); seqWrap();
   std::printf("live_events: %d checks, %d failed\n", g_checks, g_fail); return g_fail ? 1 : 0;
 }

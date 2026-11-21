@@ -173,6 +173,7 @@ class LiveHost {
   // F_EFFECTS); pdc_plan(bus_plan(...), PdcSlot[] built from the FxPlan entries (FxPlan::entry(i): lat, bi >= 0, on; NOT FxBank::pdcSlots, which reads the audio thread's chain_), sr, mode) (pdc.h:39). Queues LiveCmd::Play.
   // controlPlaying_ = true. E_BUSY after the session was made: sess_ is dropped, the snapshot deleted by publish's rule (session.h:51), nothing else changed.
   int play(const thunder_live_play_opts& o);
+  void testSetEvSeq(uint32_t v) { evSeq_ = v; }                 // TEST ONLY (no audio thread running): starts the record numbering at `v` (the 2^32 wrap)
   void setTestSeam(void (*f)(void*), void* user) { testSeam_ = f; testSeamUser_ = user; }   // TEST ONLY: `f` runs inside play(), between the push of the Play command and the publish of its snapshot (verify-283 F9)
   // stop(): queues LiveCmd::Stop; controlPlaying_ = false (a later songPublish no longer reaches the sequencer).
   int stop(int64_t at);
