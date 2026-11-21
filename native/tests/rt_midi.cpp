@@ -66,7 +66,7 @@ extern "C" int pthread_cond_wait(pthread_cond_t* c, pthread_mutex_t* m) {
 static int64_t g_nowNs = 1000000000; static long g_sent = 0, g_gone = 0;
 static int64_t sinkNow(void*) { return g_nowNs; }
 static int sinkSend(void*, uint64_t dev, const uint8_t* b, int len, int64_t) { if (dev > 2 || len < 1 || b[0] < 0x80) return -1; g_sent++; return 0; }
-static void sinkClear(void*, uint64_t) { g_gone++; }
+static int64_t sinkClear(void*, uint64_t) { g_gone++; return 0; }
 
 using namespace mdrive;
 static int fail(const char* m) { std::fprintf(stderr, "rt_midi FAIL: %s\n", m); return 1; }

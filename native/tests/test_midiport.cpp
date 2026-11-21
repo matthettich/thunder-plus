@@ -34,7 +34,7 @@ struct Fake {
     Fake* f = (Fake*)u; if (dev >= 32 || f->fail[dev]) return -1;   // a token this fake does not know is a gone device
     Rec r; std::memset(&r, 0, sizeof r); r.dev = (int)dev; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; r.sentAt = f->now.load(); f->rec.push_back(r); if (f->sendCost) f->now.fetch_add(f->sendCost); return 0;   // (a slow sink: the clock moves while it sends)
   }
-  static void clearFn(void* u, uint64_t dev) { Fake* f = (Fake*)u; if (dev < 32) f->clears[dev]++; for (Rec& r : f->rec) if ((uint64_t)r.dev == dev && r.at > f->now.load()) r.recalled = true; }   // the OS drops what it holds for the device
+  static int64_t clearFn(void* u, uint64_t dev) { Fake* f = (Fake*)u; if (dev < 32) f->clears[dev]++; for (Rec& r : f->rec) if ((uint64_t)r.dev == dev && r.at > f->now.load()) r.recalled = true; return 0; }   // the OS drops what it holds for the device
   thunder_midiout_sink sink() { thunder_midiout_sink s; s.user = this; s.now_ns = nowFn; s.send = sendFn; s.clear = clearFn; s.caps = caps; return s; }
 };
 
@@ -435,7 +435,7 @@ struct RealSink {
   std::atomic<uint64_t> sent{0}; int64_t last[32] = {}; uint64_t errs = 0;
   static int64_t nowFn(void*) { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
   static int sendFn(void* u, uint64_t dev, const uint8_t* b, int len, int64_t at) { RealSink* s = (RealSink*)u; if (dev >= 32 || len < 1 || b[0] < 0x80) return -1; s->last[dev] = at; s->sent.fetch_add(1); return 0; }
-  static void clearFn(void*, uint64_t) {}
+  static int64_t clearFn(void*, uint64_t) { return 0; }
 };
 static void threadsOnce(uint32_t caps) {
   thunder_midi* h = thunder_midi_create(48000, nullptr, 0); RealSink rs; thunder_midiout_sink sk; sk.user = &rs; sk.now_ns = RealSink::nowFn; sk.send = RealSink::sendFn; sk.clear = RealSink::clearFn; sk.caps = caps;
@@ -482,7 +482,7 @@ struct TokSink {
     if ((b[1] == 60 && tok != 10) || (b[1] == 61 && tok != 11)) s->wrong.fetch_add(1);
     (b[1] == 60 ? s->n60 : s->n61).fetch_add(1); s->sent.fetch_add(1); return 0;
   }
-  static void clearFn(void*, uint64_t) {}
+  static int64_t clearFn(void*, uint64_t) { return 0; }
 };
 // clock_map once per callback AFTER process (the documented order). order 1 adds a 3 ms gap after the FIRST process (midiout_flake, a permanent case): the first records are drained while no map exists, are HELD,
 // and nothing is lost.
@@ -591,7 +591,7 @@ struct GoneSink {
     }
     R r; std::memset(&r, 0, sizeof r); r.tok = tok; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; t->rec.push_back(r); return 0;
   }
-  static void clearFn(void* u, uint64_t) { ((GoneSink*)u)->clears++; }
+  static int64_t clearFn(void* u, uint64_t) { ((GoneSink*)u)->clears++; return 0; }
 };
 static int notesTo(const GoneSink& t, int key, uint64_t tok) { int n = 0; for (const auto& r : t.rec) if (r.b[0] == 0x90 && r.b[1] == key && r.tok == tok) n++; return n; }
 static void testGoneToken() {
