@@ -34,7 +34,7 @@ struct PadSet {
   static constexpr int PN = 64, NS = 24000;
   std::vector<float> d;
   PadSet() : d((size_t)PN * NS) {
-    for (int p = 0; p < PN; p++) { float* x = &d[(size_t)p * NS]; for (int i = 0; i < NS; i++) x[i] = (float)std::sin(0.01 * (p % 7 + 1) * i) * (1.0f - (float)i / NS) * 0.3f; }
+    for (int p = 0; p < PN; p++) { float* x = &d[(size_t)p * NS]; for (int i = 0; i < NS; i++) x[i] = (float)std::sin(0.01 * (p % 7 + 1) * i + 0.7) * (1.0f - (float)i / NS) * 0.3f; }  // (+ 0.7: the first sample is NOT zero, so a note that starts one sample off shows)
   }
   const float* pad(int p) const { return &d[(size_t)p * NS]; }
   static bool syn(int p) { return p >= 8; }

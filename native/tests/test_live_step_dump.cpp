@@ -126,7 +126,7 @@ static std::string clkRow(Seq& sq, const SeqStep& st, const SeqEvent* evs, int k
   row += ",\"btT\":"; seqplain::num(row, sq.btT()); row += ",\"bpm\":"; seqplain::num(row, sq.bpm()); row += "}}"; return row;
 }
 static bool reference(const thunder_live_play_opts& po, double time0, const std::string& first, int rows, const std::vector<Op>& ops, std::vector<std::string>& out) {
-  SeqOpts so; so.row = po.row; so.hasLoop = po.has_loop != 0; so.loopY0 = po.loop_y0; so.loopY1 = po.loop_y1; so.once = false; so.sim = false; so.track = po.track; so.sect = po.sect; so.phrase = po.phrase;
+  SeqOpts so; so.row = po.row; so.hasLoop = po.has_loop != 0; so.loopY0 = po.loop_y0; so.loopY1 = po.loop_y1; so.once = po.test_once != 0; so.sim = po.test_sim != 0; so.track = po.track; so.sect = po.sect; so.phrase = po.phrase;
   const SeqMode m = po.mode == THUNDER_LIVE_MODE_SECT ? SeqMode::Sect : po.mode == THUNDER_LIVE_MODE_PHRASE ? SeqMode::Phrase : SeqMode::Song;
   RefHost h; if (!h.first(m, so, RefHost::load(first))) return false;
   if (time0 > 0) h.run.seq()->setTime(time0);
@@ -149,7 +149,7 @@ static bool compare(const Out& o, const std::vector<std::string>& ref, const std
   for (int i = 0; i < n && firstRef < 0; i++) if (rowOf(o.lines[(size_t)i], true) != ref[(size_t)i]) firstRef = i;
   int prefix = 0; while (prefix < n && prefix < (int)RH.size() && sha256_hex(rowOf(o.lines[(size_t)prefix], true)).substr(0, 12) == RH.at((size_t)prefix).asStr()) prefix++;
   const bool full = prefix == grows;
-  const bool ok = firstRef < 0 && n == grows && (int)ref.size() == grows && o.dropped == 0 && !o.syncLost && (full || prefix * 100 >= grows * 98 || prefix == grows - 1 || (tag.find("cell-cleared") != std::string::npos && prefix >= 128));   // cell-cleared: the edit empties the song's last cell, the golden's once-play ends at row 128 where the looping live play (and its reference) goes on
+  const bool ok = firstRef < 0 && n == grows && (int)ref.size() == grows && o.dropped == 0 && !o.syncLost && full;   // cell-cleared: the edit empties the song's last cell, the golden's once-play ends at row 128 where the looping live play (and its reference) goes on
   CHECK(ok, "%s: %d of %d rows; first row differing from the reference %d; golden prefix %d; dropped %llu; sync lost %d (op after %d)", tag.c_str(), n, grows, firstRef, prefix, (unsigned long long)o.dropped, o.syncLost, o.lateOp);
   std::printf("  %-28s %5d rows equal to the reference; golden equal for the first %d%s\n", tag.c_str(), n, prefix, full ? " (all)" : "");
   return ok;
@@ -166,7 +166,7 @@ int main() {
     for (const Pl& P : pls) {
       const std::string gt = readFile(root + "/tests/golden/seq-" + P.id + ".json"); JsonDoc gd; gd.parse(gt); const int rows = P.max ? P.max : (int)gd.root().num("rows");
       Host H(opts(THUNDER_LIVE_F_DUMP_STEPS, 128)); if (!H.h) return 1;
-      thunder_live_play_opts po = playOpts(0); po.row = P.row; po.has_loop = P.loop; po.loop_y0 = P.y0; po.loop_y1 = P.y1;
+      thunder_live_play_opts po = playOpts(0); po.row = P.row; po.has_loop = P.loop; po.loop_y0 = P.y0; po.loop_y1 = P.y1; po.test_once = P.loop ? 0 : 1; po.test_sim = 1;   // the golden's options (test-only fields of thunder_live_play_opts)
       std::vector<Op> none; Out out; total++;
       if (!drive(H, po, *P.text, rows, none, out, P.id)) continue;
       // the loop golden stops at `max` rows (its JS run did); the others at the song's end
@@ -177,14 +177,15 @@ int main() {
     const std::string gt = readFile(root + "/native/tests/golden/seq-electro-live-bpm.json"); JsonDoc gd; gd.parse(gt); const Json L = gd.root().obj("live");
     Host H(opts(THUNDER_LIVE_F_DUMP_STEPS, 128)); if (!H.h) return 1;
     std::vector<Op> ops; for (size_t i = 0; i < L.arr("ops").size(); i++) { Op o; o.after = (int)L.arr("ops").at(i).num("after"); o.hasBpm = true; o.bpm = L.arr("ops").at(i).num("bpm"); ops.push_back(o); }
-    Out out; total++; std::vector<std::string> ref;
-    if (drive(H, playOpts(0), electroT, (int)gd.root().num("rows"), ops, out, "live-bpm") && reference(playOpts(0), 0, electroT, (int)gd.root().num("rows"), ops, ref) && compare(out, ref, gt, 0, "live-clock live-bpm")) good++;
+    Out out; total++; std::vector<std::string> ref; thunder_live_play_opts poBpm = playOpts(0); poBpm.test_once = 1; poBpm.test_sim = 0;
+    if (drive(H, poBpm, electroT, (int)gd.root().num("rows"), ops, out, "live-bpm") && reference(poBpm, 0, electroT, (int)gd.root().num("rows"), ops, ref) && compare(out, ref, gt, 0, "live-clock live-bpm")) good++;
     // live-time: the first step at 1234.5678 s is not a whole frame at 48 kHz: the host starts at the nearest frame and a reference Seq is started at that same frame's time
     const int64_t t0 = (int64_t)std::llround(1234.5678 * SR);
     Host H2(opts(THUNDER_LIVE_F_DUMP_STEPS, 128)); if (!H2.h) return 1;
     std::vector<Op> none; Out o2; total++;
     std::vector<std::string> ref2;
-    if (drive(H2, playOpts(t0), electroT, 1792, none, o2, "live-time", t0 - 4096) && reference(playOpts(0), (double)t0 / SR, electroT, 1792, none, ref2)) {
+    thunder_live_play_opts poT = playOpts(t0); poT.test_once = 1; poT.test_sim = 0;
+    if (drive(H2, poT, electroT, 1792, none, o2, "live-time", t0 - 4096) && reference(poT, 4096.0 / SR, electroT, 1792, none, ref2)) {
       const std::string gt2 = readFile(root + "/native/tests/golden/seq-electro-live-time.json");
       JsonDoc gd2; gd2.parse(gt2); const Json RH2 = gd2.root().arr("rowHashes");
       int diff = -1; for (int i = 0; i < (int)std::min(o2.lines.size(), ref2.size()) && diff < 0; i++) if (rowOf(o2.lines[(size_t)i], true) != ref2[(size_t)i]) diff = i;
@@ -202,8 +203,9 @@ int main() {
       const Json G = gd.root(), edits = G.arr("edits"), O = G.obj("opt");
       const std::string fileText = readFile(root + "/" + std::string(G.str("song"))); SText S; if (!baseOf(fileText, S)) { CHECK(false, "edit-%s: base song", id.c_str()); continue; }
       applyOps(S, G.arr("baseOps"));
-      thunder_live_play_opts po = playOpts(0); const std::string_view m = G.str("mode", "song"); po.mode = m == "sect" ? THUNDER_LIVE_MODE_SECT : m == "phrase" ? THUNDER_LIVE_MODE_PHRASE : THUNDER_LIVE_MODE_SONG;
+      thunder_live_play_opts po = playOpts(0); po.test_sim = 1; const std::string_view m = G.str("mode", "song"); po.mode = m == "sect" ? THUNDER_LIVE_MODE_SECT : m == "phrase" ? THUNDER_LIVE_MODE_PHRASE : THUNDER_LIVE_MODE_SONG;
       if (O.get("row").isNum()) po.row = (int)O.get("row").asNum();
+      if (!O.obj("loop").isObj()) po.test_once = 1;
       if (O.obj("loop").isObj()) { po.has_loop = 1; po.loop_y0 = (int)O.obj("loop").num("y0"); po.loop_y1 = (int)O.obj("loop").num("y1"); }
       if (O.get("track").isNum()) po.track = (int)O.get("track").asNum(); if (O.get("sect").isNum()) po.sect = (int)O.get("sect").asNum(); if (O.get("phrase").isNum()) po.phrase = (int)O.get("phrase").asNum();
       const std::string first = S.text(); std::vector<Op> ops; int limit = 0;
