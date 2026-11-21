@@ -63,7 +63,9 @@ struct thunder_midiout {
   std::atomic<uint64_t> cabTok[kCabs];
   std::atomic<uint32_t> epoch;             // bumped by every set_devices
   std::atomic<uint8_t> cabPurge[kCabs];    // the slot was reused for another device id: whatever is queued for the cable belongs to the old one (the pump drops it at its next epoch sweep)
-  std::atomic<uint8_t> cabGone[kCabs];     // the sink said so for the cable's device: until the next set_devices
+  std::atomic<uint8_t> cabGone[kCabs];     // the sink said so for the cable's device: until the next set_devices (the mark; only the pump sets it, set_devices clears it)
+  std::atomic<uint64_t> cabGoneTok[kCabs]; // ...and WHICH token failed (PR B, CodeRabbit on #268): a cable is gone iff the mark is set AND this equals its current token, so control replacing the token between the
+                                           // pump's failed send and its mark can never mute the replacement (the pump stores the token, then the mark with release; resolve reads the mark with acquire, then the token)
   std::atomic<int64_t> outLat;             // the clock map's floor, ns
 
   // ---- the clock map: a seqlock, one writer at a time (busy), the pump reads ----
@@ -76,13 +78,14 @@ struct thunder_midiout {
   // ---- the pump (SENDER thread only) ----
   thunder_midi_msg q[kQ]; int head, tail;       // sorted by frame (stable), the live part is [head, tail)
   uint32_t seenEpoch;
+  bool held;                               // PUMP thread: records were queued while no map existed (the first map's backlog rule applies once)
   struct Hand { thunder_midi_msg m; int64_t at; uint64_t dev; bool live; } hand[kHand]; int handN;   // the last stamped messages given to the OS (CAP_TS): what a CLEAR may have to recall (and what the OS's flush must not lose)
   struct { bool ok; double off; int64_t host; } lastSnap;   // the last map the pump read whole: kept when a writer is caught mid-update
-  std::atomic<uint64_t> st[10];                  // the stats, in the order of thunder_midiout_stats from `sent`
+  std::atomic<uint64_t> st[11];                  // the stats, in the order of thunder_midiout_stats from `sent`
 };
 
 namespace {
-enum St { S_SENT, S_GONE, S_CLEARED, S_NOMAP, S_LATE, S_QFULL, S_MAXQ, S_ERR, S_LATETICK, S_HANG };
+enum St { S_SENT, S_GONE, S_CLEARED, S_NOMAP, S_LATE, S_QFULL, S_MAXQ, S_ERR, S_LATETICK, S_HANG, S_STALE };
 inline void bump(thunder_midiout* o, int i, uint64_t n = 1) { o->st[i].store(o->st[i].load(std::memory_order_relaxed) + n, std::memory_order_relaxed); }   // one writer (the pump)
 inline void setSt(thunder_midiout* o, int i, uint64_t v) { o->st[i].store(v, std::memory_order_relaxed); }
 
@@ -156,9 +159,18 @@ void enqueue(thunder_midiout* o, const thunder_midi_msg& m) {
 }
 
 bool listed(const thunder_midiout* o, int cable) { return cable >= 0 && cable < kCabs && o->cabLive[cable].load(std::memory_order_acquire) != 0; }
-bool resolve(const thunder_midiout* o, int cable, uint64_t& tok) {   // the cable's device token, false if it is not listed (or the sink said it is gone)
-  if (!listed(o, cable) || o->cabGone[cable].load(std::memory_order_relaxed) || o->cabPurge[cable].load(std::memory_order_acquire)) return false;   // a purge flag: the slot was just reused, a record that is still queued belongs to the old device
-  tok = o->cabTok[cable].load(std::memory_order_relaxed); return true;
+bool resolve(const thunder_midiout* o, int cable, uint64_t& tok) {   // the cable's device token, false if it is not listed (or the sink said THIS token is gone)
+  if (!listed(o, cable) || o->cabPurge[cable].load(std::memory_order_acquire)) return false;   // a purge flag: the slot was just reused, a record that is still queued belongs to the old device
+  const bool marked = o->cabGone[cable].load(std::memory_order_acquire) != 0;
+  const uint64_t t = o->cabTok[cable].load(std::memory_order_relaxed);
+  if (marked && o->cabGoneTok[cable].load(std::memory_order_relaxed) == t) return false;   // the token the sink failed on is still the cable's
+  tok = t; return true;
+}
+// The sink failed on `tok` for `cable` (PUMP thread): mark THAT token. No compare with the cable's current token first: there is no window for control to slip a replacement into.
+void markGone(thunder_midiout* o, int cable, uint64_t tok) {
+  if (o->cabGone[cable].load(std::memory_order_relaxed) && o->cabGoneTok[cable].load(std::memory_order_relaxed) == o->cabTok[cable].load(std::memory_order_relaxed)) return;   // the cable's current token is already marked: a late failure of an OLDER token (a replay of history) must not move the mark off it
+  o->cabGoneTok[cable].store(tok, std::memory_order_relaxed);
+  o->cabGone[cable].store(1, std::memory_order_release);
 }
 
 // A CLEAR marker (the cable's STOP): what is queued for the cable after the marker's frame goes. What the OS already holds, stamped for later (CAP_TS), is recalled with the sink's
@@ -180,7 +192,7 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
       if (failed) { h.live = false; bump(o, S_GONE); continue; }   // the device failed during this replay: what is left of its history is lost with it
       if (o->sink.send(o->sink.user, h.dev, h.m.b, h.m.len, h.at) < 0) {
         h.live = false; failed = true; bump(o, S_ERR); bump(o, S_GONE);
-        uint64_t cur; if (resolve(o, h.m.cable, cur) && cur == h.dev) o->cabGone[h.m.cable].store(1, std::memory_order_relaxed);   // the same rule as a normal send
+        markGone(o, h.m.cable, h.dev);   // the same rule as a normal send: the failed token
       }
     }
   }
@@ -199,11 +211,12 @@ thunder_midiout* thunder_midiout_create(thunder_midi* core_midi, double sample_r
   for (auto& d : o->cabLive) d.store(0, std::memory_order_relaxed);
   for (auto& d : o->cabTok) d.store(0, std::memory_order_relaxed);
   for (auto& g : o->cabGone) g.store(0, std::memory_order_relaxed);
+  for (auto& g : o->cabGoneTok) g.store(0, std::memory_order_relaxed);
   for (auto& g : o->cabPurge) g.store(0, std::memory_order_relaxed);
   for (auto& s : o->st) s.store(0, std::memory_order_relaxed);
   o->epoch.store(0, std::memory_order_relaxed); o->outLat.store(0, std::memory_order_relaxed);
   o->busy.clear(); o->mseq.store(0, std::memory_order_relaxed); o->mOffBits.store(0, std::memory_order_relaxed); o->mHost.store(0, std::memory_order_relaxed); o->mValid.store(0, std::memory_order_relaxed);
-  std::memset(o->q, 0, sizeof o->q); o->head = o->tail = 0; o->seenEpoch = 0; std::memset(o->hand, 0, sizeof o->hand); o->handN = 0; o->lastSnap.ok = false; o->lastSnap.off = 0; o->lastSnap.host = 0;
+  std::memset(o->q, 0, sizeof o->q); o->head = o->tail = 0; o->seenEpoch = 0; o->held = false; std::memset(o->hand, 0, sizeof o->hand); o->handN = 0; o->lastSnap.ok = false; o->lastSnap.off = 0; o->lastSnap.host = 0;
   return o;
 }
 
@@ -302,6 +315,14 @@ bool readMap(const thunder_midiout* o, Snap& r) {   // false: no consistent snap
 }
 }  // namespace
 
+// A message the backlog rule may drop: a note-on or a controller (CC, pitch bend, pressure, program), never All Notes Off / All Sound Off, note-offs, Start / Stop / SPP / Continue, ticks (own rule).
+static bool staleClass(const thunder_midi_msg& m) {
+  const int ty = m.b[0] & 0xF0;
+  if (ty == 0x90) return m.len >= 3 && m.b[2] > 0;
+  if (ty == 0xB0) return !(m.len >= 2 && (m.b[1] == 120 || m.b[1] == 123));
+  return ty == 0xA0 || ty == 0xC0 || ty == 0xD0 || ty == 0xE0;
+}
+
 // ---- the pump ------------------------------------------------------------------------------------------------------------------
 int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   if (!o) return THUNDER_MIDIOUT_E_ARG;
@@ -311,17 +332,15 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   Snap map; if (readMap(o, map)) { o->lastSnap.ok = map.valid; o->lastSnap.off = map.off; o->lastSnap.host = map.host; } else if (o->lastSnap.ok) { map.valid = true; map.off = o->lastSnap.off; map.host = o->lastSnap.host; }   // a writer caught mid-update: the last whole map
   else { map.valid = o->mValid.load(std::memory_order_acquire) != 0; map.off = bitsToD(o->mOffBits.load(std::memory_order_acquire)); map.host = o->mHost.load(std::memory_order_acquire); }   // never read whole yet: the offset is one 64-bit atomic, always a real value; "no map" only if none was ever written
 
-  // 1. the scheduler's records into the queue: a CLEAR marker applies to what is queued at that point of the stream; before the first map nothing can be timed
+  // 1. the scheduler's records into the queue: a CLEAR marker applies to what is queued at that point of the stream; before the first map records are queued, not sent (step 3)
   thunder_midi_msg buf[128];
   for (int rounds = 0; rounds < 128; rounds++) {
     const int64_t n = thunder_midi_drain(o->core, buf, 128);
     if (n <= 0) break;
     for (int64_t i = 0; i < n; i++) {
       if (buf[i].flags & THUNDER_MIDI_F_CLEAR) { applyClear(o, buf[i], now); continue; }
-      if (!map.valid) {   // the first map may have been published while this pump ran: look again before a record is given up
-        Snap m2; if (readMap(o, m2) && m2.valid) { map = m2; o->lastSnap.ok = true; o->lastSnap.off = m2.off; o->lastSnap.host = m2.host; }
-        else { bump(o, S_NOMAP); continue; }
-      }
+      if (!map.valid) o->held = true;
+      // no map yet: the record WAITS in the queue (its frame needs no map; step 3 sends nothing until one exists). A lost Start is worse than a late burst; the fixed queue and F4's eviction order bound it.
       enqueue(o, buf[i]);
     }
   }
@@ -335,6 +354,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   }
   if (!map.valid) return 0;
   { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // the drain and the CLEARs took time
+  const bool backlog = o->held; o->held = false;   // the first pump with a map after a hold: the backlog rule applies to what is due now
   const bool stale = now - map.host > THUNDER_MIDIOUT_STALE_NS;
   // 3. what is due
   int sent = 0;
@@ -356,13 +376,14 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     }
     o->head++;
     const int64_t late = now - at;
+    if (backlog && late > THUNDER_MIDIOUT_BACKLOG_NS && staleClass(m)) { bump(o, S_STALE); continue; }   // the one lateness rule at the first map: a note-on or controller from the past is not replayed
     if (m.b[0] == 0xF8 && late > THUNDER_MIDIOUT_TICK_LATE_NS) { bump(o, S_LATE); bump(o, S_LATETICK); continue; }   // B7: a late tick is dropped, never sent in a burst
     if (late > THUNDER_MIDIOUT_LATE_NS || stale) bump(o, S_LATE);
     const int r = o->sink.send(o->sink.user, dev, m.b, m.len, at);
     { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // a slow send (a failed one too) must count against the next message's lateness
     if (r < 0) {
       bump(o, S_ERR); bump(o, S_GONE);
-      uint64_t cur; if (resolve(o, m.cable, cur) && cur == dev) o->cabGone[m.cable].store(1, std::memory_order_relaxed);   // only the token that failed: a replacement for the same id is not marked
+      markGone(o, m.cable, dev);   // only the token that failed: a replacement for the same id is not marked (resolve compares the mark's token with the cable's current one)
       continue;
     }
     bump(o, S_SENT); sent++;
@@ -378,7 +399,7 @@ int thunder_midiout_stats_get(const thunder_midiout* o, thunder_midiout_stats* o
   t.sent = o->st[S_SENT].load(std::memory_order_relaxed); t.dropped_gone = o->st[S_GONE].load(std::memory_order_relaxed); t.dropped_cleared = o->st[S_CLEARED].load(std::memory_order_relaxed);
   t.dropped_nomap = o->st[S_NOMAP].load(std::memory_order_relaxed); t.late = o->st[S_LATE].load(std::memory_order_relaxed); t.queue_full = o->st[S_QFULL].load(std::memory_order_relaxed);
   t.max_queue = o->st[S_MAXQ].load(std::memory_order_relaxed); t.send_errors = o->st[S_ERR].load(std::memory_order_relaxed); t.dropped_late_ticks = o->st[S_LATETICK].load(std::memory_order_relaxed);
-  t.may_hang = o->st[S_HANG].load(std::memory_order_relaxed);
+  t.may_hang = o->st[S_HANG].load(std::memory_order_relaxed); t.dropped_stale = o->st[S_STALE].load(std::memory_order_relaxed);
   { thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; if (thunder_midi_stats_get(o->core, &cs) == THUNDER_MIDI_OK && cs.may_hang) t.may_hang = 1; }   // the scheduler's own ring lost a note-off / Stop too
   const size_t n = out->size < sizeof t ? out->size : sizeof t; std::memcpy(out, &t, n);
   return THUNDER_MIDIOUT_OK;
