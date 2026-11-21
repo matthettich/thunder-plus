@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cassert>
 
+#include "chains/chost.h"
 #include "midi/midi_host.h"
 #include "render/players.h"
 
@@ -31,6 +32,8 @@ void SongRenderer::dispatch(const SeqEvent& e) {
     case SEV_TVL: case SEV_TVA: case SEV_TPN: case SEV_MVOL: case SEV_MOUT: if (mix_.event(e)) st_.mixEvents++; return;
     case SEV_BEAT: if (mix_.event(e)) st_.beats++; return;   // the beat clock (U10)
     case SEV_FXC: case SEV_FXP: if (fx_) fx_->event(e, mix_.now(), mix_); return;
+    case SEV_CHC: if (chains_) { chains_->event(e); return; } break;   // the tracker's BYP: counted as ignored below when there is no chains host
+    case SEV_TEMPO: if (chains_) chains_->event(e); break;               // the chains' transport; the Players still see it (the live bass nodes follow the tempo)
     default: break;
   }
   if (!players_->dispatch(e, *seq_, S_)) st_.eventsIgnored++;   // chc (chains), eng, the MIDI events, tempo: no route yet (counted)
@@ -43,7 +46,7 @@ void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLaten
 }
 
 bool SongRenderer::setStem(int track) {
-  if (track < 0 || track >= kSongNT || midi_) return false;   // (a MIDI hook would read the stem's forced mask as the audible mask)
+  if (track < 0 || track >= kSongNT || midi_ || chains_) return false;   // (a MIDI hook would read the stem's forced mask as the audible mask)
   const uint32_t aud = (uint32_t)mix_.audibleMask();   // mute / solo as the song has them (not yet forced)
   uint32_t m = 1u << track;
   // a bus's stem plays its audible sources with it, and theirs through any depth (busClosure: a walk over the feeds that adds a track only when it is audible, so a muted middle bus
@@ -52,6 +55,15 @@ bool SongRenderer::setStem(int track) {
   stem_ = track; mchain_.reset(); mix_.setMasterFx(nullptr, nullptr);
   mix_.setHeard(m);
   return true;
+}
+void SongRenderer::setChains(bool on) {
+  if (!on) { if (chains_) { for (int t = 0; t < kSongNT; t++) mix_.setChain(t, nullptr, nullptr); mix_.setPlan(bus_plan(S_.chainPatch, S_.chainOn)); chains_.reset(); } return; }
+  if (chains_) return;
+  chains_.reset(new ChainsHost(sr_));
+  ChainsSongTransport tp; tp.tempo = S_.bpm; tp.lpb = S_.lpb ? S_.lpb : 4; tp.ticks = S_.ticks ? S_.ticks : 6;   // pass(): S.bpm, S.lpb || 4, S.ticks || 6
+  std::unique_ptr<ChainsPlan> p(chains_->plan(S_.chainPatch, S_.chainOn, heardMask(), tp));
+  if (!p) { chains_.reset(); return; }
+  chains_->commit(p.get(), mix_);
 }
 void SongRenderer::setMasterChain(const MasterChainConfig& cfg) {
   if (stem_ >= 0) return;   // a stem has no master chain

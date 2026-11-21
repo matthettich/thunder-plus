@@ -24,6 +24,8 @@ int main() {
   OFF(thunder_render_opts, vars_bytes, 64);
   OFF(thunder_render_opts, stem, 72);
   OFF(thunder_render_opts, reserved2, 76);
+  OFF(thunder_render_opts, chains, 80);
+  OFF(thunder_render_opts, reserved3, 84);
   OFF(thunder_render_stats, size, 0);
   OFF(thunder_render_stats, song_over, 4);
   OFF(thunder_render_stats, voices_active, 8);

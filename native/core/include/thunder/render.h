@@ -105,6 +105,9 @@ typedef struct thunder_render_opts {
                                    (the master chain's is not). With the master chain on, an unknown-length stem is therefore longer than the mix by that latency: pass use_frames = the mix's length, as the
                                    page cuts every file to the mix's. Otherwise E_ARG from create. */
   int32_t reserved2;            /* must be 0 */
+  /* appended in C1 (docs/port/C1-NOTES.md); an older host never sees it and renders without chains */
+  int32_t chains;               /* 0 / 1: the song's chains (chainPatch / chainOn) through one chains node per heard CHN track, bus tracks included, as thunder-render --chains. No latency is added. Other values: E_ARG */
+  int32_t reserved3;            /* must be 0 */
 } thunder_render_opts;
 
 /* What a render counted (RenderStats of render.h). `size` first, as in the opts. Any time; the numbers are as of now. */
