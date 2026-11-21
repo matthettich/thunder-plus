@@ -13,6 +13,7 @@
 #include "miniaudio.h"
 #include "thunder/core.h"
 #include "thunder/rtlog.h"
+#include "midi_out.h"   // U36 T9: the MIDI out (the AMidi ports and the JNI entry points are in midi_jni.cpp)
 #if defined(__x86_64__)
 #include <xmmintrin.h>
 #endif
@@ -35,6 +36,13 @@ struct Engine {
   std::atomic<bool> infoReady{false};
   std::atomic<bool> resetReq{false};      // the callback performs rtlog_reset (the logger is written by the audio thread only)
   std::atomic<int> xrunLast{0}, xrunBase{0}, latFrames{0};
+  // U36 T9: MIDI out. `midi` is set before the stream starts and cleared after it stopped, so the callback reads it plainly. libaaudio's two counters, resolved BEFORE the stream starts
+  // (the callback calls them through these pointers; no dlsym in the callback).
+  tpa::MidiHost* midi = nullptr;
+  void* aaLib = nullptr;
+  int32_t (*aaTs)(void*, int32_t, int64_t*, int64_t*) = nullptr;
+  int64_t (*aaWritten)(void*) = nullptr;
+  int lastLatSentMs = -1;
 };
 Engine g;
 rtlog g_rt;   // A5's clock-drift logger (native/core/include/thunder/rtlog.h)
@@ -71,6 +79,7 @@ void dataCallback(ma_device* dev, void* out, const void* /*in*/, ma_uint32 frame
     }
     done += n;
   }
+  if (e->midi) e->midi->audioBlock((int)frames);   // U36 T9: the scheduler's block and the clock map, after the block (midi_out.h AUDIO)
   rtlog_end(&g_rt, monoNs(), (int)frames);
 }
 
@@ -78,6 +87,17 @@ void dataCallback(ma_device* dev, void* out, const void* /*in*/, ma_uint32 frame
 typedef int32_t (*fnI32)(void*);
 typedef int64_t (*fnI64)(void*);
 typedef int32_t (*fnTs)(void*, int32_t, int64_t*, int64_t*);
+
+// The clock map's AAudio pair (spec 3.4). Called by MidiHost::audioBlock on the audio thread at most every 20 ms. AAudio's getTimestamp and getFramesWritten read the stream's
+// shared counters (UNVERIFIED on the Fold: that getTimestamp is cheap in the callback; the rate limit is the guard). false: no timestamp (AAudio refuses for a while after start).
+bool tsRead(void*, tpa::TsPair* p) {
+  void* stream = (void*)g.device.aaudio.pStreamPlayback;
+  if (!stream || !g.aaTs || !g.aaWritten) return false;
+  int64_t pos = 0, ns = 0;
+  if (g.aaTs(stream, CLOCK_MONOTONIC, &pos, &ns) != 0) return false;
+  p->pos = pos; p->ns = ns; p->written = g.aaWritten(stream);
+  return true;
+}
 
 void probeLoop() {
   void* lib = dlopen("libaaudio.so", RTLD_NOW);
@@ -108,6 +128,10 @@ void probeLoop() {
         if (lat > 0 && lat < g.device.sampleRate) latFrames = (int)lat;
       }
       g.latFrames = latFrames;
+      if (latFrames > 0 && g.device.sampleRate > 0) {   // the clock map's floor (set_out_latency); a control call, serialised inside MidiHost
+        const int ms = (int)(latFrames * 1000.0 / g.device.sampleRate);
+        if (ms != g.lastLatSentMs) { g.lastLatSentMs = ms; tpa::host().setOutLatencyNs((int64_t)(latFrames * 1e9 / g.device.sampleRate)); }
+      }
       thunder_host_stats(g.core, latFrames, under);
       if (!infoDone && burst && bufsz) {
         std::snprintf(g.info, sizeof g.info, "sr=%u burstFrames=%d bufferFrames=%d sharing=%d (0 exclusive, 1 shared) perfMode=%d (12 low latency)", g.device.sampleRate,
@@ -139,13 +163,19 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStart(
   g.core = thunder_create((int)g.device.sampleRate, kMaxBlock);
   if (!g.core) { ma_device_uninit(&g.device); g.deviceInit = false; return -1; }
   g.infoReady = false;
+  // U36 T9: AAudio's counters for the clock map, then the MIDI out (a failure here is not fatal: audio goes on without MIDI)
+  g.aaLib = dlopen("libaaudio.so", RTLD_NOW);
+  if (g.aaLib) { g.aaTs = (int32_t(*)(void*, int32_t, int64_t*, int64_t*))dlsym(g.aaLib, "AAudioStream_getTimestamp"); g.aaWritten = (int64_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getFramesWritten"); }
+  g.lastLatSentMs = -1;
+  if (tpa::host().engineStart((double)g.device.sampleRate, &tsRead, nullptr)) g.midi = &tpa::host(); else LOGI("MIDI out did not start");
   rtlog_reset(&g_rt, (int)g.device.sampleRate);
   g.resetReq = false; g.xrunBase = 0; g.xrunLast = 0; g.latFrames = 0;
   g.probeRun = true;
   g.probe = std::thread(probeLoop);
   if (ma_device_start(&g.device) != MA_SUCCESS) {
     g.probeRun = false; g.probe.join();
-    ma_device_uninit(&g.device); g.deviceInit = false; thunder_destroy(g.core); g.core = nullptr; return -1;
+    ma_device_uninit(&g.device); g.deviceInit = false; g.midi = nullptr; tpa::host().engineStop(); if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; }
+    thunder_destroy(g.core); g.core = nullptr; return -1;
   }
   LOGI("audio started at %u Hz", g.device.sampleRate);
   return (jint)g.device.sampleRate;
@@ -160,6 +190,9 @@ JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStop(J
   if (g.probe.joinable()) g.probe.join();
   ma_device_uninit(&g.device);   // stops the callback
   g.deviceInit = false;
+  g.midi = nullptr;
+  tpa::host().engineStop();      // U36 T9: AFTER the callback stopped (no more clock_map / process): joins the sender, frees thunder_midiout, then thunder_midi
+  if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; g.aaTs = nullptr; g.aaWritten = nullptr; }
   thunder_destroy(g.core);
   g.core = nullptr;
 }

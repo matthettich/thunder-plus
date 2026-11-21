@@ -39,6 +39,7 @@ android {
 dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("androidx.core:core-ktx:1.15.0")
+    testImplementation("junit:junit:4.13.2")   // U36 T9: the JVM unit tests of MidiModel.kt (src/test), run by `gradle :app:testDebugUnitTest`
 }
 
 // Copies the web app into build/webassets (the repo root is two folders above native/android).

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- U36 T9: MIDI out over USB and virtual ports. Not required (a phone without it still plays audio). No MIDI permission exists for USB / virtual devices. Bluetooth LE MIDI is NOT opened in this slice, so no BLUETOOTH_* permission is asked. -->
+    <uses-feature android:name="android.software.midi" android:required="false" />
+
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
