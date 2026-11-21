@@ -5,7 +5,8 @@ Branch `n1/chains-c1` (from `native`, with PR #279's `n1/chains-c1g` merged: gol
 ## Status
 - DONE: `native/core/src/chains/chost.{h,cpp}` (`ChainsHost`, `ChainsPlan`), `ChainsEngine::setBusMap` capacity, `SongRenderer::setChains` + dispatch cases, `thunder_render_opts.chains`, `thunder-render --chains`, CMake,
   `test_chains_song` (all golden cases exact through Mixer+ChainsHost, and through SongRenderer where a case has no events), `test_chains_host`.
-- NEXT: re-merge `n1/chains-c1g` when the `f/byp-chrome-rule-k5` case lands (22 cases); mutations; full Release ctest; ASan+UBSan on chains / render / mix / bus tests; the PR.
+- DONE too: `n1/chains-c1g` re-merged (22 cases, all exact, the Chrome chc rule in); the six mutations below.
+- NEXT: full Release ctest (running), ASan+UBSan on chains / render / mix / bus tests, the PR.
 - OPEN QUESTIONS: see the end.
 
 ## Design as built
@@ -17,3 +18,13 @@ Branch `n1/chains-c1` (from `native`, with PR #279's `n1/chains-c1g` merged: gol
 - A refused patch (one document for every node) makes the whole plan a no-op: the playing patches, bus maps and bus plan stay. Found by the test: the hostile document's own bus plan had emptied the bus map of the playing node.
 - `setBusMap` fix: `busMap_.reserve(kMaxFeeds)` in the constructor AND the loop stops at kMaxFeeds (the node reads at most 32; with the reserve alone a call with more than 32 would allocate). Reserve + cap, not a fixed array variant: the one-line change in the constructor keeps `busMap()` a vector for every existing reader.
 - `SongRenderer::setChains(bool)`: after `setStem`, before the first block; `setStem` is refused once chains are on. Hooks only on `heardMask()` tracks.
+
+## Mutations (each made, seen to fail, undone)
+| mutation (in chost.cpp) | killed by |
+|---|---|
+| feed pairs in reverse order in `hook` | 16 of 22 golden cases (hash), `hook == direct ChainsNode` |
+| `chc` applied one quantum early (`chcQuantum` - 1, and separately `applyDue(qi + 1)`) | the plan check against `expect.eventQuanta`; with `applyDue(qi + 1)` the hashes of the f cases and the negative controls |
+| transport not re-applied after a swap | `test_chains_host` (after the swap equals a direct node with the song's transport, the transport is the song's); no golden case swaps a patch |
+| an un-heard track hooked in a stem (`heard` ignored in `plan`) | h/stem-plain-track, h/stem-source-only (plan and hash), `test_chains_host` section 4 |
+| `ceil` in float (tempo rule; chc rule separately) | g/tempo-change; f/byp-fuzz-quantum-start; the rule checks of `test_chains_host` |
+| the tempo rule used for `chc` | f/byp-chrome-rule-k5 |
