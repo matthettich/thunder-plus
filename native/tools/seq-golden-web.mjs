@@ -285,7 +285,7 @@ function chopSong(variant) {
   const notes = [[48, 49, 50, 52, 46, 44, 51, 53, 48, 47, 45, 55, 54, 48, 56, 60], [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], [48, 55, 48, 60, 48, 52, 48, 40, 48, 48, 53, 48, 61, 48, 48, 50],
     [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], [48, 50, 48, 48, 52, 48, 48, 48, 49, 48, 48, 48, 48, 55, 48, 48], [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 47, 46, 45],
     [40, 44, 48, 52, 56, 60, 64, 68, 72, 36, 41, 47, 50, 53, 59, 66]];
-  const V8 = variant === 'lines' || variant === 'sx';   // WEB-FOLLOW: an eighth track (instrument 7) for the lines / sx variants
+  const V8 = variant === 'lines' || variant === 'sx' || variant === 'parts';   // WEB-FOLLOW: an eighth track (instrument 7) for the lines / sx variants
   for (let t = 0; t < (V8 ? 8 : 7); t++) PH.push(Array.from({ length: 32 }, (_, y) => y < 16 ? row(notes[t % 7][y], t) : row(-1, 0)));
   const cmd = (t, y, col, name, v) => { const r = PH[t][y]; r[6 + 2 * col] = FXN(name); r[7 + 2 * col] = v; };
   [0, 1, 2, 3, 15, 4, 20, 17, 5, 9, 11, 13, 14, 7, 31 % 16 + 12, 8].forEach((v, y) => cmd(1, y, 0, 'SLC', v));   // slc 16 with the SLC command (20 wraps)
@@ -308,6 +308,12 @@ function chopSong(variant) {
     S.insts[7] = { ...tpl, pad: 3, sync: 3, beats: 3, sx: 1, og: 250, ou: 6, orp: 3, ox: 50, opt: 24 };
     cmd(7, 4, 0, 'TPO', 100); cmd(5, 7, 0, 'TPO', 140);
   }
+  // WEB-FOLLOW: PERFORM parts. Track 7 plays through PART 1 (PRT 1 on its first row); the part's instrument 0 (what instrument 7 falls back to, IS[ii] || IS[0]) has lines, SLICES + SMODE + OLDSCHOOL with a ramp,
+  // and is the page's normalised form (normParts: sync 0..3, sxLoad). Track 6 stays on the song's own instruments (a part is per track).
+  if (variant === 'parts') {
+    cmd(7, 0, 0, 'PRT', 1); cmd(7, 9, 0, 'TPO', 80);
+    S.parts = [{ n: 'P1', mix: [], fx: {}, insts: [{ tsp: 0, vol: 255, pan: 128, ofs: 0, pad: 2, slc: 4, smode: 1, sync: 3, beats: 4, lines: 13, grain: 1, sx: 1, og: 3.5, ou: 0, orp: 1, ox: 5, opt: 2 }] }];
+  }
   if (variant === 'sync-rev') PH.forEach((p, t) => p.forEach((r, y) => { if (r[0] >= 0 && y % 3 === 0) { r[6 + 2 * 2] = FXN('PLY'); r[7 + 2 * 2] = 1; } }));   // PLY 1: reversed notes
   S.phrases = PH; S.plen = PH.map(() => 16); S.chains = PH.map((_, t) => [[t, 0]]); S.song = Array.from({ length: 256 }, (_, r) => Array.from({ length: 33 }, (_, t) => r < 8 && t < (V8 ? 8 : 7) ? t : -1));
   return { v: j.v, song: S };
@@ -318,6 +324,7 @@ const CHOP_CASES = [
   { id: 'chop-lines', variant: 'lines', desc: 'SYNC TO LINES (web #257): lines on sync 1 / 2 / 3 at LPB 6, an LPB command and TPO commands that must not move the lines, a second sync-1 instrument' },
   { id: 'chop-lines-edit', variant: 'lines', edits: [{ after: 20, fn: S => { S.insts[2].lines = 30; S.insts[7].lines = 0; } }, { after: 60, fn: S => { delete S.insts[4].lines; S.insts[3].lines = 4; } }],
     desc: 'lines edited while running (a takeOver at each): changed, set to 0 (back to beats), removed, added' },
+  { id: 'chop-parts', variant: 'parts', desc: 'a PERFORM part\'s instrument with lines + OLDSCHOOL + SLICES / SMODE with a ramp (equal slices), a TPO on a note row' },
   { id: 'chop-sx', variant: 'sx', desc: 'OLDSCHOOL (sync 3 + sx 1, web #261 / #263): ev.st carries sx / gs / rp / x / pt, a ramp makes the SMODE slices equal parts, a sx on sync 2 is inert, ms and line-division grains at a TPO' },
   { id: 'chop-edit', variant: 'all', edits: [{ after: 20, fn: S => { S.insts[0].slc = 8; S.insts[5].slc = 6; } }, { after: 60, fn: S => { S.insts[2].sync = 0; S.insts[6].slc = 0; S.insts[7].sync = 1; } }],
     desc: 'a takeOver after edits that change slc (and sync on / off) of running instruments' },
@@ -359,8 +366,8 @@ function chopCases() {
       rowHashes: rows.map(r => crypto.createHash('sha256').update(JSON.stringify(r)).digest('hex').slice(0, 12)) };
     if (process.env.CHOP_DEBUG) console.log(JSON.stringify(counts), JSON.stringify(rows.flatMap(r => r.evs).filter(e => e.type === 'note').slice(0, 3)));
     let sxN = 0, fracBeats = 0; for (const r of rows) for (const e of r.evs) if (e.type === 'note' && e.st) { if (e.st.sx) sxN++; if (!Number.isInteger(e.st.beats)) fracBeats++; }
-    if (C.variant === 'sx') now.sxNotes = sxN;   // (only the new case carries it: the older goldens stay byte for byte)
-    if ((C.variant === 'sx' && !sxN) || (C.variant === 'lines' && !fracBeats)) { console.log(`FAIL ${C.id}: no OLDSCHOOL notes (${sxN}) / no fractional beats (${fracBeats}): the case proves nothing`); bad = true; continue; }
+    if (C.variant === 'sx' || C.variant === 'parts') now.sxNotes = sxN;   // (only the new case carries it: the older goldens stay byte for byte)
+    if (((C.variant === 'sx' || C.variant === 'parts') && !sxN) || (C.variant === 'lines' && !fracBeats)) { console.log(`FAIL ${C.id}: no OLDSCHOOL notes (${sxN}) / no fractional beats (${fracBeats}): the case proves nothing`); bad = true; continue; }
     if (!chopped || (C.variant === 'all' && !stN)) { console.log(`FAIL ${C.id}: no chopped notes (${chopped}) / no st notes (${stN}): the case proves nothing`); bad = true; continue; }
     const gf = path.join(LIVE_DIR, `seq-${C.id}.json`);
     if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${chopped} chopped notes, ${stN} with st`); continue; }

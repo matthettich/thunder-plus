@@ -221,15 +221,67 @@ static void testPartClamp() {
     CHECK(g0.notes.size() == 4 && g0.notes[0].stGrain == 0 && gn.notes.size() == 4 && gn.notes[0].stGrain == 1, "part grain 0 stays 0, null is 1"); }
 }
 
+
+// ---- 3. WEB-FOLLOW: `lines` (SYNC TO LINES, web #257) and `sx` (OLDSCHOOL, web #261 / #263): the rules of the Seq's own, with hand-computed values (the goldens chop-lines / chop-sx / chop-parts are the web's own) ----
+static void testWebFollow() {
+  SeqChop g; g.setLoop(0, 2.0);   // a 2 s loop; handSong: 120 bpm, lpb 4 (a line = 0.125 s)
+  const double ptsH[4] = {0, 0.3, 0.9, 1.5}; g.setHits(0, 4, ptsH, 4);
+  const auto rate0 = [&](const std::string& inst, bool part) { const Run r = play(part ? partSong("{\"pad\":0}", inst) : handSong(inst), &g); return r.notes.empty() ? -1.0 : r.notes[0].rate; };
+  const auto close = [](double a, double b) { return std::fabs(a - b) <= 1e-12 * std::max(1.0, std::fabs(b)); };
+  for (const bool part : {false, true}) {
+    const char* w = part ? "part" : "song";
+    // sync 1 (REPITCH): rate = loop / target, target = beats * 60 / bpm; 8 lines at lpb 4 = 2 beats = 1 s: rate 2; lines wins over beats; lines <= 0 / absent / null = the beats rule
+    CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":8}", part), 2.0), "%s: lines 8 -> rate 2 (%g)", w, rate0("{\"pad\":0,\"sync\":1,\"lines\":8}", part));
+    CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"beats\":8,\"lines\":8}", part), 2.0), "%s: lines beats beats", w);
+    for (const char* l : {"0", "-3", "null", "false", "\"\""}) CHECK(close(rate0(std::string("{\"pad\":0,\"sync\":1,\"beats\":4,\"lines\":") + l + "}", part), 1.0), "%s: lines %s = the beats rule (rate %g)", w, l, rate0(std::string("{\"pad\":0,\"sync\":1,\"beats\":4,\"lines\":") + l + "}", part));
+    CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"beats\":4}", part), 1.0), "%s: no lines = the beats rule", w);
+    // the stretch's length: st.beats = lines / lpb rounded to 6 places (7 lines at lpb 4 = 1.75; 1 line = 0.25), and the scale: ofsSec / durSec follow target / loop
+    { const Run r = play(part ? partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":2,\"lines\":7}") : handSong("{\"pad\":0,\"sync\":2,\"lines\":7}"), &g);
+      CHECK(r.notes.size() == 4 && (r.notes[0].has & SH_ST) && r.notes[0].stBeats == 1.75 && close(r.notes[0].durSec, 1.75 * 60 / 120) && r.notes[0].ofsSec == 0, "%s: sync 2, 7 lines: st.beats %g, durSec %g", w, r.notes.empty() ? 0.0 : r.notes[0].stBeats, r.notes.empty() ? 0.0 : r.notes[0].durSec); }
+  }
+  // the song's loader: lines is int() rounded and clamped 1..1024 (index.html:21677); a part's instrument is raw: `lines | 0` (truncated, int32-wrapped, no clamp)
+  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", false), 2.0 / (3 / 4.0 * 0.5)), "song lines 2.9 -> 3 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", false));
+  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", true), 2.0 / (2 / 4.0 * 0.5)), "part lines 2.9 -> 2 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", true));
+  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", false), 2.0 / (1024 / 4.0 * 0.5)), "song lines 5000 -> 1024 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", false));
+  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", true), 2.0 / (5000 / 4.0 * 0.5)), "part lines 5000 stays 5000 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", true));
+  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":4294967297}", true), 2.0 / (1 / 4.0 * 0.5)), "part lines 2^32 + 1 wraps to 1 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":4294967297}", true));
+  { const Run r = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1,\"lines\":1e300}"), &g); for (const SeqEvent& e : r.notes) CHECK(noteOk(e), "a hostile lines in a part: a sane note"); }
+  // lines follows the SONG's lpb, not a phrase's or the LPB command's: the same song at lpb 8 halves the beats
+  { std::string s = handSong("{\"pad\":0,\"sync\":1,\"lines\":8}"); const size_t k = s.find("\"lpb\":4"); s.replace(k, 7, "\"lpb\":8"); const Run r = play(s, &g);
+    // 8 lines at lpb 8 = 1 beat = 0.5 s: rate 4
+    CHECK(!r.notes.empty() && close(r.notes[0].rate, 4.0), "lines 8 at lpb 8: rate 4 (%g)", r.notes.empty() ? 0.0 : r.notes[0].rate); }
+  // sx: carried for sync 3 only; the OLDSCHOOL values as the loader leaves them (clamped); gs from ms or from a division of a line at the NOTE's tempo
+  { const Run r = play(handSong("{\"pad\":0,\"sync\":3,\"beats\":4,\"sx\":1,\"og\":6,\"orp\":2,\"ox\":10,\"opt\":-3}"), &g);
+    CHECK(r.notes.size() == 4 && r.notes[0].stSx == 1 && r.notes[0].stGs == 0.006 && r.notes[0].stRp == 2 && r.notes[0].stX == 10 && r.notes[0].stPt == -3 && r.notes[0].stMode == 3, "sx 1 on sync 3 carries sx / gs / rp / x / pt"); }
+  { const Run r = play(handSong("{\"pad\":0,\"sync\":3,\"beats\":4,\"sx\":1,\"og\":1000,\"opt\":99,\"ox\":-4,\"orp\":9}"), &g);
+    CHECK(r.notes.size() == 4 && r.notes[0].stGs == 0.25 && r.notes[0].stPt == 24 && r.notes[0].stX == 0 && r.notes[0].stRp == 3, "the loader clamps og 250 ms, opt +-24, ox 0..50, orp 0..3 (gs %g pt %d x %d rp %d)", r.notes.empty() ? 0.0 : r.notes[0].stGs, r.notes.empty() ? 0 : r.notes[0].stPt, r.notes.empty() ? 0 : r.notes[0].stX, r.notes.empty() ? 0 : r.notes[0].stRp); }
+  { const Run r = play(handSong("{\"pad\":0,\"sync\":3,\"beats\":4,\"sx\":1,\"ou\":2}"), &g);   // 1/2 line at 120 bpm lpb 4 = 0.5 * 60 / 120 / 4
+    CHECK(r.notes.size() == 4 && r.notes[0].stGs == 0.0625, "ou 2: half a line = 62.5 ms (%g)", r.notes.empty() ? 0.0 : r.notes[0].stGs); }
+  for (const char* inst : {"{\"pad\":0,\"sync\":2,\"beats\":4,\"sx\":1}", "{\"pad\":0,\"sync\":3,\"beats\":4,\"sx\":2}", "{\"pad\":0,\"sync\":3,\"beats\":4,\"sx\":0}", "{\"pad\":0,\"sync\":3,\"beats\":4,\"sx\":\"1\"}x"}) {
+    if (inst[std::strlen(inst) - 1] == 'x') { const std::string t(inst, std::strlen(inst) - 1); const Run r = play(handSong(t), &g); CHECK(r.notes.size() == 4 && r.notes[0].stSx == 1, "sx \"1\" (a string) is read as 1"); continue; }
+    const Run r = play(handSong(inst), &g); CHECK(r.notes.size() == 4 && r.notes[0].stSx == 0, "%s: no OLDSCHOOL (a pair the picker does not have)", inst); }
+  // a part's instrument with an sx or OS key is normalised (sync truncated and clamped 0..3, then sxLoad); without one it is raw
+  { const Run r = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":3.9,\"beats\":4,\"sx\":1,\"og\":7}"), &g); CHECK(r.notes.size() == 4 && r.notes[0].stSx == 1 && r.notes[0].stGs == 0.007 && r.notes[0].stMode == 3, "part: sync 3.9 -> 3 with sx"); }
+  { const Run r = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":7,\"beats\":4,\"sx\":1}"), &g); CHECK(r.notes.size() == 4 && r.notes[0].stSx == 1 && r.notes[0].stMode == 3, "part: sync 7 with sx is clamped to 3 FIRST (normParts), so sx 1 is valid: OLDSCHOOL (mode %d, sx %d)", r.notes.empty() ? -1 : r.notes[0].stMode, r.notes.empty() ? -1 : r.notes[0].stSx); }
+  { const Run r = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":7,\"beats\":4}"), &g); CHECK(r.notes.size() == 4 && r.notes[0].stMode == 7, "part: sync 7 without sx / OS keys stays raw (7)"); }
+  // SLICES + SMODE: with a ramp (orp != 0) the slices are equal parts (not the hits); without, the hits
+  { const std::string base = "{\"pad\":0,\"slc\":4,\"smode\":1,\"sync\":3,\"beats\":4,\"sx\":1,\"orp\":";
+    const Run hit = play(handSong(base + "0}"), &g), grid = play(handSong(base + "1}"), &g), none = play(handSong("{\"pad\":0,\"slc\":4,\"smode\":1,\"sync\":3,\"beats\":4}"), &g);
+    CHECK(hit.notes.size() == 4 && grid.notes.size() == 4 && none.notes.size() == 4, "slices: notes");
+    if (hit.notes.size() == 4 && grid.notes.size() == 4 && none.notes.size() == 4) {   // note 2 (49) plays slice 1; the stretch scale is target / loop = 2 / 2 = 1
+      CHECK(close(hit.notes[1].ofsSec, 0.3) && close(grid.notes[1].ofsSec, 0.5) && close(none.notes[1].ofsSec, 0.3), "slice 1 starts at %g (hits: 0.3), %g (equal parts: 0.5), %g (no sx: 0.3)", hit.notes[1].ofsSec, grid.notes[1].ofsSec, none.notes[1].ofsSec); } }
+}
+
 int main() {
   const std::string root = THUNDER_ROOT;
-  int good = 0; const char* ids[] = {"chop-all", "chop-rev", "chop-lines", "chop-sx"};   // chop-lines / chop-sx: WEB-FOLLOW (SYNC TO LINES, OLDSCHOOL's ev.st members)
+  int good = 0; const char* ids[] = {"chop-all", "chop-rev", "chop-lines", "chop-sx", "chop-parts"};   // chop-lines / chop-sx: WEB-FOLLOW (SYNC TO LINES, OLDSCHOOL's ev.st members)
   for (const char* id : ids) good += goldenCase(root, id, false) ? 1 : 0;
   good += goldenCase(root, "chop-edit", true) ? 1 : 0;
   good += goldenCase(root, "chop-lines-edit", true) ? 1 : 0;   // lines changed / zeroed / removed / added while running, a takeOver at each
   goldenCase(root, "chop-all", true);   // the same through a session with no edit (the Seq of a session reads the same table)
-  std::printf("%d of 6 chop goldens equal\n", good); CHECK(good == 6, "%d of 6 chop goldens equal", good);
+  std::printf("%d of 7 chop goldens equal\n", good); CHECK(good == 7, "%d of 7 chop goldens equal", good);
   testRules();
+  testWebFollow();
   testPartClamp();
   std::printf(fails ? "FAILED (%d)\n" : "PASS\n", fails);
   return fails ? 1 : 0;
