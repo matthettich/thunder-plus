@@ -32,13 +32,12 @@
 //                            (cid null, irs and pump bytes are left out: no module of any case reads them.)
 //   G6 initial transport     index.html:25862 (pass()): after every node is made, {tempo S.bpm, lpb S.lpb||4, ticks S.ticks||6, playing true} is posted to every node, BEFORE the first quantum. loadPatch has already
 //                            applied the PATCH's saved transport (chains-worklet.js:5986), so the song's wins (case j).
-//   G7 event delivery        index.html:23222-23236 (tempoTo, offline branch): `q = 128 / sr, at = Math.ceil(ev.t / q) * q`; at <= 0 or at >= the render length: sent at once (before quantum 0); else ac.suspend(at): sent before the
-//                            quantum that starts at `at`, i.e. quantum ceil(ev.t / q); messages of the same `at` in event order. index.html:23272 (chc): setValueAtTime(ev.v, max(ev.t, 0)) on the node's k-rate parameter b<k>:
-//                            the value the node reads in a quantum is the one in force at the quantum's first frame, so an event is seen from quantum ceil(ev.t / q) (INFERRED from the Web Audio rule, not measured: see "WHAT IT DOES NOT PROVE").
+//   G7 event delivery        TEMPO, index.html:23222-23236 (tempoTo, offline branch): `q = 128 / sr, at = Math.ceil(ev.t / q) * q`; at <= 0 or at >= the render length: sent at once (before quantum 0); else ac.suspend(at): sent before the
+//                            quantum that starts at `at`, i.e. quantum ceil(ev.t / q); messages of the same `at` in event order (MEASURED in Chrome 153, chains-krate-check.mjs: agrees for every k). CHC, index.html:23272: setValueAtTime(ev.v, max(ev.t, 0)) on the node's k-rate parameter b<k>;
+//                            Chrome's measured rule (chains-krate-check.mjs, 2400 measurements per rate, 48000 and 44100 Hz, no exception) is quantum = ceil(ceil(t * sr) / 128), t * sr in double; NOT the page's ceil(t / q) (that differs when t is exactly a quantum start, e.g. k = 5 at 48 kHz).
 //   G8 keep rule             index.html:25909-25913 (renderOut: keepT = audible tracks that have notes, busStemPlan adds buses) and 25946-25952 (a stem: Set([t])); pass() then busClosure (25829).
 //   G9 the inputs            the synthetic generator below (not the page's voices).
-// WHAT IT DOES NOT PROVE: it is not Chrome. (1) The k-rate sampling of a real AudioParam and the delivery time of port messages to a worklet in an OfflineAudioContext are inferred from the page's code and the Web Audio rule
-// (G7), not measured. (2) The mixer strip is the model of mix-dump.mjs (Chrome-checked there for the chains-off strip; with a node in it the node's output is taken as exact and gain 1 / pre / fader are the model's).
+// WHAT IT DOES NOT PROVE: it is not Chrome. (1) The event timing is MEASURED (chc and tempo, see G7) but only with a tiny worklet, not the page's whole graph; port-message delivery of the initial transport (G6) is not measured. (2) The mixer strip is the model of mix-dump.mjs (Chrome-checked there for the chains-off strip; with a node in it the node's output is taken as exact and gain 1 / pre / fader are the model's).
 // (3) The sum of the wet path and the dry path (dry gain 0) is taken as the wet path alone (a signed zero of -0 + +0 could differ). (4) No track effects, no master effects, no mastering, no limiter, no PDC: the output is the master
 // strip's sum x MASTER x OUT, which is what the C++ `Mixer` renders without them. (5) Its inputs are synthetic. (6) Taps, sends, sidechains, Resample, quality shedding and patch edits are not exercised.
 //
@@ -147,14 +146,16 @@ const chc = (t, v, p = 'b1') => ({ type: 'chc', t, track: 3, p, v });
 const K = 150;   // the quantum under test: t = K * 128 / 48000 = 0.4 s exactly (ceil(t / q) = 150 in double arithmetic: checked at run time)
 addCase({ name: 'f/byp-mid-quantum', note: 'BYP b1 = 1 at frame K*128 + 40 (inside quantum K): the page takes it from quantum K+1; b1 = -1 at frame 300*128 + 100 (from quantum 301)', song: bypPatch,
   inputs: ELECTRO_IN, events: [chc(frameT(K * 128 + 40), 1), chc(frameT(300 * 128 + 100), -1)] });
-addCase({ name: 'f/byp-on-quantum-start', note: 'BYP b1 = 1 at EXACTLY the first frame of quantum K (t = K*128/48000): ceil(t / q) = K, so the page takes it in quantum K itself (t == t0 lands in the SAME block)', song: bypPatch,
+addCase({ name: 'f/byp-on-quantum-start', note: 'BYP b1 = 1 at EXACTLY the first frame of quantum K (t = K*128/48000): ceil(t / q) = K, so it is seen in quantum K itself (t == t0 lands in the SAME block)', song: bypPatch,
   inputs: ELECTRO_IN, events: [chc(frameT(K * 128), 1), chc(frameT(300 * 128), -1)] });
 addCase({ name: 'f/byp-one-frame-before', note: 'BYP b1 = 1 one frame before quantum K (frame K*128 - 1): ceil gives K, quantum K', song: bypPatch, inputs: ELECTRO_IN, events: [chc(frameT(K * 128 - 1), 1), chc(frameT(300 * 128 - 1), -1)] });
 addCase({ name: 'f/byp-one-frame-after', note: 'BYP b1 = 1 one frame after the start of quantum K (frame K*128 + 1): ceil gives K+1', song: bypPatch, inputs: ELECTRO_IN, events: [chc(frameT(K * 128 + 1), 1), chc(frameT(300 * 128 + 1), -1)] });
 // the double-arithmetic trap: a time that IS a quantum start (k * 128 / 48000) but whose ceil(t / q) is k + 1 (0.18 of all k): the page's rule puts it in the NEXT quantum
 const KF = (() => { for (let k = 180; ; k++) if (Math.ceil((k * 128 / SR) / Q) !== k) return k; })();
-addCase({ name: 'f/byp-fuzz-quantum-start', note: `BYP b1 = 1 at t = ${KF}*128/48000, a quantum start whose ceil(t / q) is ${KF + 1} in double arithmetic (the page's expression gives the NEXT quantum): C++ must evaluate ceil(t / q) with q = 128.0 / 48000.0 in double`,
+addCase({ name: 'f/byp-fuzz-quantum-start', note: `BYP b1 = 1 at t = ${KF}*128/48000, a quantum start whose ceil(t / q) is ${KF + 1} in double arithmetic (ceil(t / q) gives the NEXT quantum, and Chrome's rule ceil(ceil(t * sr) / 128) gives it too for this k): C++ must use the chc rule of the header`,
   song: bypPatch, inputs: ELECTRO_IN, events: [chc(frameT(KF * 128), 1), chc(frameT(300 * 128), -1)] });
+addCase({ name: 'f/byp-chrome-rule-k5', note: 'BYP b1 = 1 at EXACTLY 5*128/48000: Chrome (measured, chains-krate-check.mjs) sees it in quantum 5; the old expression ceil(t / q) gives 6 (the control)', song: bypPatch, inputs: ELECTRO_IN,
+  events: [chc(frameT(5 * 128), 1), chc(frameT(300 * 128), -1)], controls: ['oldChcRule'] });
 // tempo: ELECTRO's patch with a tempo-synced LFO (triangle, 8 per beat-quarter) on a VCA after the mixer
 const lfoPatch = () => { const s = electroFrag(), p = s.chainPatch; p.modules = p.modules.concat([mod('lfo1', 'lfo', { rate: 8, sync: 1, shape: 3, depth: 0.8 }), mod('vca1', 'vca', { gain: 1 })]);
   p.cables = p.cables.filter(c => !(c.from[0] === 'mmvohebij95' && c.to[0] === 'toumvohdvso9da')).concat(wire('mmvohebij95', 'vca1'), wire('vca1', 'toumvohdvso9da'), [{ from: ['lfo1', 'out'], to: ['vca1', 'cv'] }]); return s; };
@@ -235,8 +236,8 @@ class ChainModel extends Model {
 const fnv = (h, a) => { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 0x01000193) >>> 0; } return h; };
 const hex8 = h => (h >>> 0).toString(16).padStart(8, '0');
 const bits = x => { const a = new Float32Array([x]); return hex8(new Uint32Array(a.buffer)[0]); };
-// the quantum an event is seen from (G7): ceil(t / q), t <= 0 -> 0. The tempo message additionally goes at once when at = ceil * q is not inside (0, length) (index.html:23229-23231).
-const blockOf = (ev, total) => { const k = Math.ceil(Math.max(ev.t, 0) / Q); if (ev.type === 'tempo') { const at = Math.ceil(ev.t / Q) * Q; if (!(at > 0 && at < total * N / SR)) return 0; } return k; };
+// the quantum an event is seen from (G7): chc: ceil(ceil(t * sr) / 128) (Chrome, measured); tempo: ceil(t / q) (the page's, measured); t <= 0 -> 0. The tempo message additionally goes at once when at = ceil * q is not inside (0, length) (index.html:23229-23231).
+const blockOf = (ev, total, oldChc) => { const k = ev.type === 'chc' && !oldChc ? Math.ceil(Math.ceil(Math.max(ev.t, 0) * SR) / 128) : Math.ceil(Math.max(ev.t, 0) / Q); if (ev.type === 'tempo') { const at = Math.ceil(ev.t / Q) * Q; if (!(at > 0 && at < total * N / SR)) return 0; } return k; };
 function run(c, opt = {}) {
   const S0 = typeof c.song === 'function' ? c.song() : c.song, S = Object.assign(clone(S0), { insts: [] });
   const total = c.quanta, n = total * N;
@@ -267,7 +268,7 @@ function run(c, opt = {}) {
   M.attach(nodes);
   // G7: the events, by quantum
   const due = Array.from({ length: total + 2 }, () => []); const evBlocks = [];
-  c.events.forEach((ev, i) => { let b = blockOf(ev, total); evBlocks.push(b); b = Math.max(0, Math.min(total, b + (opt.shift || 0))); due[b].push(ev); });
+  c.events.forEach((ev, i) => { let b = blockOf(ev, total, opt.oldChcRule); evBlocks.push(b); b = Math.max(0, Math.min(total, b + (opt.shift || 0))); due[b].push(ev); });
   const oL = new Float32Array(N), oR = new Float32Array(N), L = new Float32Array(n), R = new Float32Array(n), qh = []; let h = 0x811c9dc5 >>> 0;
   for (let b = 0; b < total; b++) {
     for (const ev of due[b]) {
@@ -297,7 +298,7 @@ const HEADER = {
   ],
   song: 'each case embeds the song fragment it plays: bpm, lpb, ticks, master, mout, mix[32] {vol, trim, pan, mute, solo}, chainOn[32], chainPatch (as saved). The keep rule: heard = audible tracks that have an input, plus buses busStemPlan adds (index.html:25816-25820), then busClosure (25823-25827); a stem: heard = {stem} then busClosure.',
   nodes: 'one thunder-chains node per heard track with chainsFeed(t) (CHN on and the patch has a Chain Out for it), made in the order of `expect.nodes`: processorOptions {track, patch, quality full, transport {tempo bpm, lpb, ticks, playing false}, busMap = the plan feeds of that track (<= 32, ascending), tapMap []}; then every node gets the transport message {tempo bpm, lpb, ticks, playing true} before quantum 0 (it overrides the patch\'s saved transport).',
-  events: 'ev.t in seconds (double). An event is applied at the START of quantum k = ceil(t / q) with q = 128.0 / 48000.0 in double (t <= 0: quantum 0; for tempo also quantum 0 when ceil(t / q) * q is not inside (0, quanta * q)). chc: node of ev.track (if it has one) parameter p = v (-1 own, 0 in, 1 bypassed, 2 flipped), held until changed. tempo: transport message {tempo: bpm, ticks: tks} to every node. expect.eventQuanta lists k per event.',
+  events: 'ev.t in seconds (double). An event is applied at the START of quantum k (t <= 0: quantum 0). chc: k = ceil(ceil(t * 48000.0) / 128) in double (the Chrome-measured k-rate rule). tempo: k = ceil(t / q) with q = 128.0 / 48000.0 in double, and quantum 0 when ceil(t / q) * q is not inside (0, quanta * q). chc: node of ev.track (if it has one) parameter p = v (-1 own, 0 in, 1 bypassed, 2 flipped), held until changed. tempo: transport message {tempo: bpm, ticks: tks} to every node. expect.eventQuanta lists k per event.',
 };
 function build() {
   const out = [], seenNames = new Set();

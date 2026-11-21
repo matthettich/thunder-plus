@@ -1,7 +1,7 @@
 # C1G-NOTES: the song-level golden of the chains host (unit C1g)
 
 Branch `n1/chains-c1g` (from `native`). Tool `native/tools/chains-song-dump.mjs` (its top comment is the README: how to run, page code vs glue, what it does not prove),
-goldens `native/tests/golden/chains_song_cases.json` (21 cases) and `chains_song_beta_fragment.json` (BETA-TESTING-ELECTRO's song fragment, made by `--extract-beta`).
+goldens `native/tests/golden/chains_song_cases.json` (22 cases) and `chains_song_beta_fragment.json` (BETA-TESTING-ELECTRO's song fragment, made by `--extract-beta`).
 `index.html:N` means beta's index.html at `native/tests/web-ref/BETA-COMMIT` (cdd94394); `native/tests/web-ref/chains-wiring-excerpt.js` holds those lines with the same numbers in `// ==== index.html:A-B ====` headers.
 
 ## What was added
@@ -17,6 +17,8 @@ Negative controls in each case (`controls`): events one quantum early / late, an
 Determinism: `--golden` run three times gave the same sha256 (9c3067cf...b56b3); `--check` passes.
 
 ## The t == t0 edge (D3)
+**RULED 21 Nov (Chrome is the reference):** `chc` quantum = ceil(ceil(t * sr) / 128) (t * sr in double, measured, see "Chrome k-rate check"); tempo = ceil(t / q) (measured). The text below that says the page's expression ceil(t / q) decides the `chc` quantum is the earlier inference and is superseded; for the cases in the golden both rules agree except the new case `f/byp-chrome-rule-k5` (Chrome 5, old expression 6; its control `oldChcRule` gives a different hash). 22 cases.
+
 Rule (index.html:23229 `q = 128 / ac.sampleRate, at = Math.ceil(ev.t / q) * q`, tempo; chc is `setValueAtTime(ev.v, max(ev.t, ac.currentTime))` at :23272 on a k-rate parameter, chains-worklet.js:6235 descriptor): an event is seen from quantum k = ceil(t / q).
 For t exactly the first frame of quantum k, t / q = k, so the event takes effect IN quantum k (the same block, "t == t0 lands in the block that starts at t0"): a suspend(at) at a quantum start runs before that quantum, and a k-rate parameter reads the value in force at the quantum's first frame, which includes an event at that time.
 One frame earlier is also quantum k; one frame later is k+1 (cases f/byp-one-frame-*). Pinned by f/byp-on-quantum-start (equal hash to one-frame-before, different from one-frame-after).
@@ -38,3 +40,11 @@ G1 want (applyMix filter = keep, :23495-23500), G2 plan (:23547, :21137-21160, :
 - Not Chrome: k-rate parameter sampling and port-message delivery time in an OfflineAudioContext are inferred (above). The wet + dry(0) sum is taken as the wet path.
 - No taps, sends, sidechain, Resample, patch edits, quality shedding, track effects, master effects: not in these cases.
 - Chrome extension (task 6): headless Chrome 153 + playwright (/opt/npm-tools) ARE installed and `song-ref.mjs` ran on ELECTRO here (105.01 s, peak 1.1770, sha256 f309dad188e1c05c, chains off). I did NOT add `--chains`: song-ref.mjs and render-compare.sh load the repository root OLD index.html (no bus into bus, older audible), not the pin, and the reference would also lack the track effects the page has on (13 of 25 ELECTRO slots are not hosted natively, FX1). A follow-up should first point song-ref at the pinned page.
+
+## Chrome k-rate check (measured, `native/tools/chains-krate-check.mjs`)
+Headless Chrome 153, OfflineAudioContext, a tiny worklet with a k-rate AudioParam that writes its value and the last port-message id per quantum. For k = 1..400 and t = k*128/sr (exact), (k*128-1)/sr, (k*128+1)/sr, at 48000 and 44100 Hz, three runs each: **all runs identical** (2400 measurements per rate and run).
+- **Tempo path (suspend(at), then postMessage, then resume; `at = ceil(t/q)*q` as index.html:23222-23236): Chrome AGREES with the tool's rule `ceil(t/q)` for every k, every family, both rates. No disagreement.**
+- **k-rate `chc` (`setValueAtTime`): the three families agree except for t exactly on a quantum start: 43 k at 48000 Hz (Chrome sees the event one quantum EARLIER than ceil(t/q): k = 5, 10, 17, 20, 29, 34, 40, 53, 58, 68, 80, 87, 99, 106, 109, 116, 123, 136, 160, 167, 174, 198, 201, ... see the tool's output) and 24 k at 44100 Hz (one quantum LATER: 13, 26, 45, 52, 59, 90, 104, ...).**
+  Chrome's rule fits all 2400 measurements per rate with zero exceptions: frame = ceil(t * sr) (double), quantum = ceil(frame / 128). The tool's `ceil((t) / (128/sr))` differs from it only when t is exactly a quantum start and the two double expressions round differently.
+- **Golden impact: none.** Every chc event time in the committed goldens (150/151, 300/301, and the fuzz case k = 190: t * 48000 = 24320.000000000004, so ceil gives frame 24321, quantum 191 under both rules) gives the same quantum under both rules, so no hash changes. f/byp-fuzz-quantum-start at k = 190 is therefore right for Chrome at 48000 Hz; its note ("the page's expression gives the next quantum") holds for chc by luck of that k.
+- **Correction (ADOPTED by the lead's ruling, tool changed, case f/byp-chrome-rule-k5 added):** chc events: quantum = ceil(ceil(t * sr) / 128) in double. Tempo events: keep ceil(t / q) (measured). Real songs never put t exactly on a quantum start, so this only matters for synthetic times; the goldens need no change unless a case is added at an affected k (e.g. k = 5 at 48000: tool 6, Chrome 5).
