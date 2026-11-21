@@ -6,6 +6,9 @@
 //   S4  mute / solo as the JS audible(): the list leaves a muted track and every track not soloed; solo wins over mute; the mix is the sum of the listed stems; a stem asked for directly ignores them
 //   S5  length: use_frames stems are exact; an unknown-length stem is longer than the mix by the master chain's latency; the estimate and the exact length of a stem handle
 //   S6  bad arguments: errors, no crash
+//   S8  (FU2) a stem of a track that is NOT soloed, asked for while another track is soloed, has the sound of that track (the pass replaces mute / solo); the list leaves it out
+//   S9  (FU3) a cross-track choke inside a stem: a track's notes are still choked by another track's notes that are not heard in the pass (every track still plays)
+//   S10 (FU1) the unknown-length estimate is never above the real length (the render does not end before the sequencer's end)
 //   S7  SongRenderer level: a bus that exists (a pass-through chain hook) plays its audible sources in its stem; a pure source plays only through it and has no stem of its own
 #include <algorithm>
 #include <cmath>
@@ -81,6 +84,38 @@ static std::string synth(unsigned tracks, const std::string& mix = "", const std
   s += "]";
   if (!mix.empty()) s += ",\"mix\":" + mix;
   return s + extra + "}";
+}
+// Like synth(), but at tracker note 48 + t (rate 1: the 0.5 s pad plays for 0.5 s; synth()'s 60 + t plays at twice the speed) track t has its note (pad t) on the rows listed in rows[t] (8 rows of 0.125 s).
+static std::string synthRows(const std::vector<std::vector<int>>& rows) {
+  const size_t n = rows.size();
+  std::string s = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":[[";
+  for (size_t t = 0; t < n; t++) s += (t ? "," : "") + std::to_string(t);
+  s += "]],\"chains\":[";
+  for (size_t t = 0; t < n; t++) s += std::string(t ? "," : "") + "[[" + std::to_string(t) + ",0]]";
+  s += "],\"plen\":[";
+  for (size_t t = 0; t < n; t++) s += std::string(t ? "," : "") + "8";
+  s += "],\"insts\":[";
+  for (int i = 0; i < 8; i++) s += std::string(i ? "," : "") + "{\"pad\":" + std::to_string(i) + ",\"tsp\":0,\"slc\":0,\"sync\":0,\"mo\":0}";
+  s += "],\"phrases\":[";
+  for (size_t p = 0; p < n; p++) {
+    s += p ? ",[" : "[";
+    for (int r = 0; r < 8; r++) {
+      const bool has = std::find(rows[p].begin(), rows[p].end(), r) != rows[p].end(); char b[128];
+      if (has) std::snprintf(b, sizeof b, "%s[%d,-1,-1,-1,-1,%d,-1,-1,-1,-1,-1,-1]", r ? "," : "", 48 + (int)p, (int)p); else std::snprintf(b, sizeof b, "%s[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]", r ? "," : "");
+      s += b;
+    }
+    s += "]";
+  }
+  return s + "]}";
+}
+// pads installed like installPads, but pads 0 and 1 in choke group `group` (0: none)
+static bool installPadsChoke(thunder_render* r, const PadSet& ps, int group) {
+  bool ok = true;
+  for (int p = 0; p < ps.n; p++) {
+    ok = ok && thunder_render_set_pad(r, p, ps.pad(p), (p & 1) ? ps.pad((p + 1) % ps.n) : nullptr, kNS, 48000) == 0;
+    ok = ok && thunder_render_set_pad_kit(r, p, p < 2 ? group : PadSet::choke(p), PadSet::syn(p), PadSet::rel(p)) == 0;
+  }
+  return ok;
 }
 static std::string mixJson(const char* const* items, int n) { std::string s = "["; for (int i = 0; i < n; i++) s += std::string(i ? "," : "") + items[i]; return s + "]"; }
 
@@ -220,7 +255,8 @@ int main() {
     const Stereo sa = readAll(a), sb = readAll(b);
     CHECK("S5 the same length (no master chain)", sa.L.size() == sb.L.size() && thunder_render_length(a) == (int64_t)sa.L.size() && thunder_render_length(b) == (int64_t)sb.L.size());
     std::printf("S5 synthetic: estimate %lld, real %zu\n", (long long)ea, sa.L.size());
-    CHECK("S5 the estimate is within a pad length of the real length (the sequencer end vs the voices' end: either can be later)", std::llabs(ea - (int64_t)sa.L.size()) <= 24000 + 6128);
+    CHECK("S5 the estimate is within a pad length of the real length", std::llabs(ea - (int64_t)sa.L.size()) <= 24000 + 6128);
+    CHECK("S5 (FU1) the estimate is never above the real length", ea <= (int64_t)sa.L.size());
     CHECK("S5 after the end the estimate is the exact length", thunder_render_length_estimate(a) == (int64_t)sa.L.size() && thunder_render_length_estimate(b) == (int64_t)sb.L.size());
     thunder_render_free(a); thunder_render_free(b);
     // with the master chain a stem has no latency to trim: longer than the mix by the chain's latency; the estimate follows
@@ -258,6 +294,58 @@ int main() {
     for (int stem : {0, 1, 32}) { thunder_render_opts o = mkOpts(stem, true, true, 2000); thunder_render* h = thunder_render_create((const uint8_t*)junk.data(), junk.size(), &o, nullptr, 0);
       if (h) { installPads(h, ps); int32_t t[40]; const int n = thunder_render_stem_tracks(h, t, 40); CHECK("S6 hostile song: list is sane", n >= 0 && n <= 32); readAll(h); } thunder_render_free(h); }
     CHECK("S6 stem_tracks after a failed create is not reachable: NULL is E_ARG", thunder_render_stem_tracks(nullptr, nullptr, 0) < 0);
+  }
+
+  // ---- S8 (FU2): a stem under solo --------------------------------------------------------------------------------------------------------------------------------------------------
+  {
+    const char* M2[] = {"{}", "{}", "{\"solo\":true}", "{}", "{}"};
+    const std::string solo = synth(0x1F, mixJson(M2, 5));
+    for (int t : {1, 2, 4, 5}) {   // track 3 is soloed; the stem of any other track is that track heard alone, as if there were no solo
+      std::string items[5]; const char* p[5]; for (int k = 0; k < 5; k++) { items[(size_t)k] = k == t - 1 ? "{}" : "{\"mute\":true}"; p[k] = items[(size_t)k].c_str(); }
+      const Stereo ref = render(synth(0x1F, mixJson(p, 5)), ps, mkOpts(0, false, false, 48000));   // only track t, no solo anywhere
+      const Stereo stem = render(solo, ps, mkOpts(t, false, false, 48000));
+      CHECK("S8 a stem of a track that is not soloed has sound while another track is soloed", peakOf(stem) > 0.001);
+      CHECK("S8 and equals that track heard alone (bit for bit)", bitSame(ref, stem));
+    }
+    thunder_render* s = make(solo, ps, mkOpts(0, false, false, 48000)); CHECK("S8 the list holds only the soloed track", stemList(s) == std::vector<int>({3})); thunder_render_free(s);
+  }
+
+  // ---- S9 (FU3): a cross-track choke inside a stem ------------------------------------------------------------------------------------------------------------------------------------
+  {
+    // pads are 0.5 s long (4 rows). Track 1 (pad 0) plays on rows 0 and 4, track 2 (pad 1) on rows 2 and 6; pads 0 and 1 are choke group 1, so every note of track 2 cuts the sounding note of track 1.
+    const std::string song = synthRows({{0, 4}, {2, 6}});
+    auto go = [&](int stem, int group) { Stereo out;
+      thunder_render_opts oo = mkOpts(stem, false, false, 48000); char err[100] = {0}; thunder_render* r = thunder_render_create((const uint8_t*)song.data(), song.size(), &oo, err, sizeof err);
+      if (!r || !installPadsChoke(r, ps, group)) { std::printf("S9 setup failed %s\n", err); g_fail++; if (r) thunder_render_free(r); return out; }
+      out = readAll(r); thunder_render_free(r); return out; };
+    // the mix of the same song with the other track muted (a muted track still plays and chokes), choke group 1
+    auto muted = [&](int keep) { std::string sj = song; const std::string add = std::string(",\"mix\":[") + (keep == 1 ? "{},{\"mute\":true}" : "{\"mute\":true},{}") + "]";
+      sj.insert(sj.size() - 1, add);
+      thunder_render_opts oo = mkOpts(0, false, false, 48000); thunder_render* r = thunder_render_create((const uint8_t*)sj.data(), sj.size(), &oo, nullptr, 0); Stereo out;
+      if (!r || !installPadsChoke(r, ps, 1)) { g_fail++; if (r) thunder_render_free(r); return out; } out = readAll(r); thunder_render_free(r); return out; };
+    const Stereo st1 = go(1, 1), st1free = go(1, 0), st2 = go(2, 1), ref1 = muted(1), ref2 = muted(2);
+    { double d = 0, e1 = 0, e0 = 0; for (size_t i = 0; i < st1.L.size() && i < st1free.L.size(); i++) { d += std::fabs(st1.L[i] - st1free.L[i]); if (i > 14000 && i < 24000) { e1 += std::fabs(st1.L[i]); e0 += std::fabs(st1free.L[i]); } } std::printf("S9 diag: sum|diff| %g, energy 0.29-0.5 s with choke %g, without %g, sizes %zu %zu\n", d, e1, e0, st1.L.size(), st1free.L.size()); }
+    CHECK("S9 the stem of the choked track has sound", peakOf(st1) > 0.001);
+    CHECK("S9 the choke is audible: the stem differs from the one without a choke group (the other track's notes cut it)", !bitSame(st1, st1free));
+    CHECK("S9 the stem of the choked track equals the mix with the other track muted (the other track still plays and chokes)", bitSame(st1, ref1));
+    CHECK("S9 the stem of the choking track equals the mix with the first track muted", bitSame(st2, ref2));
+  }
+
+  // ---- S10 (FU1): the estimate is never above the real length -------------------------------------------------------------------------------------------------------------------------
+  {
+    int bad = 0, n = 0;
+    for (unsigned tr : {0x01u, 0x02u, 0x05u, 0x1Fu, 0x10u}) for (int master : {0, 1}) {
+      thunder_render* r = make(synth(tr), ps, mkOpts(0, false, master != 0, 0)); if (!r) continue;
+      const int64_t est = thunder_render_length_estimate(r); const Stereo s = readAll(r); n++;
+      if (est > (int64_t)s.L.size()) { bad++; std::printf("S10 tracks %x master %d: estimate %lld above the real length %zu\n", tr, master, (long long)est, s.L.size()); }
+      thunder_render_free(r);
+    }
+    // a song whose last rows are empty: the render must reach the sequencer's end (the empty rows are part of the song)
+    const std::string tail = synthRows({{0}});   // one note on row 0; rows 1..7 empty
+    thunder_render* r = make(tail, ps, mkOpts(0, false, false, 0)); const int64_t est = r ? thunder_render_length_estimate(r) : -1; const Stereo s = r ? readAll(r) : Stereo(); thunder_render_free(r);
+    std::printf("S10 empty tail: estimate %lld, real %zu\n", (long long)est, s.L.size());
+    CHECK("S10 estimates never above the real length (10 songs)", n == 10 && bad == 0);
+    CHECK("S10 a song with empty rows after its last note: real >= estimate", est > 0 && (int64_t)s.L.size() >= est);
   }
 
   std::printf("%s (%d failures)\n", g_fail ? "FAILED" : "ok", g_fail);

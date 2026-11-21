@@ -141,6 +141,7 @@ class SongRenderer {
   // latencyFrames(). Allocates nothing (a scratch block made at construction).
   void renderTrimmed(float* outL, float* outR, int64_t N);
   bool songOver() const { return !seq_->alive(); }       // the sequencer has reached the end
+  double seqTime() const { return seq_->time(); }        // the sequencer's time: once songOver() it is the song's end (the start of the last row), which the render's audio clock may not have reached yet (it runs `lead` behind the sequencer)
   int voices() const;   // voices still sounding (the sampler's and the SoundFont pool's)
   double time() const { return (double)frame_ / sr_; }
   int64_t frame() const { return frame_; }
