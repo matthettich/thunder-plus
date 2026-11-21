@@ -9,6 +9,7 @@
 #include <cstring>
 #include <new>
 
+#include "midi/midi_host.h"
 #include "midi/midisched.h"
 #include "rt/spsc.h"
 #include "song/song.h"
@@ -19,6 +20,7 @@ namespace {
 enum Op : uint8_t { OP_SONG = 1, OP_PORT, OP_LEAD, OP_FXLAT, OP_AUDIBLE, OP_START, OP_STOP, OP_RELEASE, OP_PANIC, OP_PCLOCK, OP_CABLE, OP_KEYON, OP_KEYOFF, OP_RAW };
 struct Cmd { uint8_t op; uint8_t raw[3]; int32_t a, b, c, d; double x; uint64_t m; void* p; };
 constexpr int kStatN = 28;
+constexpr uint64_t kNoNowBits = 0xBFF0000000000000ull;   // the double -1.0: no block yet
 }  // namespace
 
 struct thunder_midi {
@@ -26,11 +28,12 @@ struct thunder_midi {
   Spsc<Cmd, kMidiCmdCap> cmds;
   Spsc<Song*, 8> retire;
   std::atomic<uint64_t> pub[kStatN];
+  std::atomic<uint64_t> lastNow;   // the bits of the last midi_end's `now` (a double; U36: the clock map's floor reads it from another thread)
   std::atomic<int> ctlIn{0};    // debug builds: how many CONTROL calls are inside right now (the control calls are single-producer: > 1 is a caller bug)
   Song* cur = nullptr;          // audio thread's song (freed by the control thread once retired / at free)
   int outstanding = 0;          // songs posted and not yet freed (control thread)
   int keySlot[128];             // audio thread: key -> sched live handle
-  explicit thunder_midi(double sr) : sched(sr) { for (auto& a : pub) a.store(0, std::memory_order_relaxed); for (int& k : keySlot) k = -1; }
+  explicit thunder_midi(double sr) : sched(sr), lastNow(kNoNowBits) { for (auto& a : pub) a.store(0, std::memory_order_relaxed); for (int& k : keySlot) k = -1; }
 };
 
 #ifndef NDEBUG
@@ -75,6 +78,18 @@ void apply(thunder_midi* h, const Cmd& c, double now) {
     case OP_RAW: s.liveRaw(c.a, c.raw, c.b, c.x, now); break;
     default: break;
   }
+}
+// U36 T2: the two halves of a block (thunder_midi_process = begin + end; the C++ host's midi_begin / midi_end add the mixer's figures and the step loop between them).
+int blockBegin(thunder_midi* h, double now, double blockSec) {
+  int n = 0; Cmd c;
+  while (n < kMidiCmdCap && h->cmds.pop(c)) { apply(h, c, now); n++; }
+  h->sched.setBlock(blockSec);
+  return n;
+}
+void blockEnd(thunder_midi* h, double now, double seqTime, double bpm, bool alive) {
+  h->sched.book(now, seqTime, bpm, alive);
+  publish(h);
+  uint64_t b; std::memcpy(&b, &now, sizeof b); h->lastNow.store(b, std::memory_order_relaxed);
 }
 }  // namespace
 
@@ -143,13 +158,29 @@ int thunder_midi_raw(thunder_midi* h, int port, const uint8_t* bytes, int len, d
   return post(h, c);
 }
 
+}  // extern "C"
+
+namespace thunder {
+int midi_begin(thunder_midi* h, double now, double blockSec, double fxLatSec, uint64_t audible) {
+  if (!h || !fin(now) || now < 0 || !fin(blockSec) || blockSec < 0 || blockSec > 1 || !fin(fxLatSec) || fxLatSec < 0 || fxLatSec > 2) return THUNDER_MIDI_E_ARG;
+  const int n = blockBegin(h, now, blockSec);
+  h->sched.setFxLatency(fxLatSec); h->sched.setAudible(audible);
+  return n;
+}
+MidiSched& midi_sched(thunder_midi* h) { return h->sched; }
+bool midi_end(thunder_midi* h, double now, double seqTime, double bpm, bool alive) {
+  if (!h || !fin(now) || now < 0 || !fin(seqTime) || !(bpm > 0) || !fin(bpm)) return false;
+  blockEnd(h, now, seqTime, bpm, alive);
+  return true;
+}
+double midi_last_now(const thunder_midi* h) { const uint64_t b = h->lastNow.load(std::memory_order_relaxed); double d; std::memcpy(&d, &b, sizeof d); return d; }
+}  // namespace thunder
+
+extern "C" {
 int thunder_midi_process(thunder_midi* h, double now_sec, double block_sec, double seq_time, double bpm, int seq_alive) {
   if (!h || !fin(now_sec) || now_sec < 0 || !fin(block_sec) || block_sec < 0 || block_sec > 1 || !fin(seq_time) || !(bpm > 0) || !fin(bpm)) return THUNDER_MIDI_E_ARG;
-  int n = 0; Cmd c;
-  while (n < kMidiCmdCap && h->cmds.pop(c)) { apply(h, c, now_sec); n++; }
-  h->sched.setBlock(block_sec);
-  h->sched.book(now_sec, seq_time, bpm, seq_alive != 0);
-  publish(h);
+  const int n = blockBegin(h, now_sec, block_sec);
+  blockEnd(h, now_sec, seq_time, bpm, seq_alive != 0);
   return n;
 }
 

@@ -59,7 +59,7 @@ to a moment. The core never blocks on the page. `put` chunks are at most 1 MB.
 | `fx.set` | `{tr, slot, p, v}` / `{tr, slot, on}` | tfx `{pset}`, master `{set}`, chains `param` | One message for track, bus, master, pump and chains parameters; target `{tr:'m'}` is the master |
 | `note.on` / `note.off` | `{pad|tr, note, vel, target?:'waves'|'chains'}` | page voices, editors' own engines | Live playing (keys, pads, MIDI thru) |
 | `meters.want` | `{rate, tracks, fx:[…], spec:bool}` | per-node `lvl` / `dyn` / `meter` subscriptions | The page asks only for what the showing screen draws |
-| `midi.cfg` | `{outs:[…], clockOut, clockIn, gearDelay}` | Web MIDI + helper config | |
+| `midi.cfg` | `{outs:[…], clockOut, clockIn, gearDelay}` | Web MIDI + helper config | Read as arrays of four (`outs:[id,id,id,id]`, `clockOut:[bool x4]`, `gearDelay:[ms x4]`; lead's ruling 5.5 of `U36-SPEC.md`, 20 Nov 2026): the page's four letters and its Gear delay per port. `BRIDGE_V` stays 1. The shell feeds `thunder_midiout_*` (`midiport.h`); the new upward event `midi.ports` is additive (U36 PR B / the shells) |
 | `dev.list` (ask) / `dev.open` (ask) | `{}` → `[{id,name,ins,outs,rates}]` / `{out, in?, sr, buf}` → `{sr, buf, latIn, latOut}` | helper `devices` / `open`, `setSinkId` | Native hosts only (`caps.nativeAudio`) |
 | `rec.arm` / `rec.start` / `rec.stop` | `{ins:[…], sync:'free'|'pattern'}` | recorder worklet, helper input ring | Result fetched with `take` |
 | `render.start` (ask) / `render.cancel` | `{what:'pad'|'song'|'stems'|'phrase', …, id}` → `{id}` | render Worker, `OfflineAudioContext` | Result by `take(id)`; pad renders by the page's Worker remain allowed until N3 |
