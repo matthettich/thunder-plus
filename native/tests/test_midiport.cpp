@@ -453,7 +453,7 @@ static void threadsOnce(uint32_t caps) {
   stop.store(true); audio.join(); sender.join();
   const auto s = statsOf(o);
   CHECK(blocks.load() > 100 && pumps.load() > 100 && rs.sent.load() > 50, "threads (%s): %llu blocks, %lld pumps, %llu messages sent", caps ? "TS" : "spin", (unsigned long long)blocks.load(), (long long)pumps.load(), (unsigned long long)rs.sent.load());
-  CHECK(s.sent == rs.sent.load() && s.send_errors == 0, "threads: the sink saw what the stats say (%llu / %llu)", (unsigned long long)s.sent, (unsigned long long)rs.sent.load());
+  CHECK((caps ? s.sent <= rs.sent.load() : s.sent == rs.sent.load()) && s.send_errors == 0, "threads: the sink saw what the stats say (%llu / %llu; with stamps a CLEAR re-sends what the flush dropped, which the stats do not count)", (unsigned long long)s.sent, (unsigned long long)rs.sent.load());
   std::printf("threads (%s): %llu blocks, %lld pumps, %llu sent, %llu dropped (gone %llu cleared %llu), max queue %llu\n", caps ? "TS" : "spin", (unsigned long long)blocks.load(), (long long)pumps.load(), (unsigned long long)s.sent, (unsigned long long)(s.dropped_gone + s.dropped_cleared), (unsigned long long)s.dropped_gone, (unsigned long long)s.dropped_cleared, (unsigned long long)s.max_queue);
   thunder_midiout_free(o); thunder_midi_free(h);
 }

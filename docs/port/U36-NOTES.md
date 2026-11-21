@@ -43,6 +43,11 @@ Nothing in `native/core/src/render/` or `src/mix/` was touched; `midisched.cpp` 
 7. Windows MIDI Services: not read.
 8. "The pump can meet 2 ms on Android without a real-time priority": needs a device; the pump is bounded (one drain of at most 128 x 128 records, one pass over the queue) and `next_ns` tells the shell when it must run.
 
+## Tests run here (GCC, Linux x86-64, Release, `-j1`)
+- `ctest -R 'midiport|midi_ledger|midi_sched|midi_api|rt_midi'`: 8 of 8 pass (midiport, midiport_threads, midi_ledger, midi_sched, midi_api, midi_api_threads, rt_midi, rt_midi_selftest). The rest of the suite was NOT run locally (the core library changed only in `src/midi/`): CI does.
+- ASan + UBSan (`-DTHUNDER_SANITIZE=ON`): `test_midiport`, `test_midiport --threads`, `test_midi_api`, `test_midi_ledger`, `rt_midi`: clean.
+- TSan (a separate build, `-fsanitize=thread` on everything, `-j1`): `test_midiport --threads` (control, fake audio, sender; spin and CAP_TS) and `test_midiport`: no report.
+
 ## How to run
 ```
 cmake -S native -B build-u36a -DCMAKE_BUILD_TYPE=Release && cmake --build build-u36a -j1 --target test_midiport test_midi_ledger test_midi_sched test_midi_api rt_midi

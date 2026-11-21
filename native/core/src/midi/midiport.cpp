@@ -25,6 +25,7 @@ constexpr int kSpinCap = 1 << 20;   // a stuck clock must not hang the pump
 
 bool idOk(const char* s) { return s && std::memchr(s, 0, kIdBytes) != nullptr; }   // NUL-terminated within the buffer
 inline bool fin(double v) { return std::isfinite(v); }
+void copyId(char* dst, const char* src) { const size_t n = std::strlen(src); std::memcpy(dst, src, n + 1); }   // src is NUL-terminated within kIdBytes (checked by the callers)
 
 // F4's ring priorities, the same classes (midisched.cpp prioOf): 0 clock ticks, CCs, bends, pressure, program; 1 ... see classOf
 int classOf(const thunder_midi_msg& m) {
@@ -91,7 +92,7 @@ int cabOf(thunder_midiout* o, const char* id) {   // the sticky slot of a device
     if (o->cabDev[i].load(std::memory_order_relaxed) < 0 && (oldest < 0 || c.cab[i].seq < c.cab[oldest].seq)) oldest = i;
   }
   const int s = free >= 0 ? free : oldest >= 0 ? oldest : 0;
-  c.cab[s].used = true; std::strcpy(c.cab[s].id, id); c.cab[s].seq = ++c.cabSeq; return s;
+  c.cab[s].used = true; copyId(c.cab[s].id, id); c.cab[s].seq = ++c.cabSeq; return s;
 }
 
 struct Want { int conn, clock, cable; double gear; };
@@ -210,7 +211,7 @@ int thunder_midiout_set_devices(thunder_midiout* o, const thunder_midiout_dev* d
 
 int thunder_midiout_assign(thunder_midiout* o, int port, const char* dev_id) {
   if (!o || port < 0 || port >= kPorts || !idOk(dev_id)) return THUNDER_MIDIOUT_E_ARG;
-  std::strcpy(o->c.portId[port], dev_id);
+  copyId(o->c.portId[port], dev_id);
   return sync(o);
 }
 int thunder_midiout_set_clock(thunder_midiout* o, int port, int on) {
@@ -234,11 +235,11 @@ int thunder_midiout_get_port(const thunder_midiout* o, int port, thunder_midiout
   if (!o || !out || port < 0 || port >= kPorts) return THUNDER_MIDIOUT_E_ARG;
   std::memset(out, 0, sizeof *out); out->dev = -1;
   const auto& c = o->c;
-  std::strcpy(out->id, c.portId[port]); out->clock = c.portClock[port]; out->gear_ms = c.portGear[port];
+  copyId(out->id, c.portId[port]); out->clock = c.portClock[port]; out->gear_ms = c.portGear[port];
   if (!c.portId[port][0]) { out->state = THUNDER_MIDIOUT_PORT_NONE; return THUNDER_MIDIOUT_OK; }
   const int d = findDev(o, c.portId[port]);
   if (d < 0) { out->state = THUNDER_MIDIOUT_PORT_MISSING; return THUNDER_MIDIOUT_OK; }
-  out->state = THUNDER_MIDIOUT_PORT_OK; out->dev = d; std::strcpy(out->name, c.devs[d].name);
+  out->state = THUNDER_MIDIOUT_PORT_OK; out->dev = d; copyId(out->name, c.devs[d].name);
   return THUNDER_MIDIOUT_OK;
 }
 
