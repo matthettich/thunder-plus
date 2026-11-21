@@ -246,7 +246,7 @@ class LiveHost {
   void postSong(int64_t rev, int64_t f);
   void afterBlock(int64_t qStart);                   // step 9: CLOCK (10/s), POS (30/s), LATE (4/s), publish pub_[], state_ (P3: METERS)
   void publish();                                    // pub_[] <- the audio side's counters (relaxed stores)
-  void reanchor(int64_t frame0);                     // process(): drop qRead_, restart the grid, count, ERROR record
+  void reanchor(int64_t frame0);                     // process(): the host timeline moves (off_ only: nothing in the engine does), count, ERROR record (live.h TIME)
   void dropSeq();                                    // the runner lets go of its Seq (stop, ENDED timeout, a new play); seqGone() follows in the next adopt()
   void giveBack(PlayPlan* p);                        // a PlayPlan back to the control side (playBack_)
   // ---- control helpers ----
@@ -332,7 +332,7 @@ class LiveHost {
   int64_t nextFrame_ = 0, origin_ = 0;               // HOST frames: where the next process call must start; the frame0 of the first call / last re-anchor (stats.frame_origin)
   bool anchored_ = false, peReady_ = false;
   int64_t wallNs_ = 0;                               // process()'s wall_ns, copied into the next CLOCK record
-  LiveCmd pend_[kLiveCmdWait]; int nPend_ = 0;       // timed commands waiting for their frame, ordered by at (equal at: ring order); a 65th is applied at once and counted (cmdLate_)
+  LiveCmd pend_[kLiveCmdWait]; int nPend_ = 0;       // timed commands waiting for their frame, in RING order (live.h TIME: commands apply in the order sent; `at` is a HOST frame); a stop or a started play clears the list (clearPend_); a 65th is applied at once and counted (cmdLate_)
   double lead_ = 0.25;                               // the runner's look-ahead (render.h:173)
   int stateA_ = THUNDER_LIVE_STATE_IDLE;             // the audio side's own copy of state_
   bool clearPend_ = false; uint32_t cmdsCleared_ = 0, cmdsNoSeq_ = 0; int64_t reanchorRecAt_ = -1;   // AUDIO: a stop / a started play asks applyCommands to clear pend_; counters; the quantum of the last REANCHOR record
