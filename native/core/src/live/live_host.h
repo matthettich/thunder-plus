@@ -95,7 +95,7 @@ struct LiveEvSlot { uint16_t bytes = 0; uint8_t data[THUNDER_LIVE_EV_MAX] = {0};
 constexpr uint32_t kLiveEvRing = 1024;               // 330 KB; a full ring refuses the NEWEST record (stats.evt_dropped); the critical ring is 64 records
 
 // One step of the test dump (F_DUMP_STEPS): the head says how many raw events follow in the event ring. Raw SeqEvent copies (456 B each); the control side turns them into JSON in dumpStep().
-struct LiveDumpHead { int64_t frame = 0; double t = 0, bpm0 = 0; int32_t tks = 0, n = 0; uint64_t validMask = 0; };
+struct LiveDumpHead { int64_t frame = 0; double t = 0, bpm0 = 0; int32_t tks = 0, n = 0; uint64_t validMask = 0 /* P2: the index of the step's first event in the circular event array */; double cTime = 0, cBase = 0, cBt = 0, cBtT = 0, cBpm = 0; /* P2: the Seq's clock after the step (the live-clock goldens hash it) */ };
 
 // A font handed in with font_add: the bytes (sf::parse keeps a VIEW of them) and the parsed tables in one object, so that a shared_ptr<const sf::Font> that aliases `font` keeps the bytes alive too.
 struct LiveFont { std::vector<uint8_t> bytes; sf::Font font; size_t held = 0; uint64_t used = 0, workUsed = 0; };
@@ -236,7 +236,7 @@ class LiveHost {
   SeqPump stepLoop(double t0, int64_t qStart);       // step 5: runner_.pump(t0, lead_, evs_, kRenderEvents, step_, onStep); onStep: dump copy, ROWS bookkeeping, then dispatch() each event
   void notePos(const SeqStep& st);                   // a played step: the ROWS record and the POS bookkeeping
   void heldRecord(double heldT, int64_t qStart);     // EXACT STOP: the HELD record
-  void dumpCopy(const SeqEvent* evs, int k, const SeqStep& st, int64_t qStart);   // F_DUMP_STEPS
+  void dumpCopy(const SeqEvent* evs, int k, const SeqStep& st, const Seq& sq, int64_t qStart);   // F_DUMP_STEPS
   void songEnded(double t0, int64_t qStart, const SeqPump& pr);   // step 7: Players::songOver once, STATE ENDED, the 0.3 s timer -> IDLE, STOPPED arg 1
   void render(double t0, int64_t qStart);            // step 8: players_->render into the mixer's inputs, mix_->render
   void post(void* rec, int bytes);                   // step 9: stamp `bytes` and `seq`, push into evCrit_ (STATE, HELD, SONG, PADS, ERROR) or evRing_; a full ring refuses the newest and counts it

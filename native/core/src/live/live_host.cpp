@@ -428,7 +428,8 @@ int LiveHost::dumpStep(char* json, int cap) {
     o = "{\"t\":"; liveplain::num(o, h.t); o += ",\"bpm0\":"; liveplain::num(o, h.bpm0); o += ",\"tks\":"; liveplain::num(o, h.tks); o += ",\"evs\":[";
     const uint64_t start = h.validMask;   // (the head's `validMask` field carries the first event's index in the circular event array)
     for (int i = 0; i < h.n; i++) { if (i) o += ','; liveplain::event(o, dumpEvs_[(size_t)((start + (uint64_t)i) % dumpEvCap_)]); }
-    o += "]}";
+    // P2 addition to the line live.h describes: the Seq's clock after the step, as the live-clock goldens hash it (tools/seq-golden.mjs "clk"); a reader that does not know it ignores the member
+    o += "],\"clk\":{\"time\":"; liveplain::num(o, h.cTime); o += ",\"base\":"; liveplain::num(o, h.cBase); o += ",\"bt\":"; liveplain::num(o, h.cBt); o += ",\"btT\":"; liveplain::num(o, h.cBtT); o += ",\"bpm\":"; liveplain::num(o, h.cBpm); o += "}}";
   } catch (...) { return THUNDER_LIVE_E_MEMORY; }
   if ((int)o.size() + 1 > cap) return -((int)o.size() + 1);   // the step stays
   std::memcpy(json, o.data(), o.size()); json[o.size()] = 0;
@@ -643,7 +644,7 @@ SeqPump LiveHost::stepLoop(double t0, int64_t qStart) {
   const Song& song = *songSlot_.get()->song;
   SeqPump r = runner_.pump(t0, lead_, evs_.get(), kRenderEvents, step_.get(), [&](const SeqEvent* evs, int k, const SeqStep& st) {
     steps_++;
-    if (dumpEvs_) dumpCopy(evs, k, st, qStart);
+    if (dumpEvs_) dumpCopy(evs, k, st, *sq, qStart);
     notePos(st);
     for (int i = 0; i < k; i++) { dispatch(evs[i], *sq, song); players_->samplePeak(); }
   });
@@ -691,11 +692,12 @@ void LiveHost::heldRecord(double heldT, int64_t) {
 }
 
 // F_DUMP_STEPS: the events of the step into the circular event array (no allocation), its head into the head ring. A step that does not fit is refused and counted.
-void LiveHost::dumpCopy(const SeqEvent* evs, int k, const SeqStep& st, int64_t qStart) {
+void LiveHost::dumpCopy(const SeqEvent* evs, int k, const SeqStep& st, const Seq& sq, int64_t qStart) {
   const uint64_t tail = dumpTail_.load(std::memory_order_acquire);
   if (dumpWr_ + (uint64_t)k - tail > dumpEvCap_ || dumpHeads_->head.load(std::memory_order_relaxed) - dumpHeads_->tail.load(std::memory_order_acquire) >= 1024u) { dumpDropped_++; return; }
   for (int i = 0; i < k; i++) dumpEvs_[(size_t)((dumpWr_ + (uint64_t)i) % dumpEvCap_)] = evs[i];
-  LiveDumpHead h; h.frame = qStart; h.t = st.t; h.bpm0 = st.bpm0; h.tks = st.tks; h.n = k; h.validMask = dumpWr_;   // validMask: the index of the first event (live_host.h's field reused)
+  LiveDumpHead h; h.frame = qStart; h.t = st.t; h.bpm0 = st.bpm0; h.tks = st.tks; h.n = k; h.validMask = dumpWr_;   // validMask: the index of the first event
+  h.cTime = sq.time(); h.cBase = sq.base(); h.cBt = sq.bt(); h.cBtT = sq.btT(); h.cBpm = sq.bpm();
   const bool ok = dumpHeads_->push(h); assert(ok); (void)ok;
   dumpWr_ += (uint64_t)k;
 }
