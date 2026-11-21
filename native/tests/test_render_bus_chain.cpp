@@ -39,12 +39,38 @@ static thunder_render* make(const std::string& js, int stem, int64_t frames, con
   for (int t = 0; t < 8; t++) if ((live || (heard >> t & 1u)) && r->R->mixer().plan().feedMask[t]) r->R->mixer().setChain(t, standIn, nullptr);
   return r;
 }
-static Stereo readAll(thunder_render* r, int64_t n) { Stereo s; s.L.assign((size_t)n, 0); s.R.assign((size_t)n, 0); int64_t got = 0; while (got < n) { const int64_t k = thunder_render_read(r, s.L.data() + got, s.R.data() + got, std::min<int64_t>(4096, n - got)); if (k <= 0) break; got += k; } return s; }
+// a render that stops before the requested frame count is a counted failure (never a zero-padded buffer that passes a silence check)
+static Stereo readAll(thunder_render* r, int64_t n) { Stereo s; s.L.assign((size_t)n, 0); s.R.assign((size_t)n, 0); int64_t got = 0; while (got < n) { const int64_t k = thunder_render_read(r, s.L.data() + got, s.R.data() + got, std::min<int64_t>(4096, n - got)); if (k <= 0) break; got += k; }
+  if (got != n) { std::printf("FAIL readAll: the render stopped after %lld of %lld frames (line %d)\n", (long long)got, (long long)n, __LINE__); g_fail++; }
+  return s; }
 static Stereo render(const std::string& js, int stem, int64_t N, const PadSet& ps, bool live = false) { thunder_render* r = make(js, stem, N, ps, live); Stereo s; if (r) { s = readAll(r, N); thunder_render_free(r); } return s; }
 static double peakOf(const Stereo& s) { double p = 0; for (float v : s.L) p = std::max(p, (double)std::fabs(v)); for (float v : s.R) p = std::max(p, (double)std::fabs(v)); return p; }
 // max |a - k b| over both channels
 static double diff(const Stereo& a, const Stereo& b, double k) { double e = 0; for (size_t i = 0; i < a.L.size() && i < b.L.size(); i++) e = std::max(e, std::max(std::fabs(a.L[i] - k * b.L[i]), std::fabs(a.R[i] - k * b.R[i]))); return e; }
 static std::vector<int> list(thunder_render* r) { int32_t o[40]; const int n = thunder_render_stem_tracks(r, o, 40); std::vector<int> v; for (int i = 0; i < n && i < 40; i++) v.push_back(o[i]); return v; }
+
+// A general song builder for the cases below: `row` is the song row (which tracks play chain 0), `chainOn` the CHN flags (8 tracks), `patch` the chains patch ("" = none), `mix` the mix array's entries.
+// Tracks 0-based; the patch below uses the page's 1-based numbers. Notes are the same eight-row phrase as above.
+struct TI { int t; std::vector<int> outs; };
+static std::string patchOf(const std::vector<TI>& v) {
+  std::string m, c; std::vector<int> cos;
+  for (size_t i = 0; i < v.size(); i++) {
+    m += std::string(m.empty() ? "" : ",") + "{\"id\":\"ti" + std::to_string(i) + "\",\"type\":\"trackIn\",\"params\":{\"track\":" + std::to_string(v[i].t) + "}}";
+    for (int o : v[i].outs) { bool have = false; for (int x : cos) have |= x == o; if (!have) cos.push_back(o);
+      c += std::string(c.empty() ? "" : ",") + "{\"from\":[\"ti" + std::to_string(i) + "\",\"out\"],\"to\":[\"co" + std::to_string(o) + "\",\"in\"]}"; }
+  }
+  for (int o : cos) m += ",{\"id\":\"co" + std::to_string(o) + "\",\"type\":\"chainOut\",\"params\":{\"track\":" + std::to_string(o) + "}}";
+  return "{\"format\":\"chains.patch\",\"modules\":[" + m + "],\"cables\":[" + c + "]}";
+}
+static std::string gsong(const char* row, const std::vector<int>& chainOn, const std::string& patch, const std::string& mix) {
+  std::string s = std::string("{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":[") + row + "],\"chains\":[[[0,0]]],\"plen\":[8],\"insts\":[";
+  for (int i = 0; i < 8; i++) s += std::string(i ? "," : "") + "{\"pad\":" + std::to_string(i) + ",\"tsp\":0,\"slc\":0,\"sync\":0,\"mo\":0}";
+  s += "],\"phrases\":[[";
+  for (int r = 0; r < 8; r++) { char b[128]; if (r % 2 == 0 && r < 6) std::snprintf(b, sizeof b, "%s[%d,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]", r ? "," : "", 60 + r); else std::snprintf(b, sizeof b, ",[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]"); s += b; }
+  s += "]],\"mix\":[" + mix + "]";
+  if (!patch.empty()) { s += ",\"chainOn\":["; for (size_t i = 0; i < chainOn.size(); i++) s += std::string(i ? "," : "") + (chainOn[i] ? "true" : "false"); s += "],\"chainPatch\":" + patch; }
+  return s + "}";
+}
 
 int main() {
   const PadSet ps; const int64_t N = 48000;
@@ -92,6 +118,43 @@ int main() {
     CHECK("busClosure: a muted middle bus is not added, so its source is not either", hb == 4u);
     // (NOT fixed, as the web: "a pure source whose only bus is muted still gets a stem": pinned here so a change is noticed)
     thunder_render* m = make(mj, 0, N, ps); CHECK("current behaviour: the source of a muted bus still gets a stem of its own (the web's known quirk, left as is)", m && list(m) == std::vector<int>({1})); if (m) thunder_render_free(m); }
+  // CodeRabbit on #266: THREE buses, 4 -> 3 -> 2 -> 1 (the page's numbers; tracks 3, 2, 1, 0 here). The source has the HIGHEST number and the last bus the lowest, so the stem list needs more than one
+  // expansion pass and the audio crosses three buses: still no block of delay (the same sample positions as the source alone) and the mix is the source times the three faders.
+  { const int vC = 112, vB = 144, vA = 176;   // faders of the buses 3, 2, 1 (tracks 2, 1, 0)
+    const double gC = mix_track_gain(vC), gB3 = mix_track_gain(vB), gA3 = mix_track_gain(vA);
+    const std::string patch = patchOf({{4, {3}}, {3, {2}}, {2, {1}}});
+    const std::vector<int> on = {1, 1, 1, 1, 0, 0, 0, 0};
+    const std::string mixJ = "{\"vol\":" + std::to_string(vA) + "},{\"vol\":" + std::to_string(vB) + "},{\"vol\":" + std::to_string(vC) + "},{}";
+    const std::string alone3 = gsong("[-1,-1,-1,0]", on, "", "{},{},{},{}"), chain3 = gsong("[-1,-1,-1,0]", on, patch, mixJ);
+    const Stereo r0 = render(alone3, 0, N, ps), m3 = render(chain3, 0, N, ps);
+    const double e = diff(m3, r0, gA3 * gB3 * gC), p0 = peakOf(r0);
+    std::printf("three-bus chain 4 -> 3 -> 2 -> 1: source alone peak %.4f, chain peak %.4f, max |mix - alone * gA * gB * gC| %.3g\n", p0, peakOf(m3), e);
+    CHECK("three buses: the source alone has sound", p0 > 0.01);
+    CHECK("three buses: the mix is the source times the three faders, sample for sample (the impulse reaches the last bus in the SAME block: no block of delay per bus)", e <= 1e-6 * p0);
+    // the first sound sits at the same frame as the source alone's (a block of delay would move it by at least one block of the mixer)
+    auto firstNonZero = [](const Stereo& s) { for (size_t i = 0; i < s.L.size(); i++) if (std::fabs(s.L[i]) > 1e-9f || std::fabs(s.R[i]) > 1e-9f) return (long long)i; return -1LL; };
+    CHECK("three buses: the first sample of sound is at the same frame as the source alone", firstNonZero(r0) >= 0 && firstNonZero(m3) == firstNonZero(r0));
+    thunder_render* m = make(chain3, 0, N, ps);
+    CHECK("three buses: the plan (4 feeds 3, 3 feeds 2, 2 feeds 1; the three upper ones are pure)", m && m->R->mixer().plan().feedMask[2] == 8u && m->R->mixer().plan().feedMask[1] == 4u && m->R->mixer().plan().feedMask[0] == 2u && m->R->mixer().plan().pure == 14u);
+    CHECK("three buses: the stem list reaches the FINAL bus (number 1) and nothing else", m && list(m) == std::vector<int>({1})); if (m) thunder_render_free(m);
+    const Stereo st = render(chain3, 1, N, ps);
+    CHECK("three buses: the stem of the final bus = the mix", diff(st, m3, 1) <= 1e-9);
+    thunder_render* h = make(chain3, 1, N, ps); CHECK("three buses: setStem(final bus): heard = the source and all three buses", h && h->R->heardMask() == 15u); if (h) thunder_render_free(h); }
+  // CodeRabbit "major" on #266, PINNED: a NESTED SEND's direct signal is counted in two stems. This is the WEB'S OWN known stems double-count (beta build 660), and native matches the web on purpose.
+  // It must change TOGETHER with the web's fix, not before: when the web's stems change, this test is the one to update. Patch (page numbers): track 1 -> its own Chain Out (1) and -> bus 2;
+  // bus 2 -> bus 3; notes on track 1 only. Track 1 is a send (it keeps its own out), bus 2 is pure. Stems listed: track 1 (the send's own stem) and bus 3 (its stem takes the send with it,
+  // direct path on). So stem 1 + stem 3 holds the send's direct signal twice: stem 1 + stem 3 = mix + the source's direct signal.
+  { const std::string patch = patchOf({{1, {1, 2}}, {2, {3}}});
+    const std::string js = gsong("[0]", {1, 1, 1, 0, 0, 0, 0, 0}, patch, "{},{},{}");
+    const std::string alone = gsong("[0]", {1, 1, 1, 0, 0, 0, 0, 0}, "", "{},{},{}");
+    const Stereo ref = render(alone, 0, N, ps), mixS = render(js, 0, N, ps), s1 = render(js, 1, N, ps), s3 = render(js, 3, N, ps);
+    thunder_render* m = make(js, 0, N, ps);
+    CHECK("nested send: the plan (1 -> 2 -> 3; the send 1 is not pure, bus 2 is)", m && m->R->mixer().plan().feedMask[1] == 1u && m->R->mixer().plan().feedMask[2] == 2u && m->R->mixer().plan().pure == 2u);
+    CHECK("nested send (the web's behaviour at beta build 660): the stems listed are 1 (the send) and 3 (the last bus); bus 2 is inside bus 3's stem", m && list(m) == std::vector<int>({1, 3})); if (m) thunder_render_free(m);
+    double e = 0; for (size_t i = 0; i < mixS.L.size(); i++) e = std::max(e, std::max(std::fabs((double)s1.L[i] + s3.L[i] - mixS.L[i] - ref.L[i]), std::fabs((double)s1.R[i] + s3.R[i] - mixS.R[i] - ref.R[i])));
+    std::printf("nested send: source alone peak %.4f, mix peak %.4f, stem 1 peak %.4f, stem 3 peak %.4f, max |stem 1 + stem 3 - mix - direct| %.3g\n", peakOf(ref), peakOf(mixS), peakOf(s1), peakOf(s3), e);
+    CHECK("nested send: the stem of track 1 is its direct signal", diff(s1, ref, 1) <= 1e-6 * peakOf(ref));
+    CHECK("nested send (the web's double-count): stem 1 + stem 3 = the mix + the send's direct signal, so the direct signal is in the stems twice", peakOf(ref) > 0.01 && e <= 1e-6 * peakOf(ref)); }
   std::printf("%s (%d failures)\n", g_fail ? "FAILED" : "ok", g_fail);
   return g_fail ? 1 : 0;
 }
