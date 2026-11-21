@@ -68,3 +68,33 @@ I put my scenarios back into `engine-u26-dump.mjs` (scratch, reverted): single c
 
 ## 6. `eng(0)` then `on(500)` (the dropped case): UNDETERMINED, follow-up
 Reproduced with `[eng(0,[100,60],[20,-30]), on(500), off(3000)]` as `seq_eng_*_{init,alt}_v_e0`: bass, acid, mach differ from seqRender (6 of 8), vox equal. Facts: (i) the JS reference is NOT silent (sum |x| 1652 bass / 1447 acid / 599 mach, first nonzero sample 501 / 501 / 500, same as a note at 500 should), so "the reference is silent" is not what I see; (ii) the difference is a start-up transient only: bass 62 samples (501..562, the first two 32-sample control blocks), max |d| 0.0114 on a 0.446 peak, identical from 563 on; (iii) not the idle skip: same 6 fail with the skip forced off; (iv) not the lane at the note: a probe (`vfy_probe`) shows the pool's twelve lanes hold the right values at the note's time and none at one ulp before; (v) the neighbours pass: `eng(0)+on(0)`, `eng(0)+on(10)`, `eng(500)+on(500)`, `held` (`on(10)`). The pool models what the page does (no node, only `engSt`, before the first note; the lanes are put at the note); seqRender's single node exists from sample 0 with lanes put at 0, so it runs about 15 control blocks with the swap on before the note. That is the only structural difference, and vox (no filter) is the kind that passes, which fits a filter-state carry in idle blocks, but the native bass / acid cores return at once when idle (`stage_ == 0`), and one swapped idle block (`on(10)`) already would differ if that were the cause, so I could not close it in the time box. Verdict: UNDETERMINED, leaning "reference artefact", not shown to be a pool bug. Follow-up: dump the JS core's smoothed cutoff / filter state at the note-on for `v_e0` vs `v_e0c` and diff it against the native core's; if the JS core carries state through idle blocks under the swap, native cores' `idle()` early return is wrong for a node that is idle with the targets on, in which case the 1b idle skip (and `idleBlocks`) is affected too.
+
+## 4. Mutants (F3a)
+`tools/live-mutants.mjs --only E14` on the new head: **killed** by `test_live_jsparity: seq_eng_bass_oor_cutonly` (the new out-of-range scenario); the tool now lists 48 mutants. My own 16 mutants (`tools/my-mutants.mjs`, a copy with my list; not committed), aimed at the new idle rule, the rate default and the per-track state:
+
+| id | mutant | result |
+|---|---|---|
+| V01 | idle without the latency wait (`clock >= lastLive`) | killed (test_live_idle, acid random script 20) |
+| V02 | lastLive = block start instead of end | killed (test_live_idle) |
+| V03 | lastLive never updated | killed (test_live_idle) |
+| V04 | rate before the first event reads 0 | killed (jsparity `first500`) |
+| V05 | rate default read with `t <= first` (instead of `<`) | **SURVIVED** |
+| V06 | startNote does not set rateT0 | SURVIVED (redundant: `pitchMods` sets it for every non-legato note; only a legato first note differs) |
+| V07 | `mul` does not set rateT0 | SURVIVED (a mod on a node with no note yet; startNote covers it later) |
+| V08 | pitchMods does not set rateT0 | SURVIVED (redundant with startNote, same reason) |
+| V09 | skip ignores queued events | killed (test_live_idle) |
+| V10 | wake one sample early | killed (test_live_idle) |
+| V11 | wake one control block late | killed (test_live_idle) |
+| V12 | per-track state not applied to a later node | killed (test_live_decisions) |
+| V13 | the same, one sample late | killed (test_live_decisions) |
+| V14 | cutoff command curve linear instead of exponential | killed (jsparity) |
+| V15 | the engine state of every track is track 0's | **SURVIVED** |
+| V16 | silent-note window 4096 -> 40960 | killed (test_live_pool) |
+
+16 mutants, 5 survivors. Real gaps: **V05** (a note exactly on a control-block start with a first-note rate other than 1: every committed scenario's first note has rate 1, so `<` vs `<=` is not pinned; the page's AudioParam returns the event's value at its own time, so `<` is right and the code is right), **V15** (the per-track isolation of `engSt_` is not tested: every eng test uses track 0; add a case with eng on track 1 and a note on track 0 and vice versa). V06-V08 are defence in depth (redundant writes of rateT0), not test gaps worth a case; a case with a LEGATO first note and a mod-only first event would kill them. The ODR note of the first round stands: the header mutants are only valid where a LivePool test kills them; E14 and V14 were killed by jsparity (a pool test), so they ran.
+
+## 5. F3b: the tap no longer turns the skip off
+Correct, and now exercised. `runNode` hands a skipped node's tap zeros (the node adds exact zeros to the mix; with F1 fixed a node is skipped only after `idle()` and a drained ring, so the unskipped engine output in those quanta is all zeros: my 600 skip-on vs skip-off scripts and 1300 resume cases are bit-identical on the mixes, and the JS parity (which compares the tapped engine output with seqRender's hash) is equal for 151/151 with the skip engaged in 30 of them, 60 of my 255, assertion `>= 10`). Note the tap sees the engine output before the gain / pan stage, which is also zero for a skipped node. Remaining gap: the 30 are the sequences with a long enough tail of silence; the JS comparison still never sees a wake in the middle of a sequence except in those 30.
+
+## 7. NOT RUN
+Full Release ctest and the sanitizer builds (about 40 minutes of build on the shared 2 cores each): NOT RUN; CI on 90bf414d is reported green by the builder and was green on the old head (my first-round check; I did not re-read the check-runs of 90bf414d here, see below if the table was filled).
