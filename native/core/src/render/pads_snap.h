@@ -75,6 +75,7 @@ struct PadBuf {
   std::shared_ptr<const sf::Font> font; std::shared_ptr<const sf::PresetPcm> pcm; const sf::Preset* pr = nullptr;
   // control-side bookkeeping
   uint32_t refs = 0; PadBuf* nextRetired = nullptr;
+  size_t held = 0;             // U37 P2: the bytes this buffer counts against the host's budget (samples + variations' samples + whatever setSf was told): added at creation, subtracted when it is freed
   const float* L() const { return mem; }
   const float* R() const { return stereo ? mem + frames : nullptr; }
   size_t bytes() const { return ((size_t)frames * (stereo ? 2 : 1)) * sizeof(float); }
@@ -103,10 +104,15 @@ class PadsHost {
   // The pad's audio (mono l, or stereo l + r, `frames` each, copied) and, optionally, its variations (copied). A pad that changes loses its chop data (the C API's rule: thunder_render_set_pad) and, being a new
   // buffer, its old variations; frames == 0 removes the pad. The same data again changes nothing. Nothing changes on an error.
   int setPad(int pad, const float* l, const float* r, int frames, double rate, const PadVarIn* vars = nullptr, int nVars = 0);
+  // U37 P2: as setPad (no variations), but TAKES OWNERSHIP of `mem` (`new (std::nothrow) float[]`, which freeBuf() frees with delete[]; thunder_live_alloc makes exactly such a block): frames floats mono, or 2 * frames
+  // stereo (all of L, then all of R); no copy. frames 1 .. MAX_PAD_FRAMES (frames 0 is kArg: there is nothing to take). The samples are checked finite IN PLACE. No identical-data shortcut: the block is kept and the old
+  // pad is replaced (retired when nobody refers to it). On ANY error (kArg, kNoMem) the block is still the CALLER's and nothing changed.
+  int setPadTake(int pad, float* mem, bool stereo, int frames, double rate);
   int setKit(int pad, const VoiceKit& kit);
   int setRoute(int pad, PadRoute route);
   // A prepared SoundFont preset for the pad (font, a preset of it, its decoded PCM: kept alive by the buffer; the route is still setRoute's). setSfParams changes the pad's params only (no new buffer).
-  int setSf(int pad, std::shared_ptr<const sf::Font> font, const sf::Preset* pr, std::shared_ptr<const sf::PresetPcm> pcm, const sf::PadParams& P);
+  // `heldBytes` (U37 P2): what the preset's decoded PCM (and the font, if the caller wants it counted) weigh, for bytesHeld(); 0 = not counted.
+  int setSf(int pad, std::shared_ptr<const sf::Font> font, const sf::Preset* pr, std::shared_ptr<const sf::PresetPcm> pcm, const sf::PadParams& P, size_t heldBytes = 0);
   int clearSf(int pad);
   int setSfParams(int pad, const sf::PadParams& P);
   SeqChop& chop() { return stage_.chop; }            // the staged chop table: edit it with setLoop / setHits, then publish() (the audio side never sees this object)
@@ -117,6 +123,9 @@ class PadsHost {
 
   size_t buffers() const { return made_ - freed_; }  // PadBufs alive (current, in snapshots, or retired and waiting)
   size_t retired() const;                            // of those, waiting for their voices
+  // U37 P2, the budget's figures (control thread): the bytes of every PadBuf alive (the builder's current ones, those in snapshots, and the RETIRED ones that voices may still read), and of those the retired ones.
+  size_t bytesHeld() const { return bytes_; }
+  size_t bytesRetired() const;
   uint64_t made() const { return made_; }
   uint64_t freed() const { return freed_; }
   uint64_t lastEpoch() const { return nextEpoch_ - 1; }
@@ -130,10 +139,12 @@ class PadsHost {
   //   1. publishes, per voice slot of `pl`, the epoch of its live or booked voice, or 0 (only the entries whose value changed are stored);
   //   2. adopts a newly published snapshot, if any: pl.setPads(its pads);
   //   3. points `seq` (the Seq the runner now uses; may be null) at the current snapshot's chop table (a pointer store, every call: harmless when unchanged).
+  // U37 P2 (verify-276 R2-2): while `seq` is null and a Seq was seen since the last seqGone(), a pending snapshot is NOT adopted (it would return a chop table that the host's Seq still points at): it stays pending,
+  // orphanAdopts() counts the quantum, and the adopt happens in the first quantum that passes a Seq or follows seqGone(). The scan and the board stores run as always.
   // Returns true when a new snapshot was adopted. No allocation, no lock, no free, no exception.
   bool beginQuantum(Players& pl, Seq* seq);
   void seqGone() { seqSeen_ = false; }               // audio thread: the host dropped its Seq (a stopped play): a snapshot may now be adopted with a null seq
-  uint64_t orphanAdopts() const { return orphan_; }  // adopts with a null seq after a Seq was seen (a host bug)
+  uint64_t orphanAdopts() const { return orphan_; }  // quanta in which an adopt was held back because a Seq was seen and none was passed (a host bug; verify-276 R2-2: nothing is adopted then)
   typedef void (*Seam)(void* user, int stage);
   void setSeam(Seam fn, void* user) { seam_ = fn; seamUser_ = user; }   // tests; before the first beginQuantum
   const PadsSnap* current() const { return slot_->get(); }   // audio thread
@@ -152,10 +163,10 @@ class PadsHost {
   RenderPads stage_;                                 // control: kit, route, sf params, chop (buf / var unused)
   PadBuf* cur_[2][kRenderPads] = {};                 // control: the builder's reference per pad
   PadBuf* retired_ = nullptr;                        // control: refs == 0, waiting for their voices
-  uint64_t nextEpoch_ = 1, nextId_ = 1, made_ = 0, freed_ = 0;
+  uint64_t nextEpoch_ = 1, nextId_ = 1, made_ = 0, freed_ = 0; size_t bytes_ = 0;   // bytes_: the sum of `held` of every PadBuf alive
   FreeHook hook_ = nullptr; void* hookUser_ = nullptr;
   Seam seam_ = nullptr; void* seamUser_ = nullptr;
-  bool seqSeen_ = false; uint64_t orphan_ = 0;       // audio only
+  bool seqSeen_ = false; uint64_t orphan_ = 0;       // audio only (orphan_: quanta in which a pending snapshot was held back because the host passed no Seq after having had one)
   // The board and the audio-only scratch each start on their own cache line, apart from the control-written fields above and from each other (verify-276 F8).
   alignas(64) std::atomic<uint64_t> board_[kBoardMax];   // audio writes (release), control reads (acquire): the epoch each voice slot's voice is on, 0 none
   alignas(64) uint64_t scan_[kBoardMax];                 // audio only: this quantum's scan

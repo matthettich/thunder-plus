@@ -21,7 +21,7 @@ class SnapSlot {
  public:
   ~SnapSlot() { T* p; while (in_.pop(p)) delete p; while (out_.pop(p)) delete p; delete cur_; }   // after the audio thread has stopped
   bool publish(T* p) { return in_.push(p); }                 // control thread; false: ring full, the caller still owns p
-  void collect() { T* p; while (out_.pop(p)) delete p; }     // control thread
+  size_t collect() { size_t n = 0; T* p; while (out_.pop(p)) { delete p; n++; } return n; }     // control thread (U37 P2: returns how many it freed)
   // The plain form is for snapshots that need nothing from the one they replace. A type that must hand its state over (SongSnap: the
   // running sequencer) specializes SnapNeedsHandover to true, and this form is then not callable (it would retire the snapshot the runner
   // still points at). Compile-time: `can_adopt_plain` below is false for it.
@@ -47,6 +47,7 @@ class SnapSlot {
     return true;
   }
   const T* get() const { return cur_; }                      // AUDIO THREAD
+  bool pending() const { return !in_.empty(); }              // AUDIO THREAD (U37 P2): a snapshot is published and not yet adopted (the consumer side of the ring: an acquire load)
  private:
   Spsc<T*, N> in_, out_;
   T* cur_ = nullptr;
