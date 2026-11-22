@@ -29062,13 +29062,14 @@ function patParts(){
 function xposeScope(){
   if (tv === 'phrase' && !onPset()){
     if (mstView()){ toast('The master phrase has no notes to transpose.'); return null; }
+    if (busTrack(cTrack)){ busSay(); return null; }   // (owner: transposing a selection) a bus track takes no notes
     if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
     const own = polyView() ? NOTE_COLS : [0];
     if (selA && selA.v === 'phrase'){
       const r = selRect(), inSel = own.filter(x => x >= r.x0 && x <= r.x1);
       if (!inSel.length && !selA.pat){ toast('Transpose: the selection has no note column.'); return null; }
       const parts = [{p:cPhrase, y0:r.y0, y1:r.y1, cols:inSel.length ? inSel : own}];
-      if (selA.pat) for (const {t, p} of patParts()) if (t !== MT) parts.push({p, y0:r.y0, y1:r.y1, cols:isPolyT(t) ? NOTE_COLS : [0]});
+      if (selA.pat) for (const {t, p} of patParts()) if (t !== MT && !busTrack(t)) parts.push({p, y0:r.y0, y1:r.y1, cols:isPolyT(t) ? NOTE_COLS : [0]});
       return {parts, where:selA.pat ? 'the pattern' : 'the selection'};
     }
     return {parts:[{p:cPhrase, y0:0, y1:plen(cPhrase) - 1, cols:own}], where:'phrase ' + hp(cPhrase)};
@@ -29076,12 +29077,23 @@ function xposeScope(){
   if (tv === 'song'){
     // (12 Nov, owner: "in arrangement mode, select patterns and use the transpose keys on every pattern selected") the selected blocks AND the picked ones (sxPicks), else the block under the cursor; each pattern once
     const cells = (selA && selA.v === 'song' ? songCells() : sxPicks.length ? [] : [[cs.song.y, cs.song.x]]).concat(sxPicks.map(q => [q.y, q.t])), by = new Map(), seen = new Set(cells.map(c => c[0] + ':' + c[1]));
-    for (const [y, t] of cells){ if (t === MT) continue; const cid = S.song[y] ? S.song[y][t] : -1; if (cid < 0) continue;
+    for (const [y, t] of cells){ if (t === MT || busTrack(t)) continue; const cid = S.song[y] ? S.song[y][t] : -1; if (cid < 0) continue;
       for (const q of S.chains[cid] || []){ const p = q[0]; if (p < 0 || !S.phrases[p]) continue; const cols = isPolyT(t) ? NOTE_COLS : [0], o = by.get(p);
         if (!o || cols.length > o.cols.length) by.set(p, {p, y0:0, y1:plen(p) - 1, cols}); } }
     if (!by.size){ toast('No block here to transpose.'); return null; }
     // "also used elsewhere": a block outside these cells plays the same pattern, so it changes too (the pattern itself is edited, as in the phrase)
     let also = 0; { const out = new Set(); for (let y = 0; y < 256; y++) for (let t = 0; t <= MT; t++){ if (seen.has(y + ':' + t)) continue; const cid = S.song[y] ? S.song[y][t] : -1; if (cid >= 0) for (const q of S.chains[cid] || []) if (by.has(q[0])) out.add(q[0]); } also = out; }
+    return {parts:[...by.values()], where:by.size > 1 ? by.size + ' phrases' : 'phrase ' + hp([...by.keys()][0]), song:true, also};
+  }
+  if (tv === 'sect' && selA && selA.v === 'sect'){
+    // (owner: "transposing a selection with the + / - buttons transposes everything in the selection") the Sect screen's selected rows: the phrase of each, once, as the Song does
+    const ch = S.chains[cSect]; if (!Array.isArray(ch)){ toast('No block here to transpose.'); return null; }
+    if (busTrack(cTrack)){ busSay(); return null; }
+    const r = selRect(), by = new Map(), cols = isPolyT(cTrack) ? NOTE_COLS : [0];
+    for (let y = r.y0; y <= Math.min(r.y1, ch.length - 1); y++){ const q = ch[y], p = q ? q[0] : -1; if (p >= 0 && S.phrases[p] && !by.has(p)) by.set(p, {p, y0:0, y1:plen(p) - 1, cols}); }
+    if (!by.size){ toast('No phrase in the selected rows to transpose.'); return null; }
+    const also = new Set(), onSong = new Set(); for (let y = 0; y < 256; y++) for (let t = 0; t <= MT; t++){ const c2 = S.song[y] ? S.song[y][t] : -1; if (c2 >= 0) onSong.add(c2); }
+    for (const id of onSong){ (S.chains[id] || []).forEach((q, i) => { if (q && by.has(q[0]) && !(id === cSect && i >= r.y0 && i <= r.y1)) also.add(q[0]); }); }
     return {parts:[...by.values()], where:by.size > 1 ? by.size + ' phrases' : 'phrase ' + hp([...by.keys()][0]), song:true, also};
   }
   toast('Transpose works on a phrase, or on blocks on the Song.'); return null;
