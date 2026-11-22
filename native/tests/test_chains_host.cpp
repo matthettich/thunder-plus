@@ -337,7 +337,17 @@ int main() {
     CHECK("bad_alloc in plan(): no leak on any failing allocation", !leak); CHECK("some allocations failed the plan (null)", nulls > 0); CHECK("the host's view is unchanged and the next plan works", view && h.node(3) == n);
     std::snprintf(g_msg, sizeof g_msg, "  %d null plans, %d plans\n", nulls, plans);
   }
+  if (g_live != liveAll) { char b[80]; const int m = std::snprintf(b, sizeof b, "  live allocations after the sweep: %+ld\n", g_live - liveAll); if (m > 0 && write(2, b, (size_t)m)) {} }
   CHECK("the sweep, the host and the plans destroyed: every allocation given back", g_live == liveAll); std::printf("%s", g_msg);
+  {   // the host's own allocation (the event array) failing: a host that is not valid() refuses plans and events, counted, and gives everything back
+    Doc pa(patchA()); const long live0 = g_live; int bad = 0; bool clean = true;
+    for (long k = 1; k <= 4; k++) {
+      g_failN = 0; g_failAt = k; std::unique_ptr<ChainsHost> hp(new (std::nothrow) ChainsHost(kSr)); g_failAt = 0;
+      if (hp && !hp->valid()) { bad++; SeqEvent e; e.type = SEV_TEMPO; e.v = 100; e.t = 1; clean = clean && planOf(*hp, pa) == nullptr && hp->stats().refused == 1 && !hp->event(e) && hp->stats().droppedEvents == 1; hp->beginBlock(0); }
+    }
+    CHECK("a host whose event array failed refuses plans and events cleanly", bad > 0 && clean);
+  }
+  CHECK("... and the failing hosts gave everything back", g_live == liveAll);
 
   // 12. the allocation audit: hook, commit and the event apply (the plan, with everything that allocates, is made outside)
   {

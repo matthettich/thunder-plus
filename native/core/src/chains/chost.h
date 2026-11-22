@@ -97,6 +97,7 @@ class ChainsHost {
  public:
   explicit ChainsHost(double sampleRate, size_t budgetBytes = kChainsHostDefaultBudget);   // control thread
   ~ChainsHost();                             // deletes the nodes it adopted (nothing may be running)
+  bool valid() const { return ev_ != nullptr; }   // false: the event array could not be allocated; plan() then returns null (counted refused) and event() drops (counted)
   ChainsHost(const ChainsHost&) = delete; ChainsHost& operator=(const ChainsHost&) = delete;
 
   // The heard set of an offline mix (pass(): index.html:25909-25913 keepT = audible tracks that have notes, busStemPlan adds the buses a kept track feeds, busClosure (:25823) the audible sources of every kept bus).
@@ -141,7 +142,7 @@ class ChainsHost {
   ChainsSongTransport lastSong_; bool haveLast_ = false;   // control side: the song transport of the last settled plan
   int nNodes_ = 0;                                 // audio side: nodes now
   bool inFlight_ = false;                          // control side
-  std::unique_ptr<Ev[]> ev_{new Ev[kChainsHostEvents]}; int nEv_ = 0;   // on the heap (made with the host, control side): a host on a 1 MB stack (MSVC) must not hold 160 KB of events
+  std::unique_ptr<Ev[]> ev_; int nEv_ = 0;   // on the heap (made with the host, control side): a host on a 1 MB stack (MSVC) must not hold 160 KB of events
   ChainsHostStats st_;
 };
 

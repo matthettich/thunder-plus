@@ -17,7 +17,7 @@ ChainsPlan::~ChainsPlan() {
   for (int i = 0; i < nOldPatch_; i++) if (oldPatch_[i]) chains::chains_free_patch(oldPatch_[i]);
 }
 
-ChainsHost::ChainsHost(double sampleRate, size_t budgetBytes) : sr_(sampleRate), q_(128.0 / sampleRate), budget_(budgetBytes ? budgetBytes : kChainsHostDefaultBudget) {}
+ChainsHost::ChainsHost(double sampleRate, size_t budgetBytes) : sr_(sampleRate), q_(128.0 / sampleRate), budget_(budgetBytes ? budgetBytes : kChainsHostDefaultBudget), ev_(new (std::nothrow) Ev[kChainsHostEvents]) {}   // (on the heap: a 1 MB stack (MSVC) must not hold 160 KB per host)
 ChainsHost::~ChainsHost() { for (int t = 0; t < kSongNT; t++) delete node_[t]; }
 
 // pass() (index.html:25909-25913, busStemPlan :25816-25820, busClosure :25823-25827)
@@ -45,6 +45,7 @@ ChainsPlan* ChainsHost::plan(Json chainPatch, const bool* chainOn, uint32_t hear
 #endif
 }
 ChainsPlan* ChainsHost::planImpl(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song) {
+  if (!ev_) { st_.refused++; return nullptr; }
   if (inFlight_) { st_.busyRefused++; return nullptr; }
   // the first call of the module tables makes static data (cdef / cinfo / the registry): do it here, so the audio thread never meets a first call
   (void)chains::cinfo_count(); (void)chains::chainsTable(); (void)chains::cdef("trackIn"); (void)chains::cdef("chainOut"); (void)chains::cdef("smixer");
@@ -123,11 +124,13 @@ int64_t ChainsHost::tempoDue(double t) const { if (!(t > 0)) return 0; const dou
 int64_t ChainsHost::chcDue(double t) const { if (!(t > 0)) return 0; const double f = std::ceil(t * sr_); const double d = std::ceil(f / 128.0) * 128.0; return d >= 9e15 ? (int64_t)9e15 : (int64_t)d; }
 
 bool ChainsHost::put(const Ev& e) {
+  if (!ev_) { st_.droppedEvents++; return false; }
   if (nEv_ >= kChainsHostEvents) { st_.droppedEvents++; return false; }
   int i = nEv_; while (i > 0 && ev_[i - 1].due > e.due) { ev_[i] = ev_[i - 1]; i--; }   // stable: after the events due at the same frame
   ev_[i] = e; nEv_++; return true;
 }
 bool ChainsHost::event(const SeqEvent& e) {
+  if (!ev_) { st_.droppedEvents++; return false; }   // not valid(): nothing can be queued
   Ev v; v.track = 0; v.p = 0; v.v = e.v; v.tks = e.tks;
   if (e.type == SEV_CHC) {
     if (!(e.t == e.t) || e.track < 0 || e.track >= kSongNT || e.p < 1 || e.p > chains::kBypSwitches || !std::isfinite(e.v)) { st_.badEvents++; return false; }
@@ -141,6 +144,7 @@ bool ChainsHost::event(const SeqEvent& e) {
   return put(v);
 }
 void ChainsHost::beginBlock(int64_t frame) {
+  if (!ev_) return;
   int n = 0;
   while (n < nEv_ && ev_[n].due <= frame) {
     const Ev& e = ev_[n++];

@@ -78,7 +78,7 @@ int SongRenderer::setChains(bool on, size_t budgetBytes) {
   if (!on) { if (chains_) { for (int t = 0; t < kSongNT; t++) mix_.setChain(t, nullptr, nullptr); mix_.setPlan(bus_plan(S_.chainPatch, S_.chainOn)); chains_.reset(); } return 0; }
   if (chains_) return 0;
   if (qFrame_ != 0) return kChainsLate;
-  std::unique_ptr<ChainsHost> h(new (std::nothrow) ChainsHost(sr_, budgetBytes ? budgetBytes : kChainsHostDefaultBudget)); if (!h) return kChainsNoMemory;
+  std::unique_ptr<ChainsHost> h(new (std::nothrow) ChainsHost(sr_, budgetBytes ? budgetBytes : kChainsHostDefaultBudget)); if (!h || !h->valid()) return kChainsNoMemory;
   ChainsSongTransport tp; tp.tempo = S_.bpm; tp.lpb = S_.lpb ? S_.lpb : 4; tp.ticks = S_.ticks ? S_.ticks : 6;   // pass(): S.bpm, S.lpb || 4, S.ticks || 6
   const uint32_t heard = stem_ >= 0 ? heardMask() : ChainsHost::keepMask(mix_.plan(), (uint32_t)mix_.audibleMask(), noteTracksOf(S_, mix_.plan()));
   std::unique_ptr<ChainsPlan> p(h->plan(S_.chainPatch, S_.chainOn, heard, tp));
