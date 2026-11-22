@@ -29062,14 +29062,15 @@ function patParts(){
 function xposeScope(){
   if (tv === 'phrase' && !onPset()){
     if (mstView()){ toast('The master phrase has no notes to transpose.'); return null; }
-    if (busTrack(cTrack)){ busSay(); return null; }   // (owner: transposing a selection) a bus track takes no notes
+    const onBus = busTrack(cTrack); if (onBus && !(selA && selA.v === 'phrase' && selA.pat)){ busSay(); return null; }   // (owner: transposing a selection) a bus track takes no notes; a Pattern selection with the cursor on a bus still moves the other tracks
     if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
     const own = polyView() ? NOTE_COLS : [0];
     if (selA && selA.v === 'phrase'){
       const r = selRect(), inSel = own.filter(x => x >= r.x0 && x <= r.x1);
       if (!inSel.length && !selA.pat){ toast('Transpose: the selection has no note column.'); return null; }
-      const parts = [{p:cPhrase, y0:r.y0, y1:r.y1, cols:inSel.length ? inSel : own}];
+      const parts = onBus ? [] : [{p:cPhrase, y0:r.y0, y1:r.y1, cols:inSel.length ? inSel : own}];
       if (selA.pat) for (const {t, p} of patParts()) if (t !== MT && !busTrack(t)) parts.push({p, y0:r.y0, y1:r.y1, cols:isPolyT(t) ? NOTE_COLS : [0]});
+      if (!parts.length){ busSay(); return null; }
       return {parts, where:selA.pat ? 'the pattern' : 'the selection'};
     }
     return {parts:[{p:cPhrase, y0:0, y1:plen(cPhrase) - 1, cols:own}], where:'phrase ' + hp(cPhrase)};

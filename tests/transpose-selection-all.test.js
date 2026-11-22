@@ -57,6 +57,11 @@ test('Phrase: a pattern selection (every track on the row) moves each track once
   assert.deepEqual(r.notes(10), [61, 63]); assert.deepEqual(r.notes(11), [49, 51]); assert.deepEqual(r.notes(12), [70, 72], 'the bus track’s phrase is untouched'); assert.equal(r.log.saves, 1);
   const b = rig({ tv: 'phrase', phrases: ph, sel: 0, cursorY: 1, cTrack: BUS }); b.click(1); assert.equal(b.notes(10)[0], 60); assert.equal(b.log.saves, 0); assert.equal(b.log.bus, 1);
 });
+test('Phrase: a pattern selection with the cursor ON a bus track still moves the other tracks, and leaves the bus phrase alone', () => {
+  const ph = { 10: P([60], [62]), 11: P([48], [50]) };
+  const r = rig({ tv: 'phrase', phrases: ph, sel: 0, cursorY: 1, cTrack: BUS, pat: true, parts: [{ t: 1, p: 11 }] }); r.click(1);
+  assert.deepEqual(r.notes(10), [60, 62], 'the bus track’s own phrase'); assert.deepEqual(r.notes(11), [49, 51]); assert.equal(r.log.saves, 1); assert.equal(r.log.bus, 0);
+});
 test('source: the command bar buttons run transposeSel with a selection required (the keys’ path), and the Sect branch is the Sect screen only', () => {
   assert.match(src, /\$\('tXposeDn'\)\.addEventListener\('click', \(\) => apRun\(transposeSel, \[-1, true\]\)\)/);
   assert.match(src, /\$\('tXposeUp'\)\.addEventListener\('click', \(\) => apRun\(transposeSel, \[1, true\]\)\)/);
