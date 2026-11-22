@@ -20,12 +20,29 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
 - **Stage N3 (engines), merged:** U22 to U29 (foundation, all layer types, Plaits / Elements, Bass / Vox, Acid / Machine / Blip, both sets of rendered-only
   engines), U30 (…waves engine), U33 (pump synths, rendered path), U04 (LXR as a separable GPL module).
-- **Not started:** **U31 …chains engine** (next for a Sonnet worker: it reuses U30's `Graph` and `waves` runner; brief it like U30 was, see the U30 entry in
+- **(Stale: U31 is MERGED, #227.)** Was: **U31 …chains engine** (next for a Sonnet worker: it reuses U30's `Graph` and `waves` runner; brief it like U30 was, see the U30 entry in
   TODAY.md, and it needs the lead's review of its live part); **U32 SoundFont player** (UNBLOCKED 17 Nov 23:13: the owner chose **stb_vorbis** (public domain / MIT), pinned and fuzzed like
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (21 Nov, 18:18): the state for a new chat. Everything below this section is history, newest first.
+## START HERE (21 Nov, 21:45): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (21 Nov, 21:45)."
+
+**The owner's rules** are those of the 18:18 section below (unchanged), plus (21 Nov, 18:38): weekly usage at 90 %; push work to git regularly; notify him rarely (needs, and the two-hour "moving or stalled" line).
+
+**MERGED since 18:18:** #283 (U37 P2 `LiveHost` core, `a00609a`), #281 (chains C1, `ChainsHost` offline, `897a4dc`), web #284 into `beta` (build 661: generators follow the song's key, TRANSP. + / - cover a whole selection; the owner said "Merge"). `beta` is NOT yet merged into `main` (he was given the GitHub steps to do it himself).
+
+**Waiting for the owner's words in chat ("merge #285 and #287 into beta"; this session's permission rules refuse a merge into `beta` without them):**
+- **#285** (`docs/track-jump-idea`, HANDOVER.md only): a possible future feature, a per-track jump command (one track loops while the others go on; not decided), and the bug entry for the lost header.
+- **#287** (`web/synth-header-lost`, build 662, head `033aa46`): on the phone PWA the header with the tabs was off the top after a notification on the Synth page (fold / unfold brought it back). A safety net, cause not reproduced: stray document scroll is reset and the layout re-measured on return to the app (`resetStrayScroll` / `remeasureAfterReturn`); the lead added: no reset while the keyboard is up over a text field. Both PRs touch HANDOVER.md: merge #285 first and resolve #287 if it then conflicts; after #287, mark #285's bug entry "safety net in build 662, waits for his test".
+
+**RUNNING at 21:45: FX1** (builder in `/home/claude/wt/fx1`, branch `n1/fx1-song-fx`, last push `1f35ca3` at 21:24: "notes with measured figures, ELECTRO all-slot reference summary"). State and how to resume: `docs/port/FX1-NOTES.md` ON THAT BRANCH. It was branched before #281 merged: expect small conflicts in `src/render/render.cpp` and the two CMake lists. When it reports: the lead reads every audio-path function it lists, an independent Sonnet verifier checks the PR, squash-merge when ALL CI is green.
+
+**Next, in order:** as the 18:18 list below from item 2 (U37 P3 with R1 and R2, P4, P5; C2; the Android shell on the live host).
+
+**New kept-open items:** (a) the …chains ENGINE (U31, `cengine.cpp`) leaves 1 to 3 allocations behind per prepare it refuses after its own bad_alloc (GCC only seen; `docs/port/C1-NOTES.md`, "Finding for U31"): `chains_host`'s sweep checks the HOST strictly and allows only that balance. (b) Web item 3 of the 18:18 section (display and audio out of alignment after an app switch on the phone) is NOT started; the lost-header bug is its sibling (both: state not re-measured on return to the app). (c) The owner asked what a per-track loop would cost (a setting, or a track jump command): answered "medium, three sequencers"; recorded as a possible future feature in #285, nothing to build.
+
+## START HERE of 21 Nov, 18:18 (now history)
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (21 Nov, 18:18)."
 
 **The owner's rules, as of today.** Unchanged: the lead manages, rules, reads every audio-path line and merges; Sonnet builders in `/home/claude/wt/<name>`, an independent Sonnet verifier per code PR (report on `review/verify-NNN`), squash-merge when ALL CI is green. NEW today: (1) he wants ONLY needs and, every two hours, one short "moving or stalled" line (schedule it); a percentage only when he asks. (2) His weekly usage was above 80 % at 15:40: short turns, no more than two builders, builders push every 10 minutes with exact notes, no new unit started casually. (3) The session's server restarted three times today (13:57, 15:40, 18:03) and stops every agent: only what is pushed survives; a new chat has none of today's agents and re-briefs from the branch notes.
