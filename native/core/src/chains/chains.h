@@ -109,6 +109,7 @@ class ChainsEngine {
   void setTaps(const float* const* taps, int n);               // input 2: the tracks' own sounds, one channel each (null: none)
   void endStandaloneBlock();   // ChainsProcessor's p1 after process(): the sends of this block become the next block's Sidechain In input (one block late, as the JS)
   void setSendIn(const float* const* sends, int n);            // input 3: the sends of every chain, one channel each (null entries: silence)
+  double bypassSwitchState(int n) const { return n >= 1 && n <= kBypSwitches ? bsw_[n] : -1; }   // (diagnostics, tests)
   void setBypassSwitch(int n, double v) { if (n >= 1 && n <= kBypSwitches) bsw_[n] = v; }   // the tracker's BYP switches: -1 the patch's own, 0 in, 1 bypassed, 2 flipped
   bool process(int frames = kBlock);   // false: refused (frames outside 0..128) or a module failed (the buses are cleared, as the worklet's catch does)
   const float* bus(int slot) const { return busesL_.get() + (size_t)(slot - 1) * kBlock; }   // slot 1..128

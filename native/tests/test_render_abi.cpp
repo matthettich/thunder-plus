@@ -24,6 +24,8 @@ int main() {
   OFF(thunder_render_opts, vars_bytes, 64);
   OFF(thunder_render_opts, stem, 72);
   OFF(thunder_render_opts, reserved2, 76);
+  OFF(thunder_render_opts, chains, 80);
+  OFF(thunder_render_opts, reserved3, 84);
   OFF(thunder_render_stats, size, 0);
   OFF(thunder_render_stats, song_over, 4);
   OFF(thunder_render_stats, voices_active, 8);
@@ -67,7 +69,14 @@ int main() {
   OFF(thunder_render_stats, live_forced_off, 184);
   OFF(thunder_render_stats, live_failed, 188);
   OFF(thunder_render_stats, live_refused, 192);
-  if (sizeof(thunder_render_opts) < 80 || sizeof(thunder_render_stats) < 200) { std::printf("FAIL: a struct got smaller\n"); g_fail++; }   // (they only grow)
+  OFF(thunder_render_stats, chains_events_applied, 200);
+  OFF(thunder_render_stats, chains_events_dropped, 208);
+  OFF(thunder_render_stats, chains_events_bad, 216);
+  OFF(thunder_render_stats, chains_chc_no_node, 224);
+  OFF(thunder_render_stats, chains_failed_blocks, 232);
+  OFF(thunder_render_stats, chains_feed_mismatch, 240);
+  OFF(thunder_render_stats, chains_refused, 248);
+  if (sizeof(thunder_render_opts) < 80 || sizeof(thunder_render_stats) < 256) { std::printf("FAIL: a struct got smaller\n"); g_fail++; }   // (they only grow)
   if (g_fail) { std::printf("render_abi: %d FAILED\n", g_fail); return 1; }
   std::printf("render_abi: all offsets as pinned\n"); return 0;
 }
