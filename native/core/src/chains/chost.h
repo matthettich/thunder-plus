@@ -36,6 +36,7 @@
 #ifndef THUNDER_CHAINS_CHOST_H
 #define THUNDER_CHAINS_CHOST_H
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "chains/chains.h"
@@ -140,7 +141,7 @@ class ChainsHost {
   ChainsSongTransport lastSong_; bool haveLast_ = false;   // control side: the song transport of the last settled plan
   int nNodes_ = 0;                                 // audio side: nodes now
   bool inFlight_ = false;                          // control side
-  Ev ev_[kChainsHostEvents]; int nEv_ = 0;
+  std::unique_ptr<Ev[]> ev_{new Ev[kChainsHostEvents]}; int nEv_ = 0;   // on the heap (made with the host, control side): a host on a 1 MB stack (MSVC) must not hold 160 KB of events
   ChainsHostStats st_;
 };
 

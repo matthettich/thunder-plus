@@ -96,6 +96,7 @@ static void adopt(ChainsHost& h, ChainsPlan* p, Mixer& m) { h.commit(p, m); h.se
 static ChainsPlan* planOf(ChainsHost& h, const Doc& p, uint32_t heard = 0xffffffffu, double bpm = 131, double lpb = 8, double ticks = 6) { ChainsSongTransport tp; tp.tempo = bpm; tp.lpb = lpb; tp.ticks = ticks; return h.plan(p.r, chainOn3, heard, tp); }
 
 int main() {
+  std::setvbuf(stdout, nullptr, _IONBF, 0);   // (a crash on a CI machine must show how far the test got)
   initChainOn(); const Sig sig = makeSig(80);
 
   // 1. the hook's feeds equal a direct ChainsNode run, bit for bit, in bus-map order (and the test can tell: swapped pairs differ)

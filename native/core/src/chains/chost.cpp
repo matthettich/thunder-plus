@@ -150,7 +150,7 @@ void ChainsHost::beginBlock(int64_t frame) {
       for (int t = 0; t < kSongNT; t++) if (node_[t]) { chains::ChainsEngine& g = node_[t]->engine(); waves::Transport tr = g.transport(); tr.tempo = e.v; if (e.tks > 0) tr.ticks = e.tks; g.setTransport(tr); }
     }
   }
-  if (n) { std::memmove(ev_, ev_ + n, sizeof(Ev) * (size_t)(nEv_ - n)); nEv_ -= n; }
+  if (n) { std::memmove(ev_.get(), ev_.get() + n, sizeof(Ev) * (size_t)(nEv_ - n)); nEv_ -= n; }
 }
 
 void ChainsHost::hook(void* user, int track, float* L, float* R, int frames, double, const MixFeed* feeds, int nFeeds) {
