@@ -116,7 +116,7 @@ struct PumpHold : Fx {
   ~PumpHold() override { delete ps; }
   void process(float*, float*, int) override {}
 };
-static Fx* make_pump(const FxEntry& e, double sr) { PumpSlot* p = PumpSlot::make(e, sr); return p ? new PumpHold(p) : nullptr; }
+static Fx* make_pump(const FxEntry& e, double sr) { PumpSlot* p = PumpSlot::make(e, sr); if (!p) return nullptr; try { return new PumpHold(p); } catch (...) { delete p; throw; } }
 
 static void copyKey(char* d, const char* s) { std::snprintf(d, kFxKey, "%s", s); }
 static bool keyHas(const char* k, const char* needle) { return std::strstr(k, needle) != nullptr; }

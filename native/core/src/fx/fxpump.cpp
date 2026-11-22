@@ -127,7 +127,7 @@ static int stagedNew(int pt, const float* pv, int npv, int bi, bool byp, bool wi
 PumpSlot* PumpSlot::make(const FxEntry& e, double sr) {
   if (!pump::available() || !fx_is_pump(e.t)) return nullptr;
   const int pt = e.t - kPumpT0, np = pump::nparams(pt);
-  PumpSlot* u = new PumpSlot;
+  std::unique_ptr<PumpSlot> up(new PumpSlot); PumpSlot* u = up.get();   // (an allocation failure below frees it: the destructor frees what was made)
   u->pt = pt; u->bi = e.bi; u->byp = !e.on; u->sck = e.sck; u->cr = e.cr; u->clk = e.clk;
   u->npv = e.npv < np ? e.npv : np;   // (the JS writes pv.length values into pump_values, which holds nparams: a longer list would write past it)
   if (u->npv < 0) u->npv = 0;
@@ -135,8 +135,8 @@ PumpSlot* PumpSlot::make(const FxEntry& e, double sr) {
   if (u->bi >= 0) { u->rbl = new float[kPumpRestMax + 128](); u->rbr = new float[kPumpRestMax + 128](); }
   if (e.pst) for (int i = 0; i < e.pst->n && i < 2; i++) { u->stKey[i] = e.pst->key[i]; u->stVal[i] = e.pst->val[i]; u->nSt = i + 1; }   // FX1: pumpNew's `pst` (MASTER's analysis, TUNE's notes), kept for a fresh instance
   { CtlGate g; u->h = stagedNew(pt, u->pv, u->npv, u->bi, u->byp, true, sr); if (u->h >= 0) u->giveState(); }
-  if (u->h < 0) { delete u; return nullptr; }
-  return u;
+  if (u->h < 0) return nullptr;
+  return up.release();
 }
 int PumpSlot::probeLatency(const FxEntry& e, double sr) {
   if (!pump::available() || !fx_is_pump(e.t)) return -1;
