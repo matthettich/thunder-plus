@@ -5,6 +5,7 @@
 #include <chrono>
 #include <thread>
 
+#include "engine/layer_pe.h"
 #include "live_common.h"
 using namespace lt;
 constexpr int Q = THUNDER_LIVE_QUANTUM;
@@ -57,7 +58,10 @@ int main() {
   CHECK(badRc == 0, "every call answered 0, E_BUSY, E_LIMIT or the expected E_SONG (%d bad of %d ops, %d busy)", badRc, ops, busy);
   CHECK(audioErr.load() == 0, "process never failed and never produced a non-finite sample (%d)", audioErr.load());
   CHECK(seqAsc, "records arrive in ascending seq on the consumer thread");
-  const auto st = stats(A.h); CHECK(st.thread_prepares == 1, "the audio side prepared its workspace once (%u)", st.thread_prepares); CHECK(st.reanchors == 0, "no re-anchor (%u)", st.reanchors);
+  const auto st = stats(A.h); // thread_prepares counts the prepares a process call actually did: 1 where the build has a per-thread Plaits / Elements workspace (a fresh thread is not "ready"), 0 where it has none (pe_thread_ready() is
+  // always true: e.g. a build without the library), and never more than 1 for one audio thread.
+  bool hasWorkspace = false; { std::thread t([&] { hasWorkspace = !pe_thread_ready(); }); t.join(); }
+  CHECK(st.thread_prepares == (hasWorkspace ? 1u : 0u), "the audio side prepared its workspace %u time(s); this build %s a per-thread workspace", st.thread_prepares, hasWorkspace ? "has" : "has no"); CHECK(st.reanchors == 0, "no re-anchor (%u)", st.reanchors);
   CHECK(st.seq_dropped == 0, "no dropped sequencer events (%llu)", (unsigned long long)st.seq_dropped);
   std::printf("hammer: %d control ops (%d E_BUSY retries), %llu quanta, %llu commands applied, %u late commands, %llu steps, %u records dropped\n", ops, busy, (unsigned long long)st.quanta, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)st.steps, st.evt_dropped);
 

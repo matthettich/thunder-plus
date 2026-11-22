@@ -228,7 +228,7 @@ typedef struct thunder_live_stats {
   uint32_t midi_may_hang;       /* the MIDI scheduler's may_hang (thunder_midi_stats): the shell should panic */
   uint32_t live_failed;         /* live nodes whose core refused: silent from then on */
   uint32_t live_late;           /* live events that arrived inside the look-ahead */
-  uint32_t thread_prepares;     /* times a process call prepared its thread's workspace (1 normally; more: the audio thread changed) */
+  uint32_t thread_prepares;     /* times a process call prepared its thread's workspace (1 normally; more: the audio thread changed; 0 in a build that has no per-thread Plaits / Elements workspace to prepare) */
   uint32_t evt_crit_dropped;    /* critical records (STATE, HELD, ERROR, SONG, PADS) the critical ring refused: see EVENTS; also counted in evt_dropped */
   uint32_t cmds_cleared;        /* waiting timed commands dropped by a stop or a play (see TIME) */
   uint32_t cmds_no_seq;         /* bpm / loop / perf commands applied with no sequencer running: dropped and counted here (they are also in cmds_applied) */
