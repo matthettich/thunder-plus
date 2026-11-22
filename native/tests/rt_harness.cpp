@@ -1070,7 +1070,7 @@ done:
 // U33: the pump synths' per-block interface (PumpSynth: the live lanes' reusable path) under the guard, WITH events. Control thread, outside the guard: every instrument is made (psyn_new allocates) and FREEZE's built-in
 // spectra are built (PumpSynth::builtins). Under the guard, for all 13 instruments: 640 blocks of 32 to 512 frames in which every kind of block occurs: no event; a note-on; a note-off; several events at once (note-ons and
 // -offs, a chord with equal offsets, offsets NOT in queue order so the event sort has work to do, a pitch bend and a controller); and a block with 40 events queued in reverse order. Nothing may allocate in any of them.
-// (Before the fourth patch of third_party/prepare-pump.sh every block with an event made one operator new in all 13 synths: the temporary buffer of std::stable_sort in pump's SynthBase::run; this case then aborts
+// (Before the allocation fix (a patch of third_party/prepare-pump.sh until the re-pin to e43ee10, upstream pump 458b88d since) every block with an event made one operator new in all 13 synths: the temporary buffer of std::stable_sort in pump's SynthBase::run; this case then aborts
 // with "operator new" inside the guard. The first note-on of each instrument is under the guard too.) The rendered path (xeng_psyn) is offline and allocates by design (an instance per render).
 static int run_pumpsynth() {
 #ifndef THUNDER_HAVE_PUMP
