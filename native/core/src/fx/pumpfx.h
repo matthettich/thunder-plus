@@ -20,6 +20,8 @@ struct PumpSlot {
   // s.rd: the rest delay line {n: latency, m: n + 128, L, R, w, ok, sig}. The buffers are made with the slot (the JS makes them when a rest begins).
   bool hasRd = false; int rn = 0, rm = 0, rw = 0, rok = 0, rsig = 0;
   float* rbl = nullptr; float* rbr = nullptr;
+  std::string stKey[2], stVal[2]; int nSt = 0;   // FX1: the state texts (pumpNew: pumpState for each `pst` key), given again to a fresh instance
+  void giveState();                              // pump_state_set for each text on instance h (inside the gate)
 
   // Control thread: stages pv (and the bypass) and calls pump_new. nullptr: pump refused (the JS leaves such a slot out of the chain: the sound passes).
   static PumpSlot* make(const FxEntry& e, double sr);
@@ -53,6 +55,7 @@ const float* tel(int h);
 void midi(int h, int frame, int status, int d1, int d2);
 void transport(int h, double bpm, double ppq, int playing);
 void hold(int h, int kind, float a, float b, float c, float d);
+void state_set(int h, const std::string& key, const std::string& value);
 float* values(int h);
 void commit(int h);
 float* io(int ch);

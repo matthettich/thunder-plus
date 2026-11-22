@@ -23,10 +23,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const songFile = process.argv[2]; if (!songFile) { console.error('usage: song-ref.mjs <song.thunder> [outDir]'); process.exit(2); }
 // --master (U12): the app's own master chain switched ON (track effects, master effects, chains and live engines stay off): S.mst on with a shaped EQ,
 // the suppressor, the compressor (the freshMst defaults) and its own limiter OFF, so that the safety limiter (S.limiter, pass(lim = true)) is in the path too.
-const MASTER = process.argv.includes('--master'), FX = process.argv.includes('--fx');   // --fx (U14): the 34 tfx effects on the tracks and the master stay ON; every other effect is removed (not yet ported: U15 to U18)
+const MASTER = process.argv.includes('--master'), FXALL = process.argv.includes('--fx-all'), FX = process.argv.includes('--fx') || FXALL;   // --fx-all (FX1): EVERY effect slot of the song stays ON (tfx, JS cores, pump, MODFX; pump mastering in S.mfx), chains / mastering (S.mst) / limiter off   // --fx (U14): the 34 tfx effects on the tracks and the master stay ON; every other effect is removed (not yet ported: U15 to U18)
 const FXTYPES = FX ? new Set((await import('./fx-src.mjs')).effects().map(e => e.key)) : new Set();
 const keepFx = f => FX && f && FXTYPES.has(f.type);
-const name = path.basename(songFile).replace(/\.thunder$/, '') + (MASTER ? '-master' : FX ? '-fx' : '');
+const name = path.basename(songFile).replace(/\.thunder$/, '') + (MASTER ? '-master' : FXALL ? '-fx-all' : FX ? '-fx' : '');
 const OUT = (process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : null) || '/tmp/thunder-ref/' + name;
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', path.join(ROOT, 'node_modules/playwright/index.mjs')].find(f => fs.existsSync(f));
 const CHROME = process.env.CHROME || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(f => fs.existsSync(f));
@@ -36,6 +36,7 @@ fs.mkdirSync(OUT, { recursive: true });
 
 // the song, with everything after the mixer's own strip switched off
 const file = JSON.parse(fs.readFileSync(path.resolve(songFile), 'utf8')), S0 = file.song;
+if (FXALL) { for (const a of (S0.tfx || [])) for (const f of (a || [])) if (f) FXTYPES.add(f.type); for (const f of (S0.mfx || [])) if (f) FXTYPES.add(f.type); }   // (the page's own list for the in-memory pass below)
 const off = { tfx: 0, mfx: 0, chainOn: 0, mst: !!(S0.mst && S0.mst.on), limiter: !!S0.limiter };
 S0.tfx = (S0.tfx || []).map(a => (a || []).map(f => { if (f) off.tfx++; return keepFx(f) ? f : null; }));
 S0.mfx = (S0.mfx || []).map(f => { if (f) off.mfx++; return keepFx(f) ? f : null; });

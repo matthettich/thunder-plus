@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "modfx/modfx.h"
 #include "rt/jsmath.h"
 
 namespace thunder {
@@ -14,8 +15,10 @@ FxBank::FxBank(double sr) : sr_(sr) {
 }
 void FxBank::load(const Song& S, double bpm, double restartN) {
   bpm_ = bpm; restartN_ = restartN;
-  for (int t = 0; t < kSongNT; t++) { std::unique_ptr<FxPlan> p(h_[t]->planFromSong(S.tfx.at((size_t)t), bpm, restartN)); if (p) h_[t]->commit(p.get()); }
-  { std::unique_ptr<FxPlan> p(h_[kSongNT]->planFromSong(S.mfx, bpm, restartN)); if (p) h_[kSongNT]->commit(p.get()); }
+  // the MODFX modules draw their seeds from ONE counter, as the page's audio thread has one (chains-worklet.js nextSeed): the master's node is made first (pass()), then the tracks in order
+  modfx::SeedCounter seeds;
+  { std::unique_ptr<FxPlan> p(h_[kSongNT]->planFromSong(S.mfx, bpm, restartN, &seeds)); if (p) h_[kSongNT]->commit(p.get()); }
+  for (int t = 0; t < kSongNT; t++) { std::unique_ptr<FxPlan> p(h_[t]->planFromSong(S.tfx.at((size_t)t), bpm, restartN, &seeds)); if (p) h_[t]->commit(p.get()); }
   for (int t = 0; t <= kSongNT; t++) if (h_[t]->slotCount() > 0) flush(t, 0);
 }
 void FxBank::attach(Mixer& m, bool master) {
@@ -49,6 +52,13 @@ bool FxBank::event(const SeqEvent& e, double now, const Mixer& m) {
   }
   if (e.type == SEV_FXP) {   // FXV: the slot's controls with this one moved, mapped, queued at its time (unshifted)
     FxHost& H = *h_[tr]; const FxEntry* c = nullptr; for (int i = 0; i < H.chainSize(); i++) if (H.chainEntry(i)->slot == e.slot) { c = H.chainEntry(i); break; }
+    if (c && fx_is_pump(c->t)) { fxvRefused_++; return false; }   // a pump slot's FXV (pumpPv over the rows that are LFO targets) is not played yet: counted
+    if (c && fx_is_mod(c->t)) {   // a MODFX slot: the control's byte moved to q.min + round((q.max - q.min) * v / 255), the module's values made again (fxvMsg: {pset:{slot, mp}})
+      int bmin, bmax; if (e.slot < 0 || e.slot >= kFxSlots || !fx_mod_bounds(c->t, e.pi, &bmin, &bmax)) return false;
+      Ov& o = ov_[tr][e.slot]; o.v[e.pi] = bmin + js_round((double)(bmax - bmin) * e.v / 255); o.mask |= 1u << e.pi;
+      double bytes[kModMaxParams], mp[kModMaxParams]; for (int i = 0; i < c->nmp; i++) bytes[i] = o.mask >> i & 1u ? o.v[i] : c->mb[i];
+      fx_mod_map(c->t, bytes, mp); H.psetMod(std::max(e.t, now), e.slot, mp, c->nmp); return true;
+    }
     if (!c || e.slot < 0 || e.slot >= kFxSlots || e.pi < 0 || e.pi >= c->nvals) return false;
     Ov& o = ov_[tr][e.slot]; const int mn = fx_param_min(c->t, e.pi), mx = fx_param_max(c->t, e.pi);
     o.v[e.pi] = mn + js_round((double)(mx - mn) * e.v / 255); o.mask |= 1u << e.pi;
@@ -56,6 +66,11 @@ bool FxBank::event(const SeqEvent& e, double now, const Mixer& m) {
     double p[12]; fx_map(c->t, vals, sr_, bpm_, restartN_, p); H.psetAt(std::max(e.t, now), e.slot, p); return true;
   }
   return false;
+}
+int64_t FxBank::masterPumpLatency() const {
+  const FxHost& H = *h_[kSongNT]; int64_t n = 0;
+  for (int i = 0; i < H.slotCount(); i++) if (fx_is_pump(H.slotType(i)) && (H.slotOn(i) || H.slotBypass(i))) n += (int64_t)H.slotLatency(i);   // pumpSlotLat: on, or a bypass of its own
+  return n;
 }
 int FxBank::pdcSlots(PdcSlot* out, int max) const {
   int n = 0;

@@ -120,7 +120,7 @@ class SongRenderer {
   // `N + latencyFrames()` long and the start is trimmed. extraLatencyFrames: what pass() adds for the master side (mastering, the master's pump
   // effects, the limiter's look-ahead: U11 / U12 / U18 say how much). Call before the first block.
   void setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLatencyFrames = 0);
-  int64_t latencyFrames() const { return extra_ + (mchain_ ? mchain_->latency() : 0) + pdc_trim_frames(plan_, sr_); }
+  int64_t latencyFrames() const { return extra_ + (mchain_ ? mchain_->latency() : 0) + pdc_trim_frames(plan_, sr_) + (fx_ && stem_ < 0 ? fx_->masterPumpLatency() : 0); }   // FX1: + the master's pump effects (pass(): pumpChainLatency(S.mfx))
   // THE MASTER CHAIN (U12): between MASTER VOL and OUT, as the page routes it: [mastering: EQ, suppressor / compressor / limiter] -> [the safety limiter].
   // OFF by default (no chain: what U09 / U10 rendered). master_chain_from_song(song.mst, song.limiter) is the song's own. Its latency (mastering's
   // suppressor + limiter look-ahead, the safety limiter's look-ahead) is part of latencyFrames() and renderTrimmed() trims it, as pass() does.
