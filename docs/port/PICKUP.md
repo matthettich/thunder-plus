@@ -14,7 +14,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Machine: 2 cores, about 7 GB free disk. At most two compiling workers; delete build directories of merged work. One git network operation at a time per
   worker; `gh` through REST only (GraphQL is blocked); no CI runs on a push to `native`, only on PRs.
 
-## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); about 68% of the whole port by the lead's estimate (the lists below are older: see START HERE)
+## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); about 70% of the whole port by the lead's estimate (21 Nov, 22:05, after #283 and #281) (the lists below are older: see START HERE)
 - **Stage N1 (playback core):** every worker-buildable unit is merged, pump effect hosting (U18) and Marbles / Tides included. **Left: steps 10 and 11, the
   lead's own: U34 (offline render API and pad renders through the core), U35 (MIDI scheduling), U37 (bridge and host switch: `core.wasm` behind the Settings
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
@@ -32,11 +32,11 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 
 **MERGED since 18:18:** #283 (U37 P2 `LiveHost` core, `a00609a`), #281 (chains C1, `ChainsHost` offline, `897a4dc`), web #284 into `beta` (build 661: generators follow the song's key, TRANSP. + / - cover a whole selection; the owner said "Merge"). `beta` is NOT yet merged into `main` (he was given the GitHub steps to do it himself).
 
-**Waiting for the owner's words in chat ("merge #285 and #287 into beta"; this session's permission rules refuse a merge into `beta` without them):**
-- **#285** (`docs/track-jump-idea`, HANDOVER.md only): a possible future feature, a per-track jump command (one track loops while the others go on; not decided), and the bug entry for the lost header.
-- **#287** (`web/synth-header-lost`, build 662, head `033aa46`): on the phone PWA the header with the tabs was off the top after a notification on the Synth page (fold / unfold brought it back). A safety net, cause not reproduced: stray document scroll is reset and the layout re-measured on return to the app (`resetStrayScroll` / `remeasureAfterReturn`); the lead added: no reset while the keyboard is up over a text field. Both PRs touch HANDOVER.md: merge #285 first and resolve #287 if it then conflicts; after #287, mark #285's bug entry "safety net in build 662, waits for his test".
+**Web PRs, all MERGED into `beta` on his word (22:00):** #285 (HANDOVER: the possible per-track jump command, the lost-header bug entry), #287 (build 662: the header lost on the phone PWA after a notification; a SAFETY NET, `resetStrayScroll` / `remeasureAfterReturn`, cause not reproduced; waits for his test on the Fold), #288 (HANDOVER: "PICK UP HERE (21 Nov, 22:05)", the web app's brief; if still open, it only needs CI and his word). `beta` = build 662; `main` is behind (he has the steps to merge it himself).
 
-**RUNNING at 21:45: FX1** (builder in `/home/claude/wt/fx1`, branch `n1/fx1-song-fx`, last push `1f35ca3` at 21:24: "notes with measured figures, ELECTRO all-slot reference summary"). State and how to resume: `docs/port/FX1-NOTES.md` ON THAT BRANCH. It was branched before #281 merged: expect small conflicts in `src/render/render.cpp` and the two CMake lists. When it reports: the lead reads every audio-path function it lists, an independent Sonnet verifier checks the PR, squash-merge when ALL CI is green.
+**USAGE: the weekly cap was nearly reached at 22:00; it resets Monday 23 Nov, 18:59 Mountain. A check-in is scheduled for 19:05 that day to resume FX1. The FX1 builder was told at 21:57 to push and stop.**
+
+**STOPPED for the usage cap, resume first: FX1** (PR #286, WIP; builder was in `/home/claude/wt/fx1`, branch `n1/fx1-song-fx`, last push `1f35ca3` at 21:24: "notes with measured figures, ELECTRO all-slot reference summary"). State and how to resume: `docs/port/FX1-NOTES.md` ON THAT BRANCH. It was branched before #281 merged: expect small conflicts in `src/render/render.cpp` and the two CMake lists. When it reports: the lead reads every audio-path function it lists, an independent Sonnet verifier checks the PR, squash-merge when ALL CI is green.
 
 **Next, in order:** as the 18:18 list below from item 2 (U37 P3 with R1 and R2, P4, P5; C2; the Android shell on the live host).
 
