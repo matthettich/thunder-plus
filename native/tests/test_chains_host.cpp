@@ -332,6 +332,7 @@ int main() {
     for (long k = 1; k <= 400; k++) {
       const long live0 = g_live; g_failN = 0; g_failAt = k; ChainsPlan* p = planOf(h, pa); g_failAt = 0;
       if (!p) nulls++; else { plans++; h.settle(p); delete p; }
+      if (p && g_live != live0) { static int shown = 0; if (shown++ < 12) { char b[96]; const int m = std::snprintf(b, sizeof b, "  k=%ld: plan kept, refused=%d, live delta %+ld\n", k, p ? 1 : 0, g_live - live0); if (m > 0 && write(2, b, (size_t)m)) {} } }   // (diagnostic)
       if (!p && g_live != live0) { leak = true; std::printf("  leak at k=%ld: %ld\n", k, g_live - live0); break; }
       std::unique_ptr<ChainsPlan> q(planOf(h, pa, 0xffffffffu)); view = view && q && q->nodeMask() == (1u << 3); h.settle(q.get());   // the host is usable and its view is unchanged
       if (!p && q) { /* (counted above) */ }
