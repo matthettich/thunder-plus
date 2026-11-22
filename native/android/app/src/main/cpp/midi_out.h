@@ -13,10 +13,10 @@
 //             an optional AAudio timestamp read at most every 20 ms (TsFn: dlsym'd function pointers, called with a stream pointer; it must be bounded and lock-free).
 //   SENDER    senderMain(): created in engineStart, joined in engineStop. Calls thunder_midiout_pump in a loop and the sink's send and clear (the core calls both from inside the pump, so
 //             on this thread: midiport.h THREADS). Send -> PortTable lookup, PortIo::send. A message for a port without timestamps is HELD (sender-owned array, no lock) until its time; the
-//             core's CLEAR calls sink.clear(dev), which drops that device's held messages that are not yet due (the core then re-sends the ones before the marker). NOTHING is recalled from
-//             the OS (a stamped message already handed over plays: at most 20 ms after a Stop; no AMidi flush, it could discard a note-off the core will not replay), so the core's replay is
-//             SWALLOWED for what was really sent: sendTo keeps the last 256 messages it sent (device, bytes, time) and, between a clear(dev) and the end of that pump call, drops a message
-//             equal to one of them (once). When the sender is told to stop it sends every held message at once, in order, before it ends.
+//             core's CLEAR calls sink.clear(dev), which drops that device's held messages that are not yet due and RETURNS the time up to which nothing was recalled (midiport.h): for a
+//             port without timestamps now + 50 us (what it sent, or was about to send under the 50 us rule, was not recalled: the core does not replay it, and releases its note-ons), for a
+//             stamped port INT64_MAX (nothing is recalled from the OS: no AMidi flush, it could discard a note-off the core will not replay; what the OS holds plays and the core sends the
+//             note-off of every note-on it still holds, midiport.cpp applyClear). When the sender is told to stop it sends every held message at once, in order, before it ends.
 //   TABLE     PortTable (token -> PortIo): ONE std::mutex, held for a vector lookup / swap only; NEVER across a send, an open, a close or a destructor. The sender copies the
 //             shared_ptr out and releases the lock before it sends; the control thread swaps entries under the lock and lets the OLD shared_ptr die AFTER the unlock. So a port is
 //             closed (PortIo destructor) by whichever thread drops the last reference, never under the lock, never while a send on it is running (the sender's copy keeps it alive).
@@ -131,22 +131,13 @@ class MidiHost {
   std::atomic<uint64_t> deferred{0}, deferFull{0}, deferFail{0}, shortWrite{0}, mapExact{0}, mapFallback{0}, mapOdd{0}, sendUnknown{0};
   std::atomic<uint64_t> earlyLong{0};   // a message of more than 3 bytes (SysEx) for a port without timestamps: sent at once, up to 20 ms before its time (not held)
   std::atomic<uint64_t> heldCleared{0}; // held messages dropped by a CLEAR
-  std::atomic<uint64_t> replaySwallowed{0}; // messages the core replayed after a CLEAR that had been sent already: dropped here
   std::atomic<int64_t> lastOffsetFrames{0};   // written - F_cb at the last exact map: the owner's report says whether it is 0 (UNVERIFIED on a device)
 
  private:
   friend struct SinkGlue;
   int sendTo(uint64_t dev, const uint8_t* b, int len, int64_t at);   // SENDER
-  void clearDev(uint64_t dev);                                       // SENDER (sink.clear)
+  int64_t clearDev(uint64_t dev);                                    // SENDER (sink.clear): returns the time up to which nothing was recalled
   void flushAllHeld();                                               // SENDER: sends every held message now, in order
-  // SENDER: what was really sent lately, so the core's replay after a CLEAR does not send it twice (see THREADS)
-  struct Sent { uint64_t dev; uint8_t b[3]; uint8_t len; int64_t at; bool used; };
-  static constexpr int kSent = 256;
-  Sent sent_[kSent];
-  int sentN_ = 0;
-  bool replay_ = false; uint64_t replayDev_ = 0;
-  int emit(const std::shared_ptr<PortIo>& io, uint64_t dev, const uint8_t* b, int len, int64_t at, int64_t ioAt);   // io->send, and remember it
-  bool swallowReplay(uint64_t dev, const uint8_t* b, int len, int64_t at);
   void senderMain();
   int64_t flushDeferred(int64_t now);                               // SENDER: sends the held messages that are due; returns the next due time (INT64_MAX: none)
   int applyDevicesLocked();                                         // ctl_ held

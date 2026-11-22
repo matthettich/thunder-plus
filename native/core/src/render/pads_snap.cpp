@@ -60,10 +60,12 @@ void PadsHost::release(PadBuf* b) {
 
 void PadsHost::freeBuf(PadBuf* b) {
   if (hook_) hook_(hookUser_, b);   // (a test may take mem / varMem: the pointers are then null)
+  bytes_ -= b->held;
   delete[] b->mem; delete[] b->vars; delete[] b->varMem; delete b; freed_++;
 }
 
 size_t PadsHost::retired() const { size_t n = 0; for (const PadBuf* b = retired_; b; b = b->nextRetired) n++; return n; }
+size_t PadsHost::bytesRetired() const { size_t n = 0; for (const PadBuf* b = retired_; b; b = b->nextRetired) n += b->held; return n; }
 
 int PadsHost::setPad(int pad, const float* l, const float* r, int frames, double rate, const PadVarIn* vars, int nVars) {
   if (pad < 0 || pad >= kRenderPads || frames < 0 || frames > THUNDER_RENDER_MAX_PAD_FRAMES || nVars < 0 || nVars > THUNDER_RENDER_MAX_VARIATIONS) return kArg;
@@ -111,9 +113,24 @@ int PadsHost::setPad(int pad, const float* l, const float* r, int frames, double
     off += (size_t)vars[i].frames;
   }
   b->vars = vv; b->nVars = nVars; b->varMem = vmem;
+  b->held = (n + varFrames) * sizeof(float); bytes_ += b->held;
   if (cur_[0][pad]) release(cur_[0][pad]);
   cur_[0][pad] = b;
   stage_.chop.setLoop(pad, 0);   // a changed pad loses its chop data (the C API's rule)
+  return kOk;
+}
+
+int PadsHost::setPadTake(int pad, float* mem, bool stereo, int frames, double rate) {
+  if (pad < 0 || pad >= kRenderPads || !mem || frames < 1 || frames > THUNDER_RENDER_MAX_PAD_FRAMES || !finite(rate) || rate < 1 || rate > 1e6) return kArg;
+  const size_t n = (size_t)frames * (stereo ? 2 : 1);
+  if (n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES) return kArg;   // the same ceiling as setPad
+  for (size_t i = 0; i < n; i++) if (!finite(mem[i])) return kArg;     // checked in place
+  PadBuf* b = newBuf();
+  if (!b) return kNoMem;                                               // (the block is still the caller's)
+  b->mem = mem; b->frames = frames; b->rate = rate; b->stereo = stereo; b->held = n * sizeof(float); bytes_ += b->held;   // from here the PadBuf owns `mem` (freeBuf: delete[])
+  if (cur_[0][pad]) release(cur_[0][pad]);
+  cur_[0][pad] = b;
+  stage_.chop.setLoop(pad, 0);   // a changed pad loses its chop data, as setPad
   return kOk;
 }
 
@@ -126,11 +143,11 @@ int PadsHost::setRoute(int pad, PadRoute route) {
   stage_.route[pad] = route; return kOk;
 }
 
-int PadsHost::setSf(int pad, std::shared_ptr<const sf::Font> font, const sf::Preset* pr, std::shared_ptr<const sf::PresetPcm> pcm, const sf::PadParams& P) {
+int PadsHost::setSf(int pad, std::shared_ptr<const sf::Font> font, const sf::Preset* pr, std::shared_ptr<const sf::PresetPcm> pcm, const sf::PadParams& P, size_t heldBytes) {
   if (pad < 0 || pad >= kRenderPads || !font || !pcm || !pr || pr < font->presets.data() || pr >= font->presets.data() + font->presets.size()) return kArg;
   PadBuf* b = newBuf();
   if (!b) return kNoMem;
-  b->font = std::move(font); b->pcm = std::move(pcm); b->pr = pr;
+  b->font = std::move(font); b->pcm = std::move(pcm); b->pr = pr; b->held = heldBytes; bytes_ += heldBytes;
   if (cur_[1][pad]) release(cur_[1][pad]);
   cur_[1][pad] = b; stage_.sf[pad].P = P;
   return kOk;
@@ -195,18 +212,21 @@ size_t PadsHost::collect() {
 bool PadsHost::beginQuantum(Players& pl, Seq* seq) {
   assert(&pl == owner_);
   if (&pl != owner_) return false;   // a Players whose pools the board does not cover: nothing is adopted, nothing is published
+  assert(pl.epochSlots() == nBoard_);   // verify-276 R2-4: the board and the scratch were sized for this many slots at create(); a pool that grew would overflow them
   seam(0);
   for (int i = 0; i < nBoard_; i++) scan_[i] = 0;
   pl.epochVoices(scan_);
   seam(1);
   for (int i = 0; i < nBoard_; i++) if (scan_[i] != last_[i]) { last_[i] = scan_[i]; board_[i].store(scan_[i], std::memory_order_release); }
   seam(2);
-  const bool changed = slot_->adopt();   // (the old snapshot goes back to the control thread only now, AFTER the stores above)
+  // verify-276 R2-2: a Seq was seen and none is passed now: the host still holds one (or forgot seqGone()). Adopting would hand back the snapshot whose chop table that Seq points at: use after free at its next
+  // step. So the snapshot stays PENDING (the old one stays current) and the quantum is counted; the adopt happens once a Seq is passed or seqGone() was called.
+  const bool held = !seq && seqSeen_ && slot_->pending();
+  if (held) orphan_++;
+  const bool changed = !held && slot_->adopt();   // (the old snapshot goes back to the control thread only now, AFTER the stores above)
   seam(3);
   const PadsSnap* s = slot_->get();
   if (changed) pl.setPads(&s->pads);
-  assert(!(changed && !seq && seqSeen_));   // a Seq the host still holds was not passed: it would point into the snapshot just returned
-  if (changed && !seq && seqSeen_) orphan_++;
   if (s && seq) { seq->setChop(&s->pads.chop); seqSeen_ = true; }
   seam(4);
   return changed;

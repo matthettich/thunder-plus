@@ -11,6 +11,11 @@
 //   E8  the order inside beginQuantum, deterministically: a test seam runs publish + collect between its stages (adopt above the scan would free a buffer a voice is on)
 //   E6  a chop change (hits edited) published and adopted between steps: the Seq's events from that step on equal those of a Seq built fresh with the new table; before it, those of the old table
 #include <atomic>
+#include <csignal>
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -315,8 +320,67 @@ static void e6() {
   delete host; P.reset();
 }
 
+
+// U37 P2, verify-276 R2-2: a Seq was seen and none is passed (the host forgot seqGone(), or still holds one): a pending snapshot is NOT adopted (its chop table is the one the Seq points at) and the quantum is counted;
+// once seqGone() was called, or a Seq is passed, the adopt happens.
+static void e9() {
+  Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
+  CHECK(r.set(0, 0.1f, 4800) == 0, "setPad"); r.post(); CHECK(r.host->beginQuantum(*r.P, r.seq.get()), "adopted with a Seq (the Seq is now seen)");
+  const uint64_t id1 = r.host->current()->id, orphans0 = r.host->orphanAdopts();
+  CHECK(r.set(0, 0.2f, 4800) == 0, "replace"); r.post();
+  for (int i = 0; i < 3; i++) CHECK(!r.host->beginQuantum(*r.P, nullptr), "quantum %d with no Seq after one was seen: not adopted", i);
+  CHECK(r.host->current()->id == id1 && r.host->orphanAdopts() == orphans0 + 3, "the old snapshot stays current (id %llu), the three quanta are counted (%llu)", (unsigned long long)r.host->current()->id, (unsigned long long)(r.host->orphanAdopts() - orphans0));
+  CHECK(r.host->beginQuantum(*r.P, r.seq.get()) && r.host->current()->id > id1, "passed a Seq again: the snapshot is adopted");
+  // seqGone(): the host dropped its Seq on purpose: adopting with a null Seq is fine and is not counted
+  CHECK(r.set(0, 0.3f, 4800) == 0, "replace again"); r.post(); r.host->seqGone(); const uint64_t o2 = r.host->orphanAdopts();
+  CHECK(r.host->beginQuantum(*r.P, nullptr) && r.host->orphanAdopts() == o2, "after seqGone(): adopted with no Seq, not counted");
+  // a host that never had a Seq adopts as always
+  Rig q; if (!q.ok) { CHECK(false, "rig"); return; } CHECK(q.set(0, 0.1f, 4800) == 0, "setPad"); q.post(); CHECK(q.host->beginQuantum(*q.P, nullptr) && q.host->orphanAdopts() == 0, "no Seq ever seen: adopted, not counted");
+  r.host->collect();
+}
+
+// U37 P2: setPadTake (ownership, the finite check in place, errors leave the block with the caller, no identical-data shortcut) and the byte counter (bytesHeld includes retired buffers; bytesRetired)
+static void e10() {
+  Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
+  const int N = 4800; CHECK(r.host->bytesHeld() == 0 && r.host->bytesRetired() == 0, "empty: no bytes");
+  float* blk = new float[(size_t)N]; for (int i = 0; i < N; i++) blk[i] = 0.25f;
+  CHECK(r.host->setPadTake(0, blk, false, N, 48000) == 0, "take a mono block"); CHECK(r.host->bytesHeld() == (size_t)N * 4 && r.host->buffers() == 1, "the block is counted: %zu bytes", r.host->bytesHeld());
+  r.post(); r.quantum(); r.go(0, 0, r.now()); r.quanta(2); CHECK(near(r.out(0), 0.25 * kPan), "the taken block sounds: %g", r.out(0));
+  // the same data again: taking does not shortcut, the old buffer is retired (a voice reads it) and both count
+  float* blk2 = new float[(size_t)N]; for (int i = 0; i < N; i++) blk2[i] = 0.25f;
+  CHECK(r.host->setPadTake(0, blk2, false, N, 48000) == 0 && r.host->buffers() == 2 && r.host->bytesHeld() == (size_t)N * 8, "a take of identical data still makes a new buffer (%zu buffers, %zu bytes)", r.host->buffers(), r.host->bytesHeld());
+  r.post(); r.quantum(); r.host->collect(); CHECK(r.host->retired() == 1 && r.host->bytesRetired() == (size_t)N * 4 && r.host->bytesHeld() == (size_t)N * 8, "retired buffers are counted until freed (%zu retired bytes, %zu held)", r.host->bytesRetired(), r.host->bytesHeld());
+  CHECK(r.endVoices(), "voice ended"); r.quantum(); r.host->collect(); CHECK(r.host->retired() == 0 && r.host->bytesRetired() == 0 && r.host->bytesHeld() == (size_t)N * 4, "freed: %zu bytes held", r.host->bytesHeld());
+  // errors: the block stays the caller's and nothing is staged
+  float* bad = new float[(size_t)N]; for (int i = 0; i < N; i++) bad[i] = 0.1f; bad[4000] = INFINITY; const size_t before = r.host->bytesHeld(), made = r.host->made();
+  CHECK(r.host->setPadTake(1, bad, false, N, 48000) != 0 && r.host->bytesHeld() == before && r.host->made() == made, "a non-finite sample: refused, nothing counted");
+  bad[4000] = 0.1f; CHECK(r.host->setPadTake(1, bad, false, N, 48000) == 0 && r.host->bytesHeld() == before + (size_t)N * 4, "the repaired block is taken");
+  float* z = new float[16]; CHECK(r.host->setPadTake(-1, z, false, 16, 48000) != 0 && r.host->setPadTake(kRenderPads, z, false, 16, 48000) != 0 && r.host->setPadTake(2, nullptr, false, 16, 48000) != 0 && r.host->setPadTake(2, z, false, 0, 48000) != 0 && r.host->setPadTake(2, z, false, 16, 0) != 0, "bad arguments refused"); delete[] z;
+  // stereo: all of L then all of R, 8 bytes a frame
+  float* st = new float[(size_t)N * 2]; for (int i = 0; i < N; i++) { st[i] = 0.1f; st[N + i] = 0.2f; } const size_t b2 = r.host->bytesHeld();
+  CHECK(r.host->setPadTake(2, st, true, N, 48000) == 0 && r.host->bytesHeld() == b2 + (size_t)N * 8, "stereo: %zu bytes more", r.host->bytesHeld() - b2);
+  // removing a pad retires its bytes; a pad with no voice is freed by the next collect after the adopt
+  CHECK(r.host->setPad(2, nullptr, nullptr, 0, 48000) == 0, "remove pad 2"); r.post(); r.quantum(); r.host->collect(); r.host->collect(); CHECK(r.host->bytesHeld() == before + (size_t)N * 4, "back to two pads' bytes (%zu)", r.host->bytesHeld());
+}
+
+// U37 P2, verify-276 R2-4: the epoch board is sized for the pool's slots at create(); beginQuantum asserts the pool still has that many (a pool that grew would overflow the board)
+static void e11() {
+  Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
+  CHECK(r.host->boardSlots() == r.P->epochSlots() && r.host->boardSlots() > 0, "the board has %d slots, the pool %d", r.host->boardSlots(), r.P->epochSlots());
+  Players small(nullptr, 48000, 16); PadsHost* h2 = PadsHost::create(small); CHECK(h2 && h2->boardSlots() == small.epochSlots() && h2->boardSlots() < r.host->boardSlots(), "a smaller pool, a smaller board (%d)", h2 ? h2->boardSlots() : -1);
+#ifndef NDEBUG
+  // assertions are on: a pool of another size passed to beginQuantum must abort (a child process)
+#if defined(__unix__) || defined(__APPLE__)
+  if (h2) { const pid_t pid = fork(); if (pid == 0) { std::freopen("/dev/null", "w", stderr); h2->beginQuantum(*r.P, nullptr); _exit(0); } int stt = 0; waitpid(pid, &stt, 0); CHECK(WIFSIGNALED(stt) && WTERMSIG(stt) == SIGABRT, "beginQuantum with a pool of another size aborts (status %d)", stt); }
+#endif
+#else
+  std::printf("  (R2-4: NDEBUG build: the assert itself is compiled out; the sizing is checked above)\n");
+#endif
+  small.setPads(nullptr); delete h2;
+}
+
 int main() {
-  e0(); e1(); e2(); e3(); e4(); e5(); e6(); e7(); e8();
+  e0(); e1(); e2(); e3(); e4(); e5(); e6(); e7(); e8(); e9(); e10(); e11();
   std::printf("live_pads_epoch: %d checks, %d failed\n", g_checks, g_fail);
   return g_fail ? 1 : 0;
 }
