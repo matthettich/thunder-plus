@@ -88,3 +88,6 @@ Kept. The real host (`opts.chains = 1`, Track In -> Chain Out) gives the stand-i
 - The 300 KB per-node overhead in the budget is an estimate, not a measured bound.
 - Threaded host (C2): the plan comes back through a ring (release / acquire) before `settle()` or deletion; deleting an unsettled plan leaves `inFlight_` set (`~ChainsPlan` asserts).
 - `chains = 2` giving E_ARG: tested in test_render_bus_chain.
+
+## Finding for U31 (engine), not fixed here
+With the n-th allocation failing inside `ChainsEngine::preparePatch` (bad_alloc caught there, patch refused) the engine leaves 1 to 3 allocations behind per refused prepare on GCC 15 / glibc 2.42 (CI job "Core (Linux, GCC)"; local GCC 13 shows one at k=38). `chains_host`'s bad_alloc sweep therefore checks strictly that the HOST's own failures (`plan()` returning null) leak nothing, and allows the balance at the end to exceed zero only by what refused-but-kept plans left (the engine's). Whoever owns cengine.cpp: look for raw `new` in `waves::readPatchDoc` / `PatchImpl::sync` paths that a mid-way bad_alloc skips.
