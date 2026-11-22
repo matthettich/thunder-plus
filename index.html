@@ -26678,7 +26678,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 661;
+const BUILD = 662;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34174,6 +34174,20 @@ if (window.visualViewport) visualViewport.addEventListener('resize', () => sched
 if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(() => arrLayout(true), 150));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => arrLayout(true), 150); });
 new ResizeObserver(() => scheduleRefit(false)).observe(document.documentElement);
+// HEADER LOST (21 Nov, build 662): html / body are overflow:hidden, but a focus(), a keyboard or a notification that resizes the visual viewport can still
+// scroll them from code, and then nothing can scroll them back: the header (the way back to TRACKER) stays off the top. Nothing on the page container
+// level is meant to scroll (.main and the panels scroll themselves), so every re-measure signal puts the document and body back at 0,0.
+function resetStrayScroll(){
+  try { for (const e of [document.scrollingElement, document.documentElement, document.body]) if (e && (e.scrollTop || e.scrollLeft)){ e.scrollTop = 0; e.scrollLeft = 0; } } catch(e){}
+  try { if (scrollX || scrollY) scrollTo(0, 0); } catch(e){}
+}
+function remeasureAfterReturn(){ resetStrayScroll(); scheduleRefit(true); }
+addEventListener('scroll', resetStrayScroll, {passive:true});
+addEventListener('resize', resetStrayScroll);
+addEventListener('pageshow', remeasureAfterReturn);
+addEventListener('focus', remeasureAfterReturn);
+if (window.visualViewport){ visualViewport.addEventListener('resize', resetStrayScroll); visualViewport.addEventListener('scroll', resetStrayScroll); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ remeasureAfterReturn(); setTimeout(resetStrayScroll, 300); } });
 idleTick(() => { if (!document.hidden) arrLayout(); }, 1000, () => !document.hidden, 3000);   // BATTERY: nothing to check while hidden (the visibilitychange above lays out on return)
 // The line over the song's info and the line over ARRANGE's footer meet in one straight line across: whichever
 // block is shorter grows upward to the other's line.
@@ -37104,6 +37118,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [662, '21 Nov', ['Fixed: after a notification or switching apps on the Fold, the Synth page could end up scrolled so the header (the way back to TRACKER) was off the top of the screen and could not be scrolled back. The page now puts itself back at the top whenever the screen comes back, resizes or the keyboard moves it.']],
   [661, '21 Nov', ['Every generator that writes pitches (Arp, Chords, Polymeter, Markov melody, Mutate) has a \u201cSong key\u201d option, on at first: with it on, every note it writes is in the song\u2019s key, the Project SCALE if it is set, else the key found from the song\u2019s notes. Switch it off to write out of key. The command bar\u2019s TRANSP. + / \u2212 now also move the phrases of the selected rows on the Sect screen, and never touch a bus track.']],
   [660, '20 Nov', ['New sync mode OLDSCHOOL, the classic sampler stretch: a tiny loop at the sample\u2019s own pitch whose start is scrubbed through the sample by a ramp that lasts the length. LOOP BY (ms, or 1 to 1/32 of a line), RAMP (FWD, REV, PING, EASE), SMOOTH (0 is the hard cut, up to 50% crossfade), PITCH (semitones). Pick it in the SYNC row (EDIT) or in Sync to lines\u2026. GRANULAR and LOOP sound exactly as before. While you drag TEMPO, synced samples keep the stretch they had and the new tempo is rendered once when you stop.']],
   [659, '20 Nov', ['Sync modes in one list: the SYNC row on INST (press EDIT on it) and the Sync to lines… sheet now pick from the same grouped list (REPITCH; GRANULAR, which is the old STRETCH, and LOOP). REPITCH says what it does: \u201cplays 17.8% slower, 3.4 semitones down\u201d, worked out from the sample\u2019s real length. Nothing you hear changes; old songs are the same.']],
