@@ -148,6 +148,11 @@ add_executable(test_midiport_verify test_midiport_verify.cpp)
 target_link_libraries(test_midiport_verify PRIVATE thunder_core)
 target_include_directories(test_midiport_verify PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include)
 add_test(NAME midiport_verify COMMAND test_midiport_verify --strict)
+# The Stop against stamped messages the sink did not recall (or could not): the last message of every note is a note-off, nothing is replayed; a recalling sink is the old behaviour.
+add_executable(test_midiout_norecall test_midiout_norecall.cpp)
+target_link_libraries(test_midiout_norecall PRIVATE thunder_core)
+target_include_directories(test_midiout_norecall PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include)
+add_test(NAME midiout_norecall COMMAND test_midiout_norecall)
 # SEQ-LIVE-DESIGN Part B: the Song's lifetime under a running sequencer (SeqSession, takeOver, rebind) against the JS's edit goldens (tools/seq-golden.mjs --edit).
 find_package(Threads REQUIRED)
 add_executable(test_seq_takeover test_seq_takeover.cpp)
@@ -613,6 +618,7 @@ if(THUNDER_SANITIZE AND NOT MSVC)
   target_compile_options(test_modfx PRIVATE -fno-sanitize=vptr)
   target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
   target_compile_options(test_hardening PRIVATE -fno-sanitize=vptr)
+  target_compile_options(test_midiout_norecall PRIVATE -fno-sanitize=vptr)   # the Seq's shared_ptr<SeqSession>: as test_seq_takeover
   target_compile_options(test_seq_takeover PRIVATE -fno-sanitize=vptr)   # SongSnap holds shared_ptrs whose control blocks the -fno-rtti core makes: the same reason
 endif()
 
