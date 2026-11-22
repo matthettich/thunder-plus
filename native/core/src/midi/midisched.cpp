@@ -568,6 +568,8 @@ void MidiSched::releaseAll(double now, bool playing, bool stopping) {
   // every note that SOUNDS at the stop time ends now (B9: one whose on was never sent gets no off; B4: one off per pitch, whoever held it).
   // F3: what the gear has been told is judged BY TIME. A STOP's CLEAR discards every message queued after `nf`, an off that was already pushed for a later
   // frame included, so those are undone first (newest first) and the pitch left sounding gets its one off here, whatever was in the ring.
+  // That holds for what is QUEUED in the core. A stamped message the pump already handed to the sink is recalled by the sink's clear() or, when the sink recalls nothing, the pump releases its
+  // note-ons itself (midiport.cpp applyClear: a note-off RELEASE_GAP_NS after the note-on), so no off is made here for them.
   if (!playing) for (int i = nFut_ - 1; i >= 0; i--) if (fut_[i].fr > nf) wire_[fut_[i].idx] = fut_[i].on ? 0 : 1;
   // the offs go in the web's order: the held notes track by track as they were played (moRelease walks mx.held), then whatever else sounds, by pitch
   for (int t = 0; t < kMidiTracks; t++) for (int i = 0; i < nHeld_[t]; i++) {

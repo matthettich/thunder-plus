@@ -47,6 +47,7 @@ extern "C" {
 #define THUNDER_MIDIOUT_TICK_LATE_NS 20000000LL    /* a clock tick later than this is dropped, never sent in a burst */
 #define THUNDER_MIDIOUT_BACKLOG_NS 150000000LL     /* at the FIRST map after a hold: a note-on or controller more than this behind its time is dropped (stats.dropped_stale) */
 #define THUNDER_MIDIOUT_STALE_NS 2000000000LL      /* a clock map not refreshed for this long is stale (counted, still used) */
+#define THUNDER_MIDIOUT_RELEASE_GAP_NS 1000000LL   /* the note-off the core sends for a note-on it could not recall is stamped this much after that note-on (one USB MIDI frame: never the same time, so never reordered on the wire) */
 
 #define THUNDER_MIDIOUT_DEV_TS 1u            /* thunder_midiout_dev.flags: the OS honours a send time (informational) */
 #define THUNDER_MIDIOUT_CAP_TS 1u            /* thunder_midiout_sink.caps: send() may be called up to SEND_AHEAD_NS early with a time; else the pump waits and spins */
@@ -71,7 +72,23 @@ typedef struct thunder_midiout_sink {        /* implemented by the shell */
   void* user;
   int64_t (*now_ns)(void* user);             /* the host clock the times are in (Android CLOCK_MONOTONIC, Mac mach host time as ns, Windows QPC as ns); callable from any thread, and from the AUDIO thread (clock_map calls it): bounded, no allocation, no lock, no throw, no I/O */
   int (*send)(void* user, uint64_t dev, const uint8_t* b, int len, int64_t at_ns);   /* dev = a thunder_midiout_dev.token; at_ns <= now: send now; 0 on success, < 0 = the device is gone */
-  void (*clear)(void* user, uint64_t dev);   /* optional (NULL): drop what the OS still holds for the device (CoreMIDI MIDIFlushOutput); called only with CAP_TS, when a CLEAR meets a stamped message not yet due */
+  int64_t (*clear)(void* user, uint64_t dev);/* optional (NULL = never recalls anything). Called only with CAP_TS, on the pump thread, when a CLEAR meets a stamped message not yet due for the device.
+                                                It drops what the OS (or the shell) still holds for THAT device (CoreMIDI MIDIFlushOutput) and RETURNS R, a time on the sink's clock (now_ns): a message
+                                                handed over with a stamp LATER than R is taken as dropped, one stamped at or before R as delivered (sent, or it will play). What each kind of sink returns:
+                                                  - it flushed everything it holds for the device: R = the time before which it is SURE nothing was flushed. 0 if it cannot say (the core takes anything before its own
+                                                    clock read t as t: a message already due cannot have been recalled, so R < t is raised to t; that is right, and it is today's recalling behaviour: the core replays the
+                                                    messages before the CLEAR's frame that were stamped after t, and drops the ones after it);
+                                                  - it recalled nothing (NULL clear; no flush call): INT64_MAX. The core replays nothing and releases the notes (below);
+                                                  - never flush and return INT64_MAX: the core would not replay the note-offs the flush dropped, and their notes stay on;
+                                                    and never return an R below the stamp of a message it did NOT drop (the core would drop its record and not release a note-on that plays);
+                                                Read the sink's clock immediately BEFORE the flush call. Stamps between the core's own clock read t (just before it called clear) and the flush instant are
+                                                ambiguous: they may have been sent, dropped or be in flight. One R cannot serve both sides, and the two errors differ: for what came before the CLEAR's frame an R that is
+                                                too LATE means no replay of a message the flush did drop (a lost note-off: a stuck note); too EARLY means a replay of a message that also played (a duplicate). For what
+                                                came after the frame an R that is too EARLY means a note-on that plays is taken as dropped and gets no release (a stuck note); too LATE only gives an extra note-off. The first
+                                                is the worse in practice (note-offs are before the frame), so err EARLY, and keep the flush fast (the window is one flush long).
+                                                What was NOT recalled plays, so the core does not replay it, and for every note-on after the CLEAR's frame that it handed over and that was not recalled (also one that was
+                                                already due when the CLEAR was drained) it sends the matching note-off (RELEASE_GAP_NS after the note-on's stamp, or at once if that is past): the device is never left
+                                                holding a note. clear must not drop messages that are already due, or of another device */
   uint32_t caps;                             /* THUNDER_MIDIOUT_CAP_TS or 0 */
 } thunder_midiout_sink;
 
@@ -89,15 +106,16 @@ typedef struct thunder_midiout_stats {       /* all counted since create */
   uint32_t reserved;
   uint64_t sent;                             /* messages the sink accepted */
   uint64_t dropped_gone;                     /* the message's device is not listed, or the sink said it is gone */
-  uint64_t dropped_cleared;                  /* removed by a CLEAR marker */
+  uint64_t dropped_cleared;                  /* removed by a CLEAR marker: only what did not play (queued messages, and handed-over ones the sink recalled) */
   uint64_t dropped_nomap;                    /* no longer counted: records wait for the first clock map (kept for ABI) */
   uint64_t late;                             /* sent (or a tick dropped) more than 2 ms behind its time, or sent while the map was stale */
   uint64_t queue_full;                       /* a message did not fit: it, or a lower-priority one, was dropped (clock ticks, then CCs, then note-ons, never a note-off or Stop) */
   uint64_t max_queue;                        /* the most messages the queue held */
   uint64_t send_errors;                      /* the sink returned < 0 */
   uint64_t dropped_late_ticks;               /* clock ticks more than 20 ms behind: dropped (also in late) */
-  uint64_t may_hang;                         /* 1 = a note-off, Stop or All Notes Off did not fit: the shell should send PANIC (thunder_midi_panic) */
+  uint64_t may_hang;                         /* 1 = a note-off, Stop or All Notes Off did not fit, or the release of a note-on that a CLEAR could not recall failed to send: the shell should send PANIC (thunder_midi_panic) */
   uint64_t dropped_stale;                    /* the backlog rule of the first map: a held note-on or controller (CC, bend, pressure, program) more than 150 ms in the past was dropped; its note-off may still be sent (harmless) */
+  uint64_t released_after_stop;              /* note-offs the pump sent for note-ons that a CLEAR could not recall (they play: the sink recalled nothing, or only part) */
 } thunder_midiout_stats;
 
 /* CONTROL. NULL on a bad argument (null core_midi / sink / now_ns / send, a rate outside 8000..384000) or no memory. The core_midi and the sink must outlive it. */
