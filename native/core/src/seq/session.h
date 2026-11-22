@@ -90,6 +90,8 @@ struct SongSnap {
   std::shared_ptr<SeqSession> sess;
   std::shared_ptr<const Song> song;
   SeqVars vars;
+  uint64_t ord = 0;               // U37 P2: the host's publish ordinal (monotonic): the audio side reports how many snapshots it has adopted or retired (stats.song_pending)
+  int64_t rev = 0;                // U37 P2: the caller's revision number of the song text (LiveHost::songPublish sets it between make() and slot.publish; the audio side echoes it in the SONG record)
   std::unique_ptr<Seq> seq;       // declared last: destroyed first
 };
 

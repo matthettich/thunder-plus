@@ -16,7 +16,7 @@ static_assert(sizeof(thunder_live_ev_meters) - sizeof(thunder_live_ev_head) >= s
 static_assert(THUNDER_LIVE_MAX_FONTS == THUNDER_RENDER_MAX_FONTS, "");
 static_assert(sizeof(LiveEvSlot) >= THUNDER_LIVE_EV_MAX, "an event slot holds the longest record");
 static_assert(sizeof(void*) != 8 || sizeof(LiveCmd) == 56, "LiveCmd");
-static_assert(sizeof(thunder_live_stats) == 240 && sizeof(thunder_live_opts) == 56 && sizeof(thunder_live_play_opts) == 80, "the sizes live.h documents");
+static_assert(sizeof(thunder_live_stats) == 240 && sizeof(thunder_live_opts) == 56 && sizeof(thunder_live_play_opts) == 88, "the sizes live.h documents");
 static_assert(static_cast<int>(MixKey::Vol) == THUNDER_LIVE_MIX_VOL && static_cast<int>(MixKey::Trim) == THUNDER_LIVE_MIX_TRIM && static_cast<int>(MixKey::Pan) == THUNDER_LIVE_MIX_PAN &&
               static_cast<int>(MixKey::Mute) == THUNDER_LIVE_MIX_MUTE && static_cast<int>(MixKey::Solo) == THUNDER_LIVE_MIX_SOLO && static_cast<int>(MixKey::Out) == THUNDER_LIVE_MIX_OUT,
               "the C mixer keys are MixKey's values (Send is 5 and is refused)");

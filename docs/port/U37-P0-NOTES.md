@@ -139,3 +139,6 @@ The branch is now on `native` 56ffdc3. What changed in the `PadsHost` text of `l
 - **Quantum step 2:** `seq_adopt`, then `seqGone()` if the play was stopped or its Seq dropped (BEFORE that quantum's `beginQuantum`), then `beginQuantum(players, runner.seq())` every quantum (board, adopt, chop re-point); sessions use `opts.chop = nullptr`.
 - **Free rule:** exact per buffer and per voice slot (the board), no longer "per pad"; no `slot` / `kEpochSlots`.
 - **P2 work list:** `PadsHost::setPadTake`; the byte counter including retired buffers; verifier fix 1 (`!seq && seqSeen_`: do not adopt, leave the snapshot pending); verifier fix 2 (`assert(pl.epochSlots() == nBoard_)`).
+
+## P5 work list: thunder_live_alloc (U37 P2 round 2, F17)
+`thunder_live_alloc` blocks are handed to `PadsHost::setPadTake` and freed by `PadsHost::freeBuf` with `delete[]`. So a block MUST come from `new (std::nothrow) float[n]`. Plain `new float[]` is 16-byte aligned on glibc / bionic 64-bit but not guaranteed on wasm32 or 32-bit; if P5 needs an aligned allocation it must also change `freeBuf` (or record in the PadBuf how the block was made) so the matching aligned delete is used.
