@@ -322,6 +322,8 @@ int main() {
 #ifdef ALLOC_AUDIT
   // 11. bad_alloc: the n-th allocation of plan() fails, for every n: null (or a plan), nothing leaked, the host as it was, the next plan works
   std::printf("chains_host: bad_alloc sweep (every failing allocation of plan())\n"); std::fflush(stdout);   // (stdout's buffer is made here, not inside the count)
+  { try { throw std::bad_alloc(); } catch (const std::bad_alloc&) {}   // the first exception of a process makes the unwinder's caches (never freed): before the count, not inside it
+    Doc pw(patchA()); ChainsHost hw(kSr); for (long k = 1; k <= 3; k++) { g_failN = 0; g_failAt = k; ChainsPlan* w = planOf(hw, pw); g_failAt = 0; if (w) { hw.settle(w); delete w; } } }
   const long liveAll = g_live;
   {
     Doc pa(patchA()), pb(patchB()); ChainsHost h(kSr); auto mix = mkMixer(); std::unique_ptr<ChainsPlan> w(planOf(h, pa)); adopt(h, w.get(), *mix); w.reset();
