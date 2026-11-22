@@ -34178,6 +34178,8 @@ new ResizeObserver(() => scheduleRefit(false)).observe(document.documentElement)
 // scroll them from code, and then nothing can scroll them back: the header (the way back to TRACKER) stays off the top. Nothing on the page container
 // level is meant to scroll (.main and the panels scroll themselves), so every re-measure signal puts the document and body back at 0,0.
 function resetStrayScroll(){
+  // (lead) not while the on-screen keyboard is up over a text field: the browser may have scrolled the page to keep that field in view; the reset runs when the field loses focus
+  try { const a = document.activeElement, vv = window.visualViewport; if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && vv && vv.height < innerHeight - 120) return; } catch(e){}
   try { for (const e of [document.scrollingElement, document.documentElement, document.body]) if (e && (e.scrollTop || e.scrollLeft)){ e.scrollTop = 0; e.scrollLeft = 0; } } catch(e){}
   try { if (scrollX || scrollY) scrollTo(0, 0); } catch(e){}
 }
@@ -34185,6 +34187,7 @@ function remeasureAfterReturn(){ resetStrayScroll(); scheduleRefit(true); }
 addEventListener('scroll', resetStrayScroll, {passive:true});
 addEventListener('resize', resetStrayScroll);
 addEventListener('pageshow', remeasureAfterReturn);
+addEventListener('focusout', () => setTimeout(resetStrayScroll, 300));
 addEventListener('focus', remeasureAfterReturn);
 if (window.visualViewport){ visualViewport.addEventListener('resize', resetStrayScroll); visualViewport.addEventListener('scroll', resetStrayScroll); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden){ remeasureAfterReturn(); setTimeout(resetStrayScroll, 300); } });
