@@ -40,10 +40,10 @@ fi
 BIN="$BUILD/tools/thunder-render/thunder-render"
 if [ ! -x "$BIN" ]; then cmake -S "$ROOT/native" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build "$BUILD" -j8 --target thunder-render >/dev/null; fi
 OUT="${TMPDIR:-/tmp}/thunder-render-$NAME"
-"$BIN" "$REF/song.thunder" "$REF" "$OUT-page.wav" --page-timing ${MASTER:+--master} ${FX:+--fx}
+"$BIN" "$REF/song.thunder" "$REF" "$OUT-page.wav" --page-timing ${MASTER:+--master} ${FX:+--fx --pdc}
 set +e
 node "$HERE/render-diff.mjs" "$OUT-page.wav" "$REF/ref.f32" "voices timed as the page player's (the reference's own): "; A=$?
-"$BIN" "$REF/song.thunder" "$REF" "$OUT-core.wav" ${MASTER:+--master} ${FX:+--fx} >/dev/null; RC=$?
+"$BIN" "$REF/song.thunder" "$REF" "$OUT-core.wav" ${MASTER:+--master} ${FX:+--fx --pdc} >/dev/null; RC=$?
 node "$HERE/render-diff.mjs" "$OUT-core.wav" "$REF/ref.f32" "voices timed as the core's (not part of the verdict; see voice/voice.h setPageTiming): "
 set -e
 [ $RC -eq 0 ] || { echo "render-compare: FAIL: the core-timed render reported lost events or a voice that never ended (exit $RC)"; exit 1; }

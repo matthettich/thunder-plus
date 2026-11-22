@@ -36,7 +36,8 @@ fs.mkdirSync(OUT, { recursive: true });
 
 // the song, with everything after the mixer's own strip switched off
 const file = JSON.parse(fs.readFileSync(path.resolve(songFile), 'utf8')), S0 = file.song;
-if (FXALL) { for (const a of (S0.tfx || [])) for (const f of (a || [])) if (f) FXTYPES.add(f.type); for (const f of (S0.mfx || [])) if (f) FXTYPES.add(f.type); }   // (the page's own list for the in-memory pass below)
+if (process.env.FXKEEP) { FXTYPES.clear(); for (const k of process.env.FXKEEP.split(',')) FXTYPES.add(k); }   // (an aid for bisecting: only these effect types stay on, as FXKEEP=pmaster,peq)
+else if (FXALL) { for (const a of (S0.tfx || [])) for (const f of (a || [])) if (f) FXTYPES.add(f.type); for (const f of (S0.mfx || [])) if (f) FXTYPES.add(f.type); }   // (the page's own list for the in-memory pass below)
 const off = { tfx: 0, mfx: 0, chainOn: 0, mst: !!(S0.mst && S0.mst.on), limiter: !!S0.limiter };
 S0.tfx = (S0.tfx || []).map(a => (a || []).map(f => { if (f) off.tfx++; return keepFx(f) ? f : null; }));
 S0.mfx = (S0.mfx || []).map(f => { if (f) off.mfx++; return keepFx(f) ? f : null; });
@@ -70,7 +71,7 @@ try {
   await page.evaluate(([t, n]) => window.__seqTest.load(t, n), [text, name + '.thunder']);
   /* eslint-disable no-undef */
   // (the app's code lives in one closure: __seqTest.ev runs a line inside it, where S, kit, makeSeq, pass... are)
-  const inApp = async (MASTER, FXK) => {
+  const inApp = async (MASTER, FXK, PDCOFF) => {
     const save = (nm, f32) => fetch('/__save?name=' + nm, { method: 'POST', body: new Blob([f32.buffer.slice(f32.byteOffset, f32.byteOffset + f32.byteLength)]) }).then(r => r.text());
     // in memory too (the loader may fill in defaults)
     S.tfx = S.tfx.map(a => (a || []).map(f => f && FXK.includes(f.type) ? f : null)); S.mfx = S.mfx.map(f => f && FXK.includes(f.type) ? f : null); S.chainOn = S.chainOn.map(() => false); if (MASTER) { if (!(S.mst && S.mst.on)) return { err: 'the master chain did not load' }; } else { if (S.mst) S.mst.on = false; S.limiter = false; }
@@ -78,6 +79,7 @@ try {
     // does wherever the live module is not loaded (bassNode returns null: "play the render"). The live modules still load into the
     // render's context; the sets that say "loaded" are kept empty, so no live node is ever made.
     for (const set of [typeof bassOK !== 'undefined' && bassOK, typeof psOK !== 'undefined' && psOK, typeof wlOK !== 'undefined' && wlOK]) if (set) set.add = function () { return this; };
+    if (PDCOFF) aset.pdcMode = 'off';   // (an aid: LATENCY COMP off, to tell its effects from an effect's)
     const sr = 48000;
     // renderOut(), its own steps
     const R = Math.random; let s = 0x2545F491;
@@ -114,7 +116,7 @@ try {
     const all = new Float32Array(2 * N); all.set(mix[0], 0); all.set(mix[1], N); await save('ref.f32', all);
     return { sr, frames: N, vars: coreVars(), kit: coreKitV(), pads: padList, offAfter: off2, stats };
   };
-  info = await page.evaluate(src => window.__seqTest.ev(src), '(' + inApp.toString() + ')(' + MASTER + ', ' + JSON.stringify([...FXTYPES]) + ')');
+  info = await page.evaluate(src => window.__seqTest.ev(src), '(' + inApp.toString() + ')(' + MASTER + ', ' + JSON.stringify([...FXTYPES]) + ', ' + !!process.env.PDCOFF + ')');
 } finally { await browser.close(); srv.close(); }
 if (!info || info.err) { console.error('song-ref: ' + (info ? info.err : 'no result')); process.exit(1); }
 const ref = fs.readFileSync(path.join(OUT, 'ref.f32')), f = new Float32Array(ref.buffer, ref.byteOffset, ref.length / 4);

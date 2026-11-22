@@ -61,7 +61,7 @@ bool fx_entry_pump(Json o, int slot, int pt, FxEntry* out, FxSlotText* txt, int*
   const char* type = fx_pump_key(pt); Json pump = o.obj("pump");
   const int np = kPumpParamN[pt]; c.npv = np < kPumpMaxParams ? np : kPumpMaxParams;
   for (int i = 0; i < c.npv; i++) {   // pumpNorm1: the symbol's value clamped (pumpClamp), a missing one at its start value; tfxChain: f.pump[p.s] ?? p.def
-    const PumpParam& p = kPumpParams[pt][i]; double v = p.def; Json j = pump.get(p.s);
+    const PumpParam& p = kPumpParams[pt][i]; double v = p.st; Json j = pump.get(p.s);
     if (!j.missing()) { double x; if (!jsNumber(j, &x) || x != x) v = p.def; else { v = x > p.mx ? p.mx : x < p.mn ? p.mn : x; if (p.flags & 6) v = js_round(v); } }
     c.pv[i] = (float)v;
   }
