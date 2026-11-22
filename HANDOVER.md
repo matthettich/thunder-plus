@@ -873,6 +873,11 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Generators follow the song's key; TRANSP. on a whole selection (21 Nov; build 661, web beta)**
+- [ ] **Phone (Galaxy Z Fold 6, folded and unfolded), any song with a few melodic notes and SCALE OFF:** open a phrase, GEN → Arp (then Chords, Polymeter, Markov melody, Mutate). Pass: each panel has a "Song key" row set to "Follow it: <the key>", it fits on the folded screen, and every note written is in that key. Set Project SCALE and SCALE ROOT (for example D dorian) and repeat: the notes follow it.
+- [ ] **Same panels, "Song key" set to "Off: any note":** Pass: Arp writes its chord as shaped (a major third in a minor song), and reopening the panel keeps it Off.
+- [ ] **Computer or phone, Sect screen:** select several rows of a block's chain (Shift+arrows) and press the command bar's TRANSP. + then −. Pass: every selected row's phrase moves a semitone once (a phrase on two rows moves once), the rows outside the selection do not, one undo step, and the message says how many patterns. Also check a Phrase selection across several columns of a poly track, and Arrange with several blocks selected: all of it moves. A bus track never gets notes.
+
 **Native port, U36 T9: MIDI out from the Android test app (21 Nov; PR #275)**
 - [ ] **Phone (Galaxy Z Fold 6) and a USB MIDI synth or interface:** install the test APK, artifact `thunder-plus-native-n0-android-apk` from https://github.com/matthettich/thunder-plus/actions/runs/44935839127 (kept until 21 Dec). The full steps are in `native/tests/OWNER-TEST-U36.md` on the `native` branch (about 10 minutes).
 - [ ] **Tap MIDI out test:** Pass: one high note, then eight evenly spaced notes (C E G C twice) in about 4 seconds, no stuck note, and the `stats:` line shows `err 0`, `gone 0`, `hang 0`. Say whether the timing sounded tight or jittery.
@@ -1687,6 +1692,13 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 21 Nov (generators follow the song's key; TRANSP. buttons cover the whole selection; build 661)
+
+Branch `web/key-and-transpose`, one PR into `beta`. Notes: `docs/WEB-KEY-NOTES.md`. Tests: `tests/generators-song-key.test.js`, `tests/transpose-selection-all.test.js`.
+- **Song key option:** Arp, Chords, Polymeter, Markov melody and Mutate have a "Song key" row (Follow it: <key> / Off: any note), on at first, kept in the generator's own settings object like its other options (until the page is reloaded, as they are). On: every note written goes to the nearest note of the key (`keySnap`, ties down). The key is the Project SCALE / SCALE ROOT with its exact notes (`songKey().iv`), else the key `songKey()` finds from the song's notes; none found yet: nothing to follow, notes as set. Off: as before. No option on Ratchet, Probability fill, Euclidean fill, Drum pattern (rhythm or copies of notes already there, drum hits) or Acid line (its own KEY select: From the song / Set by hand, on at first).
+- **TRANSP. + / − (command bar) and the keys:** they were the same `transposeSel`. Left out: a selection on the Sect screen (nothing moved), and bus tracks were not skipped (blocks on a bus track, the other tracks of a Pattern selection). Now the Sect screen's selected rows move their phrases (each once, one undo step, "also used elsewhere" noted) and bus tracks are skipped everywhere.
+- **Open question for the owner:** Mutate, Polymeter and Markov already stepped along the detected scale before this build, so with the option Off they still do (Off = exactly as before). Say if Off should mean chromatic steps instead.
 
 ## 20 Nov (tests only: the FlexCore golden is a committed reference that CI runs; branch `beta-flex-golden`, no build)
 
