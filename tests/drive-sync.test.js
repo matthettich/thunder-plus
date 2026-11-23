@@ -33,9 +33,9 @@ const mkRes = (status, body) => ({ ok: status >= 200 && status < 300, status, js
 const folderRoute = { test: u => u.includes('mimeType') && u.includes('google-apps.folder') && !u.includes('upload'), reply: () => ({ body: { files: [{ id: 'F1' }] } }) };
 const dec = u => decodeURIComponent(u);
 
-test('the block exists, the client id const is empty by default, and the menu lists the three items in both File menus', () => {
+test('the block exists, the client id const holds a Web client ID (owner, 23 Nov), and the menu lists the three items in both File menus', () => {
   assert.ok(blk, 'DRIVE SYNC block missing');
-  assert.match(src, /const DRIVE_CLIENT_ID = '';/);
+  assert.match(src, /const DRIVE_CLIENT_ID = '[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com';/);
   assert.equal((src.match(/\.\.\.driveItems\(\)/g) || []).length, 2);
   const { x } = make(); assert.deepEqual(Array.from(x.driveItems(), i => i.l), ['Save to Drive', 'Open latest from Drive', 'Open from Drive…']);
 });
@@ -119,6 +119,6 @@ test('token: kept in memory until its expiry; first sign-in asks for consent, la
   assert.equal(t.tokens.opt.prompt, 'consent'); assert.equal(t.tokens.opt.scope, 'https://www.googleapis.com/auth/drive');
   t.x.drv.exp = 0; await t.x.driveRun(t.x.driveOpenLatest); assert.equal(t.tokens.n, 2); assert.equal(t.tokens.opt.prompt, '');
 });
-test('service worker leaves Google sign-in and Drive requests alone; build and cache are 668', () => {
-  assert.match(sw, /accounts\.google\.com[\s\S]{0,200}www\.googleapis\.com[\s\S]{0,200}return;/); assert.ok(sw.includes("'thunderplus-v668'")); assert.match(src, /const BUILD = 668;/);
+test('service worker leaves Google sign-in and Drive requests alone; build and cache agree (668 or later)', () => {
+  assert.match(sw, /accounts\.google\.com[\s\S]{0,200}www\.googleapis\.com[\s\S]{0,200}return;/); const b = +(/const BUILD = (\d+);/.exec(src) || [])[1]; assert.ok(b >= 668); assert.ok(sw.includes("'thunderplus-v" + b + "'"));
 });
