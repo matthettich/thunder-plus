@@ -882,6 +882,11 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Patch knobs on …waves (22 Nov; build 664, web beta)**
+- [ ] **Computer, a track playing a …waves instrument (Live engines on):** in the waves patch add a Knob (K1) into a filter's or VCA's purple jack; play notes with `KN1 00` then `KN1 FF` a few rows later. Pass: the sound changes at that row; STOP puts it back to the Knob's Value.
+- [ ] **Same, on the phone with the audio-thread sequencer:** Pass: as on the computer.
+- [ ] **KN1 FF before the first note of a waves pad:** Pass: the first note already has the knob at FF.
+
 **Patch knobs: Knob module + KN1–KN8 (22 Nov; build 663, web beta)**
 - [ ] **Computer, a track with CHN on:** open its chains patch, add Control utilities → **Knob** (K1), patch Out into a filter's purple Cutoff jack (Min 0, Max 1). In a phrase on that track type `KN1 00` on row 00 and `KN1 FF` on row 08. Pass: the filter is closed then opens at row 08, with no click; the Knob's Value slider moves nothing while the song holds it.
 - [ ] **Same song, STOP:** Pass: the filter goes back to where the Knob's Value slider sets it.
@@ -1713,6 +1718,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 22 Nov (patch knobs S2: …waves live nodes; build 664)
+`k1`–`k8` on thunder-wlive (`e.knobs`, `__wl`). Page: `knSt` per track in makePlayer, the `chc` handler also sets the track's wl nodes, wlNode applies knSt, STOP resets. Core: `chc` sets __wl procs for the track (knPut), lnode() applies knSt to a node met later, stopAll resets knTouched. waves worklet ?v=48. Renders use the page path.
 
 ## 22 Nov (patch knobs S1: Knob module + KN1–KN8; build 663)
 Owner, 22 Nov: tracks should control aspects of …waves / …chains. Plan: docs/plans/PATCH-KNOBS-PLAN.md (S2 waves, S3 MOD targets, S4 bottom panel). Built: shared `knob` module (chains-worklet SHARED block, synced to waves; editor entry, palette, hint, summary, width), `engine.knobs[1..8]`, `k1`–`k8` AudioParams on thunder-chains (−1 = the Knob's own Value), KN1–KN8 appended to FXC (after CHD), sequencer emits `chc` k-events (v/255), STOP resets via `CHN_RESET`; chase and the audio-thread core handle `chc` generically (core regenerated). Worklets ?v=59 / ?v=47. Tests: tests/patch-knobs.test.js (written by a Sonnet worker, reviewed and mutation-checked by the lead); flex FXC-order regex and the 662 build test loosened to allow later entries.
