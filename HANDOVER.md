@@ -24,6 +24,14 @@ Keep this file up to date at the end of a work session.
 - **Cache-busters now:** `chains-worklet.js?v=15`, `waves-worklet.js?v=11`, `master-worklet.js?v=2` (index.html, the editor
   pages, sw.js). Cache is `thunderplus-v79`.
 
+## Native port: in-flight web work (22 Nov, read before porting the sequencer or …chains / …waves)
+
+The lead is building **patch knobs** on the web app (`beta`), plan `docs/plans/PATCH-KNOBS-PLAN.md`. It changes things a
+native port mirrors: new tracker commands **KN1–KN8** appended to `FXC` (after `CHD`), new AudioParams **k1–k8** on the
+`thunder-chains` node (and later the …waves live node), a new shared module **`knob`** (reads `ctx.engine.knobs`), and
+later MOD targets K1–K8. Port the sequencer / chains engine from the `beta` that includes these, and check that plan's
+progress notes for what has landed. Nothing in `native/` is touched by this work.
+
 ## Build the native I/O helper — START HERE when the owner says "I want to build the helper"
 
 Owner, 7 Nov: "make it so when I say 'I want to build the helper' the whole plan is clear to the next agent". This section
@@ -1647,6 +1655,7 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 - Test-suite notes: `tests/waves.test.js` golden hashes depend on render order in the shared wasm instance; `effects.mjs`'s two "master: … default chain" checks fail on an untouched base; a heap-sampling test can fail once when the machine is busy (rerun it alone).
 
 ### Native port: Mac, Windows, Android, iOS as a stretch (owner, 10 Nov: asked for the strategy; **plan only, waiting on the owner's go**)
+> **22 Nov:** web-app work in flight that a port must mirror (KN1–KN8, k1–k8 on thunder-chains, the `knob` module): see "Native port: in-flight web work" near the top.
 
 Owner: "write up a strategy to port thunder plus to a native Mac, windows, and Android app (with iOS as a stretch goal, unless its easy) … I am debating whether maintaining multiple apps for parity is worth managing. I still want to be able to open songs from desktop on mobile". Full text, benefits, costs and risks: [`docs/NATIVE-PORT-STRATEGY.md`](docs/NATIVE-PORT-STRATEGY.md). It builds on `docs/NATIVE-DESKTOP-PLAN.md` (core rules, bridge, timing, desktop host) and `docs/ENGINE-PLUGIN-PLAN.md`. **When the owner says "start the native spike", do stage N0.** Nothing else starts before N0's exit. **The plan a managing session works from (tasks, who does each, pass / fail gates, the brief template, the status table) is [`docs/port/WORKPLAN.md`](docs/port/WORKPLAN.md)**, with `docs/port/ENGINE-INVENTORY.md` (every piece to port, units U01–U37), `docs/port/BRIDGE-TODAY.md` (today's messages) and `docs/port/CORE-BRIDGE.md` (the new contract, draft). Owner (10 Nov): the web app must stay fully working until there is a native beta with few bugs, so the port lives on a `native` branch in new folders (`native/…`) and never edits the app; wants a plan a less capable managing model (Opus) can run, calling on Fable for the heavy work.
 
