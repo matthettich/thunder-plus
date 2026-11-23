@@ -3927,7 +3927,15 @@ function addItem(type, x, y){
   x = snapV(x); y = snapV(y);   // M11: a new module lands on the grid
   store.snapshot();
   if (type.startsWith('c:')){ const ids = addCustom(type.slice(2), [x, y]); clearSel(); ids.forEach(id => setSel(id, true)); afterAdd(ids); return; }
-  const m = addModule(type, x, y); if (m){ clearSel(); setSel(m.id, true); afterAdd([m.id]); }
+  const m = addModule(type, x, y); if (m){ if (type === 'knob') knobToDeck(m); clearSel(); setSel(m.id, true); afterAdd([m.id]); }
+}
+// S4 (patch knobs): a Knob added from the palette puts its Value on the bottom panel, labelled K<n> (as "Add to the bottom panel" would, but in the
+// same undo step as the add, which addItem has already snapshotted). Only here: load, undo, paste and duplicate never add one. The label is stored
+// (like any deck entry), so changing the Knob's n later leaves it; the owner can remove and re-add it.
+function knobToDeck(m){
+  if (deckHas(m.id, 'value')) return;
+  const d = deckDesc(m, 'value'); d.l = 'K' + Math.round(m.params.n || 1);
+  doc.deck = (doc.deck || []).concat([d]); store.touch(); markDeck(); if (EMBED && TW && TW.deck) TW.deck();
 }
 // T3 (13 Nov, audit T3): on a narrow screen the module list covers the patch, so it closes once a module is added, and the view pans to
 // the new module if it is not wholly in view. (On a wide screen the list stays open: several modules are often added in a row.)

@@ -209,7 +209,7 @@ const blockMuted = (Sx, y, t) => {
 const masterBlockMuted = (Sx, y) => !!(Sx && Array.isArray(Sx.smuteM) && Sx.smuteM.indexOf(y) >= 0);
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
-function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$/.test(id); }
+function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$|^kn:\d+:[1-8]$/.test(id); }
 const perfOf = (Sx = S) => Sx.perf || (Sx.perf = freshPerf());
 function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1], s:a[2] != null ? +a[2] : -1, p:a[3] != null ? +a[3] : -1, b:a[4] != null ? +a[4] : null}; }
 function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p], pu = isPumpT(f.type);
@@ -219,6 +219,7 @@ function tgtOwn(id, Sx = S){
   const g = tgtParse(id);
   if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : Sx.mout == null ? 255 : Sx.mout;   // the master: the OUT fader's own byte (S.mout; the song's own is never written)
   if (g.k === 'pan') return g.t < NT ? Sx.mix[g.t].pan : 128;
+  if (g.k === 'kn') return 128;   // PATCH KNOBS S3: the page can't see the Knob's own Value (it is in the patch): an LFO swings round the middle
   if (g.k === 'fx'){ const x = tgtFx(g, Sx); if (x && x.q.pb){ const p = TFX[x.f.type].pd[x.pi]; return clamp(pumpByte(p, x.f.pump && x.f.pump[p.s] !== undefined ? x.f.pump[p.s] : p.def), 0, 255); }
     return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
   // cut / dec: open (255); res: none (0). env / atk / sus / rel (live engines, 10 Nov): 0. Only the OFFSET from the engine's own value reaches the engine
@@ -239,6 +240,7 @@ function tgtEvs(id, v, at, pno){
   if (g.k === 'cut' || g.k === 'res' || g.k === 'dec' || g.k === 'tch'){ const o = pno.get(g.t) || {}; if (own) delete o[g.k]; else o[g.k] = v; pno.set(g.t, o); return []; }
   if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : g.t === MT ? [{type:'mout', t:at, track:MT, v:own ? tgtOwn(id) : v}] : [];   // the master: 'mout', the OUT fader (not 'mvol', the drive)
   if (g.k === 'pan') return g.t < NT ? [{type:'tpn', t:at, track:g.t, v:own ? S.mix[g.t].pan : v}] : [];
+  if (g.k === 'kn') return g.t < NT && g.s >= 1 && g.s <= 8 ? [{type:'chc', t:at, track:g.t, p:'k' + g.s, v:own ? -1 : clamp(v, 0, 255) / 255}] : [];   // PATCH KNOBS S3: as KN1–KN8 (own: the Knob's Value again)
   if (g.k === 'fx') return tgtFx(g) ? [g.b != null ? {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, b:g.b, v:own ? tgtOwn(id) : v} : {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, v:own ? tgtOwn(id) : v}] : [];
   return [];
 }
