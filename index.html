@@ -26353,7 +26353,9 @@ async function driveFolderId(){
     try { g = await driveJson(DRIVE_API + '/' + encodeURIComponent(ch.id) + '?fields=' + encodeURIComponent('id,name,trashed') + '&supportsAllDrives=true'); }
     catch(e){ if (!e || e.status !== 404) throw e; }
     if (g && g.id && !g.trashed){ drv.folderName = g.name || ch.name; if (g.name && g.name !== ch.name){ try { const o = driveSeenGet(); o.folder = {id:ch.id, name:g.name}; localStorage.setItem(DRIVE_LS, JSON.stringify(o)); } catch(e){} } return (drv.folder = ch.id); }
-    try { const o = driveSeenGet(); delete o.folder; localStorage.setItem(DRIVE_LS, JSON.stringify(o)); } catch(e){}
+    const now = driveChosen();   // CodeRabbit on #296: a folder chosen while this check ran wins; only the checked one is cleared
+    if (now && now.id !== ch.id){ drv.folderName = now.name; return (drv.folder = now.id); }
+    try { const o = driveSeenGet(); if (o.folder && o.folder.id === ch.id) delete o.folder; localStorage.setItem(DRIVE_LS, JSON.stringify(o)); } catch(e){}
     toast('The Drive folder “' + ch.name + '” is gone or in the trash: using “' + DRIVE_FOLDER + '” instead.', 6000);
   }
   drv.folderName = DRIVE_FOLDER;
