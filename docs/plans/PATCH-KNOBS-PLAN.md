@@ -32,3 +32,5 @@ output into any purple (control) jack. Then the track drives it from three place
 ## Progress notes
 - 22 Nov 23:10: plan written, S1 started on branch `knobs-kn`.
 - 22 Nov 23:40: S1 built and tested (npm test green, browser-check green), PR into `beta`.
+- 23 Nov ~01:00: S1–S4 merged into `beta` (#289, #290, #291; build 666, web beta auto-publishes). CodeRabbit reviewed #289 (three findings: glide length and core RESUME fixed; waves help covered by S2). **#290 and #291 were merged unreviewed**: CodeRabbit's free OSS review limit was hit. Next session: open a review-only PR (e.g. a no-op branch off `beta` diffed against fb28b9e) or ask `@coderabbitai review` on the next PR that touches these files, and fix what it finds.
+- Next (not started, owner to pick): the "Later ideas" list above.

@@ -26,7 +26,7 @@ Keep this file up to date at the end of a work session.
 
 ## Native port: in-flight web work (22 Nov, read before porting the sequencer or …chains / …waves)
 
-The lead is building **patch knobs** on the web app (`beta`), plan `docs/plans/PATCH-KNOBS-PLAN.md`. It changes things a
+**Patch knobs S1–S4 are merged into `beta` (build 666, 23 Nov).** The lead built **patch knobs** on the web app (`beta`), plan `docs/plans/PATCH-KNOBS-PLAN.md`. It changes things a
 native port mirrors: new tracker commands **KN1–KN8** appended to `FXC` (after `CHD`), new AudioParams **k1–k8** on the
 `thunder-chains` node (and later the …waves live node), a new shared module **`knob`** (reads `ctx.engine.knobs`), and
 later MOD targets K1–K8. Port the sequencer / chains engine from the `beta` that includes these, and check that plan's
