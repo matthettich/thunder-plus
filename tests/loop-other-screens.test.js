@@ -33,3 +33,9 @@ test('dropped pad renders are started again: after the track counts change, and 
   assert.match(src, /if \(vtrk\) growKit\(\);\n[\s\S]{0,500}if \(vtrk && \(n1 !== n0 \|\| m1 !== m0\)\) try \{ prerender\(\); \} catch\(e\)\{\}/);
   assert.match(src, /if \(!tp\.on && !\(o && o\._warm\) && PW\.ready\) try \{ prerender\(\); \} catch\(e\)\{\}/);
 });
+test('LP.SEL lock (23 Nov): a locked loop keeps its rows while another selection is made; a stale lock (not playing) does not', () => {
+  const sel = { r: { y0: 0x20, y1: 0x27 } };
+  let c = rig({ tv: 'song', arm: { v: 'song', y0: 8, y1: 15 }, sel: Object.assign({ v: 'song' }, sel) }); c.lsLock = true; c.tp.on = true; c.warmTok = 0;
+  c.tp.on = false; c.lsLock = true; c.warmTok = 1; c.go(); assert.deepEqual(c.log, ['song:8-15'], 'locked during warm-up: the armed rows, not the selection');
+  c = rig({ tv: 'song', arm: { v: 'song', y0: 8, y1: 15 }, sel: Object.assign({ v: 'song' }, sel) }); c.lsLock = true; c.warmTok = 0; c.go(); assert.deepEqual(c.log, ['song:32-39'], 'stale lock: the selection again');
+});

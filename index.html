@@ -28961,7 +28961,8 @@ function playPatLoop(){
 // LOCK (23 Nov, owner: "make it so the selection is locked once loop selection is selected so you can work within the selection"; keep LOOP SEL's
 // follow-the-selection as the alternative): a loop LP.SEL starts holds its rows (lsLock) while you select and edit elsewhere; syncLoop / loopFor
 // don't re-arm from the selection. LP.SEL again while it plays: with 2+ other rows selected, the loop moves there (still locked); else it stops.
-// STOP releases it (lpSelRestore).
+// STOP releases it (lpSelRestore). The lock counts only while playing or warming up (CodeRabbit on #292: a warm-up start that is then refused
+// can't leave a stale lock behind).
 let lsLock = false;
 let lsW = null;
 function lpSelRestore(){ lsLock = false; if (!lsW) return; const w = lsW; lsW = null; loopSel = w.was; loopArm = w.arm; }
@@ -29033,7 +29034,7 @@ function syncLoop(){
   }
   if (!tp.loopV) return;
   if (!loopSel){ tp.seq.setLoop(null); return; }
-  if (!lsLock && tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }   // (LOCK: LP.SEL's rows hold)
+  if (!(lsLock && (tp.on || warmTok)) && tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }   // (LOCK: LP.SEL's rows hold)
   tp.seq.setLoop(loopArm && loopArm.v === tp.loopV ? loopArm : null);
 }
 // KEY TRANS. (KEYS mode, top bar): a lock (owner, 3 Nov): while it is on, ▲ / ▼ transpose the selection a semitone and play its
@@ -29065,7 +29066,7 @@ function topSelVis(){
 }
 function loopFor(view){
   if (!loopSel || !GRIDV.has(view)) return null;
-  if (!lsLock && selA && selA.v === view && !onPset()){ const r = selRect(); loopArm = {v:view, y0:r.y0, y1:r.y1}; }   // (LOCK: LP.SEL's rows hold)
+  if (!(lsLock && (tp.on || warmTok)) && selA && selA.v === view && !onPset()){ const r = selRect(); loopArm = {v:view, y0:r.y0, y1:r.y1}; }   // (LOCK: LP.SEL's rows hold)
   else if (!loopArm || loopArm.v !== view) return null;
   if (loopArm.y1 <= loopArm.y0) return null;
   // A phrase plays only its ROWS: a loop past them would play row 0 over and over. Keep it inside.

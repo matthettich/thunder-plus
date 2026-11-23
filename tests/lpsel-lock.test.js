@@ -11,8 +11,8 @@ test('lpSelPlay locks the selected rows and moves the lock on a new selection', 
 });
 test('STOP releases the lock', () => { assert.match(fn('lpSelRestore'), /^function lpSelRestore\(\)\{ lsLock = false;/); });
 test('syncLoop and loopFor do not re-arm from the selection while locked', () => {
-  assert.match(fn('syncLoop'), /if \(!lsLock && tv === tp\.loopV && selA/);
-  assert.match(fn('loopFor'), /if \(!lsLock && selA && selA\.v === view/);
+  assert.match(fn('syncLoop'), /if \(!\(lsLock && \(tp\.on \|\| warmTok\)\) && tv === tp\.loopV && selA/);
+  assert.match(fn('loopFor'), /if \(!\(lsLock && \(tp\.on \|\| warmTok\)\) && selA && selA\.v === view/);
 });
 test('LOOP SEL alone still follows the selection (lsLock only set by LP.SEL)', () => {
   const sets = src.match(/lsLock = true/g) || []; assert.strictEqual(sets.length, 1);
