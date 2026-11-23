@@ -867,7 +867,7 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 5. **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
   group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
   later, not while stabilising. **More than 32 tracks** (owner, Oct: likely up to 128) goes with it: the GUI and the mono / poly split need working out first. Anything built above that stores a track index (MOD's `fx:t:s:p` targets, automation lanes) joins the renumbering.
-6. **Song sync between devices through Google Drive** (planned, owner undecided; wants to pick up the last save on Android, Mac and Windows): "3 Nov (48): plan, not built" below. Confirm with the owner before starting.
+6. **Song sync between devices through Google Drive**: built in 668, web app only (File ▾ → Save to Drive / Open latest from Drive / Open from Drive…; needs the owner's one-time setup, `docs/GOOGLE-DRIVE-SETUP.md`, then the client ID in `DRIVE_CLIENT_ID`). Plan: "3 Nov (48)" in the archive. **Next step (planned, owner 23 Nov): Drive in the desktop app.** Not built; the items are hidden in Electron. System-browser OAuth with a loopback redirect + PKCE in the Electron main process (refresh token kept with `safeStorage`); a separate "Desktop app" OAuth client ID (Google Auth Platform → Clients → Create client → Desktop app, same project, scopes and test users); the same File items and the same Drive code, getting its token through an IPC bridge (`thunderDesktop.drive.token()`); testing needs a packaged Mac and Windows build, a phone round trip, an expired token and a cancelled browser sign-in. Details in `docs/GOOGLE-DRIVE-SETUP.md`.
 7. **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
 8. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
@@ -885,6 +885,18 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 **Patch knobs on the bottom panel (22 Nov; build 666, web beta)**
 - [ ] **Computer, …chains: add a Knob (K1) from the module list:** Pass: with the bottom panel's FX bar on, a "K1" slider appears in the chains section at once; moving it changes what the Knob drives; deleting the Knob removes the slider.
 - [ ] **Reload the song / undo / paste a copy of the Knob:** Pass: no second K1 slider appears (a pasted copy has none until you right-click its Value, Add to the bottom panel).
+
+**Google Drive save / load (23 Nov; build 668, web beta; needs the setup first)**
+- [ ] **Setup (owner, ~15 min):** follow `docs/GOOGLE-DRIVE-SETUP.md`, paste the Client ID into `DRIVE_CLIENT_ID` (or send it to Claude). Before that: File ▾ → Save to Drive toasts "Google Drive isn't set up yet". Pass: it does.
+- [ ] **Computer (Chrome, the GitHub Pages site), File ▾ → Save to Drive:** Pass: a Google popup (first time: "unverified app" → Advanced → continue), then a toast "Saved <name>.thunder to Drive" and the file in My Drive / Thunder Plus.
+- [ ] **Computer, change the song and Save to Drive again:** Pass: it updates the same file (no second copy), no question asked.
+- [ ] **Phone (Android Chrome / installed app), File ▾ → Open latest from Drive:** Pass: sign-in once, then the newest song opens and a toast says "Opened <name> (saved … ago)". With unsaved changes it asks "Save changes?" first.
+- [ ] **Phone, File ▾ → Open from Drive…:** Pass: a list of the newest songs with dates; picking one opens it.
+- [ ] **Desktop app saves a .thunder into My Drive / Thunder Plus (Google Drive for desktop), then phone Open latest:** Pass: that song opens (a file the web app did not create).
+- [ ] **Save to Drive for a song that Drive for desktop made:** Pass: a toast says a new copy was saved (the web app can't edit that file); report if it instead errors.
+- [ ] **Save on the phone, then Save on the computer's older copy:** Pass: the second asks "Replace the newer copy on Drive?".
+- [ ] **Airplane mode, Open latest from Drive; close the Google popup:** Pass: a short toast each time, nothing breaks.
+- [ ] **Desktop (Electron) app:** Pass: File ▾ has no Drive items.
 
 **LP.SEL locks its loop (23 Nov; build 667, web beta)**
 - [ ] **Computer, Arrange:** select rows 00–07, press LP.SEL. Then click and select elsewhere (e.g. rows 10–13) and edit a phrase. Pass: the loop keeps playing 00–07 and stays marked.
@@ -1736,6 +1748,13 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
 
 ## 22 Nov (patch knobs S4: Knob on the bottom panel; build 666)
 chains/index.html `addItem` calls new `knobToDeck(m)` after `addModule` when the type is `knob` (palette adds only, so load / undo / paste / duplicate never add one; same undo step as the add): pushes `deckDesc(m,'value')` with label `K<n>` into `doc.deck`. The label is stored, so changing n later does not relabel it. removeModule already drops deck entries. waves has no deck, untouched. Tests: tests/patch-knobs-deck.test.js.
+
+## 23 Nov (Google Drive save / load, web only; build 668)
+Owner: save to and open from Google Drive in the web app (GitHub Pages origin; Android phone and desktop Chrome), mainly to get the latest song onto the phone; not in Electron (items hidden when `window.thunderDesktop` is set). The owner works in the desktop app, which saves into a "Thunder Plus" folder synced by Google Drive for desktop, so the web app reads files it did not create (scopes `drive.file` + `drive.readonly`).
+- `index.html`: `DRIVE_CLIENT_ID` (empty: the items toast "isn't set up yet"); block `/* DRIVE SYNC BEGIN */ … END` before RECENT in the project-file section (GIS token client injected once, token + expiry in memory, one 401 retry, folder found / created by name and cached, `driveSave` create vs PATCH vs newer-confirm via `localStorage` `thunderplus-drive-v1`, `driveOpenLatest`, `driveOpenPick` through `askPick`, `driveItems()` spread after Save as in both File menus). Reused: `projName` / `projBlob` / `smpSaveGate` (Save), `openProjectFile` (Open: now returns whether it loaded), `askYes`, `askPick`.
+- A file Drive for desktop made can be read but not PATCHed with `drive.file`: a 403/404 falls back to a new same-named copy (toast says so). Open latest takes the newest by modifiedTime.
+- `sw.js`: accounts.google.com, www.googleapis.com, apis.google.com and googleusercontent hosts are not intercepted. Cache `thunderplus-v668`.
+- `docs/GOOGLE-DRIVE-SETUP.md` (owner steps + the planned desktop version); `tests/drive-sync.test.js`.
 
 ## 23 Nov (LP.SEL lock; build 667)
 Owner: lock the selection once loop selection starts so you can work within it; keep LOOP SEL's follow-the-cursor as the alternative. `lsLock` set when LP.SEL starts a selection loop (tp.on or warmTok); syncLoop / loopFor skip re-arming from the selection while locked; LP.SEL while playing with a different 2+ row selection moves the locked loop (setLoop), otherwise stops; lpSelRestore (STOP) clears it.
