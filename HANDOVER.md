@@ -878,6 +878,9 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
+- [ ] **Drive folder (build 671; phone)**: File ▾ shows "Drive folder: Thunder Plus…". Tap it, go into a folder (and ↑ Up), tap "✓ Use this folder"; the menu label and the toast show the new name. Save to Drive puts the song in that folder; Open from Drive… lists that folder.
+- [ ] **Drive folder (build 671; computer)**: reload the page: the chosen folder is still used. Pick "Shared with me" and a shared folder you can edit, save there. Trash the chosen folder in Drive, reload, Save: a toast says it is gone and "Thunder Plus" is used.
+
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
@@ -1745,6 +1748,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 23 Nov (Drive folder chooser; build 671)
+Owner: let me choose the Drive folder. `index.html` Drive block: File ▾ "Drive folder: <name>…" runs `driveChoose` (askPick walk: ✓ Use this folder, ↑ Up, subfolders by name via `driveSubfolders`, Shared with me at root). Choice stored per device as `folder:{id,name}` in `thunderplus-drive-v1`; `driveFolderId()` uses it, verified once per session with files.get (404 or trashed: toast, choice cleared, default Thunder Plus find/create). Save / Open toasts and the empty-folder message name the folder. `sw.js` v671; docs/GOOGLE-DRIVE-SETUP.md; tests in `tests/drive-sync.test.js`.
 
 ## 22 Nov (patch knobs S4: Knob on the bottom panel; build 666)
 chains/index.html `addItem` calls new `knobToDeck(m)` after `addModule` when the type is `knob` (palette adds only, so load / undo / paste / duplicate never add one; same undo step as the add): pushes `deckDesc(m,'value')` with label `K<n>` into `doc.deck`. The label is stored, so changing n later does not relabel it. removeModule already drops deck entries. waves has no deck, untouched. Tests: tests/patch-knobs-deck.test.js.
