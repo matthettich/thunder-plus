@@ -116,7 +116,7 @@ test('errors: a 401 gets one new token and one retry; offline and a closed popup
 test('token: kept in memory until its expiry; first sign-in asks for consent, later ones prompt ""; scopes are the two Drive ones', async () => {
   const t = make({ routes: [folderRoute, { test: u => u.includes('orderBy'), reply: () => ({ body: { files: [] } }) }] });
   await t.x.driveRun(t.x.driveOpenLatest); await t.x.driveRun(t.x.driveOpenLatest); assert.equal(t.tokens.n, 1);
-  assert.equal(t.tokens.opt.prompt, 'consent'); assert.equal(t.tokens.opt.scope, 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly');
+  assert.equal(t.tokens.opt.prompt, 'consent'); assert.equal(t.tokens.opt.scope, 'https://www.googleapis.com/auth/drive');
   t.x.drv.exp = 0; await t.x.driveRun(t.x.driveOpenLatest); assert.equal(t.tokens.n, 2); assert.equal(t.tokens.opt.prompt, '');
 });
 test('service worker leaves Google sign-in and Drive requests alone; build and cache are 668', () => {

@@ -26284,10 +26284,12 @@ async function openProj(){
 /* ---------- GOOGLE DRIVE (23 Nov, build 668; the web app only, hidden in the desktop app) ----------
    File ▾ → Save to Drive / Open latest from Drive / Open from Drive…: one "Thunder Plus" folder in My Drive. Sign-in is the Google
    Identity Services token client (script loaded once; the token is kept in memory with its expiry). The folder is found by name, so
-   a "Thunder Plus" folder made by Google Drive for desktop (where the desktop app saves) is the one read: drive.readonly lets this
-   app read files it did not create; drive.file lets it write the ones it did. Setup: docs/GOOGLE-DRIVE-SETUP.md. */
+   a "Thunder Plus" folder made by Google Drive for desktop (where the desktop app saves) is the one used. Scope: full `drive` (lead's review,
+   23 Nov): drive.file can't add files to a folder Drive for desktop made, or update the songs the desktop app saved, so the phone's saves
+   would fail or pile up copies; drive.readonly is already restricted (Testing mode), so `drive` costs no more. The code only lists, reads
+   and writes .thunder files in that one folder. Setup: docs/GOOGLE-DRIVE-SETUP.md. */
 /* DRIVE SYNC BEGIN */
-const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive';
 const DRIVE_FOLDER = 'Thunder Plus', DRIVE_LS = 'thunderplus-drive-v1', DRIVE_GSI = 'https://accounts.google.com/gsi/client';
 const driveShown = () => !window.thunderDesktop;
 const drv = {tok:null, exp:0, folder:null, gsi:null};

@@ -14,12 +14,13 @@ in desktop Chrome). They stay greyed out in effect ("Google Drive isn't set up y
 2. **Branding**: App name "Thunder Plus", User support email (yours), Developer contact email (yours) → **Save**.
 3. **Audience**: choose **External**. Leave the publishing status on **Testing** (do not press "Publish app").
    Under **Test users** → **Add users** → add your own Google address and any friends' (up to 100).
-   `drive.readonly` is a restricted scope, so the app stays in Testing: fine for personal use. The first time you sign in Google shows
+   Full Drive access (`drive`) is a restricted scope, so the app stays in Testing: fine for personal use. The first time you sign in Google shows
    an "unverified app" screen: click **Advanced** → **Go to Thunder Plus (unsafe)** → tick the Drive boxes → **Continue**.
    (In Testing, Google asks you to sign in again about every 7 days. Same click-through.)
-4. **Data access** → **Add or remove scopes** → add these two (paste them into "Manually add scopes" if they are not listed) → **Update** → **Save**:
-   - `https://www.googleapis.com/auth/drive.file`
-   - `https://www.googleapis.com/auth/drive.readonly`
+4. **Data access** → **Add or remove scopes** → add this one (paste it into "Manually add scopes" if it is not listed) → **Update** → **Save**:
+   - `https://www.googleapis.com/auth/drive`
+   (Full access, because the desktop app's songs and folder are made by Drive for desktop, not by this app; narrower scopes could read
+   them but not save into that folder. The app only lists, reads and writes .thunder files in **My Drive / Thunder Plus**.)
 
 ## 3. The client ID
 1. **Google Auth Platform** → **Clients** → **Create client** → type **Web application** → name "Thunder Plus web".
@@ -35,9 +36,7 @@ folder → My Drive → Thunder Plus; create the folder there if it isn't there)
 by name ("Thunder Plus" directly in My Drive) and can read those files although it did not create them.
 
 ## How it behaves
-- Save to Drive writes `<song name>.thunder` into that folder. If a file of that name that the app may edit is newer on Drive than the copy
-  this device last saved or opened, it asks before replacing it. A file that came from Drive for desktop is readable but the web app is not
-  allowed to change it (the `drive.file` scope covers only files the app made), so Save then makes a new copy of the same name; Open latest picks the newest.
+- Save to Drive writes `<song name>.thunder` into that folder, overwriting the same-named song there (after asking if Drive's copy is one this device hasn't seen); Open latest picks the newest.
 - Open latest / Open from Drive… use the normal Open (the "Save changes?" question included).
 - Problems (offline, sign-in closed, "403 / access blocked"): a short message; a 403 usually means the account is not on the Test users list.
 
