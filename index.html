@@ -22141,7 +22141,7 @@ var PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NA
 var PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
-function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$/.test(id); }
+function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$|^kn:\d+:[1-8]$/.test(id); }   // kn:t:k (22 Nov): knob K1–K8 of track t's patch
 function normPerf(j){
   const P = freshPerf(); if (!j || typeof j !== 'object') return P;
   const v8 = x => clamp(int(x, 0), 0, 255), vals = o => { const r = {}; if (o && typeof o === 'object') for (const k in o) if (tgtOk(k)) r[k] = v8(o[k]); return r; };
@@ -22193,6 +22193,7 @@ function tgtFxGone(g){ const A = g.t >= MT ? S.mfx : S.tfx[g.t], f = A && A[g.s]
 function tgtLabel(id, short){
   const g = tgtParse(id), w = tgtTrk(g.t);
   if (g.k === 'fx'){ const x = tgtFx(g); return (short ? '' : w + ' · ') + (x ? 'FX' + (g.s + 1) + ' ' + TFX[x.f.type].n + ' ' + tgtRowL(x.q, x.b) : tgtFxGone(g)); }
+  if (g.k === 'kn') return (short ? '' : w + ' · ') + 'K' + g.s + ' (patch knob)';   // PATCH KNOBS S3
   if (g.k === 'vol' && g.t >= MT) return (short ? '' : w + ' · ') + 'VOL (master out)';   // 10 Nov: the master OUT fader (S.mout), after the limiter
   return (short ? '' : w + ' · ') + {vol:'VOL', pan:'PAN', cut:'CUT (pad filter)', res:'RES (pad resonance)', dec:'DEC (pad decay)', tch:'CHANCE (track chance)', env:'ENV (filter envelope)', atk:'ATK (attack)', sus:'SUS (sustain)', rel:'REL (release)'}[g.k];
 }
@@ -22201,6 +22202,7 @@ function tgtOwn(id, Sx = S){
   const g = tgtParse(id);
   if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : Sx.mout == null ? 255 : Sx.mout;   // the master: the OUT fader's own byte (S.mout; the song's own is never written)
   if (g.k === 'pan') return g.t < NT ? Sx.mix[g.t].pan : 128;
+  if (g.k === 'kn') return 128;   // PATCH KNOBS S3: the page can't see the Knob's own Value (it is in the patch): an LFO swings round the middle
   if (g.k === 'fx'){ const x = tgtFx(g, Sx); if (x && x.q.pb){ const p = TFX[x.f.type].pd[x.pi]; return clamp(pumpByte(p, x.f.pump && x.f.pump[p.s] !== undefined ? x.f.pump[p.s] : p.def), 0, 255); }
     return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
   // cut / dec: open (255); res: none (0). env / atk / sus / rel (live engines, 10 Nov): 0. Only the OFFSET from the engine's own value reaches the engine
@@ -22209,16 +22211,20 @@ function tgtOwn(id, Sx = S){
 }
 // Does track t play a live-engine pad (the pads of the instruments its phrases use; a voice track: its own voice)? For the pickers only: the
 // sequencer does not ask (it sends `eng` for any track that has a command or an LFO on the engine targets; the player ignores a track with no live node).
-function tgtLive(t){
+function tgtLive(t){ return tgtPadAny(t, i => isLivePad(i)); }
+// PATCH KNOBS S3: does track t play a …waves live pad (its K1–K8 targets reach the waves patch)?
+function tgtWaves(t){ return tgtPadAny(t, i => isWlV(kit.voices[i])); }
+// Does track t play a pad that passes test (the pads of the instruments its phrases use; a voice track: its own voice)?
+function tgtPadAny(t, test){
   try {
     if (t >= NT) return false;
-    if (vtrk) return !!isLivePad(voiceForTrack(t));
+    if (vtrk) return !!test(voiceForTrack(t));
     const ins = new Set(), seen = new Set();
     for (let y = 0; y < S.song.length; y++){ const c = S.song[y] && S.song[y][t]; if (c == null || c < 0) continue;
       for (const row of S.chains[c] || []){ const pid = row ? row[0] : -1; if (pid == null || pid < 0 || seen.has(pid)) continue; seen.add(pid);
         for (const r of S.phrases[pid] || []) if (r && r[IC] >= 0) ins.add(r[IC]); } }
     if (!ins.size) ins.add(0);
-    for (const i of ins){ const I = S.insts[i]; if (I && isLivePad(I.pad)) return true; }
+    for (const i of ins){ const I = S.insts[i]; if (I && test(I.pad)) return true; }
   } catch(e){}
   return false;
 }
@@ -22226,7 +22232,8 @@ function tgtLive(t){
 function tgtList(t){
   const L = [];
   if (t < NT){ L.push(['vol:' + t, 'VOL'], ['pan:' + t, 'PAN'], ['cut:' + t, 'CUT · pad filter'], ['res:' + t, 'RES · pad resonance'], ['dec:' + t, 'DEC · pad decay'], ['tch:' + t, 'CHANCE · track chance']);
-    if (tgtLive(t)) L.push(['env:' + t, 'ENV · filter envelope'], ['atk:' + t, 'ATK · attack'], ['sus:' + t, 'SUS · sustain'], ['rel:' + t, 'REL · release']); }   // live engines (10 Nov)
+    if (tgtLive(t)) L.push(['env:' + t, 'ENV · filter envelope'], ['atk:' + t, 'ATK · attack'], ['sus:' + t, 'SUS · sustain'], ['rel:' + t, 'REL · release']);   // live engines (10 Nov)
+    if ((S.chainOn && S.chainOn[t]) || tgtWaves(t)) for (let k = 1; k <= 8; k++) L.push(['kn:' + t + ':' + k, 'K' + k + ' · patch knob']); }   // PATCH KNOBS S3: a track through chains, or playing a waves instrument
   const A = t >= MT ? S.mfx : S.tfx[t];
   (A || []).forEach((f, s) => { if (!f || !TFX[f.type]) return; const nm = 'FX' + (s + 1) + ' ' + TFX[f.type].n + ' · ';
     TFX[f.type].ps.forEach((q, p) => { if (isPumpT(f.type) && !q.lfo) return;
@@ -22255,6 +22262,7 @@ function tgtEvs(id, v, at, pno){
   if (g.k === 'cut' || g.k === 'res' || g.k === 'dec' || g.k === 'tch'){ const o = pno.get(g.t) || {}; if (own) delete o[g.k]; else o[g.k] = v; pno.set(g.t, o); return []; }
   if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : g.t === MT ? [{type:'mout', t:at, track:MT, v:own ? tgtOwn(id) : v}] : [];   // the master: 'mout', the OUT fader (not 'mvol', the drive)
   if (g.k === 'pan') return g.t < NT ? [{type:'tpn', t:at, track:g.t, v:own ? S.mix[g.t].pan : v}] : [];
+  if (g.k === 'kn') return g.t < NT && g.s >= 1 && g.s <= 8 ? [{type:'chc', t:at, track:g.t, p:'k' + g.s, v:own ? -1 : clamp(v, 0, 255) / 255}] : [];   // PATCH KNOBS S3: as KN1–KN8 (own: the Knob's Value again)
   if (g.k === 'fx') return tgtFx(g) ? [g.b != null ? {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, b:g.b, v:own ? tgtOwn(id) : v} : {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, v:own ? tgtOwn(id) : v}] : [];
   return [];
 }
@@ -24977,7 +24985,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = 'qoqkhr';
+const CORE_REV = 'yk0qds';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -26688,7 +26696,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 664;
+const BUILD = 665;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37131,6 +37139,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [665, '22 Nov', ['MOD, macros and scenes can drive patch knobs: a track that runs through chains (or plays a waves instrument) lists K1–K8 as targets, so an LFO can sweep a Knob module. An LFO on a knob swings round the middle and takes over from KN commands on that knob while it runs.']],
   [664, '22 Nov', ['Patch knobs reach waves too: KN1–KN8 on a track playing a waves instrument (live) set the Knob modules in its waves patch, as they do in chains.']],
   [663, '22 Nov', ['New: patch knobs. A Knob module in chains (and waves) puts out a control you patch into any purple jack; the tracker commands KN1–KN8 (00–FF) set knob 1–8 of the track’s chains patch from that row on, and stopping the song hands each Knob its own Value back. Try Knob 1 into a filter’s Cutoff, then KN1 00 … KN1 FF down a phrase (RNL after it for a random walk).']],
   [662, '21 Nov', ['Fixed: after a notification or switching apps on the Fold, the Synth page could end up scrolled so the header (the way back to TRACKER) was off the top of the screen and could not be scrolled back. The page now puts itself back at the top whenever the screen comes back, resizes or the keyboard moves it.']],

@@ -882,6 +882,11 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Patch knobs as MOD / macro / scene targets (22 Nov; build 665, web beta)**
+- [ ] **Computer, a track with CHN on and a Knob (K1) into a filter cutoff:** MOD → add an LFO on that track, target **K1 · patch knob**, 1 bar sine. Pass: the filter sweeps once a bar; STOP returns it to the Knob's Value.
+- [ ] **PERFORM → a macro targeting K1 (lo 00, hi FF):** move the macro while playing. Pass: the filter follows.
+- [ ] **A waves-instrument track (no chain):** its MOD targets list K1–K8 too, and an LFO on K1 moves its waves patch's Knob.
+
 **Patch knobs on …waves (22 Nov; build 664, web beta)**
 - [ ] **Computer, a track playing a …waves instrument (Live engines on):** in the waves patch add a Knob (K1) into a filter's or VCA's purple jack; play notes with `KN1 00` then `KN1 FF` a few rows later. Pass: the sound changes at that row; STOP puts it back to the Knob's Value.
 - [ ] **Same, on the phone with the audio-thread sequencer:** Pass: as on the computer.
@@ -1718,6 +1723,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 22 Nov (patch knobs S3: MOD / macro / scene targets; build 665)
+Target id `kn:t:k` (tgtOk, tgtLabel, tgtOwn 128, tgtList for tracks with CHN on or a waves live pad via new `tgtWaves` / `tgtPadAny` (tgtLive now uses it), tgtEvs → `chc` k-event, own → −1). LFO centre is 128 (the page can't read the Knob's Value); an LFO overrides KN on the same knob each step.
 
 ## 22 Nov (patch knobs S2: …waves live nodes; build 664)
 `k1`–`k8` on thunder-wlive (`e.knobs`, `__wl`). Page: `knSt` per track in makePlayer, the `chc` handler also sets the track's wl nodes, wlNode applies knSt, STOP resets. Core: `chc` sets __wl procs for the track (knPut), lnode() applies knSt to a node met later, stopAll resets knTouched. waves worklet ?v=48. Renders use the page path.
