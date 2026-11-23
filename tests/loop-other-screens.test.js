@@ -8,7 +8,7 @@ const src = H.read('index.html');
 const lf = src.match(/\nfunction loopFor\(view\)\{[\s\S]*?\n\}\n/), pc = src.match(/\nfunction playCtx\(\)\{[\s\S]*?\n\}\n/);
 assert.ok(lf && pc, 'could not find loopFor / playCtx: the code moved, this test needs updating');
 function rig({ tv, arm = null, loopSel = true, sel = null }) {
-  const log = [], c = { tv, loopSel, loopArm: arm, selA: sel, tp: { on: false }, GRIDV: new Set(['song', 'sect', 'phrase']), S: { plen: [] }, cPhrase: 0, cSect: 0, cTrack: 0, NT: 32, PROWS: 64,
+  const log = [], c = { tv, loopSel, loopArm: arm, selA: sel, lsLock: false, tp: { on: false }, GRIDV: new Set(['song', 'sect', 'phrase']), S: { plen: [] }, cPhrase: 0, cSect: 0, cTrack: 0, NT: 32, PROWS: 64,
     onPset: () => false, selRect: () => sel && sel.r, clamp: (v, a, b) => Math.max(a, Math.min(b, v)), isBusT: () => false, busPlay: () => log.push('bus'), tStopUser: () => log.push('stop'),
     toast: m => log.push('toast'), songRow: () => 5, tStart: (m, o) => log.push(m + ':' + (o.loop ? o.loop.y0 + '-' + o.loop.y1 : 'row' + o.row)), log };
   vm.createContext(c); vm.runInContext(lf[0] + pc[0] + '\nthis.go = playCtx; this.arm = () => loopArm;', c); return c;

@@ -886,6 +886,12 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 - [ ] **Computer, …chains: add a Knob (K1) from the module list:** Pass: with the bottom panel's FX bar on, a "K1" slider appears in the chains section at once; moving it changes what the Knob drives; deleting the Knob removes the slider.
 - [ ] **Reload the song / undo / paste a copy of the Knob:** Pass: no second K1 slider appears (a pasted copy has none until you right-click its Value, Add to the bottom panel).
 
+**LP.SEL locks its loop (23 Nov; build 667, web beta)**
+- [ ] **Computer, Arrange:** select rows 00–07, press LP.SEL. Then click and select elsewhere (e.g. rows 10–13) and edit a phrase. Pass: the loop keeps playing 00–07 and stays marked.
+- [ ] **While it plays, with rows 10–13 selected, press LP.SEL:** Pass: the loop moves to 10–13 (toast says so). LP.SEL again with nothing new selected stops it.
+- [ ] **LOOP SEL alone (no LP.SEL):** Pass: the loop still follows the selection, as before.
+- [ ] **Phone, folded or Arrange beside Phrase:** LP.SEL from the Edit ▾ / right-click menu. Pass: same lock.
+
 **Patch knobs as MOD / macro / scene targets (22 Nov; build 665, web beta)**
 - [ ] **Computer, a track with CHN on and a Knob (K1) into a filter cutoff:** MOD → add an LFO on that track, target **K1 · patch knob**, 1 bar sine. Pass: the filter sweeps once a bar; STOP returns it to the Knob's Value.
 - [ ] **PERFORM → a macro targeting K1 (lo 00, hi FF):** move the macro while playing. Pass: the filter follows.
@@ -1730,6 +1736,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
 
 ## 22 Nov (patch knobs S4: Knob on the bottom panel; build 666)
 chains/index.html `addItem` calls new `knobToDeck(m)` after `addModule` when the type is `knob` (palette adds only, so load / undo / paste / duplicate never add one; same undo step as the add): pushes `deckDesc(m,'value')` with label `K<n>` into `doc.deck`. The label is stored, so changing n later does not relabel it. removeModule already drops deck entries. waves has no deck, untouched. Tests: tests/patch-knobs-deck.test.js.
+
+## 23 Nov (LP.SEL lock; build 667)
+Owner: lock the selection once loop selection starts so you can work within it; keep LOOP SEL's follow-the-cursor as the alternative. `lsLock` set when LP.SEL starts a selection loop (tp.on or warmTok); syncLoop / loopFor skip re-arming from the selection while locked; LP.SEL while playing with a different 2+ row selection moves the locked loop (setLoop), otherwise stops; lpSelRestore (STOP) clears it.
 
 ## 22 Nov (patch knobs S3: MOD / macro / scene targets; build 665)
 Target id `kn:t:k` (tgtOk, tgtLabel, tgtOwn 128, tgtList for tracks with CHN on or a waves live pad via new `tgtWaves` / `tgtPadAny` (tgtLive now uses it), tgtEvs → `chc` k-event, own → −1). LFO centre is 128 (the page can't read the Knob's Value); an LFO overrides KN on the same knob each step.
