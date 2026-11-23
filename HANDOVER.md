@@ -870,7 +870,19 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 6. **Song sync between devices through Google Drive**: built in 668, web app only (File ▾ → Save to Drive / Open latest from Drive / Open from Drive…; needs the owner's one-time setup, `docs/GOOGLE-DRIVE-SETUP.md`, then the client ID in `DRIVE_CLIENT_ID`). Plan: "3 Nov (48)" in the archive. **Next step (planned, owner 23 Nov): Drive in the desktop app.** Not built; the items are hidden in Electron. System-browser OAuth with a loopback redirect + PKCE in the Electron main process (refresh token kept with `safeStorage`); a separate "Desktop app" OAuth client ID (Google Auth Platform → Clients → Create client → Desktop app, same project, scopes and test users); the same File items and the same Drive code, getting its token through an IPC bridge (`thunderDesktop.drive.token()`); testing needs a packaged Mac and Windows build, a phone round trip, an expired token and a cancelled browser sign-in. Details in `docs/GOOGLE-DRIVE-SETUP.md`.
 7. **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
   change it needs.
-8. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
+8. **Possible future plan, not decided (owner, 23 Nov): a Monomachine-style synth that opens Monomachine presets.** Our own engine
+   with the Monomachine's machine types and per-machine parameter layout (SWAVE virtual analog, FM, SID-style, VO, DPRO… 22 in all;
+   3 oscillators per voice, filter / amp / LFO pages, the effect machines), so it runs everywhere Thunder Plus does (phone and web
+   included), plus a reader for Monomachine SysEx (.syx) sound / kit dumps that maps each machine's parameters onto the engine.
+   Expect "same family" sound, not identical (the real character is Elektron's DSP code). **Clean room:** Elektron's manuals and
+   public docs (confirm the SysEx dump format is documented there) and listening only; never read Monomodule's source
+   (https://monomodule.com, github.com/shnolk/monomodule): it is AGPL-3.0, and its code would put Thunder Plus under the AGPL.
+   Suggested first step if the owner says go: a cheap agent researches the machines, parameters and SysEx format and writes
+   `docs/MONOMACHINE-PLAN.md` (which machines first: ask the owner which he uses most; how presets map; good vs loose matches).
+   Alternative the owner also asked about: Monomodule itself (free AU / VST3 that runs the original DSP program in a DSP56300
+   emulator, user supplies the Monomachine OS file) through VST hosting in the native desktop app, desktop only. Never build it
+   into the web app (needs a JIT emulator; licence as above).
+9. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
 
 ### Pump re-pin: waits on pump (18 Nov)
 
