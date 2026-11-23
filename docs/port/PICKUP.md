@@ -4,6 +4,11 @@ To continue the native port in a new chat, the owner says: **"pull thunder-plus,
 This file is the brief. Background only when needed: `docs/port/TODAY.md` (the full log of 16 and 17 Nov, newest at the end), `docs/port/WORKPLAN.md` (the
 plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's punch list).
 
+> **22 Nov, web-app work to mirror (read first):** the lead is adding **patch knobs** on `beta` (plan `docs/plans/PATCH-KNOBS-PLAN.md`
+> on `beta`): tracker commands **KN1–KN8** appended to `FXC` after `CHD`, AudioParams **k1–k8** on `thunder-chains` (later the …waves live
+> node), a new shared module **`knob`** that reads the track's knob values, later MOD targets K1–K8. The sequencer (U07), chains (U31) and
+> waves (U30) ports will need these; check that plan's progress notes on `beta`. Nothing in `native/` was changed by it.
+
 ## How the owner wants this run (his words, 16 and 17 Nov)
 - The lead manages, decides, reviews and merges; **everything that can be is built by low-cost agents** (Sonnet builds a unit in its own `git worktree` under
   `/home/claude/wt/`, Haiku does document chores); an INDEPENDENT Sonnet verifier checks a unit before or right after merge (it has caught a real crash twice).
