@@ -21,7 +21,7 @@ output into any purple (control) jack. Then the track drives it from three place
   own), `engine.knobs`, shared `knob` module (DSP + editor), commands in index.html (FXC, FXB, groups, help, describer,
   sequencer `chc` events, STOP reset), `node tools/make-core.mjs`, `python3 tools/sync-shared.py`, tests, changelog, BUILD,
   sw.js cache. Audio-thread sequencer path is generic over `chc` param names (core-processor `tcParam`).
-- [ ] **S2: …waves knobs.** The live waves engine (`thunder-wlive`) gets k1–k8 too, so `KN1`–`KN8` on a …waves instrument track
+- [x] **S2 (build 664): …waves knobs.** The live waves engine (`thunder-wlive`) gets k1–k8 too, so `KN1`–`KN8` on a …waves instrument track
   reach its patch.
 - [ ] **S3: MOD targets K1–K8** (tgtList) for tracks with a chain / waves instrument; macros + scenes follow from tgtList.
 - [ ] **S4: knobs on the bottom panel**: a Knob module shows in the FX bar deck by default (moving it there moves the Value).

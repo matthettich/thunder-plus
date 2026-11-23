@@ -6014,6 +6014,7 @@ try { registerProcessor('waves', WavesProcessor); } catch (_) {}   // (loaded tw
 const WL_LANES = 4;
 // the lane parameters' names and the a-rate read, made once (per block: five strings a lane and a closure otherwise)
 const WL_T = ['t0', 't1', 't2', 't3'], WL_G = ['g0', 'g1', 'g2', 'g3'], WL_L = ['l0', 'l1', 'l2', 'l3'], WL_R = ['r0', 'r1', 'r2', 'r3'], WL_V = ['v0', 'v1', 'v2', 'v3'];
+const WL_K = ['', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8'];   // PATCH KNOBS (S2)
 const wlAt = (A, i) => A.length > 1 ? A[i] : A[0];
 class WavesLiveProc extends AudioWorkletProcessor {
   static get parameterDescriptors(){
@@ -6025,6 +6026,7 @@ class WavesLiveProc extends AudioWorkletProcessor {
       {name:'l' + j, defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
       {name:'v' + j, defaultValue:100, minValue:1, maxValue:127, automationRate:'a-rate'});
     d.push({name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'});
+    for (let k = 1; k <= 8; k++) d.push({name:'k' + k, defaultValue:-1, minValue:-1, maxValue:1, automationRate:'k-rate'});   // PATCH KNOBS (S2): the track's KN1–KN8 for the patch's Knob modules (−1 their own Value)
     return d;
   }
   constructor(options){
@@ -6036,6 +6038,7 @@ class WavesLiveProc extends AudioWorkletProcessor {
     this.e = new WavesEngine(sampleRate, { hosted:false, maxVoices:8, transport:{ tempo:120, lpb:4, ticks:6, playing:false } });
     try { if (o.doc) this.e.loadPatch(o.doc); } catch (_) {}
     this.e.setOnly(this.busOf());   // only what feeds this pad's Bus runs
+    this.e.knobs = new Float32Array(9).fill(-1); this.__wl = true;   // PATCH KNOBS: the Knob modules read e.knobs (ctx.engine); __wl: the core finds the track's waves nodes
     this.lane = Array.from({length:WL_LANES}, () => ({row:-1, lt:0, lg:false}));
     this.quiet = 1e9; this.ms = 0; this.fr = 0; this.bpm = 0;
     this.port.onmessage = ev => { const d = ev.data || {};
@@ -6052,6 +6055,7 @@ class WavesLiveProc extends AudioWorkletProcessor {
     if (this.dead){ try { e.dispose(); } catch (_) {} return false; }
     const t0 = Date.now();
     const bpm = P.bpm ? P.bpm[0] : 120; if (bpm !== this.bpm){ e.setTransport({ tempo:bpm }); this.bpm = bpm; }
+    for (let k = 1; k <= 8; k++){ const a = P[WL_K[k]]; e.knobs[k] = a ? a[0] : -1; }   // PATCH KNOBS: KN1–KN8
     let any = false;
     for (let j = 0; j < WL_LANES; j++){
       const ln = this.lane[j], T = P[WL_T[j]], G = P[WL_G[j]];
