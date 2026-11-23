@@ -3839,7 +3839,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=47"></script>
+<script src="waves/waves-worklet.js?v=48"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8875,7 +8875,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=47', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=48', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -23069,6 +23069,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
       node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
       const lanes = [0, 1, 2, 3].map(j => ({node, g, pn, pad, kind, ps:true, wl:true, lane:j, rate:P('r' + j), gate:P('g' + j), trig:P('t' + j), leg:P('l' + j), vel:P('v' + j), n:0, lastOn:-1, cur:null}));
       const b = lanes[0]; b.lanes = lanes; b.fileRef = null; b.bpm = P('bpm'); if (b.bpm) b.bpm.value = bpmNow;
+      const K = knSt.get(t); if (K) for (let k = 1; k <= 8; k++) if (K[k] >= 0){ const q = P('k' + k); if (q) q.value = K[k]; }   // PATCH KNOBS: the knobs already set on this track
       bassN.set(key, b); if (live) bassLive.add(b);
       return b;
     } catch(e){ tpLog('waves live node', e); return null; }
@@ -23097,6 +23098,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
      the track: cCut cRes cDec cAtk cRel (the commands' bytes, -1 = none) with setValueAtTime, oCut oRes oEnv oAtk oDec oSus oRel (signed offsets) with a ramp from
      the node's last point (the first one a node gets: a step). engSt (track -> the state in force) is what a node made later, or a note, starts from. A node
      without a param (a processor that has not got it) skips it. The same in an OfflineAudioContext (a render), which has no core. */
+  const knSt = new Map();   // PATCH KNOBS (S2): track → its KN1–KN8 in force (index 1–8, −1 none), for …waves live nodes made after the command
   const engSt = new Map(), ENG_C = {cut:'cCut', res:'cRes', dec:'cDec', atk:'cAtk', rel:'cRel'}, ENG_O = {cut:'oCut', res:'oRes', env:'oEnv', atk:'oAtk', dec:'oDec', sus:'oSus', rel:'oRel'};
   function engPut(node, st, at, ramp){
     const Pm = node && node.parameters; if (!Pm || !Pm.get) return;
@@ -23272,7 +23274,10 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
       if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime) + ((n._cd && n._cd._pv) || 0)); } catch(e){}
       else { const k = ev.track + ':' + ev.p, L = fxcPend.get(k) || []; L.push(ev); fxcPend.set(k, L); }   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the values when it is
       return; }
-    if (ev.type === 'chc'){ const b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }   // BYP
+    if (ev.type === 'chc'){ const at = Math.max(ev.t, ac.currentTime), b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, at); } catch(e){}   // BYP, KN1–KN8 on the chain
+      if (ev.p[0] === 'k'){ const K = knSt.get(ev.track) || new Float32Array(9).fill(-1); K[+ev.p.slice(1)] = ev.v; knSt.set(ev.track, K);   // PATCH KNOBS (S2): and on the track's …waves live nodes (knSt: for the ones made later)
+        for (const [k, o] of bassN) if (o.wl && k.startsWith(ev.track + ':')){ const p = o.node.parameters.get(ev.p); if (p) try { p.setValueAtTime(ev.v, at); } catch(e){} } }
+      return; }
     // The master column's VOL: the master level, with a 4 ms glide so it doesn't click.
     if (ev.type === 'mvol'){ const g = out.gain, at = Math.max(ev.t, ac.currentTime), to = curve(ev.v);
       try { g.setValueAtTime(mvol == null ? curve(S.master) : mvol, at); g.linearRampToValueAtTime(to, at + 0.004); } catch(e){} mvol = to; return; }
@@ -23465,6 +23470,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     try { pdcSync(); } catch(e){}   /* (LATENCY COMP AUTO: the song has stopped here, with the page's own sequencer after tStop's call: the delays go) */
     for (const n of [...buses.map(b => b && b.fx), mfx]) if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
     for (const b of buses) if (b && b.chn && b.chn.parameters) for (const k of CHN_RESET){ const q = b.chn.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }   // BYP and KN1–KN8 back to the patch
+    knSt.clear(); for (const o of bassN.values()) if (o.wl && o.node && o.node.parameters) for (let k = 1; k <= 8; k++){ const q = o.node.parameters.get('k' + k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }   // PATCH KNOBS: the …waves live nodes' too
     for (const key of fxOv.keys()){ const [t, k] = key.split(':').map(Number), m = fxpMsg(t, k, {}); if (m) atTime(at, () => { const n = fxNodeOf(t); if (n && n.port) try { n.port.postMessage(m); } catch(e){} }); }   // FXV: back to the slots' own
     fxOv.clear();
     if (tvlOv.size || tpnOv.size){ tvlOv.clear(); tpnOv.clear(); if (live) try { applyMix(); } catch(e){} }   // TVL / TPN: the mixer's again
@@ -24304,7 +24310,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=14', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=47', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=48', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -24971,7 +24977,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '141502n';
+const CORE_REV = 'qoqkhr';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -26682,7 +26688,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 663;
+const BUILD = 664;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37125,6 +37131,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [664, '22 Nov', ['Patch knobs reach waves too: KN1–KN8 on a track playing a waves instrument (live) set the Knob modules in its waves patch, as they do in chains.']],
   [663, '22 Nov', ['New: patch knobs. A Knob module in chains (and waves) puts out a control you patch into any purple jack; the tracker commands KN1–KN8 (00–FF) set knob 1–8 of the track’s chains patch from that row on, and stopping the song hands each Knob its own Value back. Try Knob 1 into a filter’s Cutoff, then KN1 00 … KN1 FF down a phrase (RNL after it for a random walk).']],
   [662, '21 Nov', ['Fixed: after a notification or switching apps on the Fold, the Synth page could end up scrolled so the header (the way back to TRACKER) was off the top of the screen and could not be scrolled back. The page now puts itself back at the top whenever the screen comes back, resizes or the keyboard moves it.']],
   [661, '21 Nov', ['Every generator that writes pitches (Arp, Chords, Polymeter, Markov melody, Mutate) has a \u201cSong key\u201d option, on at first: with it on, every note it writes is in the song\u2019s key, the Project SCALE if it is set, else the key found from the song\u2019s notes. Switch it off to write out of key. The command bar\u2019s TRANSP. + / \u2212 now also move the phrases of the selected rows on the Sect screen, and never touch a bus track.']],
