@@ -8475,6 +8475,9 @@ class PitchFxCore {
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
+// GOOGLE DRIVE (23 Nov, build 668; web only): the Web application OAuth client ID from the Google Cloud console, pasted here
+// (it is not a secret). Setup: docs/GOOGLE-DRIVE-SETUP.md. Empty: the File ▾ Drive items say it isn't set up yet.
+const DRIVE_CLIENT_ID = '';
 const inAI = !!(window.claude && typeof window.claude.use === 'function');
 // Thunder Plus saves under its own names. The first time it opens it starts from a copy of Thunder's kit and song (only read, never written).
 const KEY = 'thunderplus-kit-v1', OLD_KEY = 'thunder-kit-v1';
@@ -15634,6 +15637,7 @@ function fileItems(){
   if (f) return [
     ...(editShown() ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => f.undo(), off:!f.canUndo()}, {l:'Redo', k:K('mod+shift+Z'), f:() => f.redo(), off:!f.canRedo()}]),
     {h:'Project'}, {l:'New project', k:K('mod+N'), f:newSong, ask:'song'}, {l:'Open project…', k:K('mod+O'), f:openProj}, saveIt, saveAs,
+    ...driveItems(),
     {h:(view === 'waves' ? 'Waves' : 'Chains') + ' patch'}, {l:'New patch', f:() => f.new()}, {l:'Open a patch file…', f:() => f.open()}, {l:'Export the patch…', f:() => f.saveAs()},
     {h:'Custom modules'}, {l:'Export custom modules…', f:() => f.exportCustom()}, {l:'Import custom modules…', f:() => f.importCustom()}
   ];
@@ -15647,6 +15651,7 @@ function fileItems(){
     {l:'New project', k:K('mod+N'), f:newSong, ask:'song'},
     {l:'Open project…', k:K('mod+O'), f:openProj}, ...(recentL.length ? [{l:'Open recent…', f:openRecent}] : []),
     saveIt, saveAs,
+    ...driveItems(),
     {l:'Restore a backup…', f:restoreBackup},
     ...(canShareProj() ? [{l:'Share project…', f:shareProj}] : []),
     ...(typeof defSongItems === 'function' ? defSongItems() : []),
@@ -26276,6 +26281,137 @@ async function openProj(){
   $('projIn').removeAttribute('accept');
   $('projIn').click();
 }
+/* ---------- GOOGLE DRIVE (23 Nov, build 668; the web app only, hidden in the desktop app) ----------
+   File ▾ → Save to Drive / Open latest from Drive / Open from Drive…: one "Thunder Plus" folder in My Drive. Sign-in is the Google
+   Identity Services token client (script loaded once; the token is kept in memory with its expiry). The folder is found by name, so
+   a "Thunder Plus" folder made by Google Drive for desktop (where the desktop app saves) is the one used. Scope: full `drive` (lead's review,
+   23 Nov): drive.file can't add files to a folder Drive for desktop made, or update the songs the desktop app saved, so the phone's saves
+   would fail or pile up copies; drive.readonly is already restricted (Testing mode), so `drive` costs no more. The code only lists, reads
+   and writes .thunder files in that one folder. Setup: docs/GOOGLE-DRIVE-SETUP.md. */
+/* DRIVE SYNC BEGIN */
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive';
+const DRIVE_FOLDER = 'Thunder Plus', DRIVE_LS = 'thunderplus-drive-v1', DRIVE_GSI = 'https://accounts.google.com/gsi/client';
+const driveShown = () => !window.thunderDesktop;
+const drv = {tok:null, exp:0, folder:null, gsi:null};
+const driveSeenGet = () => { try { return JSON.parse(localStorage.getItem(DRIVE_LS) || '{}') || {}; } catch(e){ return {}; } };
+const driveSeenSet = (id, mt) => { try { const o = driveSeenGet(); o.seen = o.seen || {}; o.seen[id] = mt; localStorage.setItem(DRIVE_LS, JSON.stringify(o)); } catch(e){} };
+const driveAgo = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+const driveQ = x => String(x).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+class DriveErr extends Error { constructor(m, status, quiet){ super(m); this.status = status; this.quiet = !!quiet; } }
+// The sign-in script, injected once (File ▾ opening starts it, so it is ready before the click that needs the popup).
+function driveLoadGsi(){
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+  if (!drv.gsi) drv.gsi = new Promise((res, rej) => {
+    const el = document.createElement('script'); el.src = DRIVE_GSI; el.async = true;
+    el.onload = () => res(); el.onerror = () => { drv.gsi = null; rej(new DriveErr('Couldn’t reach Google. Are you online?')); };
+    document.head.appendChild(el);
+  });
+  return drv.gsi;
+}
+// A token (from the user's click: it may open Google's popup). force: ignore the one in memory.
+async function driveToken(force){
+  if (!force && drv.tok && Date.now() < drv.exp - 30000) return drv.tok;
+  await driveLoadGsi();
+  return await new Promise((res, rej) => {
+    let tc;
+    const consented = driveSeenGet().consented;
+    try {
+      tc = window.google.accounts.oauth2.initTokenClient({client_id:DRIVE_CLIENT_ID, scope:DRIVE_SCOPES, prompt:consented ? '' : 'consent',
+        callback: r => {
+          if (!r || r.error || !r.access_token) return rej(new DriveErr('Google sign-in failed' + (r && r.error ? ' (' + r.error + ')' : '') + '.', 0, r && r.error === 'access_denied'));
+          drv.tok = r.access_token; drv.exp = Date.now() + (Number(r.expires_in) || 3600) * 1000;
+          try { const o = driveSeenGet(); o.consented = true; localStorage.setItem(DRIVE_LS, JSON.stringify(o)); } catch(e){}
+          res(drv.tok);
+        },
+        error_callback: e => rej(new DriveErr(e && e.type === 'popup_closed' ? 'Google sign-in was closed.' : 'Google sign-in didn’t open (' + ((e && e.type) || 'blocked') + ').', 0, e && e.type === 'popup_closed'))});
+      tc.requestAccessToken();
+    } catch(e){ rej(new DriveErr('Google sign-in didn’t start.')); }
+  });
+}
+// One Drive API call; a 401 gets one new token and one retry. Returns the Response (ok) or throws a DriveErr.
+async function driveFetch(url, opt){
+  for (let tries = 0; ; tries++){
+    const tok = await driveToken(tries > 0);
+    let r;
+    try { r = await fetch(url, Object.assign({}, opt, {headers:Object.assign({}, opt && opt.headers, {Authorization:'Bearer ' + tok})})); }
+    catch(e){ throw new DriveErr('Couldn’t reach Google Drive. Are you online?'); }
+    if (r.status === 401 && tries === 0){ drv.tok = null; continue; }
+    if (!r.ok) throw new DriveErr(r.status === 401 ? 'Google Drive didn’t accept the sign-in.' : r.status === 403 ? 'Google Drive said no (403): is the account a test user? See docs/GOOGLE-DRIVE-SETUP.md.' : 'Google Drive error ' + r.status + '.', r.status);
+    return r;
+  }
+}
+const driveJson = async (url, opt) => (await driveFetch(url, opt)).json();
+const DRIVE_API = 'https://www.googleapis.com/drive/v3/files', DRIVE_UP = 'https://www.googleapis.com/upload/drive/v3/files';
+async function driveFolderId(){
+  if (drv.folder) return drv.folder;
+  const q = "mimeType='application/vnd.google-apps.folder' and name='" + DRIVE_FOLDER + "' and 'root' in parents and trashed=false";
+  const L = await driveJson(DRIVE_API + '?q=' + encodeURIComponent(q) + '&fields=' + encodeURIComponent('files(id,name)') + '&pageSize=1');
+  if (L && L.files && L.files[0]) return (drv.folder = L.files[0].id);
+  const c = await driveJson(DRIVE_API + '?fields=id', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:DRIVE_FOLDER, mimeType:'application/vnd.google-apps.folder', parents:['root']})});
+  return (drv.folder = c.id);
+}
+// Every Drive command goes through here: never throws, says what went wrong in one toast.
+async function driveRun(fn){
+  if (!DRIVE_CLIENT_ID) return toast('Google Drive isn’t set up yet (needs a client ID: see docs/GOOGLE-DRIVE-SETUP.md).', 6000);
+  try { return await fn(); }
+  catch(e){ if (e && e.quiet) return toast(e.message); try { toastErr((e && e.message) || 'Google Drive didn’t work.', 6000); } catch(_){} }
+}
+async function driveSave(){
+  await driveToken();   // first, so the sign-in popup is still inside the click
+  flushS(); await presetSmpFill();
+  if (!await smpSaveGate()) return;
+  const name = projName(), blob = projBlob(), fid = await driveFolderId();
+  const q = "'" + fid + "' in parents and name='" + driveQ(name) + "' and trashed=false";
+  const L = await driveJson(DRIVE_API + '?q=' + encodeURIComponent(q) + '&orderBy=' + encodeURIComponent('modifiedTime desc') + '&fields=' + encodeURIComponent('files(id,name,modifiedTime,capabilities/canEdit)'));
+  const mine = ((L && L.files) || []).find(f => f.capabilities && f.capabilities.canEdit);
+  if (mine){
+    const seen = (driveSeenGet().seen || {})[mine.id];
+    if (!seen || Date.parse(mine.modifiedTime) > Date.parse(seen)){
+      if (!await askYes({title:'Replace the newer copy on Drive?', body:name + ' on Drive was saved ' + driveAgo(Date.parse(mine.modifiedTime)) + (seen ? ', after the copy this device last saw.' : ', and this device hasn’t seen it.') + ' Saving replaces it.'}, 'Replace')) return;
+    }
+    let r = null;
+    try { r = await driveFetch(DRIVE_UP + '/' + mine.id + '?uploadType=media&fields=id,modifiedTime', {method:'PATCH', headers:{'Content-Type':'application/json'}, body:blob}); }
+    catch(e){ if (!e || (e.status !== 403 && e.status !== 404)) throw e; }   // a file this app didn't make (synced by Drive for desktop) can be read, not changed: a new copy is made
+    if (r){ const j = await r.json(); driveSeenSet(j.id, j.modifiedTime); return toast('Saved ' + name + ' to Drive.'); }
+  }
+  const bd = 'tpdrive' + Date.now();
+  const body = new Blob(['--' + bd + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify({name, parents:[fid]}) + '\r\n--' + bd + '\r\nContent-Type: application/json\r\n\r\n', blob, '\r\n--' + bd + '--'], {type:'multipart/related; boundary=' + bd});
+  const j = await driveJson(DRIVE_UP + '?uploadType=multipart&fields=id,modifiedTime', {method:'POST', headers:{'Content-Type':'multipart/related; boundary=' + bd}, body});
+  driveSeenSet(j.id, j.modifiedTime);
+  toast(mine ? 'Saved ' + name + ' to Drive as a new copy (the old one is read-only to this app).' : 'Saved ' + name + ' to Drive.', mine ? 6000 : undefined);
+}
+async function driveList(n){
+  const fid = await driveFolderId();
+  const q = "'" + fid + "' in parents and name contains '.thunder' and trashed=false";
+  const L = await driveJson(DRIVE_API + '?q=' + encodeURIComponent(q) + '&orderBy=' + encodeURIComponent('modifiedTime desc') + '&pageSize=' + n + '&fields=' + encodeURIComponent('files(id,name,modifiedTime)'));
+  return (L && L.files) || [];
+}
+async function driveOpenFile(f){
+  const r = await driveFetch(DRIVE_API + '/' + f.id + '?alt=media');
+  const file = new File([await r.blob()], f.name, {type:'application/json'});
+  if (await openProjectFile(file)){ driveSeenSet(f.id, f.modifiedTime); toast('Opened ' + f.name + ' (saved ' + driveAgo(Date.parse(f.modifiedTime)) + ')'); }
+}
+async function driveOpenLatest(){
+  await driveToken();
+  const L = await driveList(1);
+  if (!L.length) return toast('No .thunder files in the Thunder Plus folder on Drive yet.');
+  await driveOpenFile(L[0]);
+}
+async function driveOpenPick(){
+  await driveToken();
+  const L = await driveList(30);
+  if (!L.length) return toast('No .thunder files in the Thunder Plus folder on Drive yet.');
+  const k = await askPick({title:'Open from Drive', body:'The newest songs in your Thunder Plus folder.'}, L.map(f => f.name + '  ·  ' + new Date(f.modifiedTime).toLocaleString([], {dateStyle:'medium', timeStyle:'short'})));
+  if (k < 0) return;
+  await driveOpenFile(L[k]);
+}
+// The File ▾ items (none in the desktop app).
+function driveItems(){
+  if (!driveShown()) return [];
+  if (DRIVE_CLIENT_ID) driveLoadGsi().catch(() => {});   // ready before the click that opens the sign-in popup
+  return [{l:'Save to Drive', f:() => driveRun(driveSave)}, {l:'Open latest from Drive', f:() => driveRun(driveOpenLatest)}, {l:'Open from Drive…', f:() => driveRun(driveOpenPick)}];
+}
+/* DRIVE SYNC END */
 // RECENT: the last 8 project files (desktop: paths; Chrome / Edge: handles). Phones that download have none.
 let recentL = [];
 kvGet('recent').then(L => { if (Array.isArray(L)) recentL = L.filter(e => e && (e.path || e.h)); });
@@ -26696,7 +26832,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 667;
+const BUILD = 668;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37150,6 +37286,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [668, '23 Nov', ['Google Drive in the web app: File ▾ → Save to Drive, Open latest from Drive and Open from Drive… use a "Thunder Plus" folder in your My Drive, so the song you saved on the computer opens on the phone. It needs a one-time setup (docs/GOOGLE-DRIVE-SETUP.md). Not in the desktop app yet.']],
   [667, '23 Nov', ['LP.SEL now locks its loop: once it starts, the looped rows stay put while you select and edit anywhere else. Select other rows and press LP.SEL again to move the loop there; STOP ends it. LOOP SEL on its own still follows your selection as before.']],
   [666, '22 Nov', ['A Knob module you add to a chains patch now puts its Value on the bottom panel straight away, labelled K1 to K8, so you can play it from the FX bar without opening the editor.']],
   [665, '22 Nov', ['MOD, macros and scenes can drive patch knobs: a track that runs through chains (or plays a waves instrument) lists K1–K8 as targets, so an LFO can sweep a Knob module. An LFO on a knob swings round the middle and takes over from KN commands on that knob while it runs.']],
@@ -38433,9 +38570,9 @@ try { const v = localStorage.getItem(VK); if (v !== 'synth') setView(v === 'chai
    other apps' Share sheets use the manifest's share_target instead: sw.js parks the file in the
    "thunder-share" cache and reopens the app with ?shared=1, and it is picked up below. */
 async function openProjectFile(f){
-  if (!f) return;
-  if (!await okToLeave('opening ' + f.name)) return;
-  await loadProjFile(f);
+  if (!f) return false;
+  if (!await okToLeave('opening ' + f.name)) return false;
+  return await loadProjFile(f);
 }
 if ('launchQueue' in window) try {
   launchQueue.setConsumer(async p => {
