@@ -1957,6 +1957,25 @@ const Constant = {
   process(st, io, ctx){ io.out.out.fill(io.p.value + io.p.fine); }
 };
 
+/* Knob (22 Nov 2026, patch knobs): a control the track drives. Out is knob N's value from the tracker (KN1–KN8) while the
+   song has set it, else Value; mapped into Min..Max. ctx.engine.knobs[1..8] (−1 = not set) is filled from the host node's
+   k1–k8 params each block; an engine without them (…waves before S2) just uses Value. A change glides across one block so
+   a jump doesn't click. */
+const Knob = {
+  type:'knob', scope:'poly', cost:.01,
+  inputs:{}, outputs:{ out:'cv' },
+  params:{ n:[1,1,8,1], value:[0,0,1,.01], min:[0,-1,1,.01], max:[1,-1,1,.01] },
+  create:() => ({ y:NaN }),
+  process(st, io, ctx){
+    const K = ctx.engine && ctx.engine.knobs, n = Math.max(1, Math.min(8, Math.round(io.p.n) || 1)), h = K ? K[n] : -1;
+    // (len: the frames rendered this block, ctx.block, not the buffer's length: CodeRabbit on #289, a short block glides all the way and the rest of the buffer holds)
+    const v = h >= 0 ? Math.min(1, h) : io.p.value, to = io.p.min + (io.p.max - io.p.min) * v, o = io.out.out, len = Math.max(1, Math.min(o.length, ctx.block || o.length)), from = st.y;
+    if (!(from === from) || from === to) o.fill(to);   // (NaN: the first block)
+    else { const d = (to - from) / len; for (let i = 0; i < len; i++) o[i] = from + d * (i + 1); o.fill(to, len); }
+    st.y = to;
+  }
+};
+
 /* Divider: counts Clock in and gates every 2nd, 4th, 8th and Nth pulse (each output stays high for the length of
    the pulse that fired it). Reset starts counting again. */
 const Divider = {
@@ -5581,7 +5600,7 @@ const SHARED_MODULES = { beads:Beads,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
-  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
+  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant, knob:Knob,
   steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
   onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide, dline:DelayLine, expr:Expression,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
@@ -5884,6 +5903,7 @@ class ChainsEngine {
        modulates them). It used to run the whole patch, so 4 tracks on …chains did 4× every track's effects. -1 = all. */
     this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = -1;
     this.bsw = new Float32Array(16).fill(-1); this._bn = null; this._bnKey = -1;   // BYPASS: the tracker's switches, the module numbers
+    this.knobs = new Float32Array(9).fill(-1);   // PATCH KNOBS: the tracker's KN1–KN8 (index 1–8; −1 = the Knob module's own Value)
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
       // The views below are made once per slot and kept (modules ask for them every block: a new subarray each time was steady garbage).
       // The track inputs are the host's own buffers (the same each block), so their views are dropped only if the buffer is replaced.
@@ -6229,10 +6249,13 @@ registerProcessor('chains', ChainsProcessor);
    Track In modules); every Chain Out t sums into output channel pair t.
    Anything after the track in the chain (native track FX, fader, mute/solo,
    pan, master) is untouched Thunder code downstream of this node. */
+const KN_NAMES = ['', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8'];   // PATCH KNOBS (made once, as BYP_NAMES)
 const BYP_NAMES = ['', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b12', 'b13', 'b14', 'b15'];   // (the parameter names, made once: 15 strings a block otherwise)
 class ThunderChains extends AudioWorkletProcessor {
   // b1–b15: the tracker's BYP switches for the modules numbered 1–15 (−1 the patch's own, 0 in, 1 bypassed, 2 flipped)
-  static get parameterDescriptors(){ return Array.from({length:15}, (_, i) => ({name:'b' + (i + 1), defaultValue:-1, minValue:-1, maxValue:2, automationRate:'k-rate'})); }
+  // k1–k8 (22 Nov, patch knobs): the tracker's KN1–KN8 for this track's Knob modules (−1 their own Value, else 0–1)
+  static get parameterDescriptors(){ return Array.from({length:15}, (_, i) => ({name:'b' + (i + 1), defaultValue:-1, minValue:-1, maxValue:2, automationRate:'k-rate'}))
+    .concat(Array.from({length:8}, (_, i) => ({name:'k' + (i + 1), defaultValue:-1, minValue:-1, maxValue:1, automationRate:'k-rate'}))); }
   constructor(options){
     super();
     const o = options.processorOptions || {};
@@ -6288,6 +6311,7 @@ class ThunderChains extends AudioWorkletProcessor {
     if (this.__q && this.__q.length){ const q = this.__q, due = currentTime + 64 / sampleRate; while (q.length && q[0][0] <= due) this._recv(q.shift()[1]); }   // THUNDER CORE: tempo at its time
     if (this.__ov && globalThis.__tcOv) params = globalThis.__tcOv(this, params, n);   // THUNDER CORE: BYP
     if (params) for (let k = 1; k <= 15; k++){ const a = params[BYP_NAMES[k]]; e.bsw[k] = a ? a[0] : -1; }   // BYPASS: the tracker's switches
+    if (params) for (let k = 1; k <= 8; k++){ const a = params[KN_NAMES[k]]; e.knobs[k] = a ? a[0] : -1; }   // PATCH KNOBS: KN1–KN8
     const L = o[0], R = o[1] || o[0];
     // Feed this track's input into the engine's per-track buffers.
     for (const k of this._tw){ this._tmpL.fill(0, k * BLOCK, (k + 1) * BLOCK); this._tmpR.fill(0, k * BLOCK, (k + 1) * BLOCK); }
