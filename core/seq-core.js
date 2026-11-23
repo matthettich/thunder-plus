@@ -85,7 +85,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CC_CMDS = ['CCA', 'CCB', 'CCC', 'CCD'];
 const NCC = CC_CMDS.length;
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8'];
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
 const s8 = v => v > 127 ? v - 256 : v;
 const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};
@@ -508,6 +508,8 @@ function makeSeq(S, mode, o){
       if (fx.BYP != null && t < MT){ const X = fx.BYP >> 4, Y = fx.BYP & 15;
         for (let k = X ? X : 1; k <= (X ? X : 15); k++){ evs.push({type:'chc', t:at, track:t, p:'b' + k, v:Y >= 2 ? 2 : Y});
           if (Y >= 2) evs.push({type:'chc', t:at + Y * line, track:t, p:'b' + k, v:-1}); } }
+      // KN1–KN8 (22 Nov, patch knobs): knob N of the track's chains patch, 00–FF as 0–1, on k1–k8 of its thunder-chains node (STOP: −1, the Knob's own Value)
+      if (t < MT) for (let k = 1; k <= 8; k++){ const v = fx['KN' + k]; if (v != null) evs.push({type:'chc', t:at, track:t, p:'k' + k, v:v / 255}); }
     };
     // GGR on a row due now (any track, often the master column, which comes last) grooves every track's step from this one
     for (let t = 0; t <= MT; t++){ const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
@@ -1187,6 +1189,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
       if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
       for (const e of r.evs) if (e.type === 'eng') (c.eng || (c.eng = new Map())).set(e.track, e);   // ENGINE TARGETS: the state the silent steps left
+        else if (e.type === 'chc') (c.chc || (c.chc = new Map())).set(e.track + ':' + e.p, e);   // BYP / KN1–KN8 (CodeRabbit on #289): the last switch and knob values, as the page's chase keeps them
       if (ms != null && Date.now() - t0 >= ms) return;
     }
     c.done = true;
@@ -1292,6 +1295,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
       if (!c.done) this.chaseRun(c, null);
       seq = c.seq; const first = c.first;
+      if (c.chc) for (const e of c.chc.values()) if (!(e.v === 2)) this.ev(Object.assign({}, e, {t:d.t0}));   // (a momentary BYP flip, 2, is not carried over: its own −1 to end it may be past)
       if (c.eng) for (const e of c.eng.values()) this.engEv(Object.assign({}, e, {t:d.t0}));   // the steps run silently: the live engines' state they left, now (then the step it stopped on, below)
       if (first) for (const e of first.evs) if (e.type === 'eng') this.engEv(Object.assign({}, e, {t:e.t + (d.t0 - first.t)}));
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }

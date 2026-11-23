@@ -16,6 +16,6 @@ test('it runs on return to the app, resize, visual viewport and scroll, and the 
     /visualViewport\.addEventListener\('resize', resetStrayScroll/, /document\.addEventListener\('visibilitychange', \(\) => \{ if \(!document\.hidden\)\{ remeasureAfterReturn/]) assert.match(src, re);
   assert.match(src, /function remeasureAfterReturn\(\)\{ resetStrayScroll\(\); scheduleRefit\(true\); \}/);
 });
-test('build and service-worker cache agree at 662', () => {
-  assert.match(src, /const BUILD = 662;/); assert.match(H.read('sw.js'), /thunderplus-v662/);
+test('build and service-worker cache agree (662 or later)', () => {
+  const b = +(/const BUILD = (\d+);/.exec(src) || [])[1]; assert.ok(b >= 662, 'BUILD ' + b); assert.match(H.read('sw.js'), new RegExp('thunderplus-v' + b + "'"));
 });
