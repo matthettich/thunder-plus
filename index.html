@@ -26696,7 +26696,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 666;
+const BUILD = 667;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -28958,14 +28958,25 @@ function playPatLoop(){
 // Arrange (the Song screen, or Arrange holding the keys beside Phrase) it is LOOP SEL's own path: LOOP SEL turned on from the selection (toggleLoop arms the rows), then playCtx plays the song looping them, every track; nothing new in
 // the sequencer. With no selection (lead's decision: or one row) it is loop play on the cursor's row (playPatLoop) and says how to select more. Pressed while it plays, it stops. LOOP SEL goes back to what it was when the song stops, as LOOP does
 // after loop play (lpW). lsW: {was, arm: LOOP SEL and its armed rows before, seen: tp.on has been true since}. If the selection changes while it plays, draw()'s syncLoop follows it only on the Song screen itself (selA is then Arrange's); beside Phrase the running loop keeps its rows.
+// LOCK (23 Nov, owner: "make it so the selection is locked once loop selection is selected so you can work within the selection"; keep LOOP SEL's
+// follow-the-selection as the alternative): a loop LP.SEL starts holds its rows (lsLock) while you select and edit elsewhere; syncLoop / loopFor
+// don't re-arm from the selection. LP.SEL again while it plays: with 2+ other rows selected, the loop moves there (still locked); else it stops.
+// STOP releases it (lpSelRestore). The lock counts only while playing or warming up (CodeRabbit on #292: a warm-up start that is then refused
+// can't leave a stale lock behind).
+let lsLock = false;
 let lsW = null;
-function lpSelRestore(){ if (!lsW) return; const w = lsW; lsW = null; loopSel = w.was; loopArm = w.arm; }
+function lpSelRestore(){ lsLock = false; if (!lsW) return; const w = lsW; lsW = null; loopSel = w.was; loopArm = w.arm; }
 function lpSelPlay(){
-  if (tp.on){ tStopUser(); return; }   // the restore is in draw(), which tStop runs
+  if (tp.on){
+    if (lsLock && lsW && tv === 'song'){ const r = sxRect();   // LOCK: a new selection moves the locked loop there
+      if (r && r.y1 > r.y0 && !(loopArm && loopArm.v === 'song' && loopArm.y0 === r.y0 && loopArm.y1 === r.y1)){
+        loopArm = {v:'song', y0:r.y0, y1:r.y1}; if (tp.loopV === 'song') tp.seq.setLoop(loopArm);
+        toast(`Loop locked to rows ${hx(r.y0)}–${hx(r.y1)}`); draw(); return; } }
+    tStopUser(); return; }   // the restore is in draw(), which tStop runs
   if (tv !== 'song') return toast('LOOP SEL loops the selected rows on Arrange.');
   const r = sxRect(), rows = !!r && r.y1 > r.y0;
   lsW = {was:loopSel, arm:loopArm, seen:false};
-  if (rows){ if (!loopSel) toggleLoop(); playCtx(); }   // LOOP SEL's own path: arms the selected rows, then plays them
+  if (rows){ if (!loopSel) toggleLoop(); loopArm = {v:'song', y0:r.y0, y1:r.y1}; playCtx(); if (tp.on || warmTok){ lsLock = true; toast(`Loop locked to rows ${hx(r.y0)}–${hx(r.y1)}: select and edit freely; LP.SEL on other rows moves it, STOP ends it`, 2600); } }   // LOOP SEL's own path: arms the selected rows, then plays them (LOCK: and holds them)
   else { playPatLoop(); toast(`Looping row ${rS(cs.song.y, 3)}: select 2 or more rows for a longer loop`, 2400); }
   if (tp.on) lsW.seen = true; else if (!warmTok){ lpSelRestore(); draw(); }
 }
@@ -29023,7 +29034,7 @@ function syncLoop(){
   }
   if (!tp.loopV) return;
   if (!loopSel){ tp.seq.setLoop(null); return; }
-  if (tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }
+  if (!(lsLock && (tp.on || warmTok)) && tv === tp.loopV && selA && selA.v === tv && !onPset()){ const r = selRect(); loopArm = {v:tv, y0:r.y0, y1:r.y1}; }   // (LOCK: LP.SEL's rows hold)
   tp.seq.setLoop(loopArm && loopArm.v === tp.loopV ? loopArm : null);
 }
 // KEY TRANS. (KEYS mode, top bar): a lock (owner, 3 Nov): while it is on, ▲ / ▼ transpose the selection a semitone and play its
@@ -29055,7 +29066,7 @@ function topSelVis(){
 }
 function loopFor(view){
   if (!loopSel || !GRIDV.has(view)) return null;
-  if (selA && selA.v === view && !onPset()){ const r = selRect(); loopArm = {v:view, y0:r.y0, y1:r.y1}; }
+  if (!(lsLock && (tp.on || warmTok)) && selA && selA.v === view && !onPset()){ const r = selRect(); loopArm = {v:view, y0:r.y0, y1:r.y1}; }   // (LOCK: LP.SEL's rows hold)
   else if (!loopArm || loopArm.v !== view) return null;
   if (loopArm.y1 <= loopArm.y0) return null;
   // A phrase plays only its ROWS: a loop past them would play row 0 over and over. Keep it inside.
@@ -37139,6 +37150,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [667, '23 Nov', ['LP.SEL now locks its loop: once it starts, the looped rows stay put while you select and edit anywhere else. Select other rows and press LP.SEL again to move the loop there; STOP ends it. LOOP SEL on its own still follows your selection as before.']],
   [666, '22 Nov', ['A Knob module you add to a chains patch now puts its Value on the bottom panel straight away, labelled K1 to K8, so you can play it from the FX bar without opening the editor.']],
   [665, '22 Nov', ['MOD, macros and scenes can drive patch knobs: a track that runs through chains (or plays a waves instrument) lists K1–K8 as targets, so an LFO can sweep a Knob module. An LFO on a knob swings round the middle and takes over from KN commands on that knob while it runs.']],
   [664, '22 Nov', ['Patch knobs reach waves too: KN1–KN8 on a track playing a waves instrument (live) set the Knob modules in its waves patch, as they do in chains.']],

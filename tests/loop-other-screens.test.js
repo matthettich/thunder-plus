@@ -8,7 +8,7 @@ const src = H.read('index.html');
 const lf = src.match(/\nfunction loopFor\(view\)\{[\s\S]*?\n\}\n/), pc = src.match(/\nfunction playCtx\(\)\{[\s\S]*?\n\}\n/);
 assert.ok(lf && pc, 'could not find loopFor / playCtx: the code moved, this test needs updating');
 function rig({ tv, arm = null, loopSel = true, sel = null }) {
-  const log = [], c = { tv, loopSel, loopArm: arm, selA: sel, tp: { on: false }, GRIDV: new Set(['song', 'sect', 'phrase']), S: { plen: [] }, cPhrase: 0, cSect: 0, cTrack: 0, NT: 32, PROWS: 64,
+  const log = [], c = { tv, loopSel, loopArm: arm, selA: sel, lsLock: false, tp: { on: false }, GRIDV: new Set(['song', 'sect', 'phrase']), S: { plen: [] }, cPhrase: 0, cSect: 0, cTrack: 0, NT: 32, PROWS: 64,
     onPset: () => false, selRect: () => sel && sel.r, clamp: (v, a, b) => Math.max(a, Math.min(b, v)), isBusT: () => false, busPlay: () => log.push('bus'), tStopUser: () => log.push('stop'),
     toast: m => log.push('toast'), songRow: () => 5, tStart: (m, o) => log.push(m + ':' + (o.loop ? o.loop.y0 + '-' + o.loop.y1 : 'row' + o.row)), log };
   vm.createContext(c); vm.runInContext(lf[0] + pc[0] + '\nthis.go = playCtx; this.arm = () => loopArm;', c); return c;
@@ -32,4 +32,10 @@ test('leaving a screen keeps the selection as the armed loop', () => {
 test('dropped pad renders are started again: after the track counts change, and when PLAY is pressed', () => {
   assert.match(src, /if \(vtrk\) growKit\(\);\n[\s\S]{0,500}if \(vtrk && \(n1 !== n0 \|\| m1 !== m0\)\) try \{ prerender\(\); \} catch\(e\)\{\}/);
   assert.match(src, /if \(!tp\.on && !\(o && o\._warm\) && PW\.ready\) try \{ prerender\(\); \} catch\(e\)\{\}/);
+});
+test('LP.SEL lock (23 Nov): a locked loop keeps its rows while another selection is made; a stale lock (not playing) does not', () => {
+  const sel = { r: { y0: 0x20, y1: 0x27 } };
+  let c = rig({ tv: 'song', arm: { v: 'song', y0: 8, y1: 15 }, sel: Object.assign({ v: 'song' }, sel) }); c.lsLock = true; c.tp.on = true; c.warmTok = 0;
+  c.tp.on = false; c.lsLock = true; c.warmTok = 1; c.go(); assert.deepEqual(c.log, ['song:8-15'], 'locked during warm-up: the armed rows, not the selection');
+  c = rig({ tv: 'song', arm: { v: 'song', y0: 8, y1: 15 }, sel: Object.assign({ v: 'song' }, sel) }); c.lsLock = true; c.warmTok = 0; c.go(); assert.deepEqual(c.log, ['song:32-39'], 'stale lock: the selection again');
 });
