@@ -1968,9 +1968,10 @@ const Knob = {
   create:() => ({ y:NaN }),
   process(st, io, ctx){
     const K = ctx.engine && ctx.engine.knobs, n = Math.max(1, Math.min(8, Math.round(io.p.n) || 1)), h = K ? K[n] : -1;
-    const v = h >= 0 ? Math.min(1, h) : io.p.value, to = io.p.min + (io.p.max - io.p.min) * v, o = io.out.out, len = o.length, from = st.y;
+    // (len: the frames rendered this block, ctx.block, not the buffer's length: CodeRabbit on #289, a short block glides all the way and the rest of the buffer holds)
+    const v = h >= 0 ? Math.min(1, h) : io.p.value, to = io.p.min + (io.p.max - io.p.min) * v, o = io.out.out, len = Math.max(1, Math.min(o.length, ctx.block || o.length)), from = st.y;
     if (!(from === from) || from === to) o.fill(to);   // (NaN: the first block)
-    else { const d = (to - from) / len; for (let i = 0; i < len; i++) o[i] = from + d * (i + 1); }
+    else { const d = (to - from) / len; for (let i = 0; i < len; i++) o[i] = from + d * (i + 1); o.fill(to, len); }
     st.y = to;
   }
 };
