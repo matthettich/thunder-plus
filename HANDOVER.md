@@ -882,6 +882,10 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Patch knobs on the bottom panel (22 Nov; build 666, web beta)**
+- [ ] **Computer, …chains: add a Knob (K1) from the module list:** Pass: with the bottom panel's FX bar on, a "K1" slider appears in the chains section at once; moving it changes what the Knob drives; deleting the Knob removes the slider.
+- [ ] **Reload the song / undo / paste a copy of the Knob:** Pass: no second K1 slider appears (a pasted copy has none until you right-click its Value, Add to the bottom panel).
+
 **Patch knobs as MOD / macro / scene targets (22 Nov; build 665, web beta)**
 - [ ] **Computer, a track with CHN on and a Knob (K1) into a filter cutoff:** MOD → add an LFO on that track, target **K1 · patch knob**, 1 bar sine. Pass: the filter sweeps once a bar; STOP returns it to the Knob's Value.
 - [ ] **PERFORM → a macro targeting K1 (lo 00, hi FF):** move the macro while playing. Pass: the filter follows.
@@ -1723,6 +1727,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 22 Nov (patch knobs S4: Knob on the bottom panel; build 666)
+chains/index.html `addItem` calls new `knobToDeck(m)` after `addModule` when the type is `knob` (palette adds only, so load / undo / paste / duplicate never add one; same undo step as the add): pushes `deckDesc(m,'value')` with label `K<n>` into `doc.deck`. The label is stored, so changing n later does not relabel it. removeModule already drops deck entries. waves has no deck, untouched. Tests: tests/patch-knobs-deck.test.js.
 
 ## 22 Nov (patch knobs S3: MOD / macro / scene targets; build 665)
 Target id `kn:t:k` (tgtOk, tgtLabel, tgtOwn 128, tgtList for tracks with CHN on or a waves live pad via new `tgtWaves` / `tgtPadAny` (tgtLive now uses it), tgtEvs → `chc` k-event, own → −1). LFO centre is 128 (the page can't read the Knob's Value); an LFO overrides KN on the same knob each step.

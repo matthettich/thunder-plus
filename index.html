@@ -26696,7 +26696,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 665;
+const BUILD = 666;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37139,6 +37139,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [666, '22 Nov', ['A Knob module you add to a chains patch now puts its Value on the bottom panel straight away, labelled K1 to K8, so you can play it from the FX bar without opening the editor.']],
   [665, '22 Nov', ['MOD, macros and scenes can drive patch knobs: a track that runs through chains (or plays a waves instrument) lists K1–K8 as targets, so an LFO can sweep a Knob module. An LFO on a knob swings round the middle and takes over from KN commands on that knob while it runs.']],
   [664, '22 Nov', ['Patch knobs reach waves too: KN1–KN8 on a track playing a waves instrument (live) set the Knob modules in its waves patch, as they do in chains.']],
   [663, '22 Nov', ['New: patch knobs. A Knob module in chains (and waves) puts out a control you patch into any purple jack; the tracker commands KN1–KN8 (00–FF) set knob 1–8 of the track’s chains patch from that row on, and stopping the song hands each Knob its own Value back. Try Knob 1 into a filter’s Cutoff, then KN1 00 … KN1 FF down a phrase (RNL after it for a random walk).']],
