@@ -1849,6 +1849,24 @@ const Constant = {
   process(st, io, ctx){ io.out.out.fill(io.p.value + io.p.fine); }
 };
 
+/* Knob (22 Nov 2026, patch knobs): a control the track drives. Out is knob N's value from the tracker (KN1–KN8) while the
+   song has set it, else Value; mapped into Min..Max. ctx.engine.knobs[1..8] (−1 = not set) is filled from the host node's
+   k1–k8 params each block; an engine without them (…waves before S2) just uses Value. A change glides across one block so
+   a jump doesn't click. */
+const Knob = {
+  type:'knob', scope:'poly', cost:.01,
+  inputs:{}, outputs:{ out:'cv' },
+  params:{ n:[1,1,8,1], value:[0,0,1,.01], min:[0,-1,1,.01], max:[1,-1,1,.01] },
+  create:() => ({ y:NaN }),
+  process(st, io, ctx){
+    const K = ctx.engine && ctx.engine.knobs, n = Math.max(1, Math.min(8, Math.round(io.p.n) || 1)), h = K ? K[n] : -1;
+    const v = h >= 0 ? Math.min(1, h) : io.p.value, to = io.p.min + (io.p.max - io.p.min) * v, o = io.out.out, len = o.length, from = st.y;
+    if (!(from === from) || from === to) o.fill(to);   // (NaN: the first block)
+    else { const d = (to - from) / len; for (let i = 0; i < len; i++) o[i] = from + d * (i + 1); }
+    st.y = to;
+  }
+};
+
 /* Divider: counts Clock in and gates every 2nd, 4th, 8th and Nth pulse (each output stays high for the length of
    the pulse that fired it). Reset starts counting again. */
 const Divider = {
@@ -5473,7 +5491,7 @@ const SHARED_MODULES = { beads:Beads,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
-  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
+  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant, knob:Knob,
   steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
   onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide, dline:DelayLine, expr:Expression,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,

@@ -882,6 +882,13 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Patch knobs: Knob module + KN1–KN8 (22 Nov; build 663, web beta)**
+- [ ] **Computer, a track with CHN on:** open its chains patch, add Control utilities → **Knob** (K1), patch Out into a filter's purple Cutoff jack (Min 0, Max 1). In a phrase on that track type `KN1 00` on row 00 and `KN1 FF` on row 08. Pass: the filter is closed then opens at row 08, with no click; the Knob's Value slider moves nothing while the song holds it.
+- [ ] **Same song, STOP:** Pass: the filter goes back to where the Knob's Value slider sets it.
+- [ ] **Start playback from below row 08:** Pass: the filter is already open (the last KN1 above is picked up).
+- [ ] **Phone, audio-thread sequencer on:** the same phrase. Pass: as on the computer, in time.
+- [ ] **Two Knob modules both on K1** (one into cutoff, one into a delay's feedback): both follow KN1.
+
 **Header lost on the Synth page after a notification (21 Nov; build 662, web beta)**
 - [ ] Fold, installed PWA, unfolded: open the Synth page, pull the notification shade down / get a text, or switch to another app and back. The header (CPU, Play, tabs) must still be on screen and TRACKER reachable. Also try tapping the name field with the keyboard up.
 
@@ -1706,6 +1713,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 22 Nov (patch knobs S1: Knob module + KN1–KN8; build 663)
+Owner, 22 Nov: tracks should control aspects of …waves / …chains. Plan: docs/plans/PATCH-KNOBS-PLAN.md (S2 waves, S3 MOD targets, S4 bottom panel). Built: shared `knob` module (chains-worklet SHARED block, synced to waves; editor entry, palette, hint, summary, width), `engine.knobs[1..8]`, `k1`–`k8` AudioParams on thunder-chains (−1 = the Knob's own Value), KN1–KN8 appended to FXC (after CHD), sequencer emits `chc` k-events (v/255), STOP resets via `CHN_RESET`; chase and the audio-thread core handle `chc` generically (core regenerated). Worklets ?v=59 / ?v=47. Tests: tests/patch-knobs.test.js (written by a Sonnet worker, reviewed and mutation-checked by the lead); flex FXC-order regex and the 662 build test loosened to allow later entries.
 
 ## 21 Nov (header lost on the Synth page; build 662)
 Owner's bug (screenshot, Fold 6 unfolded): after a text, the Synth page sat scrolled with the header off the top. Fixed by build 662 (the lead reconciles this with the bug entry from PR #285). Cause not reproduced; html/body are overflow:hidden but still scrollable from code, and the return path did not reset it (fold/unfold, a resize, brought it back). Safety net `resetStrayScroll` / `remeasureAfterReturn` in index.html on scroll, resize, visualViewport, pageshow, focus, visibilitychange. Notes: docs/SYNTH-HEADER-NOTES.md. Test: tests/header-lost-scroll.test.js.

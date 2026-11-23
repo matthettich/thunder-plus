@@ -17,7 +17,7 @@ output into any purple (control) jack. Then the track drives it from three place
 3. **Macros / scenes** (MAC, XFD) reach the same ids.
 
 ## Steps
-- [ ] **S1 (build 663): Knob module + KN1–KN8 on …chains.** `k1`–`k8` AudioParams on `thunder-chains` (−1 = the patch's
+- [x] **S1 (build 663): Knob module + KN1–KN8 on …chains.** `k1`–`k8` AudioParams on `thunder-chains` (−1 = the patch's
   own), `engine.knobs`, shared `knob` module (DSP + editor), commands in index.html (FXC, FXB, groups, help, describer,
   sequencer `chc` events, STOP reset), `node tools/make-core.mjs`, `python3 tools/sync-shared.py`, tests, changelog, BUILD,
   sw.js cache. Audio-thread sequencer path is generic over `chc` param names (core-processor `tcParam`).
@@ -31,3 +31,4 @@ output into any purple (control) jack. Then the track drives it from three place
 
 ## Progress notes
 - 22 Nov 23:10: plan written, S1 started on branch `knobs-kn`.
+- 22 Nov 23:40: S1 built and tested (npm test green, browser-check green), PR into `beta`.
