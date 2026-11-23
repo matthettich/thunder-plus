@@ -37,6 +37,7 @@ by name ("Thunder Plus" directly in My Drive) and can read those files although 
 
 ## How it behaves
 - Save to Drive writes `<song name>.thunder` into that folder, overwriting the same-named song there (after asking if Drive's copy is one this device hasn't seen); Open latest picks the newest.
+- File ▾ → Drive folder: <name>… lets you choose the folder (browse My Drive or Shared with me; "Use this folder"). The choice is kept on that device only; default is "Thunder Plus" in My Drive. If the chosen folder is deleted or trashed, the app says so and falls back to the default.
 - Open latest / Open from Drive… use the normal Open (the "Save changes?" question included).
 - Problems (offline, sign-in closed, "403 / access blocked"): a short message; a 403 usually means the account is not on the Test users list.
 

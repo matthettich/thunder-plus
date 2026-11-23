@@ -26,18 +26,18 @@ function make({ clientId = 'cid.apps.googleusercontent.com', desktop = false, ro
   if (desktop) win.thunderDesktop = {};
   win.google = { accounts: { oauth2: { initTokenClient: (o) => ({ requestAccessToken() { tokens.n++; tokens.opt = o; Promise.resolve().then(() => o.callback({ access_token: 'tok' + tokens.n, expires_in: 3600 })); } }) } } };
   sb.globalThis = sb; vm.createContext(sb);
-  vm.runInContext(blk + '\n;globalThis.__x = {driveItems, driveRun, driveSave, driveOpenLatest, driveOpenPick, drv};', sb);
+  vm.runInContext(blk + '\n;globalThis.__x = {driveItems, driveRun, driveSave, driveOpenLatest, driveOpenPick, driveChoose, drv};', sb);
   return { sb, x: sb.__x, calls, toasts, opened, store, tokens };
 }
 const mkRes = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, blob: async () => new Blob([typeof body === 'string' ? body : JSON.stringify(body)]) });
 const folderRoute = { test: u => u.includes('mimeType') && u.includes('google-apps.folder') && !u.includes('upload'), reply: () => ({ body: { files: [{ id: 'F1' }] } }) };
 const dec = u => decodeURIComponent(u);
 
-test('the block exists, the client id const holds a Web client ID (owner, 23 Nov), and the menu lists the three items in both File menus', () => {
+test('the block exists, the client id const holds a Web client ID (owner, 23 Nov), and the menu lists the four items in both File menus', () => {
   assert.ok(blk, 'DRIVE SYNC block missing');
   assert.match(src, /const DRIVE_CLIENT_ID = '[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com';/);
   assert.equal((src.match(/\.\.\.driveItems\(\)/g) || []).length, 2);
-  const { x } = make(); assert.deepEqual(Array.from(x.driveItems(), i => i.l), ['Save to Drive', 'Open latest from Drive', 'Open from Drive…']);
+  const { x } = make(); assert.deepEqual(Array.from(x.driveItems(), i => i.l), ['Save to Drive', 'Open latest from Drive', 'Open from Drive…', 'Drive folder: Thunder Plus…']);
 });
 test('hidden in the desktop app (window.thunderDesktop)', () => { assert.equal(make({ desktop: true }).x.driveItems().length, 0); });
 test('an empty client id toasts the setup message and makes no request', async () => {
@@ -61,7 +61,7 @@ test('open latest: newest .thunder in the folder (modifiedTime desc, 1), downloa
   assert.match(q, /'F1' in parents and name contains '\.thunder' and trashed=false/); assert.match(q, /orderBy=modifiedTime desc/); assert.match(q, /pageSize=1\b/); assert.match(q, /fields=files\(id,name,modifiedTime\)/);
   assert.equal(t.calls.find(c => c.url.includes('alt=media')).opt.headers.Authorization, 'Bearer tok1');
   assert.equal(t.opened.length, 1); assert.equal(t.opened[0].name, 'song.thunder');
-  assert.match(t.toasts.at(-1), /^Opened song\.thunder \(saved 3 h ago\)$/);
+  assert.match(t.toasts.at(-1), /^Opened song\.thunder from Thunder Plus \(saved 3 h ago\)$/);
   assert.ok(JSON.parse(t.store['thunderplus-drive-v1']).seen.A);
 });
 test('open latest: if the normal open path declines (unsaved-changes confirm cancelled) there is no "Opened" toast', async () => {
@@ -121,4 +121,47 @@ test('token: kept in memory until its expiry; first sign-in asks for consent, la
 });
 test('service worker leaves Google sign-in and Drive requests alone; build and cache agree (668 or later)', () => {
   assert.match(sw, /accounts\.google\.com[\s\S]{0,200}www\.googleapis\.com[\s\S]{0,200}return;/); const b = +(/const BUILD = (\d+);/.exec(src) || [])[1]; assert.ok(b >= 668); assert.ok(sw.includes("'thunderplus-v" + b + "'"));
+});
+
+const LS = 'thunderplus-drive-v1';
+const subRoute = (map) => ({ test: u => dec(u).includes("mimeType='application/vnd.google-apps.folder'") && dec(u).includes(' in parents') && dec(u).includes('orderBy=name'), reply: u => { const m = /'([^']+)' in parents/.exec(dec(u)); return { body: { files: map[m ? m[1] : '@'] || [] } }; } });
+test('folder chooser: Into / Up navigation, query shape, Use stores {id,name}; menu label and later queries use it', async () => {
+  const map = { root: [{ id: 'B', name: 'Beats' }, { id: 'A', name: 'Albums' }], A: [{ id: 'A2', name: '2026' }] };
+  const t = make({ routes: [subRoute(map), { test: u => u.includes('orderBy=modifiedTime'), reply: () => ({ body: { files: [] } }) }] });
+  const seen = []; const script = [(l) => l.indexOf('Albums ›'), (l) => l.indexOf('↑ Up'), (l) => l.indexOf('Albums ›'), (l) => l.indexOf('2026 ›'), (l) => 0];
+  t.sb.askPick = async (m, l) => { seen.push(Array.from(l)); return script[seen.length - 1](l); };
+  await t.x.driveRun(t.x.driveChoose);
+  assert.deepEqual(seen[0], ['✓ Use this folder (My Drive)', 'Shared with me ›', 'Albums ›', 'Beats ›'], 'sorted by name, no Up at root');
+  assert.deepEqual(seen[1], ['✓ Use this folder (Albums)', '↑ Up', '2026 ›']); assert.equal(seen[2][0], '✓ Use this folder (My Drive)');
+  assert.deepEqual(seen[4], ['✓ Use this folder (2026)', '↑ Up']);
+  const q = dec(t.calls[0].url); assert.match(q, /'root' in parents and mimeType='application\/vnd\.google-apps\.folder' and trashed=false/); assert.match(q, /orderBy=name/); assert.match(q, /pageSize=200/); assert.match(q, /fields=nextPageToken,files\(id,name\)/);
+  assert.deepEqual(JSON.parse(t.store[LS]).folder, { id: 'A2', name: '2026' }); assert.match(t.toasts.at(-1), /Drive folder: 2026/);
+  assert.equal(t.x.driveItems()[3].l, 'Drive folder: 2026…');
+  await t.x.driveRun(t.x.driveOpenLatest);   // chosen folder verified once, then listed by its id
+  assert.ok(t.calls.some(c => /'A2' in parents and name contains/.test(dec(c.url)))); assert.match(t.toasts.at(-1), /No \.thunder files in the “2026” folder/);
+});
+test('folder chooser: cancel changes nothing; Shared with me lists sharedWithMe and has no Use row; pages are followed', async () => {
+  const t = make({ routes: [{ test: u => dec(u).includes('orderBy=name') && !dec(u).includes('pageToken'), reply: u => ({ body: dec(u).includes('sharedWithMe') ? { files: [{ id: 'S', name: 'Shared' }] } : { files: [{ id: 'A', name: 'a' }], nextPageToken: 'P2' } }) }, { test: u => dec(u).includes('pageToken=P2'), reply: () => ({ body: { files: [{ id: 'B', name: 'b' }] } }) }] });
+  const seen = []; t.sb.askPick = async (m, l) => { seen.push(Array.from(l)); return seen.length === 1 ? l.indexOf('Shared with me ›') : seen.length === 2 ? -1 : 0; };
+  await t.x.driveRun(t.x.driveChoose);
+  assert.ok(t.calls.some(c => /sharedWithMe and mimeType/.test(dec(c.url)))); assert.deepEqual(seen[1], ['↑ Up', 'Shared ›']); assert.ok(!(LS in t.store) || !JSON.parse(t.store[LS]).folder);
+  const t2 = make({ routes: [{ test: u => dec(u).includes('orderBy=name') && !dec(u).includes('pageToken'), reply: () => ({ body: { files: [{ id: 'A', name: 'a' }], nextPageToken: 'P2' } }) }, { test: u => dec(u).includes('pageToken=P2'), reply: () => ({ body: { files: [{ id: 'B', name: 'b' }] } }) }] });
+  let l0; t2.sb.askPick = async (m, l) => { l0 = Array.from(l); return -1; }; await t2.x.driveRun(t2.x.driveChoose); assert.deepEqual(l0.slice(-2), ['a ›', 'b ›']);
+});
+test('folder: choosing My Drive itself is allowed (id root, no files.get); save queries use it and toasts name it', async () => {
+  const t = make({ routes: [listReply([]), { test: u => u.includes('uploadType=multipart'), reply: () => ({ body: { id: 'N1', modifiedTime: '2026-11-23T12:00:00Z' } }) }, subRoute({ root: [] })] });
+  t.sb.askPick = async () => 0; await t.x.driveRun(t.x.driveChoose); assert.deepEqual(JSON.parse(t.store[LS]).folder, { id: 'root', name: 'My Drive' });
+  const t2 = make({ routes: [listReply([]), { test: u => u.includes('uploadType=multipart'), reply: () => ({ body: { id: 'N1', modifiedTime: '2026-11-23T12:00:00Z' } }) }] }); t2.store[LS] = JSON.stringify({ folder: { id: 'root', name: 'My Drive' } });
+  await t2.x.driveRun(t2.x.driveSave); assert.ok(t2.calls.some(c => /'root' in parents and name='My Song\.thunder'/.test(dec(c.url)))); assert.ok(!t2.calls.some(c => c.url.includes('/root?'))); assert.match(t2.toasts.at(-1), /Saved My Song\.thunder to Drive \(My Drive\)/);
+});
+test('folder: a stored choice is verified once per session; gone (404) or trashed falls back to Thunder Plus with a toast and clears it', async () => {
+  const ok = make({ routes: [{ test: u => u.includes('/CH?'), reply: () => ({ body: { id: 'CH', name: 'Renamed', trashed: false } }) }, { test: u => u.includes('orderBy=modifiedTime'), reply: () => ({ body: { files: [] } }) }] }); ok.store[LS] = JSON.stringify({ folder: { id: 'CH', name: 'Old' } });
+  await ok.x.driveRun(ok.x.driveOpenLatest); await ok.x.driveRun(ok.x.driveOpenLatest);
+  assert.equal(ok.calls.filter(c => c.url.includes('/CH?')).length, 1); assert.match(dec(ok.calls.at(-1).url), /'CH' in parents/); assert.equal(JSON.parse(ok.store[LS]).folder.name, 'Renamed');
+  for (const gone of [{ status: 404, body: {} }, { body: { id: 'CH', name: 'Old', trashed: true } }]) {
+    const t = make({ routes: [{ test: u => u.includes('/CH?'), reply: () => gone }, folderRoute, { test: u => u.includes('orderBy=modifiedTime'), reply: () => ({ body: { files: [] } }) }] }); t.store[LS] = JSON.stringify({ folder: { id: 'CH', name: 'Old' }, consented: true });
+    await t.x.driveRun(t.x.driveOpenLatest);
+    assert.ok(t.toasts.some(m => /“Old” is gone or in the trash: using “Thunder Plus”/.test(m))); assert.match(dec(t.calls.find(c => c.url.includes('orderBy=modifiedTime')).url), /'F1' in parents/);
+    assert.equal(JSON.parse(t.store[LS]).folder, undefined); assert.equal(JSON.parse(t.store[LS]).consented, true); assert.equal(t.x.driveItems()[3].l, 'Drive folder: Thunder Plus…');
+  }
 });
