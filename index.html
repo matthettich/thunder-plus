@@ -8477,7 +8477,7 @@ class PitchFxCore {
 const $ = id => document.getElementById(id);
 // GOOGLE DRIVE (23 Nov, build 668; web only): the Web application OAuth client ID from the Google Cloud console, pasted here
 // (it is not a secret). Setup: docs/GOOGLE-DRIVE-SETUP.md. Empty: the File ▾ Drive items say it isn't set up yet.
-const DRIVE_CLIENT_ID = '422911491818-rh0rlonckhrsc31t8mdfka2u1mv1h5dm.apps.googleusercontent.com';
+const DRIVE_CLIENT_ID = '619815961895-bjn84v7u0oavpemeu5ip2ii4s9eb8h3l.apps.googleusercontent.com';
 const inAI = !!(window.claude && typeof window.claude.use === 'function');
 // Thunder Plus saves under its own names. The first time it opens it starts from a copy of Thunder's kit and song (only read, never written).
 const KEY = 'thunderplus-kit-v1', OLD_KEY = 'thunder-kit-v1';
@@ -26832,7 +26832,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 669;
+const BUILD = 670;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37286,6 +37286,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [670, '23 Nov', ['Google Drive moved to a new sign-in setup (a personal Google Cloud project).']],
   [669, '23 Nov', ['Google Drive is switched on: File ▾ → Save to Drive / Open latest from Drive / Open from Drive… (the first time, Google asks you to sign in and allow it).']],
   [668, '23 Nov', ['Google Drive in the web app: File ▾ → Save to Drive, Open latest from Drive and Open from Drive… use a "Thunder Plus" folder in your My Drive, so the song you saved on the computer opens on the phone. It needs a one-time setup (docs/GOOGLE-DRIVE-SETUP.md). Not in the desktop app yet.']],
   [667, '23 Nov', ['LP.SEL now locks its loop: once it starts, the looped rows stay put while you select and edit anywhere else. Select other rows and press LP.SEL again to move the loop there; STOP ends it. LOOP SEL on its own still follows your selection as before.']],
