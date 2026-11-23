@@ -312,6 +312,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
       if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
       for (const e of r.evs) if (e.type === 'eng') (c.eng || (c.eng = new Map())).set(e.track, e);   // ENGINE TARGETS: the state the silent steps left
+        else if (e.type === 'chc') (c.chc || (c.chc = new Map())).set(e.track + ':' + e.p, e);   // BYP / KN1–KN8 (CodeRabbit on #289): the last switch and knob values, as the page's chase keeps them
       if (ms != null && Date.now() - t0 >= ms) return;
     }
     c.done = true;
@@ -417,6 +418,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
       if (!c.done) this.chaseRun(c, null);
       seq = c.seq; const first = c.first;
+      if (c.chc) for (const e of c.chc.values()) if (!(e.v === 2)) this.ev(Object.assign({}, e, {t:d.t0}));   // (a momentary BYP flip, 2, is not carried over: its own −1 to end it may be past)
       if (c.eng) for (const e of c.eng.values()) this.engEv(Object.assign({}, e, {t:d.t0}));   // the steps run silently: the live engines' state they left, now (then the step it stopped on, below)
       if (first) for (const e of first.evs) if (e.type === 'eng') this.engEv(Object.assign({}, e, {t:e.t + (d.t0 - first.t)}));
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
