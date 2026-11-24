@@ -137,7 +137,12 @@ int main() {
     rops.push_back({200, [&](SongRenderer& R) { FxPlan* p = planFor(R, 5, slotsTape); R.fxBank()->host(5).commit(p); R.mixer().setFx(5, &FxBank::hook, R.fxBank()); keep.push_back(p); }});
     const Ref ref = reference(song, rp, 0, false, true, true, N2, rops);   // (with ELECTRO's own slots on the other tracks; PDC off here so the edit's latency is not in the way)
     { const Ref unedited = reference(song, rp, 0, false, true, true, N2); size_t f1; const size_t nd = diff(unedited.l, ref.l, &f1);
-      CHECK(nd > 1000, "the fx edit is audible (%zu samples differ from the unedited render)", nd); }
+#ifdef THUNDER_HAVE_TFX   // (a build without the effects library, the closed build and MSVC, hosts none of these slots: the edit changes nothing there and only the bit-equality below is checked)
+      CHECK(nd > 1000, "the fx edit is audible (%zu samples differ from the unedited render)", nd);
+#else
+      (void)nd;
+#endif
+    }
     for (int cs : {128, 4096}) {
       std::vector<std::pair<int64_t, LiveOp>> lops;
       lops.push_back({0, [&](Host& H, int64_t f0) {
