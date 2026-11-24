@@ -134,6 +134,7 @@ class Mixer {
   // THE BEAT CLOCK (mix/beat.h): 'beat' events (event()) ramp it; stop it with clockStop at PLAY / STOP; render() fills it each block.
   void clockStop(double at) { clk_.stop(at); }
   BeatClock& clock() { return clk_; }
+  void setPageClock(bool on) { clk_.setPage(on); }   // FX1: the page player's clock (beat.h), set before the first event
   // after render() and valid until the next: the core's lane (beat + 1 playing, 0 stopped); clkBus (the lane - 1: the beat playing, -1 stopped);
   // and what the effects node of track t (kSongNT: the master) hears: clkBus, delayed by its c. Callable from a track's / the master's hook.
   const float* beatLane() const { return clkLane_.get(); }

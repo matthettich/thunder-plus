@@ -135,6 +135,7 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
   SeqOpts so; so.row = r->song.renderFrom; so.once = true;
   r->R.reset(new SongRenderer(r->song, r->vars, r->pads, sr, kRenderQuantum, so));
   r->R->pool().setPageTiming(o.page_timing != 0);
+  r->R->mixer().setPageClock(o.page_timing != 0);   // FX1: page timing also means the page player's beat clock (mix/beat.h): the reference's Flex / tempo-synced effects read it
   if (o.stem > 0) r->R->setStem(o.stem - 1);   // first: a stem has no master effects and no master chain (the calls below leave the master alone)
   if (o.chains) {   // after setStem (the hooks go on the heard tracks), before setEffects
     const int cr = r->R->setChains(true);
