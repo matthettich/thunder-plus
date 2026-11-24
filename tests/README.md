@@ -21,6 +21,7 @@ device, so it runs in about 15 seconds.
 
 | `reset-track.test.js` | Reset track (build 650, `docs/RESET-TRACK-NOTES.md`): `resetTrackData` on ELECTRO and a shared-block song with the real `makeSeq` (other tracks' events unchanged), one undo step, mixer / effects / CHN / PERFORM / parts defaults, which track on which screen, the key mapping (Mac and not), text fields, menu rows; opt-in real-page run |
 
+| `startup-song.test.js` | the start-up song (build 674, 24 Nov): a guard that nothing `normSong` / `demoSong` / `freshSong` reach is a const / let / class declared below the saved-song load (the build-660 bug); the start-up block run on its own (saved / first run / unreadable song kept, never autosaved over, copied aside); wiring pins; opt-in real page with songs from older builds and odd fields |
 `tests/sweep/` holds slower headless-Chrome sweeps (every engine, preset and effect through the app itself), not run by
 `npm test`: see `tests/sweep/README.md`.
 

@@ -22084,7 +22084,7 @@ let FIRST_SONG = false;
    ELECTRO), 'error' (a saved song was there but could not be read: the starter beat is shown, and START.held keeps it from being autosaved over the real one), 'nostore' (the
    browser would not let the app read its storage), later 'share' / 'file' when a share link or a launch file replaced it. Settings → App shows it; the playback report starts with it.
    START.held: while true nothing writes the song key (songStore); it is released by the first deliberate change (markChange, after the start-up grace) or by any song being loaded (setSong). */
-var START = {how:'', note:'', then:'', held:false, raw:null, key:TK, err:null, t0:Date.now()};
+var START = {inT:-1e9, how:'', note:'', then:'', held:false, raw:null, key:TK, err:null, t0:Date.now()};
 let S = (() => {
   let raw = null;
   try { raw = localStorage.getItem(TK); if (!raw){ raw = localStorage.getItem('thunder-song-v1'); if (raw) START.key = 'thunder-song-v1'; } }
@@ -22100,6 +22100,7 @@ let S = (() => {
 // Restore a backup… lists (never rotated out by the 10 newest backups), and a small one also into a second localStorage key. A message stays on screen until it is clicked.
 function songHash(t){ let h = 0x811c9dc5 >>> 0; for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16) + '-' + t.length; }
 function songStore(){ if (START.held) return true; return storeWrite(TK, JSON.stringify(songOut(S))); }   // true: stored, or deliberately skipped
+for (const ev of ['pointerdown', 'keydown', 'touchstart', 'input', 'wheel', 'paste']) addEventListener(ev, () => { START.inT = performance.now(); }, true);   // a deliberate change follows a touch, click or key within a moment
 function songRelease(why){ if (!START.held) return; START.held = false; START.then = (START.then ? START.then + '; ' : '') + 'autosave back on (' + why + ')'; try { tpLog('song autosave released', why); } catch(e){} startShow(); }
 function startHow(how, note){ if (Date.now() - START.t0 < 20000){ START.how = how; START.note = note || ''; } else START.then = note || how; startShow(); }
 function startLine(){
@@ -22118,9 +22119,9 @@ async function startRescue(){
   try {
     const idx = (await kvGet('rescueIndex')) || [];
     if (!idx.some(e => e.h === h)){
-      const k = 'rescue' + Date.now(), nm = (parsed && typeof parsed.name === 'string' && parsed.name) || 'Song';
-      const text = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? JSON.stringify({app:'thunder-project', v:1, build:typeof BUILD === 'number' ? BUILD : 0, song:parsed}) : raw;
-      await kvSet(k, text); idx.unshift({k, at:Date.now(), name:nm, kb:Math.round(text.length / 1024), h, text:!!parsed, err:START.note});
+      const k = 'rescue' + Date.now(), nm = (parsed && typeof parsed.name === 'string' && parsed.name) || ((raw.match(/"name":"([^"]{1,40})"/) || [])[1]) || 'Song';
+      const isSong = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed), text = isSong ? JSON.stringify({app:'thunder-project', v:1, build:typeof BUILD === 'number' ? BUILD : 0, song:parsed}) : raw;
+      await kvSet(k, text); idx.unshift({k, at:Date.now(), name:nm, kb:Math.round(text.length / 1024), h, text:isSong, err:START.note});
       while (idx.length > 3){ const o = idx.pop(); await kvDel(o.k); }
       await kvSet('rescueIndex', idx);
     }
@@ -26506,7 +26507,7 @@ function projSet(path, handle){
 // Edits in the first moments after start-up (conversions, the saved song settling) don't count.
 let projDirty = (() => { try { return localStorage.getItem(DTK) === '1'; } catch(e){ return false; } })(), dirtyArmed = false, bkDirty = false;
 setTimeout(() => { dirtyArmed = true; }, 2500);
-function markChange(){ if (!dirtyArmed) return; songRelease('you changed the song'); bkDirty = true; if (!projDirty) setDirty(true); else dirtyShow(); }
+function markChange(){ if (!dirtyArmed) return; if (START.held && performance.now() - START.inT < 3000) songRelease('you changed the song'); bkDirty = true; if (!projDirty) setDirty(true); else dirtyShow(); }
 function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { localStorage.setItem(DTK, projDirty ? '1' : '0'); localStorage.setItem(DTK + '-smp', smpNew ? '1' : '0'); } catch(e){} dirtyShow(); }
 // a sample recorded or loaded since the last save (the close prompt says so); cleared with the dirty mark
 var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
@@ -26840,7 +26841,7 @@ async function backupNow(force){
 setInterval(() => { if (!rendering && !tp.on) backupNow(false); }, BK_MS);   // not mid-render or while playing (a big kit takes a moment)
 async function restoreBackup(){
   // songs that could not be read at start-up (startRescue) come first: they are kept apart from the 10 newest backups, so those never push them out
-  const resc = ((await kvGet('rescueIndex')) || []).filter(e => e && e.text).map(e => Object.assign({}, e, {name:'Unopened song: ' + e.name}));
+  const resc = ((await kvGet('rescueIndex')) || []).filter(e => e && e.k).map(e => Object.assign({}, e, {name:(e.text === false ? 'Unreadable song text (saves a file): ' : 'Unopened song: ') + e.name}));
   const idx = [...resc, ...((await kvGet('bkIndex')) || [])];
   if (!idx.length) return toast('No backups yet: one is made every few minutes while you work.');
   const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
@@ -26848,6 +26849,7 @@ async function restoreBackup(){
   if (k < 0) return;
   if (!await okToLeave('restoring the backup')) return;
   const text = await kvGet(idx[k].k); if (!text) return toastErr('That backup couldn’t be read.');
+  if (idx[k].text === false){ try { await deliver('thunder-unreadable-song.json', new Blob([text], {type:'application/json'})); } catch(e){ toastErr('Couldn’t save that text.'); } return; }   // not a song this app can open: keep its text as a file
   if (await loadProjText(text, idx[k].name, {dirty:true})) toast('Restored the backup of ' + idx[k].name + ' from ' + ago(idx[k].at) + '. Save it to keep it in a file', 5000);
 }
 // DESKTOP APP: closing the window asks first when there are unsaved changes; a .thunder file opened from the desktop

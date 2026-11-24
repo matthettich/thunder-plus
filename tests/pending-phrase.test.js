@@ -39,7 +39,7 @@ test('no free row at all: a visible error, not a silent drop', () => {
   const c = rig({ taken: Array.from({ length: 256 }, (_, y) => [0, y]) }); c.placePending(); assert.equal(c.log.length, 1); assert.match(c.log[0], /^err Phrase P0 has notes but track T1 has no free song row/);
 });
 test('wiring: setSong forgets a phrase waiting in the old song; the three silent drops are gone', () => {
-  assert.match(src, /function setSong\(s, msg\)\{ tStop\(true\); tp\.paused = null; pendPlace = null;/);
+  assert.match(src, /function setSong\(s, msg\)\{ songRelease\('a song was opened'\); tStop\(true\); tp\.paused = null; pendPlace = null;/);
   const body = fn[0]; assert.doesNotMatch(body, /q\.p !== cPhrase\)\{ pendPlace = null; return; \}\n/);
 });
 test('nav(): SHIFT+▶ from an empty Arrange / Song cell does not let go() fill the cell before the pending phrase is made for it (reproduced: notes in a phrase on no block)', () => {
