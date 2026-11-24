@@ -30,3 +30,7 @@ Control side: `play` (R2, planning), `fxPlan`, `fxCommit`, `fxParam`, `pdcSet`, 
 
 ## Test results
 See the end of this file (appended when the full ctest finished).
+
+### Results (24 Nov, GCC Release, local)
+`ctest -R "live|rt_|fxsong|fx|pdc|master|mix|meter|render_api|render_dispatch|players|midi_glue|seq_|beat"`: 100% tests passed, 0 failed out of 82 (472.82 s), including live_fx, live_r1r2, live_equals_render, live_transport, live_events, live_pads, live_threads, live_step_dump, rt_core, fxsong, render_api*. The full 231-test suite was NOT run (2-core machine); CI decides.
+`test_live_fx`: "live_fx: 177 checks, 0 failed". R1 mutation (state store removed): `FAIL test_live_r1r2.cpp:19 ... song_pending 0`; R2 mutation: `FAIL ... R2: test_once / test_sim without F_DUMP_STEPS are E_ARG`.
