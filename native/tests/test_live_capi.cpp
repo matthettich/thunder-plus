@@ -81,6 +81,29 @@ size_t diff(const std::vector<float>& a, const std::vector<float>& b, size_t* fi
   return bad + (a.size() > b.size() ? a.size() - b.size() : b.size() - a.size());
 }
 
+
+// ---- edits through the API against the same edits on LiveHost (kills a wrapper that drops or inverts an argument)
+struct EditCfg { int masterSafety = -1; int64_t fxAt = -2; /* -2: no effects edit; -1: NOW; else frames after the edit point */ };
+Out editRun(bool api, const EditCfg& c, const std::string& text, const PadSet& ps) {
+  Out o; const char* fxj = "[{\"type\":\"delay\",\"on\":true}]"; const size_t fxn = std::strlen(fxj);
+  thunder_live* L = nullptr; Host* H = nullptr; std::unique_ptr<Host> hold; int64_t frame = 0; int rc = 0;
+  thunder_live_opts op = opts(FX, 4096); char err[128];
+  if (api) { L = thunder_live_create(&op, err, sizeof err); if (!L) { o.rc = -1; return o; } rc = thunder_live_song_publish(L, (const uint8_t*)text.data(), text.size(), nullptr, 0, 1, err, sizeof err); for (int p = 0; p < PadSet::PN && !rc; p++) { rc = thunder_live_pad_set(L, p, ps.pad(p), nullptr, PadSet::NS, SR); if (!rc) rc = thunder_live_pad_kit(L, p, PadSet::choke(p), PadSet::syn(p) ? 1 : 0, PadSet::rel(p)); } if (!rc) rc = thunder_live_pads_publish(L); thunder_live_play_opts po = playOpts(0); po.pdc_mode = 1; if (!rc) rc = thunder_live_play(L, &po); }
+  else { hold.reset(new Host(op)); H = hold.get(); if (!H->h) { o.rc = -1; return o; } H->song(text); rc = H->loadPads(ps); thunder_live_play_opts po = playOpts(0); po.pdc_mode = 1; if (!rc) rc = (*H)->play(po); }
+  if (rc) { o.rc = -2; if (L) thunder_live_destroy(L); return o; }
+  auto run = [&](int64_t n) { std::vector<float> a(128), b(128); for (int64_t d = 0; d < n; d += 128) { const int r = api ? thunder_live_process(L, a.data(), b.data(), 128, frame, 0) : (*H)->process(a.data(), b.data(), 128, frame, 0); if (r) o.rc = r; o.l.insert(o.l.end(), a.begin(), a.end()); o.r.insert(o.r.end(), b.begin(), b.end()); frame += 128; } };
+  run(48000);
+  if (c.masterSafety >= 0) o.rc |= api ? thunder_live_master_config(L, nullptr, 0, c.masterSafety) : (*H)->masterConfig(nullptr, 0, c.masterSafety != 0);
+  if (c.fxAt != -2) {
+    o.rc |= api ? thunder_live_fx_plan(L, THUNDER_LIVE_MASTER, (const uint8_t*)fxj, fxn, 120) : (*H)->fxPlan(THUNDER_LIVE_MASTER, (const uint8_t*)fxj, fxn, 120);
+    const int64_t at = c.fxAt < 0 ? THUNDER_LIVE_NOW : frame + c.fxAt;
+    o.rc |= api ? thunder_live_fx_commit(L, THUNDER_LIVE_MASTER, at) : (*H)->fxCommit(THUNDER_LIVE_MASTER, at);
+  }
+  run(48000 * 3);
+  if (L) thunder_live_destroy(L);
+  return o;
+}
+
 struct Rng { uint64_t s; uint32_t next() { s = s * 6364136223846793005ull + 1442695040888963407ull; return (uint32_t)(s >> 33); } int below(int n) { return (int)(next() % (uint32_t)n); } double unit() { return next() / 2147483648.0; } };
 bool okRc(int rc) { return rc == 0 || rc == THUNDER_LIVE_E_BUSY || rc == THUNDER_LIVE_E_LIMIT || rc == THUNDER_LIVE_E_SONG || rc == THUNDER_LIVE_E_STATE; }
 }  // namespace
@@ -122,6 +145,47 @@ int main() {
     CHECK(A.st.quanta == D.st.quanta && A.st.steps == D.st.steps && A.st.events == D.st.events && A.st.latency_frames == D.st.latency_frames, "the same counters (%llu quanta, %llu steps, latency %d)", (unsigned long long)A.st.quanta, (unsigned long long)A.st.steps, A.st.latency_frames);
     std::printf("C API: call size %4d, frame0 %12lld, %-8s: %s (%llu quanta, latency %d)\n", c.cs, (long long)c.f0, c.take ? "pad_take" : "pad_set", b1 + b2 ? "DIFFERENT" : "bit-equal to LiveHost and SongRenderer", (unsigned long long)A.st.quanta, A.st.latency_frames);
   }
+
+  // ---- 1b. EDITS: master_config's `safety` and fx_commit's `at` reach the host as given
+  { EditCfg s1; s1.masterSafety = 1; EditCfg s0; s0.masterSafety = 0;
+    const Out a1 = editRun(true, s1, text, ps), d1 = editRun(false, s1, text, ps), a0 = editRun(true, s0, text, ps), d0 = editRun(false, s0, text, ps); size_t f;
+    CHECK(a1.rc == 0 && d1.rc == 0 && a0.rc == 0 && d0.rc == 0, "master_config runs (%d %d %d %d)", a1.rc, d1.rc, a0.rc, d0.rc);
+    CHECK(diff(a1.l, d1.l, &f) == 0 && diff(a1.r, d1.r, &f) == 0, "master_config(safety 1) through the API equals masterConfig(true)");
+    CHECK(diff(a0.l, d0.l, &f) == 0 && diff(a0.r, d0.r, &f) == 0, "master_config(safety 0) through the API equals masterConfig(false)");
+    CHECK(diff(d1.l, d0.l, &f) != 0, "the safety limiter makes a difference in this run (else the two checks above could not tell an inverted flag)"); }
+  { EditCfg at; at.fxAt = 30000; EditCfg now; now.fxAt = -1;
+    const Out aa = editRun(true, at, text, ps), da = editRun(false, at, text, ps), an = editRun(true, now, text, ps), dn = editRun(false, now, text, ps); size_t f;
+    CHECK(aa.rc == 0 && da.rc == 0 && an.rc == 0 && dn.rc == 0, "fx_commit runs (%d %d %d %d)", aa.rc, da.rc, an.rc, dn.rc);
+    CHECK(diff(aa.l, da.l, &f) == 0 && diff(aa.r, da.r, &f) == 0, "fx_commit(at 30000 frames on) through the API equals fxCommit(at)");
+    CHECK(diff(an.l, dn.l, &f) == 0 && diff(an.r, dn.r, &f) == 0, "fx_commit(NOW) through the API equals fxCommit(NOW)");
+    CHECK(diff(da.l, dn.l, &f) != 0, "the commit time makes a difference in this run (else `at` could be dropped unseen)"); }
+
+  // ---- 1c. THE ENGINE OFFSET read from another thread while process runs: never torn, never stale for a call that has returned
+  { thunder_live_opts op = opts(0, 128); thunder_live* L = thunder_live_create(&op, nullptr, 0);
+    const int64_t val[4] = {0, 1000, 6000, 3000};   // after: nothing, the first call (frame0 1000), a forward gap of 5000, a jump back of 3000
+    std::atomic<int> phase{0}; std::atomic<bool> done{false}; std::atomic<int> bad{0}; std::atomic<long> reads{0};
+    std::thread audio([&] {
+      std::vector<float> l(128), r(128); int64_t fr = 1000; const int N1 = CAPI_SAN ? 3000 : 30000;
+      thunder_live_process(L, l.data(), r.data(), 128, fr, 0); fr += 128; phase.store(1, std::memory_order_release);
+      for (int i = 0; i < N1; i++) { thunder_live_process(L, l.data(), r.data(), 128, fr, 0); fr += 128; }
+      thunder_live_process(L, l.data(), r.data(), 1, fr, 0); fr += 1;                                   // a call that completes no quantum ...
+      fr += 5000; thunder_live_process(L, l.data(), r.data(), 1, fr, 0); fr += 1; phase.store(2, std::memory_order_release);   // ... and a re-anchor inside one
+      for (int i = 0; i < N1 / 4; i++) { thunder_live_process(L, l.data(), r.data(), 128, fr, 0); fr += 128; }
+      fr -= 3000; thunder_live_process(L, l.data(), r.data(), 1, fr, 0); phase.store(3, std::memory_order_release);
+      for (int i = 0; i < N1 / 4; i++) { thunder_live_process(L, l.data(), r.data(), 1, fr + 1 + i, 0); }
+      done.store(true, std::memory_order_release);
+    });
+    std::thread reader([&] {
+      while (!done.load(std::memory_order_acquire)) {
+        const int p1 = phase.load(std::memory_order_acquire); int64_t v = -999; thunder_live_engine_offset(L, &v); const int p2 = phase.load(std::memory_order_acquire); reads++;
+        bool ok = false; for (int q = p1; q <= std::min(3, p2 + 1); q++) if (v == val[q]) ok = true;
+        if (!ok) bad++;
+      }
+    });
+    audio.join(); reader.join();
+    CHECK(bad.load() == 0 && reads.load() > 1000, "engine offset: %ld reads against a running process, %d torn or stale", reads.load(), bad.load());
+    int64_t v = 0; thunder_live_engine_offset(L, &v); CHECK(v == 3000, "the last offset (%lld)", (long long)v);
+    thunder_live_destroy(L); }
 
   // ---- 2b. the engine offset of live.h (MIDI records keep the engine frame): offset = stats.frames - 128 * stats.quanta, in a gapless run and across a re-anchor
   { thunder_live_opts op = opts(0, 1024); thunder_live* L = thunder_live_create(&op, nullptr, 0); std::vector<float> a(1024), b(1024);

@@ -442,7 +442,7 @@ static void test_offset(void) {
   thunder_live_process(L, a, b, 1, fr, 0); fr += 1;   /* mid-quantum from here on */
   fr += 5000; thunder_live_process(L, a, b, 1, fr, 0); fr += 1;   /* a re-anchor in a call that completes no quantum */
   thunder_live_engine_offset(L, &off); CHECK(off == 777 + 5000, "a forward gap, in a 1-frame call: the new offset at once (%lld)", (long long)off);
-  fr -= 20000; thunder_live_process(L, a, b, 1, fr, 0); thunder_live_engine_offset(L, &off); CHECK(off < 777 + 5000 && off > 0, "a backward jump moves it back (%lld)", (long long)off);
+  fr -= 3000; thunder_live_process(L, a, b, 1, fr, 0); thunder_live_engine_offset(L, &off); CHECK(off == 777 + 5000 - 3000, "a backward jump moves it back (%lld)", (long long)off);
   thunder_live_destroy(L);
 }
 
