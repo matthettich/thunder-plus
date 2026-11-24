@@ -6,6 +6,18 @@
 
 #include <functional>
 
+// the sanitizer builds (ASan + UBSan: about 20 times slower) run a REDUCED matrix and shorter spans; the convention of the repo (test_fx): CMake defines THUNDER_SANITIZE_BUILD for -DTHUNDER_SANITIZE=ON, the compilers' own macros cover the rest
+#if defined(THUNDER_SANITIZE_BUILD) || defined(__SANITIZE_ADDRESS__)
+#define LIVE_FX_SAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(undefined_behavior_sanitizer)
+#define LIVE_FX_SAN 1
+#endif
+#endif
+#ifndef LIVE_FX_SAN
+#define LIVE_FX_SAN 0
+#endif
+
 #include "fx/fxbank.h"
 #include "master/chain.h"
 #include "meter/meter.h"
@@ -92,7 +104,10 @@ int main() {
   auto loadSong = [&](const std::string& t, Song& s) { JsonError je; return s.load(t.data(), t.size(), &je, /*pageS*/ true); };
   Song song; if (!loadSong(text, song)) { std::printf("FAIL: ELECTRO does not load\n"); return 1; }
   const uint32_t FX = THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS;
-  const int64_t N = (int64_t)(SR * 14);
+  const bool SAN = LIVE_FX_SAN != 0;
+  // spans: the first variant 14 s (normal) so the whole song's sections are met; the other three differ only in the limiter / PDC / timing, 8 s show it; a sanitizer build 6 s for all
+  const int64_t N = (int64_t)(SR * (SAN ? 6 : 14)), NV = (int64_t)(SR * (SAN ? 6 : 8));
+  if (SAN) std::printf("live_fx: sanitizer build, the reduced matrix\n");
 
   // ---- 1. THE DONE-TEST: every effect slot, the master chain, PDC and the meters, bit for bit, whatever the call size and frame0 --------------------------------------------------------------------------
   struct Var { const char* name; std::string text; int pdc; bool page; };
@@ -101,16 +116,22 @@ int main() {
   { std::string t = text; const size_t at = t.find("\"limiter\":true"); if (at != std::string::npos) t.replace(at, 14, "\"limiter\":false"); vars.push_back({"ELECTRO, safety limiter off, pdc ON", t, 2, false}); }
   vars.push_back({"ELECTRO, pdc OFF", text, 0, false});
   vars.push_back({"ELECTRO, the page's timing", text, 1, true});
-  for (const Var& v : vars) {
+  int64_t latency0 = 0;
+  for (size_t vi = 0; vi < vars.size(); vi++) {
+    const Var& v = vars[vi]; const int64_t NN = vi == 0 ? N : NV;
     Song sv; if (!loadSong(v.text, sv)) { std::printf("FAIL: variant %s does not load\n", v.name); return 1; }
-    const Ref ref = reference(sv, rp, v.pdc, v.page, true, true, N);
+    Ref ref = reference(sv, rp, v.pdc, v.page, true, true, NN);   // ONE reference per variant, reused by every call size / frame0 below, freed with the loop pass
+    if (vi == 0) latency0 = ref.latency;
     double peak = 0; for (float x : ref.l) peak = std::max(peak, (double)std::fabs(x));
     CHECK(peak > 0.01, "%s: the reference is not silent (peak %g)", v.name, peak);
     CHECK(!ref.meters.empty(), "%s: the reference bank made events", v.name);
     struct Case { int cs; int64_t f0; };
-    const Case cases[] = {{128, 0}, {480, 37}, {4096, (int64_t)1 << 31}, {333, 1000}};
+    // normal builds: every variant x {128, 333} at frame0 0; the first variant also frame0 37 (480), 1000 (333) and 2^31 (4096). Sanitizer builds: every variant at 128 / frame0 0; the first variant also call size 333 and frame0 2^31.
+    std::vector<Case> cases; cases.push_back({128, 0});
+    if (SAN) { if (vi == 0) { cases.push_back({333, 0}); cases.push_back({4096, (int64_t)1 << 31}); } }
+    else { cases.push_back({333, 0}); if (vi == 0) { cases.push_back({480, 37}); cases.push_back({4096, (int64_t)1 << 31}); cases.push_back({333, 1000}); } }
     for (const Case& c : cases) {
-      const Run L = live(v.text, ps, FX | (v.page ? THUNDER_LIVE_F_PAGE_TIMING : 0), v.pdc, c.cs, c.f0, N);
+      const Run L = live(v.text, ps, FX | (v.page ? THUNDER_LIVE_F_PAGE_TIMING : 0), v.pdc, c.cs, c.f0, NN);
       CHECK(L.rc == 0, "%s: process rc %d", v.name, L.rc);
       size_t first; const size_t bad = diff(L.l, ref.l, &first), bad2 = diff(L.r, ref.r, &first);
       CHECK(bad == 0 && bad2 == 0, "%s, call size %d, frame0 %lld: %zu + %zu samples differ, first at %zu", v.name, c.cs, (long long)c.f0, bad, bad2, first);
@@ -121,12 +142,13 @@ int main() {
     }
   }
   // the latency is not zero for ELECTRO (master chain + pump slots): the check above would be empty otherwise
-  { const Ref r1 = reference(song, rp, 1, false, true, true, 4096); CHECK(r1.latency > 0, "ELECTRO has a latency to report (%lld)", (long long)r1.latency); }
+  CHECK(latency0 > 0, "ELECTRO has a latency to report (%lld)", (long long)latency0);   // (the first variant's reference: ELECTRO, pdc auto)
 
   // ---- 2. EDITS WHILE PLAYING, each equal to the same edit made on a SongRenderer between two quanta -----------------------------------------------------------------------------------------------------------
   // a song with no track effects of its own at track 0..: the edit makes them. (ELECTRO's own track 0 has none.)
   const int64_t Q = 64 * 128;   // the edit at quantum 64 (8192 frames)
-  const int64_t N2 = (int64_t)(SR * 6);
+  const int64_t N2 = (int64_t)(SR * (SAN ? 3 : 6));   // the last edit is at quantum 200 (0.53 s): 3 s is enough under a sanitizer
+  const Ref base2 = reference(song, rp, 0, false, true, true, N2);   // the unedited render, once (the fx edits and the master_config cases compare against it)
   const std::string slotsDelay = "[{\"type\":\"delay\",\"on\":true,\"time\":3,\"fb\":60,\"mix\":50}]", slotsTape = "[{\"type\":\"tape\",\"on\":true},{\"type\":\"reverb\",\"on\":true}]";
   auto planFor = [&](SongRenderer& R, int track, const std::string& js) -> FxPlan* { JsonDoc d; JsonError je; d.parse(js.data(), js.size(), &je); return R.fxBank()->host(track).planFromSong(d.root(), song.bpm, 0, nullptr); };
   std::vector<FxPlan*> keep;   // the renderer-side plans (the reference's hosts are gone when reference() returns; deleted at the end of the test)
@@ -136,7 +158,7 @@ int main() {
     rops.push_back({128, [&](SongRenderer& R) { double p12[12]; for (int i = 0; i < 12; i++) p12[i] = 0.1 * i; R.fxBank()->host(0).psetAt(128 * 128.0 / SR, 0, p12); }});
     rops.push_back({200, [&](SongRenderer& R) { FxPlan* p = planFor(R, 5, slotsTape); R.fxBank()->host(5).commit(p); R.mixer().setFx(5, &FxBank::hook, R.fxBank()); keep.push_back(p); }});
     const Ref ref = reference(song, rp, 0, false, true, true, N2, rops);   // (with ELECTRO's own slots on the other tracks; PDC off here so the edit's latency is not in the way)
-    { const Ref unedited = reference(song, rp, 0, false, true, true, N2); size_t f1; const size_t nd = diff(unedited.l, ref.l, &f1);
+    { size_t f1; const size_t nd = diff(base2.l, ref.l, &f1);
 #ifdef THUNDER_HAVE_TFX   // (a build without the effects library, the closed build and MSVC, hosts none of these slots: the edit changes nothing there and only the bit-equality below is checked)
       CHECK(nd > 1000, "the fx edit is audible (%zu samples differ from the unedited render)", nd);
 #else
@@ -247,7 +269,6 @@ int main() {
       if (kind == 1) rops.push_back({64, [&](SongRenderer& R) { R.masterChain()->configure(cfg2); }});
       else rops.push_back({64, [&](SongRenderer& R) { R.masterChain()->configure(master_chain_from_song(song.mst, song.limiter)); }});
       const Ref ref = reference(song, rp, 0, false, true, true, N2, rops);
-      const Ref base = reference(song, rp, 0, false, true, true, N2);
       std::vector<std::pair<int64_t, LiveOp>> lops;
       if (kind == 1) lops.push_back({Q, [&](Host& H, int64_t) { CHECK(H->masterConfig((const uint8_t*)mstJs.data(), mstJs.size(), true) == 0, "master_config"); }});
       else lops.push_back({Q, [&](Host& H, int64_t) { // the song's own mst object, written out of the song text
@@ -256,7 +277,7 @@ int main() {
       const Run L = live(text, ps, FX, 0, 4096, 0, N2, true, lops);
       size_t first; const size_t bad = diff(L.l, ref.l, &first), bad2 = diff(L.r, ref.r, &first);
       CHECK(bad == 0 && bad2 == 0, "master_config (%s) at a quantum: %zu + %zu samples differ, first at %zu", kind ? "a different chain" : "the song's own again", bad, bad2, first);
-      size_t f2; const size_t nd = diff(base.l, ref.l, &f2);
+      size_t f2; const size_t nd = diff(base2.l, ref.l, &f2);
       if (kind == 1) CHECK(nd > 1000, "a different master chain is audible (%zu samples differ from the unchanged render)", nd);
       for (float x : L.l) if (!(x == x)) { CHECK(false, "NaN after master_config"); break; }
       std::printf("master_config (%s) at a quantum: %s\n", kind ? "a different chain" : "the song's own", bad + bad2 ? "DIFFERENT" : "bit-equal");
