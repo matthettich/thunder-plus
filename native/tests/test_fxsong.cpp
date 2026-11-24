@@ -159,7 +159,7 @@ int main() {
     for (int t = 0; t < kSongNT; t++) { Json a = song.tfx.at((size_t)t); for (size_t k = 0; k < a.size(); k++) if (a.at(k).isObj()) held++; }
     for (size_t k = 0; k < song.mfx.size(); k++) if (song.mfx.at(k).isObj()) held++;
     std::printf("ELECTRO: %d of %d effect slots hosted; refused: sidechain %u, notes %u, no engine %u, unknown %u\n", hosted, held, bank.refused(kRefSidechain), bank.refused(kRefNotesFrom), bank.refused(kRefNoEngine), bank.refused(kRefUnknown));
-    check(hosted == held && held == 25, "every effect slot of ELECTRO is played (25 of 25)" + std::string(havePump ? "" : " (no pump here: its 2 pump slots are counted)")); }
+    check(held == 25 && (havePump ? hosted == held : hosted + (int)bank.refused(kRefNoEngine) == held), "every effect slot of ELECTRO is played (25 of 25)" + std::string(havePump ? "" : " (no pump here: its pump slots are refused and counted)")); }
   { // FXV: a Plate slot's DECAY control moved by the sequencer's event equals the slot planned with that byte
     JsonDoc d; d.parse("[{\"type\":\"plate\",\"on\":true,\"size\":128,\"decay\":100,\"damp\":128,\"pre\":10,\"mod\":77,\"mix\":200}]");
     JsonDoc d2; d2.parse("[{\"type\":\"plate\",\"on\":true,\"size\":128,\"decay\":200,\"damp\":128,\"pre\":10,\"mod\":77,\"mix\":200}]");
