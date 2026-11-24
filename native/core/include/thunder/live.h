@@ -166,9 +166,8 @@ uint32_t thunder_live_caps(void);
 thunder_live* thunder_live_create(const thunder_live_opts* opts, char* err, size_t err_cap);
 
 /* CONTROL, after the audio thread has stopped calling thunder_live_process and no other call is in flight, and (when F_MIDI) after thunder_midiout_free on the handle's MIDI handle.
-   Frees everything, whatever the voices say. NULL is fine. A host that is still PLAYING is stopped first and ONE quantum is run on the calling thread (its audio discarded)
-   so that the scheduler books its note-offs and CLEAR; those records are dropped (nobody drains them), so a shell that must not leave a hung note calls thunder_live_stop, keeps
-   calling process once more, drains / pumps the MIDI records and only then destroys (the duty of docs/port/PICKUP.md: "one more quantum before the host is destroyed"). */
+   Frees everything, whatever the voices say. NULL is fine. Destroy runs NO quantum and books NO MIDI record (nothing could deliver it: the handle is freed with the host), so a shell that must not leave a hung
+   note calls thunder_live_stop, calls process once more, drains / pumps the MIDI records and only then destroys (the duty of docs/port/PICKUP.md: "one more quantum before the host is destroyed"). */
 void thunder_live_destroy(thunder_live* L);
 
 /* AUDIO. Writes `frames` samples to out_l and out_r (frames 0 .. max_block; each array needs room for `frames` floats; they must not overlap). The frame of the first sample on the
@@ -243,7 +242,8 @@ void thunder_live_free(float* block);   /* ANY. NULL is fine. Only for a block f
 /* ---- 2. SONG ---------------------------------------------------------------------------------------------------------------------------------------------- */
 
 /* CONTROL. Allocates (parses: a tree of 8.6 to 15.5 times `song_bytes`; builds the Song, the vars, the bus plan; when F_MIDI hands the song's MIDI instruments to the scheduler, which
-   parses it again). Publishes the WHOLE song text (ruling D3; there is no patch: Song::load is the only entry, with pageS = true: the text is the page's own S) and its vars
+   parses it again; that scheduler holds at most SIX songs in flight, the audio side frees them as it adopts: SIX publishes with no quantum between (a suspended device) are accepted and the SEVENTH returns E_BUSY with nothing changed, so a shell that lets
+   the user edit while the device is suspended retries after audio has run. The scheduler's post is the LAST thing a refused publish could fail on: after ANY returned error the host and the scheduler hold the same song). Publishes the WHOLE song text (ruling D3; there is no patch: Song::load is the only entry, with pageS = true: the text is the page's own S) and its vars
    ({"vtrk":..,"NSLOT":..,"TFX":{..}}; vars == NULL, vars_bytes 0: the defaults). Both are copied; the caller's bytes are free on return. Neither needs a NUL.
    `rev`: the caller's revision number (any int64), echoed in the SONG record when the audio side adopts it.
    WHAT HAPPENS, by state.
@@ -368,7 +368,7 @@ typedef struct thunder_live_play_opts {   /* the Seq's options (SeqOpts, seq.h) 
 int thunder_live_play(thunder_live* L, const thunder_live_play_opts* o);
 
 /* CONTROL. STOP. Queues the stop. Applied at the quantum containing `at` (THUNDER_LIVE_NOW: the next), and it CLEARS the waiting list of timed commands (stats.cmds_cleared): SeqRunner::stop; Players::stopAll(at) (every voice of every pool lets go at `at`, booked notes are taken back);
-   mixer.songLanesReset() + clockStop(at); the Seq is dropped and PadsHost::seqGone() is called at the top of the next quantum, before beginQuantum (step 2); the MIDI scheduler is stopped (MidiSched::stop(t0): all notes off, CLEAR, clock Stop: D-2; applied right after midi_begin of that quantum, see MIDI); a STATE record STOPPED. The host goes IDLE (THE STATE MACHINE). Effects tails are NOT cut.
+   mixer.songLanesReset() + clockStop(at); the Seq is dropped and PadsHost::seqGone() is called at the top of the next quantum, before beginQuantum (step 2); the MIDI scheduler is stopped (MidiSched::stop(t0): all notes off, CLEAR, clock Stop: D-2; applied right after midi_begin of the quantum that holds `at`, with that QUANTUM'S START as its time, so up to 127 frames (2.6 ms at 48 kHz) before `at`, while the voices stop at `at`; see MIDI); a STATE record STOPPED. The host goes IDLE (THE STATE MACHINE). Effects tails are NOT cut.
    A song_publish issued after this call returns no longer reaches the sequencer. Stop on an IDLE host: 0, harmless (it still stops MIDI). The silence never waits for the core: a host also mutes its own output. */
 int thunder_live_stop(thunder_live* L, int64_t at);
 
@@ -449,7 +449,7 @@ int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t 
      every quantum  midi_begin / onStep / midi_end (steps 4 to 6), also quanta without a step; the audible mask and the FX latency (the master chain's + the PDC delay) are taken from the mixer every block.
      stop           (audio side, step 4, immediately after midi_begin, before the step loop) MidiSched::stop(t0): all notes off, CLEAR, clock Stop; forgets last CC values.
      song end       Players::songOver at the end; the MIDI stop follows 0.3 s later (the web's frame() rule) on its own; STATE ENDED is posted at the end, STOPPED at the MIDI stop.
-     midi_begin < 0 counted in stats.midi_begin_failed (a debug build asserts); the first one posts thunder_midi_panic once.
+     midi_begin < 0 counted in stats.midi_begin_failed (a debug build asserts); the first one makes the scheduler's OWN panic (MidiSched::panic, on the audio thread: thunder_midi_panic is a control call) and posts one non-fatal ERROR record (WHERE_MIDI).
    WHERE THE DIRECT CALLS SIT, AND P4's DONE-TEST. A posted thunder_midi_start / _stop is applied inside midi_begin (blockBegin, midi_api.cpp:83-90): first setFxLatency / setAudible with this block's figures, then every posted
    command in ring order (apply(): OP_START -> MidiSched::start(spp, now), OP_STOP -> MidiSched::stop(now), midi_api.cpp:70-71), then setBlock; `now` is the quantum's start. The host's direct call is made right after midi_begin
    returns, with the same `now` and the same figures in force, before onStep. It is the posted command's point EXCEPT (1) its place among OTHER posted commands (one the shell posted before the play runs before the Start in both
@@ -458,6 +458,8 @@ int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t 
    direct path must be BYTE-EQUAL to the posted path (thunder_midi_start / _stop posted before the block) for the 18 ledger songs (native/tests/golden/midi-ledger-expect.json, test_midi_ledger.cpp). If it is not,
    THE POSTED PATH IS THE FALLBACK P4 MUST USE: thunder_live_play / thunder_live_stop post thunder_midi_start / _stop themselves, before they queue their own command, and the 0.3 s song-end stop is posted by the CONTROL side
    when thunder_live_collect sees the ENDED record. The contract of this header is the same either way.
+   SHIPPED IN P4: THE DIRECT PATH. test_live_midi (ctest live_midi) found the stream byte-equal to the posted path for the 18 ledger songs (and start-midway and loop); the posted fallback was not needed (docs/port/U37-P4-NOTES.md). The ENDED timer's Stop is issued at step 4 of the quantum in which
+   t0 >= endStopAt (the same test as the STOPPED record of step 7); a queued Start / Stop pair is applied in the order the commands were applied.
    The records' `frame` is the host timeline's frame EXCLUDING the device's output latency and INCLUDING the core's FX latency (midi.h THE OUTPUT). */
 
 /* ANY thread for the call; the handle is used under midi.h's own THREAD rules. Returns the host's thunder_midi, or NULL without F_MIDI. Valid until thunder_live_destroy; the shell passes it to

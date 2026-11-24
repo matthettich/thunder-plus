@@ -42,6 +42,7 @@ constexpr double kClockLateSec = 0.020;       // a clock tick more than this beh
 constexpr double kClockAheadSec = 0.080;      // ticks, LFO and glides are booked this far ahead (moClock, moLfo, moRamp)
 constexpr double kEchoAheadSec = 0.100;       // moEcho
 constexpr double kDefaultLeadSec = 0.060;     // MOB_AHEAD
+constexpr double kMaxLeadSec = 1.2;           // U37 P4: the outbox look-ahead's cap (was 0.5): a hidden page's lead is 1.2 s (ruling D6)
 constexpr double kLfoDt = 0.01;               // LFO_DT
 
 // THE ONE LATENESS TEST (B7). Players drops a pad note for which this is true; MidiSched drops the MIDI note of the same event.
@@ -80,7 +81,7 @@ class MidiSched {
   // ---- configuration (audio thread, between blocks; the C API reaches them through its command ring) ----------------------------
   void setSong(const Song* s) { S_ = s; }                       // the instruments' MIDI fields; must outlive its use
   void setPort(int p, bool connected, bool clockOn, double gearMs, int cable);   // gear delay clamped -50..200 ms; `cable` identifies the physical cable (equal = one clock stream)
-  void setLead(double sec);                                      // outbox look-ahead (0.005..0.5), default 0.060
+  void setLead(double sec);                                      // outbox look-ahead (0.005..1.2), default 0.060
   void setFxLatency(double sec);                                 // mastering + master pump FX + safety limiter + PDC, read each block (no cache); 0..2 s
   void setAudible(uint64_t mask) { audible_ = mask; }            // bit t set = track t is heard (mix mute / solo / bus rule is the mixer's: mix_audible); tracks >= 32 always
   void setSampleRate(double sr);

@@ -128,7 +128,7 @@ int thunder_midi_set_port(thunder_midi* h, int port, int connected, int clock_on
   if (!h || port < 0 || port >= THUNDER_MIDI_PORTS || !fin(gear_ms) || cable < 0 || cable > 250) return THUNDER_MIDI_E_ARG;
   Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_PORT; c.a = port; c.b = connected != 0; c.c = clock_on != 0; c.d = cable; c.x = gear_ms; return post(h, c);
 }
-int thunder_midi_set_lead(thunder_midi* h, double s) { CTL_GUARD(h); if (!h || !fin(s) || s < 0.005 || s > 0.5) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_LEAD; c.x = s; return post(h, c); }
+int thunder_midi_set_lead(thunder_midi* h, double s) { CTL_GUARD(h); if (!h || !fin(s) || s < 0.005 || s > kMaxLeadSec) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_LEAD; c.x = s; return post(h, c); }
 int thunder_midi_set_fx_latency(thunder_midi* h, double s) { CTL_GUARD(h); if (!h || !fin(s) || s < 0 || s > 2) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_FXLAT; c.x = s; return post(h, c); }
 int thunder_midi_set_audible(thunder_midi* h, uint64_t mask) { CTL_GUARD(h); if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_AUDIBLE; c.m = mask; return post(h, c); }
 int thunder_midi_start(thunder_midi* h, int spp) { CTL_GUARD(h); if (!h || spp < 0 || spp > 16383) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_START; c.a = spp; return post(h, c); }

@@ -46,6 +46,9 @@ static void hostileC() {
   CHECK(thunder_midi_set_port(h, -1, 1, 0, 0, 0) == THUNDER_MIDI_E_ARG && thunder_midi_set_port(h, 4, 1, 0, 0, 0) == THUNDER_MIDI_E_ARG, "port range");
   CHECK(thunder_midi_set_port(h, 0, 1, 0, NAN, 0) == THUNDER_MIDI_E_ARG && thunder_midi_set_port(h, 0, 1, 0, 0, -1) == THUNDER_MIDI_E_ARG && thunder_midi_set_port(h, 0, 1, 0, 0, 251) == THUNDER_MIDI_E_ARG, "gear / cable");
   CHECK(thunder_midi_set_lead(h, NAN) < 0 && thunder_midi_set_lead(h, 0) < 0 && thunder_midi_set_lead(h, 9) < 0, "lead");
+  // U37 P4: the cap is 1.2 s (was 0.5): 0.5 and 1.2 are accepted, anything above is E_ARG, the floor is still 0.005
+  CHECK(thunder_midi_set_lead(h, 0.5) == 0 && thunder_midi_set_lead(h, 1.2) == 0 && thunder_midi_set_lead(h, 0.005) == 0, "lead 0.005 / 0.5 / 1.2 accepted");
+  CHECK(thunder_midi_set_lead(h, 1.2000001) == THUNDER_MIDI_E_ARG && thunder_midi_set_lead(h, 1.21) == THUNDER_MIDI_E_ARG && thunder_midi_set_lead(h, 0.0049) == THUNDER_MIDI_E_ARG && thunder_midi_set_lead(h, INFINITY) == THUNDER_MIDI_E_ARG, "lead above 1.2 / below 0.005 refused");
   CHECK(thunder_midi_set_fx_latency(h, -1) < 0 && thunder_midi_set_fx_latency(h, INFINITY) < 0 && thunder_midi_set_fx_latency(h, 3) < 0, "fx latency");
   CHECK(thunder_midi_start(h, -1) < 0 && thunder_midi_start(h, 16384) < 0, "spp");
   CHECK(thunder_midi_port_clock(h, 9, 1) < 0 && thunder_midi_set_cable(h, 0, 1, 999) < 0, "port clock / cable");
@@ -66,8 +69,9 @@ static void hostileC() {
   st.size = sizeof st; CHECK(thunder_midi_stats_get(h, &st) == 0 && thunder_midi_stats_get(h, nullptr) < 0 && thunder_midi_stats_get(nullptr, &st) < 0, "stats");
   // the command ring full: BUSY, then room after a block
   int busy = 0, okc = 0; for (int i = 0; i < 1000; i++) { const int r = thunder_midi_set_lead(h, 0.06); if (r == THUNDER_MIDI_E_BUSY) busy++; else if (r == 0) okc++; }
-  CHECK(busy > 0 && okc + pre == 256, "the ring (256) fills: %d accepted (+%d before), %d busy", okc, pre, busy);
-  CHECK(thunder_midi_process(h, 0.01, 0, 0, 120, 0) == okc + pre, "process applies the %d posted commands", okc + pre);
+  const int pre3 = pre + 3;   // + the three lead commands of the U37 P4 check above
+  CHECK(busy > 0 && okc + pre3 == 256, "the ring (256) fills: %d accepted (+%d before), %d busy", okc, pre3, busy);
+  CHECK(thunder_midi_process(h, 0.01, 0, 0, 120, 0) == okc + pre3, "process applies the %d posted commands", okc + pre3);
   CHECK(thunder_midi_set_lead(h, 0.06) == 0, "room again");
   // songs: more than the hand-over allows in flight: BUSY, never a leak (ASan checks at free)
   const std::string song = readSong(); int sb = 0, so = 0;
