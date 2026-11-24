@@ -410,10 +410,11 @@ int LiveHost::play(const thunder_live_play_opts& o) {
   // Room in both rings was checked above and only this thread fills them, so neither push can fail.
   LiveCmd c; c.type = LiveCmdType::Play; c.p = plan; c.i64a = o.t0; c.i0 = spp; c.i1 = o.pdc_mode;
   const bool pushed = cmds_.push(c); assert(pushed); (void)pushed;
+  std::unique_ptr<LiveBusMsg> bmOwn(bm);                            // owned until published: an exception between here and the publish (only the test seam can raise one) must not leak it (the PlayPlan is the ring's: ~LiveHost deletes un-popped commands)
   if (testSeam_) testSeam_(testSeamUser_);                         // TEST ONLY: a quantum can run here
   const bool published = songSlot_.publish(snap.get()); assert(published); (void)published;
   snap.release(); sess->commit(); songOrd_++; songPublished_.store(songOrd_, std::memory_order_release);
-  if (!busSlot_.publish(bm)) delete bm;
+  if (busSlot_.publish(bmOwn.get())) bmOwn.release();   // (a full bus ring: bmOwn deletes it)
   playOut_++;
   sess_ = sess; controlPlaying_ = true; sessionFullSeen_ = false; sessionFullFlag_.store(0, std::memory_order_relaxed);
   refreshCtl();
@@ -630,7 +631,7 @@ int LiveHost::process(float* l, float* r, int frames, int64_t frame0, int64_t wa
   if (!pe_thread_ready()) { pe_prepare(); thread_prepares_++; }   // the one call that may allocate: this thread's Plaits / Elements workspace (live.h, create)
   calls_++; wallNs_ = wallNs;
   if (frames == 0) { publish(); return THUNDER_LIVE_OK; }        // the web's first handler: prepare only; no anchor, no quantum
-  if (!anchored_) { anchored_ = true; off_ = origin_ = frame0; qFrame_ = 0; qRead_ = kLiveQuantum; nextClockAt_ = nextPosAt_ = nextLateAt_ = 0; }   // engine frame 0 is the first call's frame0
+  if (!anchored_) { anchored_ = true; off_ = origin_ = frame0; offPub_.store(off_, std::memory_order_relaxed); qFrame_ = 0; qRead_ = kLiveQuantum; nextClockAt_ = nextPosAt_ = nextLateAt_ = 0; }   // engine frame 0 is the first call's frame0
   else if (frame0 != nextFrame_) reanchor(frame0);               // a call that does not continue the last one (live.h, TIME)
   nextFrame_ = frame0 + frames;
   int done = 0;
@@ -650,6 +651,7 @@ void LiveHost::reanchor(int64_t frame0) {
   const int64_t skipped = frame0 - nextFrame_;
   const int64_t eNext = qFrame_ - (kLiveQuantum - qRead_);   // (qRead_ == kLiveQuantum: nothing buffered: the next quantum's start)
   off_ = frame0 - eNext; origin_ = frame0;
+  offPub_.store(off_, std::memory_order_relaxed);
   reanchors_++;
   thunder_live_ev_error e; std::memset(&e, 0, sizeof e);
   e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = eNext; e.where = THUNDER_LIVE_WHERE_REANCHOR; e.code = 0; e.fatal = 0;   // (post() adds off_: the record's f is frame0)

@@ -40,6 +40,7 @@
 #include "waves/waves.h"
 #include "chains/chains.h"
 #include "live/live_host.h"
+#include "thunder/live.h"
 
 #include <algorithm>
 #include <cmath>
@@ -582,6 +583,53 @@ static int run_pads_snap() {
   if (adopted < 100 || notes < 500 || maxVoices < 2 || !finite) return fail("the pads snapshot run played too little or produced NaN");
   if (leak) return fail("pads snapshot: a retired buffer was not freed after its voices ended");
   std::printf("rt_harness: pads snapshot: %d adopts, %d notes, %d voices at most, %zu buffers made, every one freed by the control side, no allocation on the audio side\n", adopted, notes, maxVoices, made);
+  return 0;
+}
+
+// ---- U37 P5: the C API's audio-thread functions under the guard -----------------------------------------------------------------------------------------------
+// thunder_live_process, and the CONSUMER calls (thunder_live_poll, thunder_live_midi_drain, thunder_live_stats_get, thunder_live_host_stats), allocate and free nothing. The control calls (and thunder_live_alloc / pad_take) run outside.
+static int run_live_c_api() {
+  std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
+  for (size_t at = 0; (at = text.find("\"type\":\"pverb\"", at)) != std::string::npos;) text.replace(at, std::strlen("\"type\":\"pverb\""), "\"type\":\"reverb\"");
+  for (size_t at = 0; (at = text.find("\"mo\":0", at)) != std::string::npos; at += 6) text.replace(at, 6, "\"mo\":2");
+  thunder_live_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.sample_rate = 48000; o.max_block = 1024; o.flags = THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_MIDI;
+  char err[256] = {0}; thunder_live* L = thunder_live_create(&o, err, sizeof err); if (!L) return fail("thunder_live_create");
+  if (thunder_midi_set_port(thunder_live_midi(L), 0, 1, 1, 0, 0)) return fail("C API midi port");
+  if (thunder_live_song_publish(L, (const uint8_t*)text.data(), text.size(), nullptr, 0, 1, err, sizeof err)) return fail("C API song publish");
+  const int PN = 64, NS = 24000;
+  for (int p = 0; p < PN; p++) { float* b = thunder_live_alloc(NS); if (!b) return fail("C API alloc"); for (int i = 0; i < NS; i++) b[i] = (float)std::sin(0.01 * (p % 7 + 1) * i) * (1.0f - (float)i / NS) * 0.3f; if (thunder_live_pad_take(L, p, b, 0, NS, 48000)) return fail("C API pad_take"); if (thunder_live_pad_kit(L, p, p == 3 ? 1 : 0, p >= 8 ? 1 : 0, p >= 8 ? 0.1 : 0)) return fail("C API pad_kit"); }
+  if (thunder_live_pads_publish(L)) return fail("C API pads publish");
+  if (thunder_live_meters_want(L, 30)) return fail("C API meters_want");
+  thunder_live_play_opts po; std::memset(&po, 0, sizeof po); po.size = sizeof po; po.t0 = THUNDER_LIVE_NOW; po.spp = -1; if (thunder_live_play(L, &po)) return fail("C API play");
+  static float Lb[1024], Rb[1024]; uint32_t rng = 11; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  int64_t frame = 0; int calls = 0; double peak = 0; bool finite = true; unsigned char buf[512]; thunder_midi_msg mbuf[256]; uint64_t recs = 0, midiRecs = 0; thunder_live_stats st;
+  while (frame < 48000 * 15) {
+    static const int sizes[] = {128, 128, 480, 1, 64, 1024, 333, 128, 512};
+    const int n = sizes[(int)(rnd() * 9)]; const int k = calls % 97;
+    if (k == 5) thunder_live_bpm(L, 80 + (int)(rnd() * 80), THUNDER_LIVE_NOW);
+    else if (k == 11) thunder_live_mix_set(L, (int)(rnd() * 8), THUNDER_LIVE_MIX_MUTE, (double)(int)(rnd() * 2), -1, frame + 5000);
+    else if (k == 23) thunder_live_perf(L, (int)(rnd() * 3), 0, (double)(int)(rnd() * 2), THUNDER_LIVE_NOW);
+    else if (k == 41) thunder_live_song_publish(L, (const uint8_t*)text.data(), text.size(), nullptr, 0, 10 + calls, err, sizeof err);
+    else if (k == 47) { float* b = thunder_live_alloc(NS); if (b) { for (int i = 0; i < NS; i++) b[i] = (float)std::sin(0.02 * i + calls) * 0.2f; if (thunder_live_pad_take(L, (int)(rnd() * PN), b, 0, NS, 48000)) thunder_live_free(b); else thunder_live_pads_publish(L); } }
+    else if (k == 53) thunder_live_collect(L);
+    else if (k == 67 && calls > 500) thunder_live_play(L, &po);
+    else if (k == 79 && calls > 600 && calls % 2 == 0) { thunder_live_stop(L, THUNDER_LIVE_NOW); thunder_live_play(L, &po); }
+    else if (k == 13) { const char* j = "[{\"type\":\"delay\",\"on\":true}]"; const int t = (int)(rnd() * 33); if (thunder_live_fx_plan(L, t, (const uint8_t*)j, std::strlen(j), 120) == 0) thunder_live_fx_commit(L, t, THUNDER_LIVE_NOW); }
+    else if (k == 19) { const char* m = "{\"on\":true,\"comp\":{\"thr\":-25,\"ratio\":6}}"; thunder_live_master_config(L, (const uint8_t*)m, std::strlen(m), 1); }
+    else if (k == 59) thunder_live_midi_lead(L, 0.01 + 1.19 * rnd());
+    int64_t f0 = frame; if (calls == 700) f0 += 777; if (calls == 1500) f0 = frame / 2;   // a forward and a backward re-anchor
+    { rt_guard g; if (thunder_live_process(L, Lb, Rb, n, f0, f0 * 20833)) return fail("thunder_live_process"); }
+    frame = f0 + n; calls++;
+    for (int i = 0; i < n; i++) { if (!(Lb[i] == Lb[i]) || !(Rb[i] == Rb[i])) finite = false; peak = std::max(peak, (double)std::fabs(Lb[i])); }
+    { rt_guard g; for (int r; (r = thunder_live_poll(L, buf, sizeof buf)) > 0;) recs += (uint64_t)r; for (int64_t r; (r = thunder_live_midi_drain(L, mbuf, 256)) > 0;) midiRecs += (uint64_t)r;
+      std::memset(&st, 0, sizeof st); st.size = sizeof st; thunder_live_stats_get(L, &st); thunder_live_host_stats(L, 480, 0); }
+  }
+  thunder_live_stop(L, THUNDER_LIVE_NOW); { rt_guard g; thunder_live_process(L, Lb, Rb, 256, frame, 0); }
+  std::memset(&st, 0, sizeof st); st.size = sizeof st; thunder_live_stats_get(L, &st);
+  if (!finite || peak < 0.01) return fail("C API run: silent or non-finite");
+  if (st.reanchors != 2 || st.quanta < 3000 || st.steps < 100 || recs < 100 || midiRecs < 100) { std::printf("C API: reanchors %u quanta %llu steps %llu records %llu midi %llu\n", st.reanchors, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)recs, (unsigned long long)midiRecs); return fail("C API run did too little"); }
+  std::printf("rt_harness: C API (thunder_live_process, poll, midi_drain, stats_get, host_stats under the guard): %d process calls, %llu quanta, %llu steps, %llu commands, %llu record bytes, %llu MIDI records, no allocation\n", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, (unsigned long long)recs, (unsigned long long)midiRecs);
+  thunder_live_destroy(L);
   return 0;
 }
 
@@ -1375,5 +1423,6 @@ int main(int argc, char** argv) {
   if (int r = run_live_eng()) return r;
   if (int r = run_pads_snap()) return r;
   if (int r = run_live_host()) return r;
+  if (int r = run_live_c_api()) return r;
   return run_song();
 }
