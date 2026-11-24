@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <cassert>
+#include <new>
 
+#include "chains/chost.h"
 #include "midi/midi_host.h"
 #include "render/players.h"
 
@@ -31,6 +33,8 @@ void SongRenderer::dispatch(const SeqEvent& e) {
     case SEV_TVL: case SEV_TVA: case SEV_TPN: case SEV_MVOL: case SEV_MOUT: if (mix_.event(e)) st_.mixEvents++; return;
     case SEV_BEAT: if (mix_.event(e)) st_.beats++; return;   // the beat clock (U10)
     case SEV_FXC: case SEV_FXP: if (fx_) fx_->event(e, mix_.now(), mix_); return;
+    case SEV_CHC: if (chains_) { chains_->event(e); return; } break;   // the tracker's BYP: counted as ignored below when there is no chains host
+    case SEV_TEMPO: if (chains_) chains_->event(e); break;               // the chains' transport; the Players still see it (the live bass nodes follow the tempo)
     default: break;
   }
   if (!players_->dispatch(e, *seq_, S_)) st_.eventsIgnored++;   // chc (chains), eng, the MIDI events, tempo: no route yet (counted)
@@ -43,7 +47,7 @@ void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLaten
 }
 
 bool SongRenderer::setStem(int track) {
-  if (track < 0 || track >= kSongNT || midi_) return false;   // (a MIDI hook would read the stem's forced mask as the audible mask)
+  if (track < 0 || track >= kSongNT || midi_ || chains_) return false;   // (a MIDI hook would read the stem's forced mask as the audible mask)
   const uint32_t aud = (uint32_t)mix_.audibleMask();   // mute / solo as the song has them (not yet forced)
   uint32_t m = 1u << track;
   // a bus's stem plays its audible sources with it, and theirs through any depth (busClosure: a walk over the feeds that adds a track only when it is audible, so a muted middle bus
@@ -52,6 +56,39 @@ bool SongRenderer::setStem(int track) {
   stem_ = track; mchain_.reset(); mix_.setMasterFx(nullptr, nullptr);
   mix_.setHeard(m);
   return true;
+}
+// The tracks that play a note, from the song's tables (the page: `notes.some(e => e.track === t)` over the notes the sequencer made, index.html:25909). A static scan: a track counts when any phrase
+// its chains reach on any song row has a note (a note column 0..119) in a row, and the track is not a bus. It is a superset of the page's (a note that a mute, a CND or a loop never plays still counts).
+static uint32_t noteTracksOf(const Song& S, const BusPlan& bp) {
+  uint32_t m = 0;
+  for (int t = 0; t < kSongNT; t++) {
+    bool any = false;
+    for (int r = 0; r < kSongRows && !any; r++) {
+      const int16_t* ch = S.chain(S.cell(r, t)); if (!ch) continue;
+      for (int c = 0; c < kChainRows && !any; c++) {
+        const int16_t* ph = S.phrase(ch[c * 2]); if (!ph) continue;
+        for (int y = 0; y < kPhraseRows && !any; y++) for (int k = 0; k < 4; k++) { const int v = ph[y * kRW + k]; if (v >= 0 && v < 120) { any = true; break; } }
+      }
+    }
+    if (any) m |= 1u << t;
+  }
+  return m;
+}
+int SongRenderer::setChains(bool on, size_t budgetBytes) {
+  if (!on) { if (chains_) { for (int t = 0; t < kSongNT; t++) mix_.setChain(t, nullptr, nullptr); mix_.setPlan(bus_plan(S_.chainPatch, S_.chainOn)); chains_.reset(); } return 0; }
+  if (chains_) return 0;
+  if (qFrame_ != 0) return kChainsLate;
+  std::unique_ptr<ChainsHost> h(new (std::nothrow) ChainsHost(sr_, budgetBytes ? budgetBytes : kChainsHostDefaultBudget)); if (!h || !h->valid()) return kChainsNoMemory;
+  ChainsSongTransport tp; tp.tempo = S_.bpm; tp.lpb = S_.lpb ? S_.lpb : 4; tp.ticks = S_.ticks ? S_.ticks : 6;   // pass(): S.bpm, S.lpb || 4, S.ticks || 6
+  const uint32_t heard = stem_ >= 0 ? heardMask() : ChainsHost::keepMask(mix_.plan(), (uint32_t)mix_.audibleMask(), noteTracksOf(S_, mix_.plan()));
+  std::unique_ptr<ChainsPlan> p(h->plan(S_.chainPatch, S_.chainOn, heard, tp));
+  if (!p) return kChainsNoMemory;
+  if (p->overBudget()) return kChainsOverBudget;
+  if (p->refused()) return kChainsRefused;
+  h->commit(p.get(), mix_); h->settle(p.get());
+  p.reset();   // (the nodes the plan replaced: none, the host is new)
+  chains_ = std::move(h);
+  return 0;
 }
 void SongRenderer::setMasterChain(const MasterChainConfig& cfg) {
   if (stem_ >= 0) return;   // a stem has no master chain
@@ -113,6 +150,7 @@ void SongRenderer::quantum() {
   players_->render(mix_.inputsL(), mix_.inputsR(), N, t0, qFrame_);
   if (tap_) tap_(tapUser_, mix_.inputsL(), mix_.inputsR(), N, qFrame_);
   float* const qL = q_.get(); float* const qR = q_.get() + kRenderQuantum;
+  if (chains_) chains_->beginBlock(qFrame_);   // the events due at or before this quantum's first frame (chost.h, EVENTS)
   mix_.render(qL, qR, N, t0);
   if (meters_) { meters_feed(*meters_, mix_, qL, qR, N); meters_->advance(N, t0 + (double)N / sr_); }
   qFrame_ += N;
@@ -127,6 +165,7 @@ RenderStats SongRenderer::stats() const {
   s.peakVoices = pool_.peakVoices(); s.peakVoiceLane = pool_.peakEvents(); s.peakMixLane = mix_.peakEvents();
   s.voiceDropped = pool_.dropped(); s.voiceOverflow = pool_.tOverflow(); s.voiceAutoDropped = pool_.autoDropped(); s.mixAutoDropped = mix_.autoDropped(); s.seqDropped = seq_->dropped();
   s.seqChopped = seq_->chopped(); s.seqChopSkipped = seq_->chopSkipped(); s.seqChopNoHits = seq_->chopNoHits(); s.sfVoiceDropped = sfpool_.dropped(); s.sfVoiceOverflow = sfpool_.tOverflow(); s.sfVoiceAutoDropped = sfpool_.autoDropped(); s.peakVoicesAll = std::max(p.peakAll, pool_.peakVoices());
+  if (chains_) { const ChainsHostStats c = chains_->stats(); s.chainsEventsApplied = c.eventsApplied; s.chainsEventsDropped = c.droppedEvents; s.chainsEventsBad = c.badEvents; s.chainsChcNoNode = c.chcNoNode; s.chainsFailedBlocks = c.failedBlocks; s.chainsFeedMismatch = c.feedMismatch; s.chainsRefused = c.refused + c.busyRefused; }
   return s;
 }
 

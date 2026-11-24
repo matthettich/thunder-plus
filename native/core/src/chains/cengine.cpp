@@ -39,6 +39,7 @@ ChainsEngine::ChainsEngine(double sampleRate, const EngineOptions& o, Host* host
   if (!host_) { ownHost_.reset(new Host()); host_ = ownHost_.get(); }
   busesL_.reset(new float[(size_t)kChannels * kBlock]()); busesR_.reset(new float[(size_t)kChannels * kBlock]());
   for (double& b : bsw_) b = -1;
+  busMap_.reserve(kMaxFeeds);   // C1: setBusMap is called from the audio side by ChainsHost::commit: it must never allocate (and never holds more than kMaxFeeds: the node reads no more)
   for (int16_t& t : tapMap_) t = -1;
   takes_.reset(new TakeQ());
   p_.reset(newPatch(valid_ ? sr_ : 48000, host_)); curA_.store(p_.get(), std::memory_order_release);
@@ -146,7 +147,7 @@ void ChainsEngine::setTransport(const Transport& t) { const bool was = transport
 void ChainsEngine::setTelemetry(bool on) { telemetryOn_ = on; }
 void ChainsEngine::setFocus(int track) { focus_ = track; prepareDerived(*p_); }
 void ChainsEngine::setTapMap(const int* tracks, int n) { for (int16_t& t : tapMap_) t = -1; for (int i = 0; i < n; i++) { const int t = tracks[i]; if (t >= 0 && t < kChannels) tapMap_[t] = (int16_t)i; } hasTapMap_ = true; }
-void ChainsEngine::setBusMap(const int* tracks, int n) { busMap_.clear(); for (int i = 0; i < n; i++) if (tracks[i] >= 0 && tracks[i] < kChannels) busMap_.push_back(tracks[i]); }
+void ChainsEngine::setBusMap(const int* tracks, int n) { busMap_.clear(); for (int i = 0; i < n && (int)busMap_.size() < kMaxFeeds; i++) if (tracks[i] >= 0 && tracks[i] < kChannels) busMap_.push_back(tracks[i]); }
 
 bool ChainsEngine::handleMessage(Json m) {
   if (!m.isObj()) { stats_.droppedEvents++; return false; }
@@ -187,7 +188,7 @@ bool ChainsEngine::handleMessage(Json m) {
   }
   if (op == "busmap") {
     Json v = m.get("value"); busMap_.clear();
-    if (v.isArr()) for (size_t i = 0; i < v.size(); i++) { Json e = v.at(i); if (e.isNum() && e.asNum() >= 0 && e.asNum() < kChannels) busMap_.push_back((int)e.asNum()); }   // (a fraction is cut: the JS addresses by it)
+    if (v.isArr()) for (size_t i = 0; i < v.size() && (int)busMap_.size() < kMaxFeeds; i++) { Json e = v.at(i); if (e.isNum() && e.asNum() >= 0 && e.asNum() < kChannels) busMap_.push_back((int)e.asNum()); }   // (a fraction is cut: the JS addresses by it)
     return true;
   }
   return true;

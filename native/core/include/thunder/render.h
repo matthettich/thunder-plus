@@ -105,6 +105,9 @@ typedef struct thunder_render_opts {
                                    (the master chain's is not). With the master chain on, an unknown-length stem is therefore longer than the mix by that latency: pass use_frames = the mix's length, as the
                                    page cuts every file to the mix's. Otherwise E_ARG from create. */
   int32_t reserved2;            /* must be 0 */
+  /* appended in C1 (docs/port/C1-NOTES.md); an older host never sees it and renders without chains */
+  int32_t chains;               /* 0 / 1: the song's chains (chainPatch / chainOn) through one chains node per heard CHN track, bus tracks included, as thunder-render --chains. No latency is added. Other values: E_ARG */
+  int32_t reserved3;            /* must be 0 */
 } thunder_render_opts;
 
 /* What a render counted (RenderStats of render.h). `size` first, as in the opts. Any time; the numbers are as of now. */
@@ -149,6 +152,14 @@ typedef struct thunder_render_stats {
   uint32_t live_forced_off;     /* note-offs that had to discard queued events to be kept */
   uint32_t live_failed;         /* live nodes whose core refused (the JS would have thrown): silent from then on */
   uint32_t live_refused;        /* live note / mod fields refused at the pool's entry (non-finite or absurd: see LIVE-ROUTE-NOTES.md, the rule per field); the event or the field is not applied */
+  /* appended with the chains host (C1); 0 without opts.chains */
+  uint64_t chains_events_applied;   /* chc / tempo events applied to the chains nodes */
+  uint64_t chains_events_dropped;   /* events the host's queue (4096) had no room for */
+  uint64_t chains_events_bad;       /* events with a track / switch / time / value that cannot be applied */
+  uint64_t chains_chc_no_node;      /* chc events for a track with no chains node (the page: nothing) */
+  uint64_t chains_failed_blocks;    /* node blocks in which the engine failed: that track is silent for the block */
+  uint64_t chains_feed_mismatch;    /* bus feeds that were not the bus map's (a host bug; 0 in a correct build) */
+  uint64_t chains_refused;          /* plans the host refused (patch, memory budget, a plan in flight) */
 } thunder_render_stats;
 
 /* Parses the song and builds the renderer. song: the app's song JSON (a .thunder file's bytes or a song message), not NUL-terminated, copied.

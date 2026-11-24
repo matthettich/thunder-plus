@@ -100,14 +100,14 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
     if (opts->size < offsetof(thunder_render_opts, sample_rate)) { setErr(err, cap, "opts.size is too small"); return nullptr; }
 #define TR_COPY(f) if (opts->size >= offsetof(thunder_render_opts, f) + sizeof(opts->f)) o.f = opts->f
     TR_COPY(reserved0); TR_COPY(sample_rate); TR_COPY(effects); TR_COPY(master_chain); TR_COPY(pdc_mode); TR_COPY(page_timing); TR_COPY(use_frames);
-    TR_COPY(reserved1); TR_COPY(frames); TR_COPY(max_frames); TR_COPY(vars_json); TR_COPY(vars_bytes); TR_COPY(stem); TR_COPY(reserved2);
+    TR_COPY(reserved1); TR_COPY(frames); TR_COPY(max_frames); TR_COPY(vars_json); TR_COPY(vars_bytes); TR_COPY(stem); TR_COPY(reserved2); TR_COPY(chains); TR_COPY(reserved3);
 #undef TR_COPY
   }
   if (o.stem < 0 || o.stem > kSongNT) { setErr(err, cap, "opts.stem must be 0..32"); return nullptr; }
-  if (o.reserved0 != 0 || o.reserved1 != 0 || o.reserved2 != 0) { setErr(err, cap, "opts.reserved must be 0"); return nullptr; }
+  if (o.reserved0 != 0 || o.reserved1 != 0 || o.reserved2 != 0 || o.reserved3 != 0) { setErr(err, cap, "opts.reserved must be 0"); return nullptr; }
   double sr = o.sample_rate == 0 ? 48000.0 : o.sample_rate;
   if (!fin(sr) || sr < 8000 || sr > 384000) { setErr(err, cap, "opts.sample_rate must be 8000..384000"); return nullptr; }
-  if ((o.effects | 1) != 1 || (o.master_chain | 1) != 1 || (o.page_timing | 1) != 1 || (o.use_frames | 1) != 1) { setErr(err, cap, "opts flags must be 0 or 1"); return nullptr; }
+  if ((o.effects | 1) != 1 || (o.master_chain | 1) != 1 || (o.page_timing | 1) != 1 || (o.use_frames | 1) != 1 || (o.chains | 1) != 1) { setErr(err, cap, "opts flags must be 0 or 1"); return nullptr; }
   if (o.pdc_mode < 0 || o.pdc_mode > 2) { setErr(err, cap, "opts.pdc_mode must be 0..2"); return nullptr; }
   if (o.use_frames && (o.frames < 0 || o.frames > kMaxFrames)) { setErr(err, cap, "opts.frames must be 0..2^40"); return nullptr; }
   if (o.max_frames < 0 || o.max_frames > kMaxFrames) { setErr(err, cap, "opts.max_frames must be 0..2^40"); return nullptr; }
@@ -136,6 +136,10 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
   r->R.reset(new SongRenderer(r->song, r->vars, r->pads, sr, kRenderQuantum, so));
   r->R->pool().setPageTiming(o.page_timing != 0);
   if (o.stem > 0) r->R->setStem(o.stem - 1);   // first: a stem has no master effects and no master chain (the calls below leave the master alone)
+  if (o.chains) {   // after setStem (the hooks go on the heard tracks), before setEffects
+    const int cr = r->R->setChains(true);
+    if (cr) { setErr(err, cap, cr == SongRenderer::kChainsRefused ? "chains: the engine refused the song's chain patch" : cr == SongRenderer::kChainsOverBudget ? "chains: the song's chains need more memory than the host's budget (1.5 GiB)" : "chains: out of memory making the chains host"); return nullptr; }
+  }
   if (o.effects) r->R->setEffects(true);
   if (o.master_chain) r->R->setMasterChain(master_chain_from_song(r->song.mst, r->song.limiter));
   if (o.pdc_mode) {
@@ -361,6 +365,7 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.sf_voices_refused = t.sfVoiceDropped; s.sf_voice_track_full = t.sfVoiceOverflow; s.sf_voice_auto_dropped = t.sfVoiceAutoDropped; s.peak_voices_all = t.peakVoicesAll;
   s.stem = r->stem; s.heard_mask = r->R->heardMask();
   s.notes_live_played = t.notesLivePlayed; s.live_no_node = t.liveNoNode; s.live_late = t.liveLate; s.live_queue_dropped = t.liveQueueDropped; s.live_forced_off = t.liveForcedOff; s.live_failed = t.liveFailed; s.live_refused = t.liveRefused;
+  s.chains_events_applied = t.chainsEventsApplied; s.chains_events_dropped = t.chainsEventsDropped; s.chains_events_bad = t.chainsEventsBad; s.chains_chc_no_node = t.chainsChcNoNode; s.chains_failed_blocks = t.chainsFailedBlocks; s.chains_feed_mismatch = t.chainsFeedMismatch; s.chains_refused = t.chainsRefused;
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
   return 0;

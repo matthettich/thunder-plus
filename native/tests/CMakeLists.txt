@@ -1211,6 +1211,23 @@ target_link_libraries(test_render_bus_notes PRIVATE thunder_core)
 target_include_directories(test_render_bus_notes PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME render_bus_notes COMMAND test_render_bus_notes)
 
+# C1: the chains host (core/src/chains/chost.*): every case of the song-level golden through Mixer + ChainsHost and through SongRenderer::setChains (bit-exact), and the host's own rules (feeds, swap, transport, refusal, events, allocation audit)
+add_executable(test_chains_song test_chains_song.cpp)
+target_link_libraries(test_chains_song PRIVATE thunder_core)
+target_include_directories(test_chains_song PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME chains_song COMMAND test_chains_song ${CMAKE_CURRENT_SOURCE_DIR}/golden/chains_song_cases.json)
+add_executable(test_chains_host test_chains_host.cpp)
+target_link_libraries(test_chains_host PRIVATE thunder_core)
+target_include_directories(test_chains_host PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME chains_host COMMAND test_chains_host)
+if(NOT MSVC)
+  target_compile_options(test_chains_song PRIVATE -Wall -Wextra)
+  target_compile_options(test_chains_host PRIVATE -Wall -Wextra)
+endif()
+if(THUNDER_SANITIZE AND NOT MSVC)
+  target_compile_options(test_chains_song PRIVATE -fno-sanitize=vptr)   # a Seq / SongRenderer holds shared_ptrs whose control blocks the -fno-rtti core makes (as test_seq_takeover)
+endif()
+
 # U37 P2: the LiveHost core's tests (docs/port/U37-P2-NOTES.md). The core is built -fno-rtti and the tests are not: the shared_ptr control blocks the core makes (SeqSession, Song) are released in test code, which UBSan's
 # vptr check cannot follow across that boundary (a false positive, as for test_seq_takeover): -fno-sanitize=vptr on these TEST targets only (below, with the others).
 function(thunder_live_test NAME SRC)

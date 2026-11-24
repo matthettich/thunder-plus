@@ -28,6 +28,7 @@ struct thunder_midi;   // thunder/midi.h (the MIDI scheduler's handle): setMidi
 namespace thunder {
 
 class Players;
+class ChainsHost;   // chains/chost.h
 
 constexpr int kRenderPads = 256;       // pad slots a kit can have (a pad number is one byte)
 constexpr int kRenderQuantum = 128;    // frames a song is rendered in (the web core's block), whatever the host's block
@@ -100,6 +101,8 @@ struct RenderStats {
   // LIVE ROUTE (L8): notesLive stays every note of a live pad; notesLivePlayed those a live node sounded; liveNoNode: no node for the track (silent); liveLate: events that arrived inside the look-ahead (applied at the node's clock);
   // liveQueueDropped: events a full node timeline dropped; liveForcedOff: note-offs that had to discard queued events (L5); liveFailed: nodes whose core refused (bad() / failed_)
   int notesLivePlayed = 0; uint32_t liveNoNode = 0, liveLate = 0, liveQueueDropped = 0, liveForcedOff = 0, liveFailed = 0, liveRefused = 0;
+  // CHAINS (C1): the host's counters (ChainsHostStats), 0 without chains
+  uint64_t chainsEventsApplied = 0, chainsEventsDropped = 0, chainsEventsBad = 0, chainsChcNoNode = 0, chainsFailedBlocks = 0, chainsFeedMismatch = 0, chainsRefused = 0;
 };
 
 class SongRenderer {
@@ -131,10 +134,19 @@ class SongRenderer {
   // sources: pass's k2, :24228) whatever mute / solo say; every track still plays (chokes, takeovers). No master effects, no master chain (mastering, safety limiter) and no master
   // latency: setMasterChain / the master hook are refused from here on and a chain already set is dropped. MASTER VOL and OUT stay. Control thread, before the first block,
   // and before setEffects / setMasterChain (which then leave the master alone). Returns false for a bad track.
-  bool setStem(int track);   // also false once setMidi has set a hook (a stem's forced heard mask would reach the MIDI scheduler as the audible mask)
+  bool setStem(int track);   // also false once setChains(true) or setMidi has set a hook (a stem's forced heard mask would reach the MIDI scheduler as the audible mask)
   // A chains host, once there is one, must set a chain hook (Mixer::setChain) only on the tracks in heardMask() of a stem render, as pass() does (`routeTrack` for `keep` only, :24258):
   // a bus that is not heard does not exist there, so a pure source heard alone plays on its own, not through it.
   int stem() const { return stem_; }                     // -1: the mix
+  // THE CHAINS (C1, chains/chost.h): the song's chainPatch / chainOn played through one chains node per heard CHN track (Mixer::setChain), the bus plan's buses with them; `chc` and `tempo` events reach the nodes.
+  // OFF by default: every render is then bit-identical to what it was. ORDER: after setStem (the hooks go on heardMask() only: in a stem a track that is not heard has no node, so a pure source heard alone plays on its own),
+  // before the first block; setStem is refused once chains are on. setEffects / setMasterChain may come before or after (the chain hook, the track-effect hook and the master hook are separate; chains come first in the strip,
+  // the track effects after them). setChains(false) takes the hooks off again (control thread, before the first block). Zero latency: nothing is added to latencyFrames().
+  // Returns 0, or why chains cannot be made (nothing is changed then): kChainsLate (a block was rendered), kChainsNoMemory, kChainsRefused (the engine refused the chainPatch), kChainsOverBudget (D7: the nodes
+  // would pass budgetBytes, default 1.5 GiB). A stem render (setStem) takes its own heard set; the mix takes keepMask(): the audible tracks that play notes, the buses they feed, the sources of those buses.
+  enum { kChainsLate = 1, kChainsNoMemory = 2, kChainsRefused = 3, kChainsOverBudget = 4 };
+  int setChains(bool on, size_t budgetBytes = 0);
+  ChainsHost* chainsHost() { return chains_.get(); }
   uint32_t heardMask() const { return (uint32_t)mix_.audibleMask(); }
   // TRACK AND MASTER EFFECTS (U14): the song's tfx effects (S.tfx / S.mfx, the 34 wasm effects) in the mixer's setFx / setMasterFx hooks, their FXO / FLX / GAT /
   // RTG / FXV events dispatched to them. Effects of the other kinds (U15 to U18) are left out. Control thread, before the first block.
@@ -189,6 +201,7 @@ class SongRenderer {
   std::unique_ptr<float[]> scratch_;
   std::unique_ptr<MasterChain> mchain_;
   std::unique_ptr<FxBank> fx_;
+  std::unique_ptr<ChainsHost> chains_;
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
   int stem_ = -1;
