@@ -2702,8 +2702,8 @@ class FlexCore {
     [[0x83, 0x90], 'SCRATCH 1/16 + GATE 1/32'],
     [[0x8B, 0x94], 'SCRATCH 1/8 x2 + PUMP'],
     [[0x85, 0x1E9], 'SCRATCH 1/4 x4 + CHOP'],
-    [[0x88, 0x9D], 'CHIRP 1/16 + GATE MASK 6'],
-    [[0x8D, 0x92], 'TRANSFORM + GATE 1/16T'],
+    [[0x9D, 0x88], 'CHIRP 1/16 + GATE MASK 6'],
+    [[0x92, 0x8D], 'TRANSFORM + GATE 1/16T'],
     [[0x84, 0x9A], 'SCRATCH 1/2 x4 + MASK 3'],
     [[0x86, 0x1E4], 'CHIRP 1/8 + TEXTURE 1/32'],
     [[0x8E, 0x9B], 'CHIRP x4 + GATE MASK 4'],
@@ -2711,7 +2711,7 @@ class FlexCore {
     [[0x8A, 0x9E], 'SCRATCH x8 + GATE MASK 7'],
     [[0x8C, 0x1E7], 'SCRATCH 1/2 + FILTER SLICES'],
     [[0x89, 0xA6], 'SCRATCH BAR x8 + LP WOBBLE'],
-    [[0x8E, 0x8A, 0x91], 'DOUBLE SCRATCH + GATE 1/8T'],
+    [[0x91, 0x8E, 0x8A], 'DOUBLE SCRATCH + GATE 1/8T'],
     [[0x1A0, 0x24], 'POLYMETER 3/16 + STUTTER'],
     [[0x1A1, 0x21], 'POLYMETER 5/16 + STUTTER'],
     [[0x28, 0x1A2], 'STUTTER 1/4 + POLY 3/8'],
@@ -2895,8 +2895,11 @@ class FlexCore {
         // ===== FLZ (23 Nov): k 513–767, a chain of FLX / FLY stages (see SPEC). Gains multiply; filters take the closest (lowest low-pass,
         // highest high-pass); crush takes the strongest hold and the fewest bits. Stage ks below 17 (the first sixteen, made by pat())
         // are not allowed in a chain (FLZ_LIST uses 17–255 and 257–511; tests/flex.test.js checks).
+        // (CodeRabbit on #297: a stage that reads back into the bar before hands the next one a negative phase; each stage now sees its
+        // input as a phase in [0, 4) of the right bar, and the result moves back by the same bars; gains are never negative.)
         case 'chain': { let x = p; for (let i = 0; i < o.S.length; i++){ const sk = o.S[i]; if (!(sk > 16 && sk < 512)) continue;
-            x = this.ext(sk, x, bar); g *= this.pg; if (this.plp < lp) lp = this.plp; if (this.php > hp) hp = this.php; if (this.pcr > cr) cr = this.pcr;
+            const sh = Math.floor(x / 4 + 1e-9) * 4, xp = Math.max(0, x - sh);
+            x = this.ext(sk, xp, bar + Math.round(sh / 4)) + sh; g *= Math.max(0, this.pg); if (this.plp < lp) lp = this.plp; if (this.php > hp) hp = this.php; if (this.pcr > cr) cr = this.pcr;
             if (this.pbt > 0 && (bt === 0 || this.pbt < bt)) bt = this.pbt; }
           r = x; } break;
         // ===== FLY (5 Nov): k 257–511. Each reads only what has played (r ≤ p); see the notes by SPEC's FLY families.

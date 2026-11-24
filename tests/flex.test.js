@@ -205,3 +205,9 @@ test('FLZ reaches the Flex: FLZ v books the flx param at 512 + v (00 off)', () =
   assert.match(cut(/const FXC = \[[\s\S]*?\];/, 'FXC'), /'FLZ'\s*\]/);   // on the end: saved songs keep their command numbers
     assert.match(src, /const p = c >= 0 \? Math\.min\(767, Math\.round\(c\)\)/, 'the bar keeps FLZ values');
 });
+
+// CodeRabbit on #297: a chain stage that reads into the bar before must not give a later stage a negative phase (FLZ 08: a pump's gain went −0.75).
+test('FLZ: no chain gives a negative gain (each stage sees a phase in 0–4 of the right bar)', () => {
+  const f = new FlexCore(48000);
+  for (let v = 1; v < 256; v++) for (let bar = 0; bar < 4; bar++) for (let i = 0; i < 2000; i++) { f.ext(512 + v, i / 500, bar); assert.ok(f.pg >= 0, `FLZ ${v.toString(16)} gain ${f.pg} at ${i / 500}`); }
+});
