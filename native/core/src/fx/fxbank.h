@@ -25,6 +25,10 @@ class FxBank {
   void load(const Song& S, double bpm, double restartN = 0);
   // The mixer's hooks for every track that has slots (and the master's through `masterHook`, which the caller may wrap: the master chain follows).
   void attach(Mixer& m, bool master = true);
+  // U37 P3, the LIVE host's commit (audio thread, between blocks; the plan was made on the control thread by host(track).planFromSong / plan). What load() + attach() do for one host, one at a time:
+  // FxHost::commit, then the track's mixer hook is set (slots) or cleared (none), and the FXC commands that waited for a node are booked at max(t, now) (flush). The master (track kSongNT) has no mixer hook
+  // here: the caller's master hook decides (it also carries the master chain). Allocates nothing, takes no lock. The plan stays its owner's: the objects it retired go with it (deleted on the control thread).
+  void commitLive(int track, FxPlan* p, Mixer& m, double now);
   static void hook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   // The sequencer's events. now: the block's start time. true: taken.
   bool event(const SeqEvent& e, double now, const Mixer& m);
