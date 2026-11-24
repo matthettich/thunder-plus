@@ -41,7 +41,7 @@ void MidiSched::setPort(int p, bool connected, bool clockOn, double gearMs, int 
   gear_[p] = std::isfinite(gearMs) ? clampd(std::round(gearMs), -50, 200) : 0;   // :17695 clamp(round(v), -50, 200)
   cable_[p] = cable;
 }
-void MidiSched::setLead(double sec) { lead_ = std::isfinite(sec) ? clampd(sec, 0.005, 0.5) : kDefaultLeadSec; }
+void MidiSched::setLead(double sec) { lead_ = std::isfinite(sec) ? clampd(sec, 0.005, kMaxLeadSec) : kDefaultLeadSec; }
 void MidiSched::setFxLatency(double sec) { fxLat_ = std::isfinite(sec) ? clampd(sec, 0, 2) : 0; }
 void MidiSched::setSampleRate(double sr) { if (sr > 1000 && sr < 1e6) sr_ = sr; }
 void MidiSched::setBlock(double sec) { block_ = std::isfinite(sec) ? clampd(sec, 0, 1) : 0; }

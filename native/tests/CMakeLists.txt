@@ -1260,6 +1260,13 @@ endif()
 add_test(NAME live_fx COMMAND test_live_fx)
 thunder_live_test(test_live_r1r2 test_live_r1r2.cpp)
 add_test(NAME live_r1r2 COMMAND test_live_r1r2)
+# U37 P4: MIDI in the live host: the stream of the direct scheduler calls byte-equal to the posted path for the ledger songs (docs/port/U37-P4-NOTES.md)
+thunder_live_test(test_live_midi test_live_midi.cpp)
+if(THUNDER_SANITIZE)
+  target_compile_definitions(test_live_midi PRIVATE THUNDER_SANITIZE_BUILD=1)   # the reduced matrix (as test_live_fx)
+endif()
+add_test(NAME live_midi COMMAND test_live_midi)
+set_tests_properties(live_midi PROPERTIES TIMEOUT 600)
 
 # FX1: the pump and MODFX effect slots of a song (core/src/fx/fxsong.cpp): the reader against the page's own code (golden/fxsong_cases.json, tools/fxsong-dump.mjs), a MODFX slot through
 # FxHost against the module itself, a pump slot against the hand-made entry, counted refusals, the master pump latency, FXV on a MODFX slot, ELECTRO's 25 slots.
