@@ -458,6 +458,8 @@ int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t 
    direct path must be BYTE-EQUAL to the posted path (thunder_midi_start / _stop posted before the block) for the 18 ledger songs (native/tests/golden/midi-ledger-expect.json, test_midi_ledger.cpp). If it is not,
    THE POSTED PATH IS THE FALLBACK P4 MUST USE: thunder_live_play / thunder_live_stop post thunder_midi_start / _stop themselves, before they queue their own command, and the 0.3 s song-end stop is posted by the CONTROL side
    when thunder_live_collect sees the ENDED record. The contract of this header is the same either way.
+   SHIPPED IN P4: THE DIRECT PATH. test_live_midi (ctest live_midi) found the stream byte-equal to the posted path for the 18 ledger songs (and start-midway and loop); the posted fallback was not needed (docs/port/U37-P4-NOTES.md). The ENDED timer's Stop is issued at step 4 of the quantum in which
+   t0 >= endStopAt (the same test as the STOPPED record of step 7); a queued Start / Stop pair is applied in the order the commands were applied.
    The records' `frame` is the host timeline's frame EXCLUDING the device's output latency and INCLUDING the core's FX latency (midi.h THE OUTPUT). */
 
 /* ANY thread for the call; the handle is used under midi.h's own THREAD rules. Returns the host's thunder_midi, or NULL without F_MIDI. Valid until thunder_live_destroy; the shell passes it to
