@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/dsp_smoke_tfx.dir/smoke_tfx.cpp.o -o dsp_smoke_tfx  ../../core/dsp/libthunder_dsp_tfx.a 

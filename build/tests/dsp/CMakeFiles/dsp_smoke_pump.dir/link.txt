@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/dsp_smoke_pump.dir/smoke_pump.cpp.o -o dsp_smoke_pump  ../../core/pump/libthunder_pump.a ../../core/pump/libthunder_pump_pffft.a 

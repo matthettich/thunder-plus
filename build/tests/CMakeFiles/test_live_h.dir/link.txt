@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/test_live_h.dir/test_live_h.c.o -o test_live_h 

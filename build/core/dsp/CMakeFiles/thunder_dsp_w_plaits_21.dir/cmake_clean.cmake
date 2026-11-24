@@ -1,9 +1,0 @@
-file(REMOVE_RECURSE
-  "CMakeFiles/thunder_dsp_w_plaits_21.dir/__/__/upstream/eurorack/plaits/dsp/physical_modelling/resonator.cc.o"
-  "CMakeFiles/thunder_dsp_w_plaits_21.dir/__/__/upstream/eurorack/plaits/dsp/physical_modelling/resonator.cc.o.d"
-)
-
-# Per-language clean rules from dependency scanning.
-foreach(lang CXX)
-  include(CMakeFiles/thunder_dsp_w_plaits_21.dir/cmake_clean_${lang}.cmake OPTIONAL)
-endforeach()

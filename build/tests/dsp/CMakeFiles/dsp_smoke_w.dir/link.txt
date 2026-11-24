@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/dsp_smoke_w.dir/smoke_w.cpp.o -o dsp_smoke_w  ../../core/dsp/libthunder_dsp_w.a 
