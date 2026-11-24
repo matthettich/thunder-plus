@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/rt_midi.dir/rt_midi.cpp.o -o rt_midi  ../core/libthunder_core.a -ldl ../core/sf/libthunder_stb_vorbis.a ../core/dsp/libthunder_dsp_tfx.a ../core/dsp/libthunder_dsp_pe.a ../core/dsp/libthunder_dsp_mods.a ../core/pump/libthunder_pump.a ../core/pump/libthunder_pump_synth.a ../core/pump/libthunder_pump_pffft.a 

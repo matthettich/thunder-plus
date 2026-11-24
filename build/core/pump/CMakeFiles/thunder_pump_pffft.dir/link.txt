@@ -1,0 +1,2 @@
+/usr/bin/ar qc libthunder_pump_pffft.a CMakeFiles/pump_o_pffft.dir/__/__/pump_prepared/common/pump_pffft.c.o
+/usr/bin/ranlib libthunder_pump_pffft.a

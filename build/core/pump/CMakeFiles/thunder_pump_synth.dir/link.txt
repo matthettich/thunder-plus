@@ -1,0 +1,2 @@
+/usr/bin/ar qc libthunder_pump_synth.a CMakeFiles/pump_o_synth.dir/__/__/pump_prepared/wasm/pump_synth.cpp.o
+/usr/bin/ranlib libthunder_pump_synth.a

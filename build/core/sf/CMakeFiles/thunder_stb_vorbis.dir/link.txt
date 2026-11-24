@@ -1,0 +1,2 @@
+/usr/bin/ar qc libthunder_stb_vorbis.a CMakeFiles/thunder_stb_vorbis.dir/__/__/stb_prepared/stb_vorbis.c.o
+/usr/bin/ranlib libthunder_stb_vorbis.a
