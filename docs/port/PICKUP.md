@@ -19,7 +19,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Machine: 2 cores, about 7 GB free disk. At most two compiling workers; delete build directories of merged work. One git network operation at a time per
   worker; `gh` through REST only (GraphQL is blocked); no CI runs on a push to `native`, only on PRs.
 
-## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); FX1 merged 24 Nov; about 70% of the whole port by the lead's estimate (21 Nov, 22:05, after #283 and #281) (the lists below are older: see START HERE)
+## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); FX1 and U37 P3 merged 24 Nov; about 74% of the whole port by the lead's estimate (24 Nov, 13:05) (the lists below are older: see START HERE)
 - **Stage N1 (playback core):** every worker-buildable unit is merged, pump effect hosting (U18) and Marbles / Tides included. **Left: steps 10 and 11, the
   lead's own: U34 (offline render API and pad renders through the core), U35 (MIDI scheduling), U37 (bridge and host switch: `core.wasm` behind the Settings
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
@@ -30,8 +30,33 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (24 Nov, 07:35): the state for a new chat. Everything below this section is history, newest first.
-**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 07:35)."
+## START HERE (24 Nov, 13:05): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 13:05)."
+
+**The owner's rules:** the 21 Nov 18:18 section, plus (23 Nov, 22:31): delegate whenever possible, switch chats as often as is useful, no update while he sleeps. A two-hour "moving or stalled" line while he is awake.
+
+**U37 P3 is MERGED: #301, squash `49c956b` (24 Nov, 12:54).** Every job green on `966f165` except macOS, which never completed there (four runs "not acquired by Runner", one cut off at 60 minutes with 95 tests passed, none failed). The owner approved ("Merge it then", 10:51) merging on the macOS pass of #302's head `be7f5f8`, which held the same code.
+
+**In review, NOT merged: U37 P4 = PR #302, branch `n1/u37-p4`, head `58feb0c`** (MIDI in `LiveHost`, the DIRECT path; the posted fallback was not needed). Notes: `docs/port/U37-P4-NOTES.md` on that branch.
+- `58feb0c` is ONE commit on `native`: the tree of `be7f5f8` (the old eight-commit head, on which ALL NINE CI jobs were green, macOS and sanitizers included) with native's PICKUP.md. Checked with `git diff --stat be7f5f8 58feb0c`: PICKUP.md only.
+- Byte-equal to the posted path: 18 ledger songs + start-midway + loop; stop while playing (18 cases); non-zero FX latency against `SongRenderer`. `thunder_midi_set_lead` cap 1.2 s. The macOS job's limit is 90 minutes in this PR.
+- The lead read the whole core diff (both rounds) and accepts it. Independent verifier: `review/verify-p4` ("MERGE" on `8f903c9`); round 2 (`de1c4fd`) answers its findings 1 (wrong MIDI after a refused publish: the scheduler's song post is now the last step that can fail), 3, 4, 6, 7, 8, 9.
+- **To do: when every job is green on `58feb0c`, squash-merge #302 (REST, pin the sha).** If only the runners fail again (macOS not acquired; sanitizers "lost communication" at about 49 minutes: seen three times today, cause not found, it passed on `966f165` and `be7f5f8`): re-run the job. The code is the tree that already passed.
+
+**Things that bit today**
+- **Never `git rebase` in this shallow clone** (not even `--onto`): every file conflicts as "both added", and `-X ours` silently DROPS the branch's changes (a wrong head `59b87c0` was on `n1/u37-p4` for a minute). To move a branch onto a squash-merged base: `git checkout -B <branch> origin/native && git read-tree -u --reset <old head> && git checkout origin/native -- docs/port/PICKUP.md`, commit, then check `git diff --stat <old head> HEAD`.
+- A PR stacked on an unmerged one can be opened against `native` at once: its CI runs (CI needs a PR into `native`), which is how P4 was tested while P3 waited for a macOS runner.
+- A test's "non-empty" guard must allow for the sanitizer build's reduced matrix (`live_midi` asked for more than 50 records, the sanitizer run has 46).
+
+**Rulings for P5 (the lead, 24 Nov)**
+- MIDI records keep the ENGINE frame (verify-p4 finding 2). P5 corrects `live.h`'s text ("host timeline's frame") to say so: the shell maps engine frames to its clock with the CLOCK records, as for every other record. `midiDrain` does not add the offset (a record booked before a re-anchor would be mapped with the wrong one).
+- A MIDI command posted after `play` in the same quantum is ordered differently from the posted path (verify-p4 finding 5, the documented difference): accepted.
+
+**Next, in order:** merge #302; U37 P5 (the C API `thunder_live_*` over `LiveHost`, the shells; `thunder_live_alloc` blocks must be `new float[]`; must set `THUNDER_LIVE_CAP_MASTER_SWAP`; the rulings above) on `n1/u37-p5`; P3b (a private rand state per effects plan: `FxHost::plan` on the control thread and `FxHost::process` on the audio thread share `rand_` / `stmRng_` / `daisySeed_`); C2; the Android shell on the live host. Open after P3, unchanged: ring pushes that are `assert` only (`fxBack_`, `giveBack`); pump slots have no FXV / `fx_param`; a pump slot waking from rest allocates on the audio thread. Estimate: about 74% of the whole port (P3 merged, P4 built, verified and green).
+
+**Web side:** the owner asked (24 Nov) about the per-track loop ("independent playheads": a track that runs out loops on its own) and decided to HOLD OFF. It stays "possible, not decided" in HANDOVER on `beta`; nothing to build.
+
+## START HERE of 24 Nov, 07:35 (now history: P3's review and CI)
 
 **The owner's rules:** the 21 Nov 18:18 section, plus (23 Nov, 22:31): delegate whenever possible, switch chats as often as is useful, no update while he sleeps.
 
