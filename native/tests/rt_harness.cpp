@@ -594,10 +594,13 @@ static int run_live_host() {
   std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
   // pass 2 (U37 P3): effects + master chain + meters on; ELECTRO's pump slot made a tfx reverb (a pump slot that wakes from its rest makes an instance in the audio thread: accepted, counted, and not what is policed here)
   const std::string textPump = text; std::string textNoPump = text; for (size_t at; (at = textNoPump.find("\"type\":\"pverb\"")) != std::string::npos;) textNoPump.replace(at, std::strlen("\"type\":\"pverb\""), "\"type\":\"reverb\"");
-  for (int pass = 0; pass < 3; pass++) {
-    const std::string& text = pass == 2 ? textNoPump : textPump;
-    thunder_live_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.sample_rate = 48000; o.max_block = 1024; o.flags = pass == 1 ? THUNDER_LIVE_F_DUMP_STEPS : pass == 2 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS) : 0;
+  // pass 3 (U37 P4): pass 2 plus the MIDI scheduler (F_MIDI): every instrument's OUTPUT 2 (pad + MIDI) on port A with the clock on, the records drained by the consumer after every call, the outbox lead changed between blocks
+  std::string textMidi = textNoPump; for (size_t at = 0; (at = textMidi.find("\"mo\":0", at)) != std::string::npos; at += 6) textMidi.replace(at, 6, "\"mo\":2");
+  for (int pass = 0; pass < 4; pass++) {
+    const std::string& text = pass == 3 ? textMidi : pass == 2 ? textNoPump : textPump;
+    thunder_live_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.sample_rate = 48000; o.max_block = 1024; o.flags = pass == 1 ? THUNDER_LIVE_F_DUMP_STEPS : pass == 2 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS) : pass == 3 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_MIDI) : 0;
     char err[256] = {0}; LiveHost* H = LiveHost::create(o, err, sizeof err); if (!H) return fail("LiveHost::create");
+    if (pass == 3 && (!H->midi() || thunder_midi_set_port(H->midi(), 0, 1, 1, 0, 0))) return fail("LiveHost midi port");
     char e2[128]; if (H->songPublish((const uint8_t*)text.data(), text.size(), nullptr, 0, 1, e2, sizeof e2)) return fail("LiveHost song publish");
     const int PN = 64, NS = 24000; std::vector<float> d((size_t)NS);
     auto setp = [&](int p, int v) { for (int i = 0; i < NS; i++) d[(size_t)i] = (float)std::sin(0.01 * (p % 7 + 1) * i + 0.1 * (v % 5)) * (1.0f - (float)i / NS) * 0.3f; return H->padSet(p, d.data(), nullptr, NS, 48000); };
@@ -605,7 +608,7 @@ static int run_live_host() {
     if (H->padsPublish()) return fail("LiveHost pads publish");
     thunder_live_play_opts po; std::memset(&po, 0, sizeof po); po.size = sizeof po; po.t0 = THUNDER_LIVE_NOW; po.spp = -1; if (H->play(po)) return fail("LiveHost play");
     static float L[1024], R[1024]; uint32_t rng = 7; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
-    int64_t frame = 0; int calls = 0; bool finite = true; double peak = 0; uint8_t buf[512]; char js[16384]; long dumped = 0; uint64_t recs = 0; int endedSeen = 0, stoppedSeen = 0, heldSeen = 0;
+    int64_t frame = 0; int calls = 0; bool finite = true; double peak = 0; uint8_t buf[512]; char js[16384]; long dumped = 0; uint64_t recs = 0; int endedSeen = 0, stoppedSeen = 0, heldSeen = 0; thunder_midi_msg mbuf[256]; uint64_t midiRecs = 0, midiNotes = 0;
     while (frame < 48000 * 25) {
       static const int sizes[] = {128, 128, 480, 1, 64, 1024, 333, 128, 512};
       const int n = sizes[(int)(rnd() * 9)];
@@ -622,32 +625,35 @@ static int run_live_host() {
       else if (k == 41) { H->songPublish((const uint8_t*)text.data(), text.size(), nullptr, 0, 10 + calls, e2, sizeof e2); }
       else if (k == 47) { setp((int)(rnd() * PN), calls); H->padsPublish(); }
       else if (k == 53) H->collect();
-      else if (k == 59) H->lead(0.1 + 0.5 * rnd(), THUNDER_LIVE_NOW);
+      else if (k == 59) { H->lead(0.1 + 0.5 * rnd(), THUNDER_LIVE_NOW); if (pass == 3) H->midiLead(0.01 + 1.19 * rnd()); }
       else if (k == 61 && calls > 1000) { H->hold(THUNDER_LIVE_NOW); }
       else if (k == 67 && calls > 1000) { H->play(po); }
       else if (k == 71 && calls % 3 == 0) { H->stopTrack((int)(rnd() * 8), THUNDER_LIVE_NOW); }
       else if (k == 79 && calls > 600 && calls % 2 == 0) { H->stop(THUNDER_LIVE_NOW); }   // stop (voices let go, waiting list cleared), the play above restarts it
       else if (k == 83 && calls > 600) { thunder_live_play_opts pe = po; pe.has_only = 1; pe.only = 0; H->play(pe); }   // a song that ends at once: Players::songOver, ENDED, the 0.3 s timer, STOPPED
       else if (k == 89 && calls > 600 && calls % 4 == 1) { H->bpm(90, frame + 5000); H->stop(frame + 9000); }   // a timed command and a timed stop
-      else if (pass == 2 && k == 13) { static const char* js[] = {"[{\"type\":\"delay\",\"on\":true}]", "[{\"type\":\"tape\"},{\"type\":\"reverb\"}]", "[]", "[{\"type\":\"filter\"},{\"type\":\"flex\"},{\"type\":\"autopan\"}]"}; const int t = (int)(rnd() * 33), j = (int)(rnd() * 4); if (H->fxPlan(t, (const uint8_t*)js[j], std::strlen(js[j]), 120) == 0) H->fxCommit(t, rnd() < 0.5 ? THUNDER_LIVE_NOW : frame + 3000); }
-      else if (pass == 2 && k == 37) { double p12[12]; for (int i = 0; i < 12; i++) p12[i] = rnd(); H->fxParam((int)(rnd() * 33), (int)(rnd() * 8), p12, rnd() < 0.5 ? THUNDER_LIVE_NOW : frame + 777); }
-      else if (pass == 2 && k == 43) { H->pdcSet((int)(rnd() * 3)); }
-      else if (pass == 2 && k == 19) { static const char* m[] = {"{\"on\":true,\"comp\":{\"thr\":-25,\"ratio\":6}}", "{\"on\":false}", "{\"on\":true,\"lim\":{\"on\":true,\"ceil\":-3}}"}; const char* q = m[(int)(rnd() * 3)]; H->masterConfig((const uint8_t*)q, std::strlen(q), rnd() < 0.5); }
-      else if (pass == 2 && k == 7) { H->meters(rnd() < 0.3 ? 0.0 : 30.0); }
+      else if (pass >= 2 && k == 13) { static const char* js[] = {"[{\"type\":\"delay\",\"on\":true}]", "[{\"type\":\"tape\"},{\"type\":\"reverb\"}]", "[]", "[{\"type\":\"filter\"},{\"type\":\"flex\"},{\"type\":\"autopan\"}]"}; const int t = (int)(rnd() * 33), j = (int)(rnd() * 4); if (H->fxPlan(t, (const uint8_t*)js[j], std::strlen(js[j]), 120) == 0) H->fxCommit(t, rnd() < 0.5 ? THUNDER_LIVE_NOW : frame + 3000); }
+      else if (pass >= 2 && k == 37) { double p12[12]; for (int i = 0; i < 12; i++) p12[i] = rnd(); H->fxParam((int)(rnd() * 33), (int)(rnd() * 8), p12, rnd() < 0.5 ? THUNDER_LIVE_NOW : frame + 777); }
+      else if (pass >= 2 && k == 43) { H->pdcSet((int)(rnd() * 3)); }
+      else if (pass >= 2 && k == 19) { static const char* m[] = {"{\"on\":true,\"comp\":{\"thr\":-25,\"ratio\":6}}", "{\"on\":false}", "{\"on\":true,\"lim\":{\"on\":true,\"ceil\":-3}}"}; const char* q = m[(int)(rnd() * 3)]; H->masterConfig((const uint8_t*)q, std::strlen(q), rnd() < 0.5); }
+      else if (pass >= 2 && k == 7) { H->meters(rnd() < 0.3 ? 0.0 : 30.0); }
       else if (k == 73) { for (int i = 0; i < 20; i++) H->mixSet(i, THUNDER_LIVE_MIX_VOL, 100.0 + i, 0, frame + i * 300); }
       int64_t f0 = frame; if (calls == 700) f0 += 777; if (calls == 1500) f0 = frame / 2; if (calls == 2200) f0 = frame + 123456;   // three re-anchors: forward, backward, forward
       { rt_guard g; if (H->process(L, R, n, f0, 0)) return fail("LiveHost::process"); }
       frame = f0 + n; calls++;
       for (int i = 0; i < n; i++) { if (!(L[i] == L[i]) || !(R[i] == R[i])) finite = false; peak = std::max(peak, (double)std::fabs(L[i])); }
       for (int r; (r = H->poll(buf, sizeof buf)) > 0;) { int o2 = 0; while (o2 < r) { thunder_live_ev_head hd; std::memcpy(&hd, buf + o2, sizeof hd); recs++; if (hd.type == THUNDER_LIVE_EV_STATE) { thunder_live_ev_state es; std::memcpy(&es, buf + o2, sizeof es); if (es.state == THUNDER_LIVE_ST_ENDED) endedSeen++; if (es.state == THUNDER_LIVE_ST_STOPPED) stoppedSeen++; } if (hd.type == THUNDER_LIVE_EV_HELD) heldSeen++; o2 += hd.bytes; } }
+      if (pass == 3) for (int64_t r; (r = H->midiDrain(mbuf, 256)) > 0;) { midiRecs += (uint64_t)r; for (int64_t i = 0; i < r; i++) if (mbuf[i].b[0] == 0x90) midiNotes++; }
       if (pass == 1) for (int r; (r = H->dumpStep(js, sizeof js)) > 0;) dumped++;
     }
     thunder_live_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; H->statsGet(&st);
     if (!finite || peak < 0.01) return fail("LiveHost run: silent or non-finite");
     if (st.reanchors != 3 || st.quanta < 5000 || st.steps < 100 || st.cmds_applied < 50) return fail("LiveHost run did too little (3 re-anchors, quanta, steps or commands)");
     if (endedSeen < 1 || stoppedSeen < 2 || heldSeen < 1) return fail("LiveHost run never ended a song or never stopped (ENDED / STOPPED / HELD paths not exercised)");
+    if (pass == 3 && (midiRecs < 300 || midiNotes < 50 || st.midi_begin_failed != 0)) { std::printf("MIDI pass: %llu records, %llu note-ons, %u begin failures\n", (unsigned long long)midiRecs, (unsigned long long)midiNotes, st.midi_begin_failed); return fail("LiveHost MIDI pass: too few MIDI records / notes, or a midi_begin failed"); }
     if (pass == 1 && dumped < 50) return fail("LiveHost step dump delivered too little");
-    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records (%d ENDED, %d STOPPED, %d HELD), %ld dumped steps, no allocation in process\n", pass == 1 ? " (with the step dump)" : pass == 2 ? " (effects, master chain, PDC, meters)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, endedSeen, stoppedSeen, heldSeen, dumped);
+    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records (%d ENDED, %d STOPPED, %d HELD), %ld dumped steps, no allocation in process\n", pass == 1 ? " (with the step dump)" : pass == 2 ? " (effects, master chain, PDC, meters)" : pass == 3 ? " (effects, master chain, PDC, meters, MIDI)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, endedSeen, stoppedSeen, heldSeen, dumped);
+    if (pass == 3) std::printf("rt_harness: LiveHost MIDI: %llu MIDI records drained, %llu note-ons, midi_begin failures %u, may_hang %u\n", (unsigned long long)midiRecs, (unsigned long long)midiNotes, st.midi_begin_failed, st.midi_may_hang);
     delete H;
   }
   return 0;

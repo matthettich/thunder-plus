@@ -85,7 +85,7 @@ int thunder_midi_set_song(thunder_midi* h, const uint8_t* json, size_t bytes);
 /* CONTROL. port 0..3; connected: a cable is set; clock_on: this port gets the MIDI clock; gear_ms the port's Gear delay (-50..200, rounded);
    cable: an id: ports with the same id are one physical cable (one clock stream, one CLEAR); 0..250. */
 int thunder_midi_set_port(thunder_midi* h, int port, int connected, int clock_on, double gear_ms, int cable);
-int thunder_midi_set_lead(thunder_midi* h, double seconds);          /* outbox look-ahead 0.005 .. 0.5 (default 0.060) */
+int thunder_midi_set_lead(thunder_midi* h, double seconds);          /* outbox look-ahead 0.005 .. 1.2 (default 0.060; the cap was 0.5 before U37 P4) */
 int thunder_midi_set_fx_latency(thunder_midi* h, double seconds);    /* 0 .. 2; the mixer's figure, every block */
 int thunder_midi_set_audible(thunder_midi* h, uint64_t mask);        /* bit t: track t is heard (mix_audible); a muted track's gear goes quiet */
 int thunder_midi_start(thunder_midi* h, int spp);                    /* PLAY: spp = Song Position Pointer in 16ths (0: from the top) */

@@ -240,8 +240,8 @@ int main() {
     CHECK(G->pdcSet(3) == THUNDER_LIVE_E_ARG && G->pdcSet(1) == THUNDER_LIVE_E_STATE, "pdc_set: bad mode, no song");
     Host F(opts(THUNDER_LIVE_F_MASTER, 4096)); const std::string notjson = "{{{"; CHECK(F->masterConfig((const uint8_t*)notjson.data(), notjson.size(), true) == THUNDER_LIVE_E_ARG, "master_config: not JSON");
     CHECK(F->masterConfig(nullptr, 0, true) == 0, "master_config: NULL is freshMst");
-    // F_MIDI is still P4's
-    thunder_live_opts o = opts(THUNDER_LIVE_F_MIDI); char err[128]; CHECK(LiveHost::create(o, err, sizeof err) == nullptr, "F_MIDI is refused until P4");
+    // F_MIDI is built since P4 (test_live_midi): the host is made and owns a scheduler
+    { thunder_live_opts o = opts(THUNDER_LIVE_F_MIDI); char err[128]; LiveHost* M = LiveHost::create(o, err, sizeof err); CHECK(M != nullptr && M->midi() != nullptr, "F_MIDI is accepted (P4)"); delete M; }
   }
 
   // ---- 3. PDC, master and meters edits against the same edit on the renderer ------------------------------------------------------------------------------------------------------------------------

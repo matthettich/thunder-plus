@@ -111,7 +111,7 @@ class LiveHost {
   // chain.h:57), MeterBank(sr) (meter.h:40). LivePool::setIdleSkip stays on (live_pool.h:116). pe_prepare() (engine/layer_pe.h:20) is the audio thread's duty (process() does it on its first call).
   // nullptr, with `err`, on a bad option or no memory (nothing left allocated).
   static LiveHost* create(const thunder_live_opts& o, char* err, size_t errCap);
-  // ~LiveHost(): the audio thread has stopped. If playing: stop + ONE quantum on this thread (midi_begin / midi_end after MidiSched::stop, render.cpp:101,:109) with the audio discarded, then free everything: PadsHost's
+  // ~LiveHost(): the audio thread has stopped. No quantum is run (P4: the stop a shell owes is thunder_live_stop + one more process + a drain BEFORE destroy; a quantum here could not be seen). Frees everything: PadsHost's
   // destructor frees every buffer whatever the voices say (pads_snap.h), the SnapSlots free their snapshots (rt/snap.h:22), thunder_midi_free (midi.h).
   ~LiveHost();
   LiveHost(const LiveHost&) = delete;
@@ -209,7 +209,8 @@ class LiveHost {
   // CONTROL: MIDI, events, test
   // ======================================================================================================================================================================================================
   thunder_midi* midi() { return midi_; }             // owned; valid until ~LiveHost
-  int midiLead(double seconds);                      // thunder_midi_set_lead (midi.h:88; its cap 0.5 s -> 1.2 s is P4's change, ruling D6)
+  int midiLead(double seconds);                      // thunder_midi_set_lead (0.005 .. 1.2: the cap went from 0.5 s to 1.2 s in P4, ruling D6); E_STATE without F_MIDI, E_ARG out of range, E_BUSY when the midi command ring is full
+  int64_t midiDrain(thunder_midi_msg* out, int64_t cap);   // thunder_live_midi_drain: thunder_midi_drain (CONSUMER, one thread); E_STATE without F_MIDI
   int meters(double rateHz);                         // LiveCmd::Meters: MeterBank::setRate (meter.h:44)
   void hostStats(int outLatencyFrames, int underruns) { outLat_.store(outLatencyFrames, std::memory_order_relaxed); under_.store(underruns, std::memory_order_relaxed); }   // ANY thread
   int poll(void* buf, int cap);                      // CONSUMER: pops evRing_ and copies whole records
@@ -263,6 +264,10 @@ class LiveHost {
   void clearWaiting(int64_t qStart);                          // a stop / a started play: the waiting list is cleared; an FxCommit in it is committed first (its plan must not be lost)
   int64_t latencyFrames() const;                              // the output's lateness behind the song: master chain + PDC trim + master pump effects (SongRenderer::latencyFrames)
   void postMeters();                                          // step 9: the bank's events as METERS records
+  // ---- P4: MIDI (audio) ----
+  void midiOp(bool start, int spp);                           // step 1: queue a MIDI Start (play) or Stop (stop command) for step 4, in the order the commands were applied
+  void midiBegin(double t0, int64_t qStart);                                  // step 4: the ENDED timer's stop, midi_begin, then the queued Starts / Stops DIRECTLY on the scheduler (same `now`, same figures, before the step loop)
+  void midiEnd(double t0);                                    // step 6: midi_end(t0, the last Seq's time and tempo, alive)
   // ---- control helpers ----
   int push(const LiveCmd& c);                        // cmds_.push; E_BUSY + cmd_busy when full
   void refreshCtl();                                 // the control-side numbers statsGet reads
@@ -366,8 +371,14 @@ class LiveHost {
   bool posDirty_ = false; int32_t posRow_ = 0, posStep_ = 0, posCr_ = 0; int64_t posF_ = 0;   // AUDIO: the last played step's place, for the POS record
   uint32_t lateLast_[4] = {0, 0, 0, 0};              // AUDIO: the counters of the last LATE record
   uint64_t seqDropBase_ = 0, adoptedOrd_ = 0;        // AUDIO
-  bool midiBeginFailedOnce_ = false;
-  bool pendMidiStop_ = false; int pendMidiStartSpp_ = -1;   // set by step 1, done by midiBegin right after midi_begin (stop first, then start)
+  // P4 (AUDIO ONLY): the MIDI scheduler's transport. step 1 queues, step 4 (midiBegin) applies right after midi_begin returns, before the step loop.
+  struct MidiOp { bool start; int spp; };
+  static constexpr int kMidiOps = 16;
+  MidiOp midiOps_[kMidiOps]; int nMidiOps_ = 0;       // in the order the commands were applied; a 17th pushes the oldest out (counted nowhere: 16 plays and stops in ONE quantum cannot come from a real shell)
+  bool midiOk_ = false;                               // midi_begin of THIS quantum succeeded (midiEnd and onStep run only then)
+  bool midiBeginFailedOnce_ = false; uint32_t midiBeginFailed_ = 0;
+  double midiSeqT_ = 0, midiBpm_ = 120;               // the last Seq's next step time and tempo (midi_end's arguments once the runner has no Seq: IDLE, HELD)
+  uint32_t midiLateLast_[3] = {0, 0, 0};              // the counters of the last LATE record (late notes, late ticks, may_hang)
   int thread_prepares_ = 0;                          // process(): pe_prepare() on this thread's first call; stats.thread_prepares
   PlayerStats lastPlayerStats_;                      // for the LATE record (changed since last post)
   int64_t nextClockAt_ = 0, nextPosAt_ = 0, nextLateAt_ = 0;   // ENGINE frames: the next CLOCK / POS / LATE record is due at or after
