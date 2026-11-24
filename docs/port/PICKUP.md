@@ -30,8 +30,22 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (24 Nov, 02:35): the state for a new chat. Everything below this section is history, newest first.
-**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 02:35)."
+## START HERE (24 Nov, 07:35): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 07:35)."
+
+**The owner's rules:** the 21 Nov 18:18 section, plus (23 Nov, 22:31): delegate whenever possible, switch chats as often as is useful, no update while he sleeps.
+
+**In review, NOT merged: U37 P3 = PR #301, branch `n1/u37-p3`, head `966f165`** (effects, master chain, PDC and meters in `LiveHost`, with R1 and R2). Notes: `docs/port/U37-P3-NOTES.md` on that branch.
+- Built by a Sonnet builder: LiveHost bit-equal to SongRenderer on ELECTRO with all slots (4 variants, several call sizes and frame0); `rt_harness` third pass "no allocation in process".
+- **The lead has read the whole audio path up to `5f54ee2` and accepted it**; the commits after it (`24078f1`, `966f165`) are test-only.
+- Independent verifier (Sonnet; report in this session at /home/claude/verify-301.md, NOT yet pushed to `review/verify-301`: if that branch is missing the report is lost, its findings are here): "merge after finding 1". Finding 1 (wrong audio, confirmed by a run): a waiting FxCommit with a future `at` was committed AFTER a play's own plans. FIXED in `5f54ee2` (`commitWaitingFx`: effects plans commit in PLANNING order; tests fail without it). Real-time audit, lifetimes, R1, R2, the P0 contract: clean.
+- **What blocks the merge is CI only**, and not clearly our code: (1) "Core (Linux, sanitizers)" died twice at about 49 minutes with "The hosted runner lost communication" (heads `5f54ee2`, `24078f1`; no log). Cause NOT found. `966f165` makes `test_live_fx` lighter (sanitizer build: 153 s to 54 s, 623 MB; reduced matrix under `THUNDER_SANITIZE_BUILD`) but the builder could not show that test was the cause. If it dies again: re-run the job once; a third time, a Sonnet builder bisects (sanitizer ctest with -V, a per-test timeout, the log uploaded as an artifact even on failure). (2) "Core (macOS universal)": GitHub's macOS arm64 runners are short ("job was not acquired by Runner", "capacity constraints") and slow on some runs (the BUILD took 40 minutes on `native` `d934c0f`, cancelled at the 60-minute limit; 20 minutes for the whole job on `5f54ee2`). Re-run the job (`gh api -X POST repos/matthettich/thunder-plus/actions/jobs/<id>/rerun`, once the run has finished); if it keeps timing out, raise the macOS job's limit to 90 in `.github/workflows/native.yml`.
+- **When every job is green on the head:** squash-merge #301 (REST, pin the sha), write the next START HERE, start P4.
+- **Open after P3 (file in the next START HERE):** P3b = a private rand state per effects plan (`FxHost::plan` on the control thread and `FxHost::process` on the audio thread share `rand_` / `stmRng_` / `daisySeed_`: non-repeatable noise in Beads / Clouds / Cloud Seed / PitchShifter, no memory unsafety; old code, reachable since P3); ring pushes that are `assert` only (`fxBack_`, `giveBack`); pump slots have no FXV / `fx_param`; a pump slot waking from rest allocates on the audio thread (the accepted FX1 rule, hit more often in live use); P5 must set `THUNDER_LIVE_CAP_MASTER_SWAP`.
+
+**Next, in order:** merge #301; U37 P4 (MIDI in the host: `docs/port/U37-P0-NOTES.md` section 5 ruling 1; byte-equal to the posted path for the 18 ledger songs, else the posted fallback; raise `thunder_midi_set_lead`'s cap to 1.2 s) on `n1/u37-p4`; P5 (the C API, the shells); P3b; C2; the Android shell on the live host. Estimate: about 72% of the whole port (FX1 merged, P3 built and checked).
+
+## START HERE of 24 Nov, 02:35 (now history: FX1's merge)
 
 **The owner's rules:** those of the 21 Nov 18:18 section below, unchanged. From 23 Nov, 22:31: delegate whenever possible, switch chats as often as is useful, and no update while he sleeps (one update at 07:30; the overnight check-ins work silently). His weekly usage reset on Mon 23 Nov 18:59 Mountain.
 
