@@ -31,6 +31,12 @@ static void thunder_fx_fail_at(long) {}       // (a build without the DSP librar
 #endif
 
 extern "C" volatile int thunder_pump_create_depth;   // core/src/fx/fxpump.cpp: non-zero inside the pinned pump plugin's own pump_new
+#if defined(TR_SANITIZED) && defined(__has_include)
+#if __has_include(<sanitizer/lsan_interface.h>)
+#include <sanitizer/lsan_interface.h>
+#define TR_LSAN 1
+#endif
+#endif
 namespace {
 bool g_pumpFail = false; int64_t g_pumpLive = 0;   // the failing allocation was inside pump_new / bytes of blocks allocated inside pump_new this iteration that are still live (a flag in each block's header: added on new, subtracted on delete)
 bool g_armed = false;                 // counting / failing only while armed (the test's own allocations stay out of it)
@@ -63,8 +69,16 @@ void* operator new(size_t n) {
 #endif
     if (thunder_pump_create_depth > 0) g_pumpFail = true;
     throw std::bad_alloc(); } }
-  void* p = std::malloc(n + kHdr); if (!p) throw std::bad_alloc();
-  const bool pumpBlock = g_armed && thunder_pump_create_depth > 0; if (pumpBlock) g_pumpLive += (int64_t)n;
+  const bool pumpBlock = g_armed && thunder_pump_create_depth > 0;
+#ifdef TR_LSAN
+  if (pumpBlock) __lsan_disable();   // LeakSanitizer would report the pump plugin's own out-of-memory leak (counted and bounded below) at exit: what pump_new allocates is not tracked by it
+#endif
+  void* p = std::malloc(n + kHdr);
+#ifdef TR_LSAN
+  if (pumpBlock) __lsan_enable();
+#endif
+  if (!p) throw std::bad_alloc();
+  if (pumpBlock) g_pumpLive += (int64_t)n;
   ((size_t*)p)[1] = pumpBlock ? 1 : 0; *(size_t*)p = n; g_live += (int64_t)n; if (g_live > g_peak) g_peak = g_live;
   if (g_armed) traceAdd(p);
   return (char*)p + kHdr;

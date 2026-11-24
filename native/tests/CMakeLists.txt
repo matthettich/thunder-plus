@@ -618,6 +618,7 @@ if(THUNDER_SANITIZE AND NOT MSVC)
   target_compile_options(test_modfx PRIVATE -fno-sanitize=vptr)
   target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
   target_compile_options(test_hardening PRIVATE -fno-sanitize=vptr)
+  target_compile_options(test_fxsong PRIVATE -fno-sanitize=vptr)   # FX1: calls modfx::Module::run on a module the -fno-rtti core made, as test_modfx
   target_compile_options(test_midiout_norecall PRIVATE -fno-sanitize=vptr)   # the Seq's shared_ptr<SeqSession>: as test_seq_takeover
   target_compile_options(test_seq_takeover PRIVATE -fno-sanitize=vptr)   # SongSnap holds shared_ptrs whose control blocks the -fno-rtti core makes: the same reason
 endif()
