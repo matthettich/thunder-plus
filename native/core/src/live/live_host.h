@@ -215,6 +215,7 @@ class LiveHost {
   void hostStats(int outLatencyFrames, int underruns) { outLat_.store(outLatencyFrames, std::memory_order_relaxed); under_.store(underruns, std::memory_order_relaxed); }   // ANY thread
   int poll(void* buf, int cap);                      // CONSUMER: pops evRing_ and copies whole records
   int dumpStep(char* json, int cap);                 // TEST: pops dumpHeads_ / dumpEvs_, writes the golden's JSON (tests/golden/seq-*.json format)
+  int64_t engineOffset() const { return offPub_.load(std::memory_order_relaxed); }   // ANY: hostFrame - engineFrame, ONE 64-bit atomic written by process() when it changes (first anchor, re-anchor); thunder_live_engine_offset
   bool statsGet(thunder_live_stats* out) const;      // ANY: relaxed loads of pub_[] + the control side's own counters + padsHost_->buffers() / retired() (pads_snap.h) + bytes held
 
   // ======================================================================================================================================================================================================
@@ -357,6 +358,7 @@ class LiveHost {
   // host -> engine), post() (every record's `f`: engine -> host), publish() (stats.frames).
   int64_t qFrame_ = 0;                               // the ENGINE frame the next quantum starts at
   int64_t off_ = 0;                                  // hostFrame = engineFrame + off_
+  std::atomic<int64_t> offPub_{0};                   // AUDIO writes (relaxed, only when off_ changes), any thread reads (relaxed): off_ as ONE value (a torn read of two counters is what stats.frames - 128 * stats.quanta gave)
   int64_t nextFrame_ = 0, origin_ = 0;               // HOST frames: where the next process call must start; the frame0 of the first call / last re-anchor (stats.frame_origin)
   bool anchored_ = false, peReady_ = false;
   int64_t wallNs_ = 0;                               // process()'s wall_ns, copied into the next CLOCK record

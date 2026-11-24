@@ -58,7 +58,8 @@
                 process() empties a ring); a caller that drops an E_BUSY message loses the edit. thunder_live_stats.cmd_busy counts them.
    NULL AND DEAD HANDLES  A NULL handle is E_ARG for every function that returns an int (thunder_live_process writes nothing then: it cannot know the buffers' size), NULL for thunder_live_midi, and a no-op for destroy,
                 thunder_live_host_stats and thunder_live_free. A DEAD handle (an exception that was not an allocation failure came out of a CONTROL call, which returned E_INTERNAL) answers E_STATE to every call but the getters
-                (abi, caps, stats_get, midi, host_stats, poll, alloc, free) and destroy; process zeroes its outputs (when they are valid) and returns E_STATE. There is no FATAL record: the audio side cannot post for a handle it
+                (abi, caps, stats_get, midi, host_stats, poll, alloc, free) and destroy; process zeroes its outputs (when they are valid) and returns E_STATE. A dead handle never runs process again: MIDI notes already sounding on an external port are NOT released by the core, so the shell sends its own all-notes-off (thunder_midi_panic / freeing its thunder_midiout) when it sees E_INTERNAL or E_STATE.
+                There is no FATAL record: the audio side cannot post for a handle it
                 does not run, and the call that killed the handle said E_INTERNAL. (THUNDER_LIVE_WHERE_FATAL is reserved.)
    OUT OF MEMORY  A CONTROL call NEVER aborts on a failed allocation: it returns E_MEMORY (or E_LIMIT when a budget says no first) and changes nothing. The AUDIO
                 path allocates nothing, ever (rt_harness runs it under an allocator that aborts). What a host must still respect: this header's limits and the render.h
@@ -66,7 +67,7 @@
                 parser (Song::load, SeqVars::load, the pads snapshot's RenderPads copy, the SoundFont parse) cannot catch a failed allocation: there the call may abort. The
                 host keeps inside opts.max_song_bytes / max_pad_bytes (E_LIMIT is returned BEFORE any such allocation) and treats a trap as fatal and falls back (ruling D14; docs/port/U37-P0-NOTES.md, question 4). P6 (the wasm target) MUST MEASURE the largest
                 song and pad set that stays inside these limits on a phone before the limits are trusted. A native build with exceptions catches them and returns E_MEMORY.
-   ABI          Structs that cross the API start with a `size` field (sizeof as the caller compiled it): a field the caller's struct does not reach keeps its default,
+   ABI          Structs that cross the API start with a `size` field (sizeof as the caller compiled it; THE CALLER'S STRUCT MUST BE AT LEAST AS LONG AS `size` SAYS: the core reads `size` bytes of it, a garbage size is a read out of bounds): a field the caller's struct does not reach keeps its default (zero, except thunder_live_play_opts.t0, which is THUNDER_LIVE_NOW when the struct is too short to hold it),
                 a field a newer caller has and this build does not know must be zero. Zero-fill, set `size`, set what you want; every zero is the default. Event records
                 have fixed sizes, the same on wasm32 and 64-bit (no pointer, no size_t, no long): see EVENTS. A function a build does not have is not exported; the
                 caps word says which optional parts the build has.
@@ -238,7 +239,12 @@ typedef struct thunder_live_stats {
 } thunder_live_stats;
 int thunder_live_stats_get(const thunder_live* L, thunder_live_stats* out);
 
-/* ANY. A block of `nfloats` floats (> 0, <= 2^30) from the host's own allocator (`new float[]`: aligned as operator new[] is, 16 bytes on glibc, bionic, macOS, MSVC x64 and wasi-libc; nothing in the core needs more than alignof(float)), uninitialised, for thunder_live_pad_take (the worklet writes a pad into it and hands it over,
+/* ANY thread, wait-free. THE ENGINE OFFSET: *out = (host frame) - (engine frame), the one number that maps the engine's own timeline to the host's (see TIME and MIDI). It is ONE 64-bit atomic that the audio side stores in
+   thunder_live_process when it changes (the first call: that call's frame0; every re-anchor, in the call that makes it, even one that completes no quantum), so a read is never torn and never stale for a call that has returned.
+   0 before the first process call with frames > 0. May be negative (a backward re-anchor). Returns 0, or E_ARG (NULL handle or out). Works on a dead handle. (stats_get has no room for it: its 240 bytes are full.) */
+int thunder_live_engine_offset(const thunder_live* L, int64_t* out);
+
+/* ANY. A block of `nfloats` floats (> 0, <= 2^30) from the host's own allocator (`new float[]`: aligned as operator new[] is for float, which is at least alignof(float) and 16 bytes on the 64-bit targets; nothing in the core needs more than alignof(float)), uninitialised, for thunder_live_pad_take (the worklet writes a pad into it and hands it over,
    saving a copy). NULL when it cannot be had (never an abort). Valid until it is given to thunder_live_pad_take (which takes it) or thunder_live_free. It does NOT count against the budget until taken. */
 float* thunder_live_alloc(int64_t nfloats);
 void thunder_live_free(float* block);   /* ANY. NULL is fine. Only for a block from thunder_live_alloc that was not (successfully) taken */
@@ -465,9 +471,8 @@ int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t 
    SHIPPED IN P4: THE DIRECT PATH. test_live_midi (ctest live_midi) found the stream byte-equal to the posted path for the 18 ledger songs (and start-midway and loop); the posted fallback was not needed (docs/port/U37-P4-NOTES.md). The ENDED timer's Stop is issued at step 4 of the quantum in which
    t0 >= endStopAt (the same test as the STOPPED record of step 7); a queued Start / Stop pair is applied in the order the commands were applied.
    THE RECORDS' `frame` IS THE ENGINE FRAME (lead's ruling of 24 Nov, verify-p4 finding 2): the engine's own gapless count at the engine rate, EXCLUDING the device's output latency and INCLUDING the core's FX latency (midi.h THE OUTPUT). It is NOT
-   a host frame: it equals one only while the offset of TIME is 0 (the first process call had frame0 = 0 and nothing re-anchored). The shell maps it as it maps every other time of the engine: host frame = engine frame + OFFSET, where OFFSET = stats.frames - THUNDER_LIVE_QUANTUM * stats.quanta (the engine renders
-   exactly 128 frames per quantum from 0, so 128 * quanta is the engine frame of the quantum stats.frames names; a gapless shell, whose frame0 always continues the last call, has OFFSET = its first frame0, 0 when it counts from 0), and a host frame
-   becomes the host's clock with the CLOCK records (f and wall_ns). thunder_live_midi_drain and thunder_midiout_clock_map add no offset (a record booked before a re-anchor would be mapped with the wrong one).
+   a host frame: it equals one only while the offset of TIME is 0 (the first process call had frame0 = 0 and nothing re-anchored). THE WAY TO MAP IT (and the engine frame of any record or time the engine keeps): host frame = engine frame + thunder_live_engine_offset() (one atomic, see there; a gapless shell, whose frame0 always continues the last call, has the offset of its first frame0, 0 when it counts from 0).
+   A host frame becomes the host's clock with the CLOCK records (f and wall_ns). Do NOT derive the offset from stats.frames and stats.quanta: those are two separate loads and tear by 128 frames. thunder_live_midi_drain and thunder_midiout_clock_map add no offset (a record booked before a re-anchor would be mapped with the wrong one).
    ORDER AGAINST A SHELL'S OWN MIDI COMMAND (lead's ruling of 24 Nov, verify-p4 finding 5, ACCEPTED): a command the shell posts on the host's thunder_midi (set_port, set_cable, ...) AFTER thunder_live_play and before the quantum that applies the play is popped by midi_begin BEFORE
    the host's direct Start of that quantum; in the posted path (thunder_midi_start posted by the shell) it would run after it. So a port configured after play() is in force for that Start (its SPP is sent). A shell that wants the other order configures before play(). */
 

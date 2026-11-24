@@ -10,6 +10,7 @@
 #include "thunder/live.h"
 
 #include <atomic>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <new>
@@ -112,6 +113,12 @@ int thunder_live_stats_get(const thunder_live* L, thunder_live_stats* out) {
   return L->h->statsGet(out) ? THUNDER_LIVE_OK : THUNDER_LIVE_E_ARG;
 }
 
+int thunder_live_engine_offset(const thunder_live* L, int64_t* out) {
+  if (!L || !out) return THUNDER_LIVE_E_ARG;
+  *out = L->h->engineOffset();
+  return THUNDER_LIVE_OK;
+}
+
 float* thunder_live_alloc(int64_t nfloats) {
   // `new float[]`, because the block is handed to PadsHost::setPadTake and freed there with delete[] (pads_snap.cpp freeBuf): U37-P0-NOTES.md, "P5 work list". Alignment: that of operator new[] (16 bytes on glibc, bionic 64-bit,
   // macOS, MSVC x64 and wasi-libc; nothing in the core needs more than alignof(float): live.h says so).
@@ -157,7 +164,9 @@ int thunder_live_play(thunder_live* L, const thunder_live_play_opts* o) {
   if (!L) return THUNDER_LIVE_E_ARG;
   if (!o) return THUNDER_LIVE_E_ARG;
   thunder_live_play_opts p;
+  uint32_t callerSize = 0; std::memcpy(&callerSize, o, sizeof callerSize);
   if (abiCopyIn(o, &p, sizeof p) != 0) return THUNDER_LIVE_E_ARG;
+  if (callerSize < offsetof(thunder_live_play_opts, t0) + sizeof(int64_t)) p.t0 = THUNDER_LIVE_NOW;   // live.h ABI: a struct too short to hold t0 gets the default, which is NOW, not frame 0
   return ctl(L, [&](LiveHost& h) { return h.play(p); });
 }
 int thunder_live_stop(thunder_live* L, int64_t at) { return ctl(L, [&](LiveHost& h) { return h.stop(at); }); }

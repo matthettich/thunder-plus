@@ -150,6 +150,7 @@ static void test_null_handle(void) {
   memset(&st, 0, sizeof st); st.size = sizeof st;
   CHECK(thunder_live_process(NULL, a, b, 8, 0, 0) == THUNDER_LIVE_E_ARG, "process");
   CHECK(thunder_live_stats_get(NULL, &st) == THUNDER_LIVE_E_ARG, "stats_get");
+  { int64_t off = 5; CHECK(thunder_live_engine_offset(NULL, &off) == THUNDER_LIVE_E_ARG && off == 5, "engine_offset(NULL)"); }
   CHECK(thunder_live_song_publish(NULL, (const uint8_t*)"{}", 2, NULL, 0, 1, err, sizeof err) == THUNDER_LIVE_E_ARG && err[0] == 0, "song_publish (err cleared)");
   CHECK(thunder_live_pad_set(NULL, 0, a, NULL, 8, SR) == THUNDER_LIVE_E_ARG, "pad_set");
   CHECK(thunder_live_pad_take(NULL, 0, a, 0, 8, SR) == THUNDER_LIVE_E_ARG, "pad_take");
@@ -413,10 +414,36 @@ static void test_play_args(void) {
   memset(big, 0, sizeof big); p = play_of(THUNDER_LIVE_NOW); memcpy(big, &p, sizeof p); { uint32_t sz = (uint32_t)sizeof big; memcpy(big, &sz, 4); }
   CHECK(thunder_live_play(L, (const thunder_live_play_opts*)big) == 0, "a newer caller, extra fields zero");
   big[sizeof(thunder_live_play_opts) + 3] = 9; CHECK(thunder_live_play(L, (const thunder_live_play_opts*)big) == THUNDER_LIVE_E_ARG, "a newer caller with an unknown field set");
+  /* a struct too short to hold t0 gets NOW (the next quantum + 0.08 s), not frame 0: no catch-up skip */
+  thunder_live_destroy(L); L = make(0, 1024);
+  if (L) { int64_t fr = 0; thunder_live_stats s0, s1; CHECK(thunder_live_song_publish(L, (const uint8_t*)song, n, NULL, 0, 1, err, sizeof err) == 0 && load_pads(L, 8) == 0, "song again");
+    run(L, NULL, NULL, 96000, 1024, &fr);
+    p = play_of(0); p.size = 8; CHECK(thunder_live_play(L, &p) == 0, "play with size 8"); run(L, NULL, NULL, 48000, 1024, &fr); s0 = stats_of(L);
+    CHECK(s0.state == THUNDER_LIVE_STATE_PLAYING && s0.runner_skips == 0, "size 8: t0 is NOW, the song starts after 2 s of idle without a catch-up skip (skips %llu)", (unsigned long long)s0.runner_skips);
+    thunder_live_stop(L, -1); run(L, NULL, NULL, 4 * Q, Q, &fr);
+    p = play_of(0); CHECK(thunder_live_play(L, &p) == 0, "play with t0 = 0 (a past frame)"); run(L, NULL, NULL, 48000, 1024, &fr); s1 = stats_of(L);
+    CHECK(s1.runner_skips > s0.runner_skips, "t0 = 0 given: the runner catches up (skips %llu): the two defaults differ", (unsigned long long)s1.runner_skips); }
   /* E_BUSY of play: 8 plays outstanding, then busy (nothing ran: no quantum applied them) */
   { int ok = 0, busy = 0, k; for (k = 0; k < 12; k++) { p = play_of(THUNDER_LIVE_NOW); { int rc = thunder_live_play(L, &p); if (rc == 0) ok++; else if (rc == THUNDER_LIVE_E_BUSY) busy++; } }
     CHECK(ok <= 8 && busy >= 4, "plays queued with no quantum between: %d accepted, %d E_BUSY (the play ring holds 8)", ok, busy); }
   thunder_live_destroy(L); free(song);
+}
+
+
+/* the engine offset (live.h): host frame - engine frame, one atomic */
+static void test_offset(void) {
+  thunder_live* L = make(0, 1024); float a[1024], b[1024]; int64_t off = -7, fr = 777; int i;
+  if (!L) { CHECK(0, "make"); return; }
+  CHECK(thunder_live_engine_offset(L, NULL) == THUNDER_LIVE_E_ARG, "engine_offset(out NULL)");
+  CHECK(thunder_live_engine_offset(L, &off) == 0 && off == 0, "0 before the first call");
+  thunder_live_process(L, a, b, 0, 5, 0); thunder_live_engine_offset(L, &off); CHECK(off == 0, "frames 0 anchors nothing");
+  for (i = 0; i < 5; i++) { thunder_live_process(L, a, b, 1024, fr, 0); fr += 1024; }
+  thunder_live_engine_offset(L, &off); CHECK(off == 777, "gapless: the first frame0 (%lld)", (long long)off);
+  thunder_live_process(L, a, b, 1, fr, 0); fr += 1;   /* mid-quantum from here on */
+  fr += 5000; thunder_live_process(L, a, b, 1, fr, 0); fr += 1;   /* a re-anchor in a call that completes no quantum */
+  thunder_live_engine_offset(L, &off); CHECK(off == 777 + 5000, "a forward gap, in a 1-frame call: the new offset at once (%lld)", (long long)off);
+  fr -= 20000; thunder_live_process(L, a, b, 1, fr, 0); thunder_live_engine_offset(L, &off); CHECK(off < 777 + 5000 && off > 0, "a backward jump moves it back (%lld)", (long long)off);
+  thunder_live_destroy(L);
 }
 
 /* E_BUSY: the command ring (256) */
@@ -529,7 +556,7 @@ static void test_midi(void) {
 
 /* Reduced where it must be: nothing in this file is heavy, the run is 4 s under a sanitizer. */
 int main(void) {
-  test_static(); test_create(); test_null_handle(); test_idle_and_args(); test_play_args(); test_busy(); test_run(); test_hold_end_dump(); test_midi();
+  test_static(); test_create(); test_null_handle(); test_idle_and_args(); test_play_args(); test_offset(); test_busy(); test_run(); test_hold_end_dump(); test_midi();
   printf("live_c: %d checks, %d failed\n", g_checks, g_fail);
   return g_fail ? 1 : 0;
 }
