@@ -20,6 +20,7 @@ make the timing checks unreliable on a small machine.
 | `node tests/sweep/menus.mjs` | 6–10 min | Every top-bar menu item and every right-click menu on every screen, with the real mouse. Options: `--only=file,edit,view,aud,set,tabs,ctx`, `--screens=…`. |
 | `node tests/sweep/keys.mjs` | 3–5 min | Every documented shortcut on the screen it belongs to, checked against the app's state. |
 | `node tests/sweep/mouse.mjs` | ~5 min | The one rule for value controls on every kind of control (double-click reset, right-click Reset / Type / Learn, Shift ×0.1, Ctrl ×4, wheel only after the pointer rests), Alt-drag copy and track-number clicks. |
+| `node tests/sweep/resize-playing.mjs` | ~5 min per skin | The window resized in steps (wide to narrow and back, short heights) while ELECTRO plays, on Phrase, Pattern view, the master phrase (SIGNAL chain), Song, Mixer, Sect: long tasks during the drag, the stage over the grid's text mid-drag (`--sample=1`) and settled, a stale layout (the same after a forced refit). Options: `--skins=`, `--screens=`, `--steps=`, `--w0=`, `--w1=`, `--h0=`. |
 | `node tests/sweep/layout.mjs` | ~20 min | Every screen at desktop and Galaxy Z Fold 6 sizes (folded and unfolded, Mobile setup), and every skin with its contrast. Screenshots go to `tests/sweep/out/` (gitignored). Options: `--sizes`, `--skins`. |
 
 \* Measured on a quiet 2-CPU Linux machine. A desktop is faster.
