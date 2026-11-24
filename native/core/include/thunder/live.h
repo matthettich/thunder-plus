@@ -1,4 +1,4 @@
-/* Thunder core: the LIVE host, public C API (unit U37, P0: the contract; nothing here is implemented yet).
+/* Thunder core: the LIVE host, public C API (unit U37: P0 wrote this contract, P5 implemented it in core/src/live/live_api.cpp over thunder::LiveHost; what the live host does not build yet is said under THUNDER_LIVE_CAP_*).
    The real-time counterpart of render.h: a song, the pads the host has rendered, and a transport, played in real time through the sequencer, the voices,
    the mixer, the effects and the master chain, and pulled by the host's audio callback. A C API, so that wasm, Kotlin / JNI and Swift bind to it the
    same way. No callbacks, no C++ types, no exceptions cross it; every argument is checked and a bad one is a return code, never a crash.
@@ -50,12 +50,16 @@
                 on into the sound (stop, stop_track, mix_set, fx_param) use `at` sample-accurately from there. Commands are applied in the order sent (RING ORDER), whatever their `at`: a due command is never
                 held behind a later-sent one. A 65th waiting command is applied at once instead and counted (stats.cmd_late; one ERROR record a quantum at most). A STOP and a PLAY CLEAR the waiting list
                 (stats.cmds_cleared counts the commands dropped): a timed bpm / loop / perf / stop / mix_set of the old play never lands in the next. play has no `at`: its `t0` (a host frame) is its time.
-                Every record's `f`, stats.frames and stats.frame_origin are HOST frames (converted with the offset in force when the record is posted).
+                Every EVENT record's `f`, stats.frames and stats.frame_origin are HOST frames (converted with the offset in force when the record is posted). The MIDI records of thunder_live_midi_drain are the one exception: they carry the ENGINE frame (see MIDI).
 
    ERRORS       int functions return 0 or a negative THUNDER_LIVE_E_*; thunder_live_create returns NULL and writes its err text. A failed call changes nothing, unless
                 its own comment says so. E_BUSY (a fixed ring is full) changes nothing and loses nothing: THE CALLER OWNS THE RETRY. It must keep the message and call
                 again after the next thunder_live_process call has returned (in the web: after the next block; calling again before it cannot help, because only
                 process() empties a ring); a caller that drops an E_BUSY message loses the edit. thunder_live_stats.cmd_busy counts them.
+   NULL AND DEAD HANDLES  A NULL handle is E_ARG for every function that returns an int (thunder_live_process writes nothing then: it cannot know the buffers' size), NULL for thunder_live_midi, and a no-op for destroy,
+                thunder_live_host_stats and thunder_live_free. A DEAD handle (an exception that was not an allocation failure came out of a CONTROL call, which returned E_INTERNAL) answers E_STATE to every call but the getters
+                (abi, caps, stats_get, midi, host_stats, poll, alloc, free) and destroy; process zeroes its outputs (when they are valid) and returns E_STATE. There is no FATAL record: the audio side cannot post for a handle it
+                does not run, and the call that killed the handle said E_INTERNAL. (THUNDER_LIVE_WHERE_FATAL is reserved.)
    OUT OF MEMORY  A CONTROL call NEVER aborts on a failed allocation: it returns E_MEMORY (or E_LIMIT when a budget says no first) and changes nothing. The AUDIO
                 path allocates nothing, ever (rt_harness runs it under an allocator that aborts). What a host must still respect: this header's limits and the render.h
                 MEMORY figures. Known exception, by construction: in a build WITHOUT C++ exceptions (wasm) the control paths that use std::vector / std::string inside the
@@ -126,12 +130,12 @@ extern "C" {
 #define THUNDER_LIVE_F_PAGE_TIMING 32u    /* TEST ONLY: voices timed as the web page's player (VoicePool::setPageTiming, "never on in an app"), for the A/B against the JS engine */
 
 /* caps (thunder_live_caps) */
-#define THUNDER_LIVE_CAP_EFFECTS 1u       /* tfx effects can be made (the effects library is linked); fx_plan does not answer E_UNSUPPORTED */
-#define THUNDER_LIVE_CAP_MASTER_SWAP 2u   /* thunder_live_master_config works while a song plays. NOT BUILT in C++ today (no live master swap exists): a build without it answers E_UNSUPPORTED */
-#define THUNDER_LIVE_CAP_LIVE_SWAP 4u     /* thunder_live_pad_live may be called while a song plays (the live pool is swapped with the pads snapshot). NOT BUILT today: without it E_STATE while playing */
-#define THUNDER_LIVE_CAP_SF 8u            /* font_add / pad_sf work (the SoundFont parser and decoder are linked) */
-#define THUNDER_LIVE_CAP_TAKE 16u         /* thunder_live_pad_take is available (it needs PadsHost::setPadTake, new) */
-#define THUNDER_LIVE_CAP_ENGINES 0x1E0u   /* bits 5..8: live engines built: bass 1<<5, vox 1<<6, acid 1<<7, mach 1<<8 (THUNDER_RENDER_LIVE_x kind k: bit 4 + k) */
+#define THUNDER_LIVE_CAP_EFFECTS 1u       /* tfx effects can be made (the effects library is linked); fx_plan does not answer E_UNSUPPORTED. Set by P5 when the core is built with THUNDER_HAVE_TFX */
+#define THUNDER_LIVE_CAP_MASTER_SWAP 2u   /* thunder_live_master_config works while a song plays (built in C++ by U37 P3, set by P5 in every build) */
+#define THUNDER_LIVE_CAP_LIVE_SWAP 4u     /* thunder_live_pad_live may be called while a song plays (the live pool is swapped with the pads snapshot). NOT BUILT, and not set (P5): the live host has no live-engine pads at all yet, see CAP_ENGINES */
+#define THUNDER_LIVE_CAP_SF 8u            /* font_add / pad_sf work. NOT SET by P5: LiveHost does not wire SoundFonts yet, font_add / font_remove / pad_sf answer E_UNSUPPORTED whatever their arguments (pad_sf_clear: 0 for a pad in range) */
+#define THUNDER_LIVE_CAP_TAKE 16u         /* thunder_live_pad_take is available (PadsHost::setPadTake, built in P2; set by P5 in every build) */
+#define THUNDER_LIVE_CAP_ENGINES 0x1E0u   /* bits 5..8: live engines built: bass 1<<5, vox 1<<6, acid 1<<7, mach 1<<8 (THUNDER_RENDER_LIVE_x kind k: bit 4 + k). NONE is set by P5: pad_live answers E_UNSUPPORTED (pad_live_clear: 0 for a pad in range); a live pad stays on the SAMPLER route (ruling D8) */
 
 typedef struct thunder_live thunder_live;
 
@@ -174,7 +178,7 @@ void thunder_live_destroy(thunder_live* L);
    host's timeline is `frame0` (>= 0; see TIME). `wall_ns`: the host's monotonic clock at the start of this call in nanoseconds (0: not known: the web has no clock in the worklet, and
    a wasm build may import none); it is only copied into the clock event. No allocation, no lock, no I/O, no exception, bounded work: at most 3 steps per quantum, a fixed voice and
    event count. Takes effect: everything queued by the CONTROL calls above is applied in the quanta this call renders (see THE QUANTUM). The outputs are ALWAYS written (zeros
-   on an error). Returns 0, E_ARG (a null handle or output, frames outside 0 .. max_block, frame0 < 0, overlapping buffers) or E_STATE (a dead handle: silence).
+   on an error). Returns 0, E_ARG (a null handle or output, frames outside 0 .. max_block, frame0 < 0, overlapping buffers; with a NULL handle nothing is written) or E_STATE (a dead handle: silence).
    A re-anchor is not an error (see TIME). Stack use: the deepest path puts about 12 KB (an effects commit) + 7 KB (an LFO step) on the stack. */
 int thunder_live_process(thunder_live* L, float* out_l, float* out_r, int frames, int64_t frame0, int64_t wall_ns);
 
@@ -234,7 +238,7 @@ typedef struct thunder_live_stats {
 } thunder_live_stats;
 int thunder_live_stats_get(const thunder_live* L, thunder_live_stats* out);
 
-/* ANY. A block of `nfloats` floats (> 0, <= 2^30) from the host's own allocator, 16-byte aligned, uninitialised, for thunder_live_pad_take (the worklet writes a pad into it and hands it over,
+/* ANY. A block of `nfloats` floats (> 0, <= 2^30) from the host's own allocator (`new float[]`: aligned as operator new[] is, 16 bytes on glibc, bionic, macOS, MSVC x64 and wasi-libc; nothing in the core needs more than alignof(float)), uninitialised, for thunder_live_pad_take (the worklet writes a pad into it and hands it over,
    saving a copy). NULL when it cannot be had (never an abort). Valid until it is given to thunder_live_pad_take (which takes it) or thunder_live_free. It does NOT count against the budget until taken. */
 float* thunder_live_alloc(int64_t nfloats);
 void thunder_live_free(float* block);   /* ANY. NULL is fine. Only for a block from thunder_live_alloc that was not (successfully) taken */
@@ -424,7 +428,7 @@ int thunder_live_pdc_set(thunder_live* L, int mode);
 
 /* CONTROL. Allocates (makes the effect objects: Fx::operator new is malloc). `slots_json`: the song's slot list for the track (S.tfx[t] / S.mfx: up to 8 objects or null), exactly as FxHost::planFromSong
    reads it (fxhost.h:130), `bpm` the tempo the tempo-locked effects are mapped for. Stages a plan for the track; it is NOT audible until thunder_live_fx_commit. At most ONE staged plan per track: a second fx_plan for a
-   track whose plan was not committed is E_STATE (FxHost reuses objects of the previous plan: every plan must be committed, in order). E_UNSUPPORTED: no effects library in this build. Errors: E_ARG, E_STATE, E_MEMORY. */
+   track whose plan was not committed is E_STATE (FxHost reuses objects of the previous plan: every plan must be committed, in order). E_UNSUPPORTED: no effects library in this build. Errors: E_ARG, E_STATE, E_MEMORY, E_LIMIT (n above 4 MiB: judged before the parse). */
 int thunder_live_fx_plan(thunder_live* L, int track, const uint8_t* slots_json, size_t n, double bpm);
 
 /* CONTROL. Commits the staged plan of the track: queued, and at the top of the quantum containing `at` the audio side calls FxHost::commit (fxhost.h:134): slots in the plan's order, objects of equal key kept (no
@@ -438,8 +442,8 @@ int thunder_live_fx_param(thunder_live* L, int track, int slot, const double* p1
 
 /* CONTROL. THE MASTER CHAIN (mastering + safety limiter: master_chain_from_song(mst, limiter), chain.h:36). `mst_json`: the song's `mst` object (NULL / n 0: freshMst); `safety`: S.limiter 0 / 1. play already sets the song's own
    configuration at its start; this call is the EDIT while playing (rtRoute): the configuration is parsed here and the audio side applies it at the top of the next quantum (MasterChain::configure keeps the processors'
-   states). BUILT IN C++ by U37 P3 (LiveHost::masterConfig: MasterChain::configure at the top of a quantum; a changed latency shows in stats.latency_frames; no PDC path is needed, the PDC plan never reads the master chain): P5 sets THUNDER_LIVE_CAP_MASTER_SWAP. (The text below about E_UNSUPPORTED is for a build without it.) Without the cap: E_UNSUPPORTED,
-   nothing changes (the page then republishes the song and the chain follows at the next play). Needs F_MASTER. Errors: E_ARG, E_MEMORY, E_STATE, E_UNSUPPORTED, E_BUSY. */
+   states). BUILT IN C++ by U37 P3 (LiveHost::masterConfig: MasterChain::configure at the top of a quantum; a changed latency shows in stats.latency_frames; no PDC path is needed, the PDC plan never reads the master chain): P5 sets THUNDER_LIVE_CAP_MASTER_SWAP. (The sentence below about E_UNSUPPORTED is for a build without it.) Without the cap: E_UNSUPPORTED,
+   nothing changes (the page then republishes the song and the chain follows at the next play). Needs F_MASTER (else E_STATE). n above 4 MiB is E_LIMIT; mst_json NULL with n > 0, or `safety` not 0 / 1, is E_ARG. Errors: E_ARG, E_LIMIT, E_MEMORY, E_STATE, E_BUSY (E_UNSUPPORTED never in a P5 build). */
 int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t n, int safety);
 
 /* ---- 7. MIDI ---------------------------------------------------------------------------------------------------------------------------------------------- */
@@ -460,7 +464,12 @@ int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t 
    when thunder_live_collect sees the ENDED record. The contract of this header is the same either way.
    SHIPPED IN P4: THE DIRECT PATH. test_live_midi (ctest live_midi) found the stream byte-equal to the posted path for the 18 ledger songs (and start-midway and loop); the posted fallback was not needed (docs/port/U37-P4-NOTES.md). The ENDED timer's Stop is issued at step 4 of the quantum in which
    t0 >= endStopAt (the same test as the STOPPED record of step 7); a queued Start / Stop pair is applied in the order the commands were applied.
-   The records' `frame` is the host timeline's frame EXCLUDING the device's output latency and INCLUDING the core's FX latency (midi.h THE OUTPUT). */
+   THE RECORDS' `frame` IS THE ENGINE FRAME (lead's ruling of 24 Nov, verify-p4 finding 2): the engine's own gapless count at the engine rate, EXCLUDING the device's output latency and INCLUDING the core's FX latency (midi.h THE OUTPUT). It is NOT
+   a host frame: it equals one only while the offset of TIME is 0 (the first process call had frame0 = 0 and nothing re-anchored). The shell maps it as it maps every other time of the engine: host frame = engine frame + OFFSET, where OFFSET = stats.frames - THUNDER_LIVE_QUANTUM * stats.quanta (the engine renders
+   exactly 128 frames per quantum from 0, so 128 * quanta is the engine frame of the quantum stats.frames names; a gapless shell, whose frame0 always continues the last call, has OFFSET = its first frame0, 0 when it counts from 0), and a host frame
+   becomes the host's clock with the CLOCK records (f and wall_ns). thunder_live_midi_drain and thunder_midiout_clock_map add no offset (a record booked before a re-anchor would be mapped with the wrong one).
+   ORDER AGAINST A SHELL'S OWN MIDI COMMAND (lead's ruling of 24 Nov, verify-p4 finding 5, ACCEPTED): a command the shell posts on the host's thunder_midi (set_port, set_cable, ...) AFTER thunder_live_play and before the quantum that applies the play is popped by midi_begin BEFORE
+   the host's direct Start of that quantum; in the posted path (thunder_midi_start posted by the shell) it would run after it. So a port configured after play() is in force for that Start (its SPP is sent). A shell that wants the other order configures before play(). */
 
 /* ANY thread for the call; the handle is used under midi.h's own THREAD rules. Returns the host's thunder_midi, or NULL without F_MIDI. Valid until thunder_live_destroy; the shell passes it to
    thunder_midiout_create (and must free the thunder_midiout BEFORE destroy). The shell's CONTROL thread is the ONE control thread of the handle: it may make the thunder_midi_set_port / set_cable / port_clock /
