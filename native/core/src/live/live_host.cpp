@@ -654,10 +654,12 @@ void LiveHost::applyCommands(int64_t qStart, int64_t qEnd) {
   int w = 0;
   for (int i = 0; i < nPend_; i++) {
     const LiveCmd p = pend_[i];
+    if (p.type == LiveCmdType::FxCommit && !p.p) continue;   // already committed (and returned) by commitWaitingFx: done, not kept, not counted
     if (p.at < 0 || p.at < qEnd + off_) {
+      if (p.type == LiveCmdType::FxCommit) pend_[i].p = nullptr;   // this one is being applied (from the copy `p`): commitWaitingFx, called by applyOne, must not take it a second time
       applyOne(p, qStart);
       if (clearPend_) { clearPend_ = false; for (int k = i + 1; k < nPend_; k++) pend_[w++] = pend_[k]; nPend_ = w; clearWaiting(qStart); w = 0; break; }   // what was kept and what was not yet looked at: cleared (an FxCommit among them is committed first)
-    } else pend_[w++] = p;
+    } else { if (w != i && p.type == LiveCmdType::FxCommit) pend_[i].p = nullptr; pend_[w++] = p; }   // moved down: the old slot must not stay a second live copy (commitWaitingFx walks the whole list while this loop runs)
   }
   nPend_ = w;
   // (b) the ring, in ring order: due now: applied; not due: waits; the list is full (64): applied at once instead and counted
@@ -712,6 +714,7 @@ void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
       mix_->set(m);
       break; }
     case LiveCmdType::FxCommit: {   // the plan comes back through fxBack_ (its room is guaranteed: fxCommit() allows 64 outstanding and the ring holds 64)
+      commitWaitingFx(qStart, c.i0);   // an FxCommit of this track that still waits in pend_ was planned BEFORE this one (FxHost::plan reuses the previous plan's objects): it is committed first
       FxPlan* pl = static_cast<FxPlan*>(c.p);
       commitFxLive(c.i0, pl, qStart);
       const bool ok = fxBack_.push(pl); assert(ok); (void)ok;
@@ -746,7 +749,7 @@ bool LiveHost::tryStartPlay(PlayPlan* p, int64_t qStart) {
   endStopAt_ = -1; songOverDone_ = false; stateA_ = THUNDER_LIVE_STATE_PLAYING; clearPend_ = true;   // a play that starts clears the waiting list
   postState(qStart, THUNDER_LIVE_ST_PLAYING, 0);
   // P3: the song's effects, the master chain and the PDC plan (SongRenderer's setEffects / setMasterChain / setPlan, in the order a render calls them). The tempo the effects were mapped for is the song's (FxBank::load(S, S.bpm)).
-  if (fxBank_) { fxBank_->setBpm(p->song->bpm); commitPlayFx(p, qStart); }
+  if (fxBank_) { fxBank_->setBpm(p->song->bpm); commitWaitingFx(qStart); commitPlayFx(p, qStart); }   // a waiting FxCommit was planned before the play's own plans: it goes first
   if (mchain_ && p->hasMaster && p->cfgOrd >= masterOrd_) { mchain_->configure(p->master); masterOrd_ = p->cfgOrd; }
   if ((flags_ & THUNDER_LIVE_F_EFFECTS) && p->cfgOrd >= pdcOrd_) { pdcCur_ = p->pdc; pdcMode_ = p->pdcMode; pdcHave_ = true; pdcOrd_ = p->cfgOrd; applyPdc(qStart, !fromIdle); }   // from IDLE the delays are set AT ONCE as a render sets them (nothing of this play sounds yet: the first note is >= 80 ms away); over a running song they glide 10 ms
   // R1 (verify-283): the published state is stored BEFORE the play goes back. The control side decides "playing" from `playOut_ > 0 || state_ == PLAYING`, and a collect() that pops this plan lowers playOut_ at once:
@@ -775,7 +778,18 @@ void LiveHost::commitPlayFx(PlayPlan* p, int64_t qStart) {
   if (p->fx[kSongNT]) commitFxLive(kSongNT, p->fx[kSongNT], qStart);   // the master first, then the tracks 0..31 (FxBank::load)
   for (int t = 0; t < kSongNT; t++) if (p->fx[t]) commitFxLive(t, p->fx[t], qStart);
 }
-void LiveHost::dropPlay(PlayPlan* p, int64_t qStart) { commitPlayFx(p, qStart); giveBack(p); }
+void LiveHost::dropPlay(PlayPlan* p, int64_t qStart) { commitWaitingFx(qStart); commitPlayFx(p, qStart); giveBack(p); }
+// Commits, in list order, the FxCommits that wait in pend_ (all tracks, or only `track`) and returns their plans through fxBack_. COMMITTED IN PLANNING ORDER: FxHost::plan (control) reuses the objects of the previous plan of the track,
+// so a later plan must never be committed before an earlier one. Entries are marked done (p = nullptr, type kept) and NOT removed: applyCommands iterates pend_ by index while calling applyOne (which may land here), and a
+// compaction here would corrupt its `w` / `i` loop; that loop and clearWaiting skip an FxCommit with a null p, and the loop drops it at its next compaction.
+void LiveHost::commitWaitingFx(int64_t qStart, int track) {
+  for (int i = 0; i < nPend_; i++) {
+    if (pend_[i].type != LiveCmdType::FxCommit || !pend_[i].p || (track >= 0 && pend_[i].i0 != track)) continue;
+    FxPlan* pl = static_cast<FxPlan*>(pend_[i].p); pend_[i].p = nullptr;
+    commitFxLive(pend_[i].i0, pl, qStart);
+    const bool ok = fxBack_.push(pl); assert(ok); (void)ok;
+  }
+}
 void LiveHost::applyPdc(int64_t qStart, bool glide) {
   if (!pdcHave_) return;
   mix_->setTime((double)qStart / sr_);   // SongRenderer::setPlan: the delays are set at the block's start
@@ -792,6 +806,7 @@ void LiveHost::applyFxParams(int64_t qStart) {
 }
 void LiveHost::clearWaiting(int64_t qStart) {
   for (int i = 0; i < nPend_; i++) {
+    if (pend_[i].type == LiveCmdType::FxCommit && !pend_[i].p) continue;   // done (commitWaitingFx)
     if (pend_[i].type == LiveCmdType::FxCommit) { FxPlan* pl = static_cast<FxPlan*>(pend_[i].p); commitFxLive(pend_[i].i0, pl, qStart); const bool ok = fxBack_.push(pl); assert(ok); (void)ok; }   // the plan was made against the chain before it: it is committed, not dropped
     else cmdsCleared_++;
   }

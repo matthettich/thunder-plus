@@ -419,8 +419,8 @@ int thunder_live_mix_set(thunder_live* L, int track, int key, double value, doub
 int thunder_live_pdc_set(thunder_live* L, int mode);
 
 /* ---- 6. EFFECTS AND MASTER -------------------------------------------------------------------------------------------------------------------------------- */
-/* Need F_EFFECTS (else E_STATE). tfx effects only (ids 0 .. 33 and the JS cores 93 .. 103: fxhost.h); a pump effect (kind 200 and up) in a slot list is left out as the JS leaves out a slot whose engine
-   is missing: the sound passes (ruling D1: a song with pump effects falls back to the JS core). The track is 0 .. 31 or THUNDER_LIVE_MASTER (the master effects host). */
+/* Need F_EFFECTS (else E_STATE). tfx effects only (ids 0 .. 33 and the JS cores 93 .. 103: fxhost.h); a pump effect (kind 200 and up) is hosted too (FX1: PumpSlot), but a pump slot has no FXV / fx_param yet (a slot whose
+   engine is missing is left out, as the JS leaves it out: the sound passes). The track is 0 .. 31 or THUNDER_LIVE_MASTER (the master effects host). */
 
 /* CONTROL. Allocates (makes the effect objects: Fx::operator new is malloc). `slots_json`: the song's slot list for the track (S.tfx[t] / S.mfx: up to 8 objects or null), exactly as FxHost::planFromSong
    reads it (fxhost.h:130), `bpm` the tempo the tempo-locked effects are mapped for. Stages a plan for the track; it is NOT audible until thunder_live_fx_commit. At most ONE staged plan per track: a second fx_plan for a

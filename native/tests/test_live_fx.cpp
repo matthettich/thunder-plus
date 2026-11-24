@@ -129,12 +129,15 @@ int main() {
   const int64_t N2 = (int64_t)(SR * 6);
   const std::string slotsDelay = "[{\"type\":\"delay\",\"on\":true,\"time\":3,\"fb\":60,\"mix\":50}]", slotsTape = "[{\"type\":\"tape\",\"on\":true},{\"type\":\"reverb\",\"on\":true}]";
   auto planFor = [&](SongRenderer& R, int track, const std::string& js) -> FxPlan* { JsonDoc d; JsonError je; d.parse(js.data(), js.size(), &je); return R.fxBank()->host(track).planFromSong(d.root(), song.bpm, 0, nullptr); };
+  std::vector<FxPlan*> keep;   // the renderer-side plans (the reference's hosts are gone when reference() returns; deleted at the end of the test)
   {   // fx_plan + fx_commit at a quantum (track 0, then the master), and fx_param after it, against SongRenderer + FxHost::commit / psetAt between blocks
     std::vector<std::pair<int64_t, RefOp>> rops;
-    rops.push_back({64, [&](SongRenderer& R) { FxPlan* p = planFor(R, 0, slotsDelay); R.fxBank()->host(0).commit(p); R.mixer().setFx(0, &FxBank::hook, R.fxBank()); static std::vector<FxPlan*> keep; keep.push_back(p); }});
+    rops.push_back({64, [&](SongRenderer& R) { FxPlan* p = planFor(R, 0, slotsDelay); R.fxBank()->host(0).commit(p); R.mixer().setFx(0, &FxBank::hook, R.fxBank()); keep.push_back(p); }});
     rops.push_back({128, [&](SongRenderer& R) { double p12[12]; for (int i = 0; i < 12; i++) p12[i] = 0.1 * i; R.fxBank()->host(0).psetAt(128 * 128.0 / SR, 0, p12); }});
-    rops.push_back({200, [&](SongRenderer& R) { FxPlan* p = planFor(R, 5, slotsTape); R.fxBank()->host(5).commit(p); R.mixer().setFx(5, &FxBank::hook, R.fxBank()); static std::vector<FxPlan*> keep; keep.push_back(p); }});
+    rops.push_back({200, [&](SongRenderer& R) { FxPlan* p = planFor(R, 5, slotsTape); R.fxBank()->host(5).commit(p); R.mixer().setFx(5, &FxBank::hook, R.fxBank()); keep.push_back(p); }});
     const Ref ref = reference(song, rp, 0, false, true, true, N2, rops);   // (with ELECTRO's own slots on the other tracks; PDC off here so the edit's latency is not in the way)
+    { const Ref unedited = reference(song, rp, 0, false, true, true, N2); size_t f1; const size_t nd = diff(unedited.l, ref.l, &f1);
+      CHECK(nd > 1000, "the fx edit is audible (%zu samples differ from the unedited render)", nd); }
     for (int cs : {128, 4096}) {
       std::vector<std::pair<int64_t, LiveOp>> lops;
       lops.push_back({0, [&](Host& H, int64_t f0) {
@@ -159,6 +162,39 @@ int main() {
       CHECK(H.run(1024, 128, *std::make_unique<int64_t>(0)) == 0, "process");
       CHECK(H->collect() >= 1, "collect frees the committed plan");
       CHECK(H->fxPlan(2, (const uint8_t*)slotsTape.data(), slotsTape.size(), 120) == 0, "a new plan after the commit");   // (left staged: the destructor frees it)
+    }
+  }
+  {   // P3 fix (verify-301 finding 1): effects plans of a track are committed IN THE ORDER THEY WERE PLANNED
+    const int64_t N3 = (int64_t)SR * 2;
+    {   // (a) a stale edit (planned and committed with a far-future `at` BEFORE the play) waits in the list; the play's own plans were made after it and win: equal to a host that never had the edit
+      const Run clean = live(text, ps, FX, 0, 128, 0, N3, true);
+      const Ref ref = reference(song, rp, 0, false, true, true, N3);
+      const Run L = live(text, ps, FX, 0, 128, 0, N3, true, {}, [&](Host& H) {
+        CHECK(H->fxPlan(0, (const uint8_t*)slotsDelay.data(), slotsDelay.size(), song.bpm) == 0, "stale: fx_plan");
+        CHECK(H->fxCommit(0, (int64_t)1 << 40) == 0, "stale: fx_commit far in the future"); });
+      size_t first; const size_t bad = diff(L.l, ref.l, &first), bad2 = diff(L.r, ref.r, &first), c1 = diff(L.l, clean.l, &first), c2 = diff(L.r, clean.r, &first);
+      CHECK(bad == 0 && bad2 == 0 && c1 == 0 && c2 == 0, "a stale waiting fx_commit before the play: %zu + %zu samples differ from SongRenderer, %zu + %zu from a host without the edit (first at %zu)", bad, bad2, c1, c2, first);
+      CHECK(L.st.cmds_cleared == 0, "the stale commit is committed, not counted as cleared (%u)", (unsigned)L.st.cmds_cleared);
+      std::printf("stale waiting fx_commit, then a play: %s\n", bad + bad2 + c1 + c2 ? "DIFFERENT" : "bit-equal");
+    }
+    {   // (b) a future-`at` commit, then a NOW commit of a later plan, same track: the chain ends as the LATER plan's (both committed, in planning order)
+      std::vector<std::pair<int64_t, RefOp>> rops;
+      rops.push_back({0, [&](SongRenderer& R) {
+        FxPlan* a = planFor(R, 0, slotsDelay); FxPlan* b = planFor(R, 0, slotsTape);
+        R.fxBank()->host(0).commit(a); R.fxBank()->host(0).commit(b); R.mixer().setFx(0, &FxBank::hook, R.fxBank()); keep.push_back(a); keep.push_back(b); }});
+      const Ref ref = reference(song, rp, 0, false, true, true, N3, rops);
+      for (int cs : {128, 4096}) {
+        std::vector<std::pair<int64_t, LiveOp>> lops;
+        lops.push_back({0, [&](Host& H, int64_t) {
+          CHECK(H->fxPlan(0, (const uint8_t*)slotsDelay.data(), slotsDelay.size(), song.bpm) == 0, "order: fx_plan A");
+          CHECK(H->fxCommit(0, (int64_t)1 << 40) == 0, "order: fx_commit A (future)");
+          CHECK(H->fxPlan(0, (const uint8_t*)slotsTape.data(), slotsTape.size(), song.bpm) == 0, "order: fx_plan B");
+          CHECK(H->fxCommit(0, THUNDER_LIVE_NOW) == 0, "order: fx_commit B (now)"); }});
+        const Run L = live(text, ps, FX, 0, cs, 0, N3, true, lops);
+        size_t first; const size_t bad = diff(L.l, ref.l, &first), bad2 = diff(L.r, ref.r, &first);
+        CHECK(bad == 0 && bad2 == 0, "a future commit then a now commit (call size %d): %zu + %zu samples differ, first at %zu", cs, bad, bad2, first);
+        std::printf("future fx_commit then a now fx_commit, call size %4d: %s\n", cs, bad + bad2 ? "DIFFERENT" : "bit-equal");
+      }
     }
   }
   {   // refusals
@@ -195,7 +231,7 @@ int main() {
     const Run L = live(text, ps, FX, 0, 128, 777, N2, true, lops);
     size_t first; const size_t bad = diff(L.l, ref.l, &first), bad2 = diff(L.r, ref.r, &first);
     CHECK(bad == 0 && bad2 == 0, "pdc_set at a quantum: %zu + %zu samples differ, first at %zu", bad, bad2, first);
-    CHECK(L.st.latency_frames == (int32_t)ref.latency || ref.latency == 0, "the latency after pdc_set (%d vs the renderer's %lld with its own plan in force)", L.st.latency_frames, (long long)ref.latency);
+    CHECK(L.st.latency_frames == (int32_t)ref.latency && ref.latency > 0, "the latency after pdc_set (%d vs the renderer's %lld with its own plan in force)", L.st.latency_frames, (long long)ref.latency);
     std::printf("pdc_set (off -> auto, glide) at a quantum: %s\n", bad + bad2 ? "DIFFERENT" : "bit-equal");
   }
   {   // master_config: the song's own config again (nothing changes), and a different one (comp threshold, limiter off)
@@ -246,8 +282,11 @@ int main() {
     CHECK(H->play(po) == 0 && H->play(po) == 0 && H->stop(THUNDER_LIVE_NOW) == 0 && H->play(po) == 0, "three plays and a stop queued");
     CHECK(H.run(l, r, 48000, 128, frame) == 0, "process"); H->collect();
     const Ref ref = reference(song, rp, 1, false, true, true, 48000);
-    CHECK(stats(H.h).fx_failed_blocks == 0, "no failed effects block"); (void)ref;
+    CHECK(stats(H.h).fx_failed_blocks == 0, "no failed effects block");
+    size_t first; const size_t bad = diff(l, ref.l, &first), bad2 = diff(r, ref.r, &first);
+    CHECK(bad == 0 && bad2 == 0, "plays cancelled by a stop / a newer play: the last play equals a plain play (%zu + %zu samples differ, first at %zu)", bad, bad2, first);
   }
+  for (FxPlan* p : keep) delete p;
   std::printf("live_fx: %d checks, %d failed\n", g_checks, g_fail);
   return g_fail ? 1 : 0;
 }

@@ -254,6 +254,7 @@ class LiveHost {
   // ---- P3: effects, master chain, PDC, meters (audio) ----
   void commitFxLive(int track, FxPlan* pl, int64_t qStart);   // FxBank::commitLive + the master hook rule; the plan stays with its owner (PlayPlan / the FxCommit command, which returns it)
   void commitPlayFx(PlayPlan* p, int64_t qStart);             // every plan of a play, master first then the tracks (the order FxBank::load commits in); null entries are left alone
+  void commitWaitingFx(int64_t qStart, int track = -1);       // the FxCommits waiting in pend_ (all tracks or one) are committed in list order and returned; marked done (p = nullptr), not removed
   void dropPlay(PlayPlan* p, int64_t qStart);                 // a play that never started: its plans are committed anyway (the control side planned them against each other: FxHost::plan's rule), then it goes back
   void setMasterHook();                                       // Mixer::setMasterFx: the hook is on while the master chain exists or the master effects host has slots (SongRenderer::setEffects / setMasterChain)
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);   // SongRenderer::masterHook
