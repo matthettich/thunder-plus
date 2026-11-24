@@ -3222,6 +3222,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="btnrow"><label class="cb" title="While the song plays, the screen doesn't time out by itself (the power button still turns it off). Also on the tracker's PROJECT screen."><input type="checkbox" id="ckWake">Keep screen on while playing</label><label class="cb" title="While the song plays, Android shows a playback notification so the song keeps going when you switch apps. OFF: with the screen off playback breaks up and the volume keys move the ringer. Also on the tracker's PROJECT screen."><input type="checkbox" id="ckBgPlay">Background play</label></div>
       <h3>Updates &amp; help</h3>
       <div class="btnrow"><button type="button" id="updBtn">Check for update</button><button type="button" id="helpBtn2">Help &amp; keys</button><span class="lbl setbuildL" id="appBuild"></span></div>
+      <div class="btnrow"><span class="lbl" id="appOpened"></span></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
       <h3>Storage</h3>
       <div class="btnrow" id="storeRow"><span class="lbl" id="storeInfo">Storage: …</span><button type="button" id="storeTidy" title="Deletes stored samples that no pad, preset or saved project uses">Clear unused samples</button><button type="button" id="phrTidy" title="Empties every phrase and block that isn't on the song, so their numbers are free for new ones (Undo brings them back)">Clear unused phrases</button></div>
@@ -9591,7 +9592,7 @@ function instFit(){
     I.pad = want; I.kf = isSyn(want) ? 1 : 0; ch = true; }
   if (!ch) return;
   if (!undo.pend) undo.cur = JSON.stringify(S);   // part of the kit change, not a song edit of its own
-  clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; storeWrite(TK, JSON.stringify(songOut(S))); }, 600); songVer++;
+  clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; songStore(); }, 600); songVer++;
 }
 function setSlotKind(i, held){
   if (vtrk) return toast('THIS SLOT follows the track: mono = drum, poly = synth', 4000);
@@ -22062,10 +22063,77 @@ function demoSong(){
 // PERFORM block runs, and normSong saw them undefined then: scenes A / B came back empty, parts shrank to one, and a song with
 // a track LFO threw (PLFO_SHAPES.length), so the app opened the starter beat instead and autosaved it over the song.
 var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
+/* ===STRETCH PICKER DATA START=== Declared here, before the saved song is read just below: normSong calls sxLoad, which reads SY_PICK and OS_KEYS, and a
+   const further down was still in its temporal dead zone then, so EVERY saved song threw at start-up and the app opened the starter beat (build 660, 20 Nov;
+   fixed build 674). Anything normSong reaches must be declared above the saved-song load (tests/startup-song.test.js checks this). */
+const SY_GROUPS = ['Repitch', 'Clean', 'Drums', 'Character'];
+const SY_PICK = [
+  {n:'OFF', sync:0, sx:0, grp:'', tip:'The sample plays at its own speed'},
+  {n:'REPITCH', sync:1, sx:0, grp:'Repitch', tip:'Fits the length by playing faster or slower: the pitch moves with the speed'},
+  {n:'GRANULAR', sync:2, sx:0, grp:'Character', tip:'Fits the length, pitch kept: smooth overlapping grains, a texture (the old STRETCH)'},
+  {n:'LOOP', sync:3, sx:0, grp:'Character', tip:'Fits the length, pitch kept: a ramp loops little GRAIN-long pieces, gritty and stuttery'},
+  {n:'OLDSCHOOL', sync:3, sx:1, grp:'Character', tip:'The classic sampler stretch: a tiny loop at the sample\u2019s own pitch whose start is scrubbed through the sample by a ramp that lasts the length'},
+];
+// OLDSCHOOL's own settings (only present while the mode is OLDSCHOOL): og loop in ms, ou loop unit (0 = ms, 1..6 = 1, 1/2 … 1/32 of a LINE), orp ramp, ox smooth %, opt pitch in semitones
+const OS_KEYS = ['og', 'ou', 'orp', 'ox', 'opt'], OS_DEF = {og:12, ou:0, orp:0, ox:0, opt:0};
+/* ===STRETCH PICKER DATA END=== */
 // FIRST RUN (owner, 31 Oct; the song changed 17 Nov): with no song saved yet the app opens the bundled project (sounds/BETA-TESTING-ELECTRO.thunder, else sounds/ELECTRO.thunder);
 // the starter beat stays underneath until it has loaded (and if it can't be fetched).
 let FIRST_SONG = false;
-let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); if (!s) FIRST_SONG = true; return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
+/* HOW THE SONG AT START-UP WAS CHOSEN (24 Nov, the "last song did not reopen" report). START.how: 'saved' (the song in this browser's storage), 'first' (nothing saved: the bundled
+   ELECTRO), 'error' (a saved song was there but could not be read: the starter beat is shown, and START.held keeps it from being autosaved over the real one), 'nostore' (the
+   browser would not let the app read its storage), later 'share' / 'file' when a share link or a launch file replaced it. Settings → App shows it; the playback report starts with it.
+   START.held: while true nothing writes the song key (songStore); it is released by the first deliberate change (markChange, after the start-up grace) or by any song being loaded (setSong). */
+var START = {inT:-1e9, how:'', note:'', then:'', held:false, raw:null, key:TK, err:null, t0:Date.now()};
+let S = (() => {
+  let raw = null;
+  try { raw = localStorage.getItem(TK); if (!raw){ raw = localStorage.getItem('thunder-song-v1'); if (raw) START.key = 'thunder-song-v1'; } }
+  catch(e){ START.how = 'nostore'; START.note = 'this browser would not let the app read its saved song'; START.err = e; return demoSong(); }
+  if (!raw){ FIRST_SONG = true; START.how = 'first'; START.note = 'nothing saved in this browser yet'; return demoSong(); }
+  try {
+    const j = JSON.parse(raw);
+    if (!j || typeof j !== 'object' || Array.isArray(j)) throw new Error('the saved song is not a song (' + (Array.isArray(j) ? 'a list' : typeof j) + ')');
+    const n = normSong(j); START.how = 'saved'; return n;
+  } catch(e){ START.how = 'error'; START.err = e; START.raw = raw; START.held = true; START.note = String(e && e.message || e).slice(0, 120); return demoSong(); }
+})();
+// A song that could not be read is kept three ways before anything can write over it: the song key itself is not written (songStore), a copy goes into IndexedDB as a project the File menu's
+// Restore a backup… lists (never rotated out by the 10 newest backups), and a small one also into a second localStorage key. A message stays on screen until it is clicked.
+function songHash(t){ let h = 0x811c9dc5 >>> 0; for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16) + '-' + t.length; }
+function songStore(){ if (START.held) return true; return storeWrite(TK, JSON.stringify(songOut(S))); }   // true: stored, or deliberately skipped
+for (const ev of ['pointerdown', 'keydown', 'touchstart', 'input', 'wheel', 'paste']) addEventListener(ev, () => { START.inT = performance.now(); }, true);   // a deliberate change follows a touch, click or key within a moment
+function songRelease(why){ if (!START.held) return; START.held = false; START.then = (START.then ? START.then + '; ' : '') + 'autosave back on (' + why + ')'; try { tpLog('song autosave released', why); } catch(e){} startShow(); }
+function startHow(how, note){ if (Date.now() - START.t0 < 20000){ START.how = how; START.note = note || ''; } else START.then = note || how; startShow(); }
+function startLine(){
+  const w = {saved:'your saved song', first:'first run: ' + (START.note || 'no saved song'), error:'the starter beat, because the saved song could not be read (' + START.note + '); the saved song is kept',
+    nostore:'the starter beat (' + START.note + ')', share:'a shared project (share link)', file:'a project file opened with the app'}[START.how] || START.how || '?';
+  return 'Song at start: ' + w + (START.how === 'saved' || START.how === 'share' || START.how === 'file' ? (START.note ? ' · ' + START.note : '') : '') + (START.then ? ' · then: ' + START.then : '') + (START.held ? ' · autosave of this song is OFF until you change something' : '');
+}
+function startThen(t){ if (Date.now() - START.t0 < 20000 && ['first', 'share', 'file'].includes(START.how)) return; START.then = t; startShow(); }
+function startShow(){ try { const b = document.getElementById('appOpened'); if (b) b.textContent = startLine(); } catch(e){} }
+async function startRescue(){
+  if (!START.held || !START.raw) return;
+  const raw = START.raw, h = songHash(raw);
+  try { tpLog('the saved song could not be read, so the starter beat is shown; the saved song is kept', START.err); } catch(e){}
+  let parsed = null; try { parsed = JSON.parse(raw); } catch(e){}
+  try { if (raw.length < 1500000){ const m = localStorage.getItem('thunderplus-song-rescue-hash-v1'); if (m !== h){ localStorage.setItem('thunderplus-song-rescue-v1', raw); localStorage.setItem('thunderplus-song-rescue-hash-v1', h); } } } catch(e){}
+  try {
+    const idx = (await kvGet('rescueIndex')) || [];
+    if (!idx.some(e => e.h === h)){
+      const k = 'rescue' + Date.now(), nm = (parsed && typeof parsed.name === 'string' && parsed.name) || ((raw.match(/"name":"([^"]{1,40})"/) || [])[1]) || 'Song';
+      const isSong = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed), text = isSong ? JSON.stringify({app:'thunder-project', v:1, build:typeof BUILD === 'number' ? BUILD : 0, song:parsed}) : raw;
+      await kvSet(k, text); idx.unshift({k, at:Date.now(), name:nm, kb:Math.round(text.length / 1024), h, text:isSong, err:START.note});
+      while (idx.length > 3){ const o = idx.pop(); await kvDel(o.k); }
+      await kvSet('rescueIndex', idx);
+    }
+  } catch(e){ try { tpLog('could not copy the unreadable song into the backups', e); } catch(e2){} }
+  try { const b = document.createElement('button'); b.className = 'updb storeb'; b.id = 'rescueB'; b.type = 'button';
+    b.textContent = 'Your last song could not be opened. It is kept, nothing was overwritten · tap, then pick it in the list (File › Restore a backup…)';
+    b.addEventListener('click', () => { b.remove(); restoreBackup(); }); document.body.append(b); } catch(e){}
+}
+setTimeout(() => { try { startShow(); startRescue();
+  // nothing saved here, yet backups exist (the browser dropped the saved song, or this is a different copy of the app): say so
+  if (START.how === 'first') kvGet('bkIndex').then(i => { if (i && i.length && !START.held){ START.then = 'backups exist (' + i.length + ')'; startShow(); toastErr('No saved song was found in this browser, but ' + i.length + ' backup' + (i.length === 1 ? ' is' : 's are') + ' here: File › Restore a backup… brings one back.', 12000); } });
+} catch(e){ tpLog('start-up rescue failed', e); } }, 1200);
 setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0);   // the song's impulse responses (Convolution reverb), from IndexedDB
 setTimeout(() => { if (swingConv || scConv) try { saveS(); } catch(e){ tpLog('could not save the converted song', e); } swingNote(); scNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
 let sT = 0, sPend = false;   // sPend (12 Nov): a change is waiting for its autosave (the 600 ms timer has not run yet)
@@ -22177,7 +22245,7 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase(); if (k !== 'z' && k !== 'y') return;
   e.preventDefault(); undoStep(k === 'y' || e.shiftKey ? 1 : -1);
 });
-function flushS(){ clearTimeout(sT); sPend = false; storeWrite(TK, JSON.stringify(songOut(S))); }
+function flushS(){ clearTimeout(sT); sPend = false; songStore(); }
 // The song as it is saved (storage and project files). With 32 tracks (NT, today) it is the song itself, exactly as always.
 // With more, each row keeps tracks 1–32 and the master where every version reads them (33 numbers) and tracks 33 and up go
 // in songX[row] (null when empty), so an older version (or Thunder Perform's deck) still opens the song, without those
@@ -22219,7 +22287,7 @@ const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song uses ${NI} instruments. INS above 0F plays its own instrument.`, 5000); } catch(e){} } }
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
 function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){}   // FILE SAFETY: unsaved changes
-  if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; storeWrite(TK, JSON.stringify(songOut(S))); }, 600);
+  if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; songStore(); }, 600);
   try { songVer++; songBeatsSoon(); } catch(e){} try { liveWarmSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
 // EMPTY BLOCKS (owner, 31 Oct): Arrange shows a block whose phrases hold nothing (no notes, no commands) striped, so the
@@ -23931,16 +23999,7 @@ const SYNC_MODES = ['OFF', 'REPITCH', 'STRETCH', 'LOOP'];   // the four classic 
    (absent = 0) picks a newer algorithm inside the family. I.sx is written only when it is not 0, so an old song's JSON does not change; a
    build that does not know I.sx ignores it and plays I.sync's classic mode (an unknown (sync, sx) pair loads as the classic one).
    Only modes that exist are listed. Groups show in this order and an empty group is not shown: OFF stands alone at the top. */
-const SY_GROUPS = ['Repitch', 'Clean', 'Drums', 'Character'];
-const SY_PICK = [
-  {n:'OFF', sync:0, sx:0, grp:'', tip:'The sample plays at its own speed'},
-  {n:'REPITCH', sync:1, sx:0, grp:'Repitch', tip:'Fits the length by playing faster or slower: the pitch moves with the speed'},
-  {n:'GRANULAR', sync:2, sx:0, grp:'Character', tip:'Fits the length, pitch kept: smooth overlapping grains, a texture (the old STRETCH)'},
-  {n:'LOOP', sync:3, sx:0, grp:'Character', tip:'Fits the length, pitch kept: a ramp loops little GRAIN-long pieces, gritty and stuttery'},
-  {n:'OLDSCHOOL', sync:3, sx:1, grp:'Character', tip:'The classic sampler stretch: a tiny loop at the sample\u2019s own pitch whose start is scrubbed through the sample by a ramp that lasts the length'},
-];
-// OLDSCHOOL's own settings (only present while the mode is OLDSCHOOL): og loop in ms, ou loop unit (0 = ms, 1..6 = 1, 1/2 … 1/32 of a LINE), orp ramp, ox smooth %, opt pitch in semitones
-const OS_KEYS = ['og', 'ou', 'orp', 'ox', 'opt'], OS_DEF = {og:12, ou:0, orp:0, ox:0, opt:0};
+/* (SY_GROUPS, SY_PICK, OS_KEYS and OS_DEF are declared early, in the STRETCH PICKER DATA block above the saved-song load: sxLoad needs them while the song is read at start-up) */
 // the picker index of an instrument (an unknown pair counts as the classic mode of its I.sync)
 const syPick = I => { const s = (I.sync | 0), x = (I.sx | 0), i = SY_PICK.findIndex(m => m.sync === s && m.sx === x); return i >= 0 ? i : Math.max(0, SY_PICK.findIndex(m => m.sync === s && m.sx === 0)); };
 // writes a picker index into an instrument: I.sx is dropped for a classic mode (so old songs stay byte for byte as they were)
@@ -24278,7 +24337,7 @@ async function audReloadSafe(){
       if (left().length && !await askYes({title:'Samples not stored yet', body:'Some sample audio could not be written to this browser’s storage in time; a reload would lose it. Save the project to a file first, or reload anyway.'}, 'Reload anyway')) return false;
     }
     try { flushKit(); } catch(e){}   // (the waves editor's pending edit)
-    const okK = storeWrite(KEY, JSON.stringify(kitToJSON(sdbOk && smpStored ? 'ref' : false))), okS = storeWrite(TK, JSON.stringify(songOut(S)));
+    const okK = storeWrite(KEY, JSON.stringify(kitToJSON(sdbOk && smpStored ? 'ref' : false))), okS = songStore();
     if (!(okK && okS)){ toastErr('Couldn’t save the project (storage full), so no reload. Save it to a file first (File ▾ › Save).', 7000); return false; }
     try { saveCur(); asetSave(); } catch(e){}
     if (RCD.on || RCD.sync || rendering){ toastErr('A recording or render started meanwhile, so the app was not reloaded.', 5000); return false; }   // (review: the waits above let one start)
@@ -25580,7 +25639,7 @@ function pbTracks(why){ try { if (!rt || !rt.pl) return; const o = [], any = S.m
     if (shut || (a && rest) || sp || (!a && !any && !nm)) o.push(`${t + 1}${sp}${a ? '' : ' silent'} g${g.toFixed(2)}${b.fx ? ' fx' + (rest ? 'R' : '') : ''}${b.chn ? ' chn' : ''}${b.dl && b.dl.delayTime.value > 0.0005 ? ' d' + Math.round(b.dl.delayTime.value * 1000) : ''}${shut ? ' SHUT' : ''}${a && rest ? ' STUCK-REST' : ''}`); });
   pbLog(`tracks (${why}): solo ${any ? 'yes' : 'no'} mute ${nm ? 'yes' : 'no'}${o.length ? ' · ' + o.join(' | ') : ' · all audible'}`); } catch(e){} }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · meters ${mtrMode} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\n${startLine()}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · meters ${mtrMode} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
@@ -26448,7 +26507,7 @@ function projSet(path, handle){
 // Edits in the first moments after start-up (conversions, the saved song settling) don't count.
 let projDirty = (() => { try { return localStorage.getItem(DTK) === '1'; } catch(e){ return false; } })(), dirtyArmed = false, bkDirty = false;
 setTimeout(() => { dirtyArmed = true; }, 2500);
-function markChange(){ if (!dirtyArmed) return; bkDirty = true; if (!projDirty) setDirty(true); else dirtyShow(); }
+function markChange(){ if (!dirtyArmed) return; if (START.held && performance.now() - START.inT < 3000) songRelease('you changed the song'); bkDirty = true; if (!projDirty) setDirty(true); else dirtyShow(); }
 function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { localStorage.setItem(DTK, projDirty ? '1' : '0'); localStorage.setItem(DTK + '-smp', smpNew ? '1' : '0'); } catch(e){} dirtyShow(); }
 // a sample recorded or loaded since the last save (the close prompt says so); cleared with the dirty mark
 var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
@@ -26549,6 +26608,7 @@ async function loadProjText(text, name, where){
     // previous project's song while the app pointed at the new file, so the next Save wrote the old song over it. (New song
     // and Funk breaks keep their undo: the owner's choice.) After the kit's and the song's own snapshots have run.
     setTimeout(undoReset, 0);
+    try { startThen((where && where.file ? 'opened the project file ' : where && where.dirty ? 'restored the backup ' : 'opened ') + '“' + (S.name || name || 'song') + '”'); } catch(e){}
     return true;
   } catch(err){ toast(err.message || 'Couldn’t read that project file.'); return false; }
 }
@@ -26780,20 +26840,23 @@ async function backupNow(force){
 }
 setInterval(() => { if (!rendering && !tp.on) backupNow(false); }, BK_MS);   // not mid-render or while playing (a big kit takes a moment)
 async function restoreBackup(){
-  const idx = (await kvGet('bkIndex')) || [];
+  // songs that could not be read at start-up (startRescue) come first: they are kept apart from the 10 newest backups, so those never push them out
+  const resc = ((await kvGet('rescueIndex')) || []).filter(e => e && e.k).map(e => Object.assign({}, e, {name:(e.text === false ? 'Unreadable song text (saves a file): ' : 'Unopened song: ') + e.name}));
+  const idx = [...resc, ...((await kvGet('bkIndex')) || [])];
   if (!idx.length) return toast('No backups yet: one is made every few minutes while you work.');
   const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
   const k = await askPick({title:'Restore a backup', body:'Song and kit as they were. The newest is first.'}, idx.map(e => `${e.name} · ${new Date(e.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${ago(e.at)})`));
   if (k < 0) return;
   if (!await okToLeave('restoring the backup')) return;
   const text = await kvGet(idx[k].k); if (!text) return toastErr('That backup couldn’t be read.');
+  if (idx[k].text === false){ try { await deliver('thunder-unreadable-song.json', new Blob([text], {type:'application/json'})); } catch(e){ toastErr('Couldn’t save that text.'); } return; }   // not a song this app can open: keep its text as a file
   if (await loadProjText(text, idx[k].name, {dirty:true})) toast('Restored the backup of ' + idx[k].name + ' from ' + ago(idx[k].at) + '. Save it to keep it in a file', 5000);
 }
 // DESKTOP APP: closing the window asks first when there are unsaved changes; a .thunder file opened from the desktop
 // (double-click, or dropped on the app's icon) arrives here by path.
 if (DESK_APP){
   try { DESK_APP.onCloseAsk(async () => { DESK_APP.closeAck(); let ok = true; try { ok = await okToLeave('closing the app'); } catch(e){} DESK_APP.closeReply(ok); }); } catch(e){}
-  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path, file:true}); else toastErr('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
+  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; startHow('file', String(p).split(/[\\/]/).pop()); const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path, file:true}); else toastErr('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
   try { DESK_APP.ready(); } catch(e){}
 }
 setTimeout(dirtyShow, 0);
@@ -27110,7 +27173,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ songRelease('a song was opened'); tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -27168,7 +27231,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 673;
+const BUILD = 674;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37623,6 +37686,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [674, '24 Nov', ['Fixed: since build 660 (20 Nov) a saved song could not be read at start-up, so the app opened the starter beat and the next autosave wrote it over your song. Songs load again. If your last song is gone, File \u25be \u2192 Restore a backup\u2026 brings back an earlier one.', 'A saved song that cannot be read at start-up is never overwritten any more: it is copied aside (File \u25be \u2192 Restore a backup\u2026, listed first as \u201cUnopened song\u201d), the starter beat is not autosaved until you change something, and a red bar tells you.', 'Settings \u2192 App says how the song at start-up was chosen (saved song, first run, could not be read, share link, project file), and Copy playback report starts with the same line.']],
   [673, '23 Nov', ['Patch knobs: a knob change on a quiet waves patch is heard at once (it used to wait for a note); knob values reach waves voices made later at the right time.']],
   [672, '23 Nov', ['New command FLZ: a third bank of 255 Flex patterns for IDM and glitch punch-ins, each a chain of two or three FLX / FLY moves (a stutter into a bit crush, a juggle with slice pitches, a tape stop on a roll, reverse into a gate mask\u2026). FLZ 01\u20130F are one of each family to try first, then by the first digit: 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos. It plays on the same Flex as FLX and FLY (the last one on a row wins) and works in the MST column too.']],
   [671, '23 Nov', ['File ▾ → Drive folder…: choose which Google Drive folder Save / Open use (any folder in My Drive or Shared with me); it is remembered on this device.']],
@@ -38941,12 +39005,12 @@ async function openSharedProject(){
     await openProjectFile(new File([await r.blob()], name, {type:r.headers.get('content-type') || 'application/octet-stream'}));
   } catch(e){ tpLog('the shared project could not be opened', e); toastErr('Couldn’t read that shared project. Save it and use File ▾ → LOAD PROJECT', 7000); }
 }
-if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedProject, 0);
+if (new URLSearchParams(location.search).has('shared')){ startHow('share', ''); setTimeout(openSharedProject, 0); }
 else if (FIRST_SONG) setTimeout(async () => {
   /* FIRST-OPEN SONG (owner, 17 Nov): sounds/BETA-TESTING-ELECTRO.thunder; the older ELECTRO is the fallback if that one can't be fetched. */
   for (const [url, nm] of [['sounds/BETA-TESTING-ELECTRO.thunder?v=1', 'BETA-TESTING-ELECTRO.thunder'], ['sounds/ELECTRO.thunder?v=2', 'ELECTRO.thunder']]){
     try { const r = await fetch(url); if (!r.ok) continue; const t = await r.text();
-      if (FIRST_SONG && !projDirty) await loadProjText(t, nm); return; } catch(e){ tpLog('the first-run song could not be loaded', e); }
+      if (FIRST_SONG && !projDirty){ await loadProjText(t, nm); startHow('first', 'nothing saved in this browser yet, so the bundled ' + nm); } return; } catch(e){ tpLog('the first-run song could not be loaded', e); }
   }
 }, 0);
 /* PLAYBACK REPORT ON SCREEN (7 Nov, testing on BrowserStack's real phones): only with ?pbshow in the URL, inert otherwise. A strip

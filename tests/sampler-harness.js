@@ -8,7 +8,9 @@ function loadSampler(h, extra) {
   const eng = h.slice(A, B);
   const C = h.indexOf('const SYNC_MODES = '), D = h.indexOf('// An AudioBuffer from one channel (mono)');
   if (A < 0 || B < 0 || C < 0 || D < 0) throw new Error('index.html: an anchor moved');
-  const chopSrc = h.slice(C, D);
+  const pd = h.indexOf('/* ===STRETCH PICKER DATA START==='), pe = h.indexOf('/* ===STRETCH PICKER DATA END=== */');
+  const pickData = pd >= 0 && pe > pd ? h.slice(pd, pe) : '';   // build 674: SY_PICK and OS_KEYS moved above the saved-song load (an older index.html has them inside chopSrc)
+  const chopSrc = pickData + h.slice(C, D);
   const own = /const smpOwnTune = [^\n]*\n/.test(h) ? cutRe(h, /const smpOwnTune = [^\n]*\n/, 'smpOwnTune') : '';
   const kept = /function smpKeptMsg/.test(h) ? cutRe(h, /function smpKeptMsg\([\s\S]*?\n\}\n/, 'smpKeptMsg') : '';
   const nn = cutRe(h, /const NN = [^\n]*\n/, 'NN') + cutRe(h, /const noteS = [^\n]*\n/, 'noteS');

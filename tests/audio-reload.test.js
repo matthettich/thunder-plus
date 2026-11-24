@@ -18,6 +18,7 @@ function rig(o = {}) {
     RCD: Object.assign({ on: false, sync: null, take: null }, o.rcd), rendering: !!o.rendering, kit, S: { name: 'song' }, KEY: 'kit', TK: 'song',
     sdbOk: sdb, smpStored: sdb ? stored : null, smpPut: s => { calls.push('put:' + s.id); if (o.putFails) return Promise.reject(new Error('x')); if (o.putHangs) return new Promise(() => {}); stored.add(s.id); return Promise.resolve(); },
     kitToJSON: n => ({ n }), songOut: S => S, storeWrite: (k, j) => { calls.push('write:' + k); if (o.writeFails === k) return false; store[k] = j; return true; },
+    songStore: () => { calls.push('write:song'); if (o.writeFails === 'song') return false; store.song = { name: 'song' }; return true; },   // build 674: the song key is written through songStore
     flushKit: () => calls.push('flushKit'), saveCur: () => calls.push('saveCur'), asetSave: () => calls.push('asetSave'), tStop: q => calls.push('tStop'),
     sessionStorage: { setItem: (k, v) => { calls.push('flag'); store[k] = v; } }, applyUpdate: () => calls.push('RELOAD'),
     pbLog: s => logs.push(s), pbState: () => 'state', toast: m => toasts.push(m), toastErr: m => errs.push(m),
