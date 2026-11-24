@@ -34,6 +34,8 @@ export function table() {
     'struct ModParam { const char* p; const char* q; char kind; int bmin, bmax, d; double lo, hi; };',
     'struct ModDef { const char* key; int n; const ModParam* ps; bool tail; };'];
   const keys = Object.keys(MODFX).filter(k => MODFX[k].track), defs = [];
+  if (keys.length > 64) die('more MODFX track effects than fxhost.h kModMax (64)');
+  for (const k of keys) if (MODFX[k].ps.length > 16) die('MODFX ' + k + ' has more than fxhost.h kModMaxParams (16) parameters: raise the limit first');
   for (const k of keys) {
     const M = MODFX[k]; L.push(`static const ModParam kMP_${k}[] = {`);
     for (const [p, , c, min, max, d, x] of M.ps) {

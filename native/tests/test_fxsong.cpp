@@ -159,6 +159,11 @@ int main() {
     for (int t = 0; t < kSongNT; t++) { Json a = song.tfx.at((size_t)t); for (size_t k = 0; k < a.size(); k++) if (a.at(k).isObj()) held++; }
     for (size_t k = 0; k < song.mfx.size(); k++) if (song.mfx.at(k).isObj()) held++;
     std::printf("ELECTRO: %d of %d effect slots hosted; refused: sidechain %u, notes %u, no engine %u, unknown %u\n", hosted, held, bank.refused(kRefSidechain), bank.refused(kRefNotesFrom), bank.refused(kRefNoEngine), bank.refused(kRefUnknown));
+    if (!havePump) { int nonPump = 0, pumpSlots = 0; auto cnt = [&](Json o) { Json ty = o.get("type"); bool pump = false; if (ty.isStr() && ty.asStr().size() > 1 && ty.asStr()[0] == 'p') for (int pt = 0; pt < kPumpTypes; pt++) if (ty.asStr().substr(1) == fx_pump_key(pt)) pump = true; (pump ? pumpSlots : nonPump)++; };
+      for (int t = 0; t < kSongNT; t++) { Json a = song.tfx.at((size_t)t); for (size_t k = 0; k < a.size(); k++) if (a.at(k).isObj()) cnt(a.at(k)); }
+      for (size_t k = 0; k < song.mfx.size(); k++) if (song.mfx.at(k).isObj()) cnt(song.mfx.at(k));
+      std::printf("ELECTRO without pump: %d non-pump slots, %d pump slots\n", nonPump, pumpSlots);
+      check(hosted >= nonPump, "no pump here: every non-pump slot of ELECTRO is still hosted"); check((int)bank.refused(kRefNoEngine) == pumpSlots, "no pump here: exactly the pump slots are refused as no-engine"); }
     check(held == 25 && (havePump ? hosted == held : hosted + (int)bank.refused(kRefNoEngine) == held), "every effect slot of ELECTRO is played (25 of 25)" + std::string(havePump ? "" : " (no pump here: its pump slots are refused and counted)")); }
   { // FXV: a Plate slot's DECAY control moved by the sequencer's event equals the slot planned with that byte
     JsonDoc d; d.parse("[{\"type\":\"plate\",\"on\":true,\"size\":128,\"decay\":100,\"damp\":128,\"pre\":10,\"mod\":77,\"mix\":200}]");

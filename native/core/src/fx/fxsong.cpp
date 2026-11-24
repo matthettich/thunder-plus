@@ -25,6 +25,10 @@ namespace thunder {
 
 #include "fx/pumpparams.inc"
 #include "fx/modfxtable.inc"
+// the generated tables against the limits of fxhost.h (the arrays are `static const`, not constexpr: the per-effect parameter counts are checked by the generator's --check and at run time below)
+static_assert(kModDefN <= kModMax, "modfxtable.inc holds more effects than kModMax");
+static_assert(sizeof(kPumpParamN) / sizeof(kPumpParamN[0]) == (size_t)kPumpTypes, "kPumpParamN must have one entry per pump type");
+static_assert(sizeof(kPumpParams) / sizeof(kPumpParams[0]) >= (size_t)kPumpTypes, "kPumpParams must have one entry per pump type");
 
 // ---- small JS rules ---------------------------------------------------------------------------------------------------------------------
 static bool jsNumber(Json v, double* out) {   // +v, when it is a number the page's int() / pumpClamp() would take (a number, a boolean, a numeric string)
@@ -50,7 +54,7 @@ bool fx_mod_bounds(int id, int pi, int* bmin, int* bmax) {
   const ModParam& q = kModDefs[id - kModT0].ps[pi]; *bmin = q.bmin; *bmax = q.bmax; return true;
 }
 void fx_mod_map(int id, const double* bytes, double* mp) {   // conv[p][1](f[q]): a choice and a whole number as they are, lin: min + (max - min) * u8(b), log: min * pow(max / min, u8(b))
-  const ModDef& d = kModDefs[id - kModT0];
+  const ModDef& d = kModDefs[id - kModT0]; if (d.n > kModMaxParams) return;   // (a regenerated table with more controls than the buffers hold: nothing is written)
   for (int i = 0; i < d.n; i++) { const ModParam& q = d.ps[i]; const double b = bytes[i];
     mp[i] = q.kind == 'g' ? q.lo * js_pow(q.hi / q.lo, u8(b)) : q.kind == 'l' ? q.lo + (q.hi - q.lo) * u8(b) : b; }
 }
@@ -84,7 +88,8 @@ bool fx_entry_pump(Json o, int slot, int pt, FxEntry* out, FxSlotText* txt, int*
 
 bool fx_entry_mod(Json o, int slot, int id, double bpm, FxEntry* out, int* why) {
   FxEntry& c = *out; c = FxEntry();
-  const ModDef& d = kModDefs[id - kModT0]; c.nmp = d.n;
+  const ModDef& d = kModDefs[id - kModT0]; if (d.n > kModMaxParams) { if (why) *why = kRefUnknown; return false; }
+  c.nmp = d.n;
   for (int i = 0; i < d.n; i++) { const ModParam& q = d.ps[i];   // normTfx: clamp(int(o[q], d), min, max)
     double b = jsInt(o.get(q.q), q.d); b = b < q.bmin ? q.bmin : b > q.bmax ? q.bmax : b; c.mb[i] = b;
     if (!std::strcmp(q.p, "sck") && b > 0) { if (why) *why = kRefSidechain; return false; } }
@@ -110,7 +115,7 @@ struct ModFx : Fx {
 
 Fx* fx_make_mod(const FxEntry& e, double sr, modfx::Seeds& seeds) {
   const ModDef& d = kModDefs[e.t - kModT0]; const modfx::Def* def = modfx::find(d.key);
-  if (!def || def->np > 32 || def->nin > modfx::kMaxPorts || def->nout > modfx::kMaxPorts) return nullptr;
+  if (!def || def->np > 32 || def->nin > modfx::kMaxPorts || def->nout > modfx::kMaxPorts || def->nout == 0) return nullptr;   // (modRun reads io.out[0])
   std::unique_ptr<ModFx> m(new ModFx); m->def = def;
   m->mod = def->make(sr, seeds); if (!m->mod) return nullptr;
   { modfx::SeedCounter own(54321); m->spare = def->make(sr, own); m->spareLive = m->spare != nullptr; }   // its own seeds: the shared counter's order is the page's
