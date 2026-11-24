@@ -898,6 +898,11 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
+**FLZ, Flex's third bank (23 Nov; build 672, branch flz-bank)**
+- [ ] **Computer: FLZ 01–0F on a drum loop (the Flex in a track's FX slot):** put FLZ 01, 02, 03… on a row in turn. Pass: each one is a different, audible stutter / juggle / tape / reverse / filter / grain / chop move that comes back to the beat; none is silent or clicks badly; FLX / FLY on the same row: the rightmost plays. Tell me which families (first hex digit 1–F) you want more of and which sound the same as an FLX / FLY.
+- [ ] **Computer: FLZ on the master (MST column):** FLZ 03, 0B, 0F with a Flex in a master slot. Pass: the whole mix is punched in and out; FLZ 00 turns it off.
+- [ ] **Phone (audio-thread sequencer): FLZ 01–0F and 10–1F:** Pass: they play as on the computer, and the FX bar shows "FLZ xx · name" for the pattern playing.
+
 - [ ] **Drive folder (build 671; phone)**: File ▾ shows "Drive folder: Thunder Plus…". Tap it, go into a folder (and ↑ Up), tap "✓ Use this folder"; the menu label and the toast show the new name. Save to Drive puts the song in that folder; Open from Drive… lists that folder.
 - [ ] **Drive folder (build 671; computer)**: reload the page: the chosen folder is still used. Pick "Shared with me" and a shared folder you can edit, save there. Trash the chosen folder in Drive, reload, Save: a toast says it is gone and "Thunder Plus" is used.
 
@@ -1768,6 +1773,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 23 Nov (FLZ: Flex's third bank, 255 chained glitch patterns; build 672, branch `flz-bank`)
+
+Owner: "more effects like FLX and FLY". `FlexCore.FLZ_LIST` (static data, 255 entries `[[stage ks], NAME]`) fills k 513–767 through the `chain` engine of the previous commit; no engine change. Families by first hex digit (16 variants gentler to wilder, 2 or 3 stages each): 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos; 01–0F are the 2nd variant of each. FLZ is wired like FLY (end of `FXC`, event 512 + v, one Flex per row: rightmost of FLX / FLY / FLZ wins, slot wake, FX_NEEDS, tooltip, help, MST, FX bar). Tests in `tests/flex.test.js` scan all 255 (no read ahead, at most 8 beats back, mean gain above 0.15). Worklets rebuilt (chains ?v=60, waves ?v=49). Nobody has listened yet: punch list. The sparsest are the scratch + gate families (8x), gain about 0.2.
 
 ## 23 Nov (Drive folder chooser; build 671)
 Owner: let me choose the Drive folder. `index.html` Drive block: File ▾ "Drive folder: <name>…" runs `driveChoose` (askPick walk: ✓ Use this folder, ↑ Up, subfolders by name via `driveSubfolders`, Shared with me at root). Choice stored per device as `folder:{id,name}` in `thunderplus-drive-v1`; `driveFolderId()` uses it, verified once per session with files.get (404 or trashed: toast, choice cleared, default Thunder Plus find/create). Save / Open toasts and the empty-folder message name the folder. `sw.js` v671; docs/GOOGLE-DRIVE-SETUP.md; tests in `tests/drive-sync.test.js`.

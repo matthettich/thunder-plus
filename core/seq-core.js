@@ -85,7 +85,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CC_CMDS = ['CCA', 'CCB', 'CCC', 'CCD'];
 const NCC = CC_CMDS.length;
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8','FLZ'];
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
 const s8 = v => v > 127 ? v - 256 : v;
 const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};
@@ -502,6 +502,7 @@ function makeSeq(S, mode, o){
         (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at2, track:t, p:'sw' + k, v:sw}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
+      if (fx.FLZ != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLZ ? 512 + fx.FLZ : 0}); slotWake('FLZ', fx.FLZ > 0); }   // FLZ (23 Nov): the third bank, 512 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
         if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
@@ -606,8 +607,8 @@ function makeSeq(S, mode, o){
           }
           T.last = {c, v}; cmds.push({c, v});
         }
-        // FLX and FLY share one Flex, so on one row the rightmost of the two is the one that plays (8 Nov)
-        const fx = {}; for (const q of cmds){ if (q.c === 'FLX') delete fx.FLY; else if (q.c === 'FLY') delete fx.FLX; fx[q.c] = q.v; }
+        // FLX, FLY and FLZ share one Flex, so on one row the rightmost of the three is the one that plays (8 Nov; FLZ 23 Nov)
+        const fx = {}; for (const q of cmds){ if (q.c === 'FLX'){ delete fx.FLY; delete fx.FLZ; } else if (q.c === 'FLY'){ delete fx.FLX; delete fx.FLZ; } else if (q.c === 'FLZ'){ delete fx.FLX; delete fx.FLY; } fx[q.c] = q.v; }
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
@@ -825,7 +826,7 @@ function makeSeq(S, mode, o){
 let fxRestartN = 0;
 const ntr = () => S.ntr || 16;
 const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
-const FX_NEEDS = {FLX:'flex', FLY:'flex', GAT:'sgate', RTG:'retrig'};
+const FX_NEEDS = {FLX:'flex', FLY:'flex', FLZ:'flex', GAT:'sgate', RTG:'retrig'};
 
 // FXV: the effects' map() functions, from TFX in index.html (45 of them)
 const TFX_MAP = {

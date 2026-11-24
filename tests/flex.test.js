@@ -153,8 +153,8 @@ test('FLY reaches the Flex: FLY v books the flx param at 256 + v (00 off), after
 
 test('FLX and FLY on one row: the rightmost plays, and the FX bar can show FLY', () => {
   const src = H.read('index.html');
-  assert.match(src, /if \(q\.c === 'FLX'\) delete fx\.FLY; else if \(q\.c === 'FLY'\) delete fx\.FLX;/, 'column order decides');
-  assert.match(src, /const p = c >= 0 \? Math\.min\(511, Math\.round\(c\)\)/, 'the bar keeps FLY values');
+  assert.match(src, /if \(q\.c === 'FLX'\)\{ delete fx\.FLY; delete fx\.FLZ; \} else if \(q\.c === 'FLY'\)\{ delete fx\.FLX; delete fx\.FLZ; \} else if \(q\.c === 'FLZ'\)\{ delete fx\.FLX; delete fx\.FLY; \}/, 'column order decides');
+  assert.match(src, /const p = c >= 0 \? Math\.min\(767, Math\.round\(c\)\)/, 'the bar keeps FLY values');
 });
 
 // FLX CHECK 3 (18 Nov): two ways FlexCore put a NaN into the output (found measuring FLX 76 on the master, tools in /home/claude/progress/flx).
@@ -171,4 +171,37 @@ test('FlexCore.rd: a delay of 1e-12 samples at buffer index 0 reads b[0], not b[
   const f = new FlexCore(48000), N = f.N, b = new Float32Array(N).fill(0.5);
   for (const D of [0, 1e-12, 1e-11, 1e-10, 5e-11, 1, 3.5]) assert.ok(Number.isFinite(f.rd(b, 0, D)), 'D = ' + D);
   assert.equal(f.rd(b, 0, 1e-12), 0.5);
+});
+
+// FLZ (23 Nov): Flex's third bank, k 513–767 (512 + the FLZ value), each a chain of FLX / FLY stages (FlexCore.FLZ_LIST).
+test('FLZ: every pattern 01–FF has a name and valid stages, and 01–0F are one of each family 1–F', () => {
+  const T = FlexCore.SPEC(), N3 = FlexCore.NAMES3, L = FlexCore.FLZ_LIST;
+  assert.equal(L.length, 255); assert.equal(N3.length, 256); assert.equal(N3[0], 'OFF');
+  const seen = new Set();
+  for (let v = 1; v < 256; v++) { const o = T[512 + v];
+    assert.ok(o && o.f === 'chain' && N3[v] && N3[v] !== 'OFF', 'FLZ ' + v.toString(16)); assert.equal(N3[v], o.n);
+    assert.ok(o.n.length <= 30, `FLZ ${v.toString(16)} name too long: ${o.n}`);
+    assert.ok(o.S.length >= 2 && o.S.length <= 3, `FLZ ${v.toString(16)} has ${o.S.length} stages`);
+    for (const k of o.S) assert.ok(Number.isInteger(k) && ((k >= 17 && k <= 255) || (k >= 257 && k <= 511)) && T[k], `FLZ ${v.toString(16)} stage ${k}`);
+    if (v >= 16) { assert.ok(!seen.has(o.n), 'duplicate name ' + o.n); seen.add(o.n); } }
+  for (let v = 1; v < 16; v++) assert.ok(T.slice(512 + v * 16, 512 + v * 16 + 16).some(o => o.n === T[512 + v].n && o.S.join() === T[512 + v].S.join()), `FLZ 0${v.toString(16)} is a pattern of family ${v.toString(16)}`);
+  const d = cut(/\{\.\.\.k\('flx', -1\), maxValue:(\d+)\}/, "the flx param's FLZ range"); assert.ok(+/maxValue:(\d+)/.exec(d)[1] >= 767);
+});
+
+test('FLZ: no pattern plays ahead of the song, reads at most 8 beats back, gives no NaN, and none is mostly silent', () => {
+  const f = new FlexCore(48000);
+  for (let v = 1; v < 256; v++) { let g = 0, n = 0;
+    for (let bar = 0; bar < 4; bar++) for (let i = 0; i < 2000; i++) { const p = i / 500, r = f.ext(512 + v, p, bar); n++; g += f.pg;
+      assert.ok(Number.isFinite(r) && Number.isFinite(f.pg) && Number.isFinite(f.plp) && Number.isFinite(f.php) && Number.isFinite(f.pcr), `FLZ ${v.toString(16)} at ${p}`);
+      assert.ok(p - r > -1e-9, `FLZ ${v.toString(16)} ${FlexCore.NAMES3[v]} reads ahead at bar ${bar}, ${p}: ${r}`);
+      assert.ok(p - r <= 8, `FLZ ${v.toString(16)} ${FlexCore.NAMES3[v]} reads ${p - r} beats back at bar ${bar}, ${p}`); }
+    assert.ok(g / n > 0.15, `FLZ ${v.toString(16)} ${FlexCore.NAMES3[v]} is mostly silent`); }
+});
+
+test('FLZ reaches the Flex: FLZ v books the flx param at 512 + v (00 off)', () => {
+  const ev = cut(/if \(fx\.FLZ != null\)\{[^\n]*/, 'the FLZ event');
+  assert.match(ev, /p:'flx', v:fx\.FLZ \? 512 \+ fx\.FLZ : 0/);
+  assert.match(src, /const FX_NEEDS = \{[^}]*FLZ:'flex'/);
+  assert.match(cut(/const FXC = \[[\s\S]*?\];/, 'FXC'), /'FLZ'\s*\]/);   // on the end: saved songs keep their command numbers
+    assert.match(src, /const p = c >= 0 \? Math\.min\(767, Math\.round\(c\)\)/, 'the bar keeps FLZ values');
 });
