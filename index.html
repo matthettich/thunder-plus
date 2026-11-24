@@ -27231,7 +27231,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 674;
+const BUILD = 675;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30038,7 +30038,7 @@ function go(v){
   }
   if (v === 'mixer' && (tv === 'fx' || tv === 'mod')){ if (cFxT < NT){ cs.mixer.x = cFxT; if (cs.mixer.y === 7) cs.mixer.y = 0; } else cs.mixer.y = 7; }   // FX on the master: the Mixer's master row
   const refit = (tv === 'mixer') !== (v === 'mixer');   // the Mixer is sized for more rows
-  if (loopSel && !tp.on) loopFor(tv);   /* (LOOP SEL: keep the selection's rows as the armed loop before the selection goes with the screen; 15 Nov) */
+  if (loopSel && !tp.on && !(tv !== 'song' && loopArm && loopArm.v === 'song')) loopFor(tv);   /* (LOOP SEL: keep the selection's rows as the armed loop before the selection goes with the screen; 15 Nov. 24 Nov, build 675: not when Arrange's rows are already armed and the screen being left is another one: a note selected in a phrase replaced the armed rows with the phrase's, so back on Arrange PLAY no longer looped them) */
   tv = v; if (MID.includes(v)) midV = v; selA = null; sxPicks = []; if (refit) fit(); draw(); saveCur();
 }
 // SHIFT+▼ ON MOBILE AND DESKTOP (12 Nov, owner: "Make shift + down always go to phrase or pattern view."): from the Song / Arrange (the screen, or Arrange holding the keys beside
@@ -37686,6 +37686,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [675, '24 Nov', ['Fixed: LOOP SEL (and LP.SEL) keep looping the rows you selected in Arrange after you go into a phrase, select or edit a note there and come back. A selection in the phrase used to replace the armed rows when you left it with the song stopped, so PLAY on Arrange no longer looped them.']],
   [674, '24 Nov', ['Fixed: since build 660 (20 Nov) a saved song could not be read at start-up, so the app opened the starter beat and the next autosave wrote it over your song. Songs load again. If your last song is gone, File \u25be \u2192 Restore a backup\u2026 brings back an earlier one.', 'A saved song that cannot be read at start-up is never overwritten any more: it is copied aside (File \u25be \u2192 Restore a backup\u2026, listed first as \u201cUnopened song\u201d), the starter beat is not autosaved until you change something, and a red bar tells you.', 'Settings \u2192 App says how the song at start-up was chosen (saved song, first run, could not be read, share link, project file), and Copy playback report starts with the same line.']],
   [673, '23 Nov', ['Patch knobs: a knob change on a quiet waves patch is heard at once (it used to wait for a note); knob values reach waves voices made later at the right time.']],
   [672, '23 Nov', ['New command FLZ: a third bank of 255 Flex patterns for IDM and glitch punch-ins, each a chain of two or three FLX / FLY moves (a stutter into a bit crush, a juggle with slice pitches, a tape stop on a roll, reverse into a gate mask\u2026). FLZ 01\u20130F are one of each family to try first, then by the first digit: 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos. It plays on the same Flex as FLX and FLY (the last one on a row wins) and works in the MST column too.']],

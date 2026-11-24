@@ -936,6 +936,11 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 - [ ] **Airplane mode, Open latest from Drive; close the Google popup:** Pass: a short toast each time, nothing breaks.
 - [ ] **Desktop (Electron) app:** Pass: File ▾ has no Drive items.
 
+**LOOP SEL after a phrase trip (24 Nov; build 675, web beta)**
+- [ ] **Computer:** in Arrange select rows 00–03, turn LOOP SEL on (Shift+Alt+L), press PLAY, then STOP. Open a block's phrase (Alt+▶), select a few cells in it (Shift+▼) and edit a note, go back to Arrange (Alt+1) and press PLAY. Pass: rows 00–03 loop, as before the trip.
+- [ ] **Computer, same but the song keeps playing the whole time:** Pass: it keeps looping 00–03 after you come back (if not, say which keys or clicks you used).
+- [ ] **Computer:** same with LP.SEL instead of LOOP SEL. Pass: LP.SEL's rows still loop after the trip; with LOOP SEL on and no selection in Arrange, a new selection still moves the loop.
+
 **LP.SEL locks its loop (23 Nov; build 667, web beta)**
 - [ ] **Computer, Arrange:** select rows 00–07, press LP.SEL. Then click and select elsewhere (e.g. rows 10–13) and edit a phrase. Pass: the loop keeps playing 00–07 and stays marked.
 - [ ] **While it plays, with rows 10–13 selected, press LP.SEL:** Pass: the loop moves to 10–13 (toast says so). LP.SEL again with nothing new selected stops it.
@@ -1784,6 +1789,13 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 24 Nov (LOOP SEL after a phrase trip; build 675, branch `fix/loop-sel-after-phrase-edit`)
+Owner (build 674): "If you are looping a selection, switch to phrase, edit a note in a phrase, switch back to arrange, the playback loops one pattern row rather than going back to the looped selection."
+- **Cause found (headless, `tests/sweep` harness style, real key events):** `go()` ran `loopFor(tv)` on every screen change with LOOP SEL on and the song stopped ("keep the selection's rows as the armed loop before the selection goes with the screen", 15 Nov). `loopFor` re-arms from `selA`, so leaving the PHRASE with a note or cells selected there replaced the armed Arrange rows (`loopArm.v` 'song', rows 1–2) with the phrase's (`v` 'phrase'). Back on Arrange, `loopFor('song')` found no song arm, so PLAY gave no selection loop: plain play from the cursor row, and with loop play (LOOP lit) one pattern row. While the song was playing the guard `!tp.on` held, so the bug shows once the song has stopped on the way (a STOP, or the song ended / Space in the phrase).
+- **Fix (index.html `go()`):** that call is skipped when Arrange's rows are already armed and the screen being left is not Arrange. Arrange's own selection is still armed on leaving it. `loopFor`, `syncLoop`, `lpSelPlay`, the LP.SEL lock, LOOP (pat), `makeSeq` and the core are untouched. With the song playing, loop and lock were already unchanged by a phrase trip (checked with the keys, both sequencers' paths, LOOP SEL and LP.SEL, with and without LOOP lit).
+- **Not reproduced:** a looping song that keeps playing through the whole trip; every variation I tried kept the rows. If the owner still sees it while playing, ask which keys / clicks he used to leave Arrange and come back.
+- Test: `tests/loop-sel-phrase-return.test.js` (source checks).
 
 ## 24 Nov (the last song did not reopen: cause found and fixed; build 674, branch `fix/reopen-last-song`)
 
