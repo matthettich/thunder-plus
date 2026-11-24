@@ -64,4 +64,5 @@ Nothing new allocates, locks or blocks on the audio thread: `midiOp` / `midiBegi
 - `thunder_live_midi_lead` vs the sequencer lead: separate, as written.
 
 ## Tests run (24 Nov, GCC Release, 2 cores)
-See the end of this file.
+`ctest -R "live|rt_|midi|render_api|players|seq_|fx|pdc|master|mix|meter" -j2` (85 tests, 479 s) on the head with the code as shipped: 83 passed. Two failed: `live_fx` (its check "F_MIDI is refused until P4" is obsolete: fixed in test_live_fx.cpp, now "F_MIDI is accepted", `live_fx: 158 checks, 0 failed`) and `android_midi_sink` (a wall-clock timing test, "stamp ... wanted ... +- 3" under -j2 load; it does not touch LiveHost; passes alone: 22 s, 100%). Then on the final head: `ctest -R "live_midi|live_fx|midi_api|rt_core|midi_glue|midi_ledger|live_r1r2|live_equals_render"` (see below).
+`live_midi`: "live_midi: 109 checks, 0 failed" (2.2 s, 20 songs); `rt_harness`: LiveHost pass 4 "848 MIDI records drained, 212 note-ons, midi_begin failures 0, may_hang 0, no allocation in process". The full 231-test suite and the sanitizer build were NOT run here (reduced matrix compiled in under THUNDER_SANITIZE_BUILD: 5 songs).
