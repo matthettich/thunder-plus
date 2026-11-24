@@ -111,9 +111,9 @@ static void createFailures(const char* name, const std::string& song, const thun
     tested++;
     if (std::strstr(err, "out of memory") == nullptr) { std::printf("  k=%ld: err = \"%s\"\n", k, err); CHECK("err says out of memory", false); }
     const int64_t dl = g_live - live0, dh = haveHeap() ? heapInUse() - heap0 : 0;
-    // OURS: strict, nothing may be left. The pinned pump plugin is built -fno-exceptions (native/core/pump/CMakeLists.txt, OPT_CXX): a bad_alloc thrown INSIDE its own pump_new
-    // (pumpfx_new_* -> Engine::Engine / Engine::prepare) skips the destructors of the members already made. That is an out-of-memory-only leak in pump code (filed as a follow-up),
-    // tolerated here and counted: only when the failing allocation was inside pump_new, and only up to the bytes pump_new had allocated in this iteration.
+    // OURS: strict, nothing may be left. The pinned pump plugin was built -fno-exceptions, so a bad_alloc inside its own pump_new left everything it had made (49 cases on ELECTRO);
+    // host builds now compile pump with -fexceptions (pump/CMakeLists.txt), which frees the members, but 1 case remains (pump::verb::Engine::prepare, raw arrays with no owner:
+    // an out-of-memory-only leak in pump code, a follow-up). Tolerated here and counted: only when the failing allocation was inside pump_new, and only up to the bytes pump_new had allocated in this iteration.
     if (g_pumpFail && (dl != 0 || dh > 4096) && dl >= 0 && dl <= g_pumpBytes && dh <= g_pumpBytes + 65536) { pumpLeaks++; pumpLeakBytes += dl; }
     else if (dl != 0 || dh > 4096) { leaks++; worst = std::max(worst, std::max(dl, dh)); if (leaks <= 5) { std::printf("  LEAK at k=%ld: %lld live bytes, heap +%lld\n", k, (long long)dl, (long long)dh); if (g_trace) traceDump(); } }
     else ok++;
