@@ -158,7 +158,10 @@ int main() {
     CHECK(aa.rc == 0 && da.rc == 0 && an.rc == 0 && dn.rc == 0, "fx_commit runs (%d %d %d %d)", aa.rc, da.rc, an.rc, dn.rc);
     CHECK(diff(aa.l, da.l, &f) == 0 && diff(aa.r, da.r, &f) == 0, "fx_commit(at 30000 frames on) through the API equals fxCommit(at)");
     CHECK(diff(an.l, dn.l, &f) == 0 && diff(an.r, dn.r, &f) == 0, "fx_commit(NOW) through the API equals fxCommit(NOW)");
-    CHECK(diff(da.l, dn.l, &f) != 0, "the commit time makes a difference in this run (else `at` could be dropped unseen)"); }
+#ifdef THUNDER_HAVE_TFX   // (a build without the effects library, the closed build and MSVC, hosts no effect slot: the commit changes nothing there and only the bit-equality above is checked, as test_live_fx)
+    CHECK(diff(da.l, dn.l, &f) != 0, "the commit time makes a difference in this run (else `at` could be dropped unseen)");
+#endif
+  }
 
   // ---- 1c. THE ENGINE OFFSET read from another thread while process runs: never torn, never stale for a call that has returned
   { thunder_live_opts op = opts(0, 128); thunder_live* L = thunder_live_create(&op, nullptr, 0);
