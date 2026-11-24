@@ -1,6 +1,9 @@
 /* U37 P5 (ctest `live_c`): the C API of the live host, from a pure C99 translation unit (-std=c99 -Wall -Wextra -pedantic; /W4 under MSVC): every function of thunder/live.h, its success path and every
    error path that can be reached from C. Created hosts, a song and pads published, a play, the audio call, the event records, the MIDI records, the transport and the mixer, effects and master, meters, the dump
    ring, E_BUSY, the budget, the alloc / take pair, the NULL handle of every function. (The dead handle needs an exception: test_live_capi.cpp makes one.) No <unistd.h>, no VLA, nothing big on the stack. */
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS 1   /* sprintf / fopen / strcpy: C4996 is an error under /WX (MSVC CI) */
+#endif
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
