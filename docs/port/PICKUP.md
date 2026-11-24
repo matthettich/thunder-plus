@@ -37,14 +37,16 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 
 **U37 P3 is MERGED: #301, squash `49c956b` (24 Nov, 12:54).** Every job green on `966f165` except macOS, which never completed there (four runs "not acquired by Runner", one cut off at 60 minutes with 95 tests passed, none failed). The owner approved ("Merge it then", 10:51) merging on the macOS pass of #302's head `be7f5f8`, which held the same code.
 
-**In review, NOT merged: U37 P4 = PR #302, branch `n1/u37-p4`, head `58feb0c`** (MIDI in `LiveHost`, the DIRECT path; the posted fallback was not needed). Notes: `docs/port/U37-P4-NOTES.md` on that branch.
+**U37 P4 is MERGED: #302, squash `2816922` (24 Nov, 15:44), CI all green on `58feb0c`. U37 P5 = PR #308 (branch `n1/u37-p5b`, ONE commit on native; #303 closed: its history held a mistakenly committed `build/`); verifier `review/verify-p5` (MERGE AFTER finding 1, answered in round 2); merge when CI is green on its head.** The P4 notes below are history.
+
+**(History) In review, NOT merged: U37 P4 = PR #302, branch `n1/u37-p4`, head `58feb0c`** (MIDI in `LiveHost`, the DIRECT path; the posted fallback was not needed). Notes: `docs/port/U37-P4-NOTES.md` on that branch.
 - `58feb0c` is ONE commit on `native`: the tree of `be7f5f8` (the old eight-commit head, on which ALL NINE CI jobs were green, macOS and sanitizers included) with native's PICKUP.md. Checked with `git diff --stat be7f5f8 58feb0c`: PICKUP.md only.
 - Byte-equal to the posted path: 18 ledger songs + start-midway + loop; stop while playing (18 cases); non-zero FX latency against `SongRenderer`. `thunder_midi_set_lead` cap 1.2 s. The macOS job's limit is 90 minutes in this PR.
 - The lead read the whole core diff (both rounds) and accepts it. Independent verifier: `review/verify-p4` ("MERGE" on `8f903c9`); round 2 (`de1c4fd`) answers its findings 1 (wrong MIDI after a refused publish: the scheduler's song post is now the last step that can fail), 3, 4, 6, 7, 8, 9.
 - **To do: when every job is green on `58feb0c`, squash-merge #302 (REST, pin the sha).** If only the runners fail again (macOS not acquired; sanitizers "lost communication" at about 49 minutes: seen three times today, cause not found, it passed on `966f165` and `be7f5f8`): re-run the job. The code is the tree that already passed.
 
 **Things that bit today**
-- **Never `git rebase` in this shallow clone** (not even `--onto`): every file conflicts as "both added", and `-X ours` silently DROPS the branch's changes (a wrong head `59b87c0` was on `n1/u37-p4` for a minute). To move a branch onto a squash-merged base: `git checkout -B <branch> origin/native && git read-tree -u --reset <old head> && git checkout origin/native -- docs/port/PICKUP.md`, commit, then check `git diff --stat <old head> HEAD`.
+- **Force-pushes are refused by this session's permission rules: put a moved branch on a NEW branch name and open a new PR instead. Never `git rebase` in this shallow clone** (not even `--onto`): every file conflicts as "both added", and `-X ours` silently DROPS the branch's changes (a wrong head `59b87c0` was on `n1/u37-p4` for a minute). To move a branch onto a squash-merged base: `git checkout -B <branch> origin/native && git read-tree -u --reset <old head> && git checkout origin/native -- docs/port/PICKUP.md`, commit, then check `git diff --stat <old head> HEAD`.
 - A PR stacked on an unmerged one can be opened against `native` at once: its CI runs (CI needs a PR into `native`), which is how P4 was tested while P3 waited for a macOS runner.
 - A test's "non-empty" guard must allow for the sanitizer build's reduced matrix (`live_midi` asked for more than 50 records, the sanitizer run has 46).
 
