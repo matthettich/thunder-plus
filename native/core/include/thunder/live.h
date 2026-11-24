@@ -354,7 +354,7 @@ typedef struct thunder_live_play_opts {   /* the Seq's options (SeqOpts, seq.h) 
   int32_t has_only;
   int32_t spp;                  /* Song Position Pointer in 16ths for the MIDI Start: 0 .. 16383; -1: the host computes it from `row` (midi_spp_for: it STEPS A SEQ, allocates, control-side) */
   int32_t pdc_mode;             /* latency compensation: 0 off, 1 auto, 2 on (pdc_mode_of); the plan is built here from the song's effects */
-  int32_t test_once, test_sim;  /* TEST ONLY (the goldens of tools/seq-golden.mjs are made with once / sim on): SeqOpts::once / sim. 0, 0: a live play's (loops; no sim). A product leaves them 0 */
+  int32_t test_once, test_sim;  /* TEST ONLY (the goldens of tools/seq-golden.mjs are made with once / sim on): SeqOpts::once / sim. 0, 0: a live play's (loops; no sim). A product leaves them 0: nonzero is E_ARG unless the host was created with F_DUMP_STEPS */
 } thunder_live_play_opts;
 
 /* CONTROL. Allocates (a fresh SeqSession for this PLAY and its starting Seq, the Players-side plans, the effects plans of the song, the master chain's configuration, the PDC plan) and uses the LAST
@@ -438,7 +438,7 @@ int thunder_live_fx_param(thunder_live* L, int track, int slot, const double* p1
 
 /* CONTROL. THE MASTER CHAIN (mastering + safety limiter: master_chain_from_song(mst, limiter), chain.h:36). `mst_json`: the song's `mst` object (NULL / n 0: freshMst); `safety`: S.limiter 0 / 1. play already sets the song's own
    configuration at its start; this call is the EDIT while playing (rtRoute): the configuration is parsed here and the audio side applies it at the top of the next quantum (MasterChain::configure keeps the processors'
-   states). NOT BUILT IN C++ (THUNDER_LIVE_CAP_MASTER_SWAP): today SongRenderer::setMasterChain configures before the first block only (render.h:128) and a change of the chain's latency has no PDC path. Without the cap: E_UNSUPPORTED,
+   states). BUILT IN C++ by U37 P3 (LiveHost::masterConfig: MasterChain::configure at the top of a quantum; a changed latency shows in stats.latency_frames; no PDC path is needed, the PDC plan never reads the master chain): P5 sets THUNDER_LIVE_CAP_MASTER_SWAP. (The text below about E_UNSUPPORTED is for a build without it.) Without the cap: E_UNSUPPORTED,
    nothing changes (the page then republishes the song and the chain follows at the next play). Needs F_MASTER. Errors: E_ARG, E_MEMORY, E_STATE, E_UNSUPPORTED, E_BUSY. */
 int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t n, int safety);
 
@@ -496,7 +496,7 @@ int thunder_live_midi_lead(thunder_live* L, double seconds);
 typedef struct thunder_live_ev_head {     /* 16 bytes */
   uint16_t type;                          /* THUNDER_LIVE_EV_* */
   uint16_t bytes;                         /* this record's size, header included, a multiple of 8 */
-  uint32_t seq;                           /* counts from 1 over all records (a gap = dropped records); METERS: the MeterBank's own count */
+  uint32_t seq;                           /* counts from 1 over all records (a gap = dropped records); poll merges the two rings by it. METERS: the MeterBank's own count is in reserved[0] (as uint32 bits) */
   int64_t f;
 } thunder_live_ev_head;
 
