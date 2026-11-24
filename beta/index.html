@@ -2260,6 +2260,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
    Two dancing dogs (outline cartoons of the pittie-dachshund and the husky) that hop on every beat while the song
    plays and breathe slowly when it stops, or a preview of the phrase under the cursor. Settings → STAGE. */
 .tstage{position:absolute; z-index:2; pointer-events:none; display:flex; flex-direction:column}
+body.rszing .tstage{visibility:hidden}   /* while the window is being resized (build 676): it sits in pixels beside the grid's text and would be over it until the refit */
 .tstage[hidden]{display:none}
 .stgx{position:absolute; top:0; right:0; pointer-events:auto; min-height:0; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--muted); opacity:0; transition:opacity .15s; font-size:var(--fs-3)}
 .tstage:hover .stgx, .stgx:focus-visible{opacity:1}
@@ -27231,7 +27232,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 675;
+const BUILD = 676;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32084,7 +32085,11 @@ function stageRoom(){
   // narrower. It now starts at a fixed 72 characters (the 68ch description plus its margin), further right only for wider text.
   if (!asg && tv === 'fx'){ const cw = parseFloat(grid.style.getPropertyValue('--chw')) || parseFloat(getComputedStyle(grid).fontSize) * 0.6; right = Math.max(right, gr.left + grid.clientLeft + 72 * cw); }
   const left = right - sr.left + 18;
-  return {right, left, w:sr.width - left - 14, top:gr.top - sr.top, h:gr.height};
+  // OVERLAP (24 Nov, build 676; owner, Mac, Pattern view on the MST column: the SIGNAL chain over the phrase): the text's right edge is measured as it sits NOW. A grid that
+  // scrolls sideways (Pattern view wider than its pane) puts that edge further left the more it is scrolled, so a stage placed beside the text at the end of the scroll
+  // was over the text as soon as the cursor moved back (nothing re-places the stage on a scroll). A grid scrolled sideways has no room beside its text: ovf (the grid's scroll event re-places the stage).
+  const ovf = !asg && grid.scrollLeft > 1;
+  return {right, left, w:sr.width - left - 14, top:gr.top - sr.top, h:gr.height, ovf};
 }
 /* DANCE / DRUM / KEYS / HIDE (owner, 19 Oct): when there's no room for the dogs beside the phrase (narrower than
    150 px), DANCE and DRUM are hidden and KEYS shows lit (the keys stand in); with no room even for the keys
@@ -32099,7 +32104,7 @@ function stageLayout(){
   if (!stgReq){ box.hidden = true; stgKindNow = ''; return; }
   const {right, left, w, top, h} = R;
   let kind = stageKind(); if (tv === 'phrase' && (kind === 'dogs' || kind === 'drum') && w < 150) kind = 'piano';   // too narrow for the dogs: the keys
-  const minW = kind === 'piano' ? 90 : kind === 'peek' ? 220 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
+  const minW = kind === 'piano' ? 90 : kind === 'peek' ? 220 : 150, show = right > 0 && w >= minW && h >= 150 && !R.ovf; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
   const dg = kind === 'dogs' || kind === 'drum'; $('tStageDogs').hidden = !dg; $('tStagePh').hidden = dg || kind === 'peek';
   $('tStagePk').hidden = kind !== 'peek'; box.classList.toggle('peek', kind === 'peek'); box.setAttribute('aria-hidden', String(kind !== 'peek')); sxStageSwitch(kind); sxPkSig = '';   // SONG EXTRAS
@@ -32108,6 +32113,7 @@ function stageLayout(){
   stgKindNow = kind; stgSig = '';
   if (dg) dogsState(); else stageCanvas(true);
 }
+{ let raf = 0, was = false; grid.addEventListener('scroll', () => { const o = grid.scrollLeft > 1; if (raf || o === was) return; was = o; raf = requestAnimationFrame(() => { raf = 0; stageLayout(); }); }, {passive:true}); }   // the grid starts or stops scrolling sideways: the stage goes, or is placed again (stageRoom: ovf)
 // Dogs: arms up and dancing while the song plays, a slow breath and a lazy tail when it stops.
 function dogsState(){
   const d = $('tStageDogs').querySelector('.dogs'), on = !!tp.on, dr = stgKindNow === 'drum';
@@ -34725,13 +34731,26 @@ function arrLayout(force){
 // Every "the page changed shape" signal (window, visual viewport, the screen element, fonts arriving) lands here and
 // runs ONE layout pass in the next frame: a fold/unfold used to run fit()+draw() four times over (~0.5 s on the phone).
 let refitRaf = 0, refitForce = false, refitSize = '';
+/* WINDOW RESIZE DURING PLAYBACK (24 Nov, build 676; owner, Mac desktop app: "GUI hangs when I resize the window ... animations or information overlaps with the
+   content ... intermittently during playback"): a live drag fires 60+ resize events a second and every one ran fit() + draw() (several draws: ~100–300 ms each on a
+   busy screen), so the page never caught up; the stage (dogs, piano, the FX SIGNAL chain) is placed in pixels beside the grid's text, so any frame painted between a
+   reflow and the next refit had it over the content. Now, while the window is being resized (a resize event in the last RZ_END ms): the stage is hidden (body.rszing),
+   the refit runs at most every RZ_GAP ms (the first one at once; the gap grows to twice what the last one cost), and one full refit runs RZ_END ms after the last
+   event, which shows the stage again. Not resizing: nothing here runs, nothing changes. */
+const RZ_GAP = 100, RZ_END = 160;
+let rzOn = false, rzEndT = 0, rzLast = 0, rzCost = 0, rzOwed = false;
+function rzEnd(){ rzEndT = 0; rzOn = false; rzOwed = false; document.body.classList.remove('rszing'); scheduleRefit(true); }   // true: the stage is placed again (stageLayout in the draw) whatever the signature says
+function rzMark(){ if (!rzOn){ rzOn = true; rzLast = 0; document.body.classList.add('rszing'); } clearTimeout(rzEndT); rzEndT = setTimeout(rzEnd, RZ_END); }
 function scheduleRefit(force){
   refitForce = refitForce || !!force; if (refitRaf) return;
   if (!force && typeof dkDragHold === 'function' && dkDragging){ if (dkDragHold()) return; }   // RESIZE STUTTER: a panel drag refits at most every DK_DRAG_MS
-  refitRaf = requestAnimationFrame(() => { refitRaf = 0; const f = refitForce; refitForce = false; if (f) measure(true);
+  if (!force && rzOn && rzLast){ const nw = performance.now(); if (nw - rzLast < Math.max(RZ_GAP, rzCost * 2)){ rzOwed = true; return; } }   // the rest waits for rzEnd (the last event + RZ_END ms)
+  refitRaf = requestAnimationFrame(() => { refitRaf = 0; const t0 = performance.now(), f = refitForce; refitForce = false; if (f) measure(true);
     const did = arrLayout(f), sz = scr.clientWidth + 'x' + scr.clientHeight;   // the screen element itself changed size (a panel, the keyboard): re-fit
-    if (!did && view === 'tracker' && sz !== refitSize){ fit(); draw(); } refitSize = sz; });
+    if (!did && view === 'tracker' && sz !== refitSize){ fit(); draw(); } refitSize = sz;
+    if (rzOn){ rzLast = performance.now(); rzCost = rzLast - t0; } });
 }
+addEventListener('resize', rzMark);   // before the one below: it marks the burst first
 addEventListener('resize', () => scheduleRefit(false));
 // Web fonts can arrive after the first draw: measure again so the text and the MONO / POLY boxes line up.
 if (document.fonts) document.fonts.addEventListener('loadingdone', () => scheduleRefit(true));
@@ -36040,24 +36059,25 @@ const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 
      playhead is moved in place: the playing-row marks (Sect, Phrase, Pattern view's gutter and per-track bands) and Arrange's blocks (drawArr, which has its own
      rate on a touch screen); the Mixer, Inst, FX, MOD and Project show nothing of the playhead, so nothing is drawn for a row. Song and Arrange as the Song screen
      (their grid text carries the playing row) and every screen with a selection, a drag, Arrange focus or paging in progress take the full redraw as before.
+   - The window's size is in the stamp (vpW, vpH: a refit draws it), but not while the window is being resized (rzOn): a drag changed it every event and every playhead step drew the whole screen again (build 676).
    - A full redraw still runs when the stamp differs (the cursor or page moved: FOLLOW, an edit that moved it) and at least every PL_BEAT ms, so anything that
      changed without its own redraw is picked up within half a second. Anything the user does draws at once (it never comes through here), and STOP / PLAY draw.
    - On a touch screen (COARSE) the playhead's drawing, either kind, runs at most every PL_MIN ms (about 20 a second): the frame that would draw sooner owes it
      (plOwed) and does it on the first frame past the gap, with the newest position (the sequence is drained every frame regardless). */
 const PL_BEAT = 500, PL_MIN = 50;
 let plBase = null, plOwed = false, plLast = 0;
-const plStamp = () => [tv, view, JSON.stringify(cs), cTrack, cPhrase, cSect, tp.mode, tp.bpm, tp.tks, patRow, loopPat, followMode, scr.style.fontSize, tScale, vpW, arrW, sideOn, inlOn, stage, arrMode, apF, spOn, pvMode, pvFx, pvFold, inMode, ntr()].join('|');
+const plStamp = ns => [tv, view, JSON.stringify(cs), cTrack, cPhrase, cSect, tp.mode, tp.bpm, tp.tks, patRow, loopPat, followMode, scr.style.fontSize, tScale, ns ? 0 : vpW, ns ? 0 : vpH, arrW, sideOn, inlOn, stage, arrMode, apF, spOn, pvMode, pvFx, pvFold, inMode, ntr()].join('|');
 function playTick(){
   const now = performance.now();
   if (COARSE && now - plLast < PL_MIN){ plOwed = true; return; }
   plOwed = false; plLast = now;
   if (playLite(now)) scrAdd('draw', performance.now() - now);   // the playhead-only update is a screen update too: counted in the CPU panel's figure (a full draw() counts itself, once)
-  else { playDraw = true; try { draw(); } finally { playDraw = false; } plBase = {t:now, sig:plStamp()}; }
+  else { playDraw = true; try { draw(); } finally { playDraw = false; } plBase = {t:now, sig:plStamp(), sigN:plStamp(true)}; }
 }
 function playLite(now){
   if (!plBase || now - plBase.t > PL_BEAT || view !== 'tracker' || apHold || apF || selA || sdrag || drag || arrFast || arrSoon) return false;
   if (!(tv === 'sect' || tv === 'phrase' || tv === 'inst' || tv === 'mixer' || tv === 'fx' || tv === 'mod' || tv === 'project')) return false;
-  if (plStamp() !== plBase.sig) return false;
+  if (rzOn ? plStamp(true) !== plBase.sigN : plStamp() !== plBase.sig) return false;   // WINDOW RESIZE (build 676): the window's size changing is the refit's to draw (it runs every RZ_GAP ms, and once more at the end), not every playhead step's
   const P = tp.on ? tp.pos : null, rows = test => { const q = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) q.add(r); }); return q; };
   if (tv === 'sect') litRows(rows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null));
   else if (tv === 'phrase'){ litRows(rows(q => q.phrase === cPhrase ? q.step : null)); if (pvActive()) pvPlayMark(P); else if (pvLit.size) pvPlayMark(null); }
@@ -37686,6 +37706,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [676, '24 Nov', ['Fixed: resizing the window while a song plays no longer hangs the screen. A drag used to redraw the whole tracker and Arrange on every event, and again on every playhead step; now the screen is re-fitted a few times a second during the drag and once more when it ends, and the dogs / piano / FX chain beside the grid are hidden until then, so they cannot sit over the text.', 'Fixed: the master\u2019s SIGNAL chain (and the other panels beside the grid) could sit over the Pattern view\u2019s columns after the window was resized or the view scrolled sideways. It now shows only when the grid is not scrolled sideways.']],
   [675, '24 Nov', ['Fixed: LOOP SEL (and LP.SEL) keep looping the rows you selected in Arrange after you go into a phrase, select or edit a note there and come back. A selection in the phrase used to replace the armed rows when you left it with the song stopped, so PLAY on Arrange no longer looped them.']],
   [674, '24 Nov', ['Fixed: since build 660 (20 Nov) a saved song could not be read at start-up, so the app opened the starter beat and the next autosave wrote it over your song. Songs load again. If your last song is gone, File \u25be \u2192 Restore a backup\u2026 brings back an earlier one.', 'A saved song that cannot be read at start-up is never overwritten any more: it is copied aside (File \u25be \u2192 Restore a backup\u2026, listed first as \u201cUnopened song\u201d), the starter beat is not autosaved until you change something, and a red bar tells you.', 'Settings \u2192 App says how the song at start-up was chosen (saved song, first run, could not be read, share link, project file), and Copy playback report starts with the same line.']],
   [673, '23 Nov', ['Patch knobs: a knob change on a quiet waves patch is heard at once (it used to wait for a note); knob values reach waves voices made later at the right time.']],
@@ -38470,7 +38491,7 @@ try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; if ('m' in
 function pvSave(){ try { localStorage.setItem(PVUK, JSON.stringify({m:pvMode, fx:pvFx, fold:pvFold, fit:pvFitOn, rh:pvRH})); } catch(e){} }
 function setPv(on){ pvOn = !!on; try { localStorage.setItem(PVK, pvOn ? '1' : '0'); } catch(e){} draw(); }
 // It needs width: the computer and the unfolded Fold. On the folded phone the buttons are hidden and Phrase is as before.
-let vpW = innerWidth; addEventListener('resize', () => { vpW = innerWidth; });   // (13 Nov) read once per resize: pvActive() runs dozens of times a redraw and innerWidth can force a layout on a phone
+let vpW = innerWidth, vpH = innerHeight; addEventListener("resize", () => { vpW = innerWidth; vpH = innerHeight; });   // (13 Nov) read once per resize: pvActive() runs dozens of times a redraw and innerWidth can force a layout on a phone
 const pvRoom = () => vpW >= 600 && !spOn;   // SIMPLE PHRASE: the plain phrase only
 const pvActive = () => pvOn && pvMode && view === 'tracker' && tv === 'phrase' && pvRoom() && (cTrack < ntr() || cTrack === MT);
 // Text size: sized to show about PVW characters across (the phrase is sized for 52), but no smaller than 11px, and tall
