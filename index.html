@@ -3799,7 +3799,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>Mobile: Arrange (▲). From Song, Arrange or Sect, ▼ opens the block’s phrase (the Pattern view when that is on; an empty block gets a new phrase once you add a note), on a computer too. Otherwise Project (▲). Mixer (▼), from any other screen, and back the same way (M8 style). To select, use SHIFT + ALT or SEL</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note, instrument, volume or effect, picks it up; on an empty one, drops it (EDIT + arrows changes a note in place) · on an empty Song / Arrange block, makes a new empty pattern (EDIT + arrows then changes its number) · tap twice (within about half a second) for a note off, the effect list on an effect, a unique copy of a song block, or a new sect</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>EDIT + ◀▶ on a › PRESET row</td><td>The previous / next preset of that FX slot (holds repeat; one undo step)</td></tr><tr><td>ALT + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>ALT + arrows</td><td>Other sect, phrase, instrument or FX track: ▲ ◀ the one before, ▼ ▶ the one after · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, the nearest block that way (PATTERN NAV; off: ◀▶ previous / next block in the track, ▲▼ 16 rows)</td></tr><tr><td>ALT + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + ALT + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + ALT</td><td>Start or cancel a selection (SEL on the command row too); arrows grow it, ALT copies, ALT+EDIT cuts</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play the song · play this screen, which loops the selected rows when LOOP SEL is on</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>EDIT on an FX slot</td><td>A list of every effect (like the FX command list): pick one and its controls open; its own effect, marked NOW, keeps its settings; --- empties the slot</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or ALT alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on a new row below; the rows below move down) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines (so does <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>▲▼</kbd>, as in KEYS mode). <kbd>Z</kbd> stays ALT (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (ALT+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. To change the cursor’s cell by dragging, rest your finger on it a moment (a short buzz), then drag up or down; a quick swipe scrolls, from anywhere.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>KN1</code>–<code>KN8</code>knob 1–8 of this track’s chains patch (its Knob modules) from here on, 00 lowest – FF highest; stopping the song gives the patch its own Value back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 center (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 center</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10, then 11–FF in families by the first digit: 1 roll, 2 stutter, 3 build, 4 reverse, 5 pitch down, 6 pitch up, 7 tape, 8 scratch, 9 gate, A filter, B crush, C fade repeat, D juggle, E groove, F chaos (the second digit picks the variant)</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>FX stutter: the <b>Retrigger effect</b> in a slot repeats every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops. It needs that effect in a slot (typing RTG adds it to a free one)</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays (times the track’s TCH)</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row XX (00–1F; row 00 if that’s past its length)</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>note repeat: the note itself retriggers every Y ticks, X fades each hit (needs no effect; RTG is the effect stutter)</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomize the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed chance so it falls the same way every time, in renders too: in the master column the whole song (00: a new roll each time it plays), on a track that track only until its next SED (00: back to the song’s). RND and ARC random repeat too</div><div><code>TCH</code>track chance from here on: every note of the track plays XX/FF of the time, times its own CHA (FF: off; the master column: every track; MOD → CHANCE does the same with an LFO)</div><div><code>SKP</code>what a note skipped by chance or a condition does from here on: 00 the note before rings on, 01 it is stopped</div><div><code>CHD</code>chords and chance from here on: 00 the chord plays or is skipped as one, 01 each note rolls by itself</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is center</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div><div><code>CND</code>a condition, as on the Elektron boxes: Y 0 FILL (plays while FILL is on), 1 !FILL, 2 PRE (this track’s last condition — NTH, CHA or 1ST — came out true), 3 !PRE, 4 NEI (the neighbor’s did: X its track number, 0 = the track to the left), 5 !NEI, 6 1ST (the first pass through this row since PLAY), 7 !1ST</div><div><code>NUD</code>nudge ± ticks: 01–7F late, FF–80 early (up to half a step)</div><div><code>RTV</code>the RET note repeats’ level: + rises to the last hit (the first ones softer), − fades, 1/32 a hit</div><div><code>SLC</code>on a sliced sound, play slice XX (00 the first); the note pitches it, C-4 as it is</div><div><code>XFD</code>the crossfader between scene A and scene B (Perform): 00 all A … FF all B</div><div><code>MAC</code>macro X (1–8) to Y (0 lowest – F highest)</div><div><code>LK1</code>–<code>LK4</code>set what this track’s lock 1–4 points at (Perform → Locks) to XX until the next note without it</div><div><code>PRT</code>switch to part XX (Perform → Parts: instruments, mixer and effect values); 00 back to the song’s own. STOP goes back too</div></div>
+<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>KN1</code>–<code>KN8</code>knob 1–8 of this track’s chains patch (its Knob modules) from here on, 00 lowest – FF highest; stopping the song gives the patch its own Value back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 center (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 center</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLZ</code>Flex pattern from the third bank, 255 chained IDM / glitch punch-ins (two or three FLX / FLY moves in a row, e.g. stutter + crush): 00 off, 01–0F one of each family to try first, then by the first digit 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos; plays on the same Flex as FLX and FLY, the last one written wins</div><div><code>FLX</code>Flex pattern: 00 off, 01–10, then 11–FF in families by the first digit: 1 roll, 2 stutter, 3 build, 4 reverse, 5 pitch down, 6 pitch up, 7 tape, 8 scratch, 9 gate, A filter, B crush, C fade repeat, D juggle, E groove, F chaos (the second digit picks the variant)</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>FX stutter: the <b>Retrigger effect</b> in a slot repeats every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops. It needs that effect in a slot (typing RTG adds it to a free one)</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays (times the track’s TCH)</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row XX (00–1F; row 00 if that’s past its length)</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>note repeat: the note itself retriggers every Y ticks, X fades each hit (needs no effect; RTG is the effect stutter)</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomize the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed chance so it falls the same way every time, in renders too: in the master column the whole song (00: a new roll each time it plays), on a track that track only until its next SED (00: back to the song’s). RND and ARC random repeat too</div><div><code>TCH</code>track chance from here on: every note of the track plays XX/FF of the time, times its own CHA (FF: off; the master column: every track; MOD → CHANCE does the same with an LFO)</div><div><code>SKP</code>what a note skipped by chance or a condition does from here on: 00 the note before rings on, 01 it is stopped</div><div><code>CHD</code>chords and chance from here on: 00 the chord plays or is skipped as one, 01 each note rolls by itself</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is center</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div><div><code>CND</code>a condition, as on the Elektron boxes: Y 0 FILL (plays while FILL is on), 1 !FILL, 2 PRE (this track’s last condition — NTH, CHA or 1ST — came out true), 3 !PRE, 4 NEI (the neighbor’s did: X its track number, 0 = the track to the left), 5 !NEI, 6 1ST (the first pass through this row since PLAY), 7 !1ST</div><div><code>NUD</code>nudge ± ticks: 01–7F late, FF–80 early (up to half a step)</div><div><code>RTV</code>the RET note repeats’ level: + rises to the last hit (the first ones softer), − fades, 1/32 a hit</div><div><code>SLC</code>on a sliced sound, play slice XX (00 the first); the note pitches it, C-4 as it is</div><div><code>XFD</code>the crossfader between scene A and scene B (Perform): 00 all A … FF all B</div><div><code>MAC</code>macro X (1–8) to Y (0 lowest – F highest)</div><div><code>LK1</code>–<code>LK4</code>set what this track’s lock 1–4 points at (Perform → Locks) to XX until the next note without it</div><div><code>PRT</code>switch to part XX (Perform → Parts: instruments, mixer and effect values); 00 back to the song’s own. STOP goes back too</div></div>
 <p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI (on a computer, Audio &amp; MIDI ▾ in the top bar) says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again (unless the next row retunes it or plays another note).</p>
 <p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTER, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
 <p><b>Playing and recording from a MIDI keyboard:</b> ⚙ Settings → MIDI → <b>Keys play</b>: in the tracker the keyboard plays the instrument you're on (the INST screen's, or the cursor row's in a phrase) and holds it while the key is down; a MIDI instrument plays its gear, with bend, aftertouch, sustain and every unlearned knob passed through. <b>Notes in</b> picks the input and channel, <b>Clock from</b> the input Clock in follows, and each port has its own <b>delay</b>. <b>REC</b> on the top strip (F9): stopped, a note or chord goes in at the cursor and the cursor moves on when you let go; playing, notes land on the step they were played on in the track under the cursor, with velocity and OFFs (a take is one undo step). <b>CLICK</b> is the metronome; Settings → <b>Record &amp; play</b> has its level, the count-in, REC TIMING (STEP, or TICKS: the step plus a <code>DEL</code>) and LIVE TRANSPOSE (a key transposes the KEY FOLLOW instruments as the song plays).</p>
@@ -3810,7 +3810,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p><b>chains modules:</b> every effect module in a chains patch has a <b>BYP</b> button on its title bar with a number: it bypasses the module (its dry sound passes). From a phrase, <code>BYP 31</code> bypasses module 3 on that track's chain, <code>BYP 30</code> puts it back, and <code>BYP 34</code> switches it the other way from the patch for four rows, so a trance gate left bypassed plays for four rows. <code>BYP 0Y</code> does every numbered module. Stopping the song puts them back as the patch has them.</p>
 <p><b>Presets and sidechains in chains:</b> effects and sound sources have a <b>Preset</b> row: factory presets, Default, and your own (Save as a preset keeps them on this device, for every patch). Anything that takes a sidechain has a <b>Source</b> row: <b>Self</b>, <b>Send 1–8</b> (what a <b>Sidechain Out</b> in any chain sends) or one <b>track</b>'s own sound, before its effects and fader, so a muted ghost kick still drives it. That goes for <b>Sidechain In</b> (its meter shows what it hears before you patch it), Sidechain Comp, the compressors, the noise gate and the envelope filter, in chains and as track or master effects. The Mixer's <b>SC</b> row lights when a track is a source for something. The light beside a module's <b>SC</b> input flashes with the sidechain it hears.</p>
 <h3>Flex, Step gate and Retrigger</h3>
-<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Load sample</b> opens the sample browser (or File › Samples…): FOLDER is your sample folder with its subfolders, set once and remembered (where the browser asks again after a restart, press Reconnect); RECENT is every sample you've loaded or recorded, from anywhere; ＋ Files… adds files from anywhere (one file loads straight into the pad). Type to search, ▲▼ to walk the list (AUDITION plays each), Enter or a double-click loads into the pad picked at the bottom. Phones get RECENT and ＋ Files…. <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. Stopping the song while it records plays on to the end of the pattern, then stops with the take. Press Stop again to end it at once. If LENGTH is Until Stop, the take is cut when the song stops. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited and kept in a pad; <b>Edit sample…</b> on a sample layer opens the same editor on a loaded sample (APPLY writes it back, and Start and the loop points move with the audio). In the editor: drag to select, click to place the cursor (Shift-click stretches the selection); the wheel or a pinch zooms at the pointer, − / + zoom at the cursor, FIT shows all, SEL the selection; Shift+wheel or a sideways swipe scrolls, and the overview above moves the view; F fits the whole take. ● Record over a take you haven't kept asks first (keep it in the pad, discard it, or cancel). Tools: crop, cut, silence, snap to zero crossings, auto-trim, normalize, ±3 dB, fades, reverse, invert, remove DC, to mono / stereo, append a file, undo; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. The note keys play the take chromatically (C-4 as recorded), OCT − + beside Play. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. FLX and FLY drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex values (STEPS 1–8 and 9–16, where 1 is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> plays its PATTERN from PLAY. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
+<p><b>Flex</b> re-sequences the last bar in time with the song: repeats, fills, a stutter build, half speed, tape stop, reversed beats, a backspin, scratching, gates, shuffles, a beat juggle, octave-up and random slices (256 patterns; <code>FLX</code> picks one from a row: 01–10 the originals, then families by the first hex digit, after the OP-Z and Pocket Operator punch-ins: 1 rolls, 2 stutters, 3 builds, 4 reverses, 5 pitch down, 6 pitch up, 7 tape stops and wow, 8 scratches, 9 gates and pumps, A filter sweeps, B bit crush, C fading repeats, D juggles, E swing and feel, F chaos). <b>Load sample</b> opens the sample browser (or File › Samples…): FOLDER is your sample folder with its subfolders, set once and remembered (where the browser asks again after a restart, press Reconnect); RECENT is every sample you've loaded or recorded, from anywhere; ＋ Files… adds files from anywhere (one file loads straight into the pad). Type to search, ▲▼ to walk the list (AUDITION plays each), Enter or a double-click loads into the pad picked at the bottom. Phones get RECENT and ＋ Files…. <b>Record a sample…</b> (Synth page beside Load sample, or File): an input, STEREO / MONO / LEFT / RIGHT, monitoring (headphones) and a level meter; FREE records until Stop; PATTERN records whole patterns in time with the song, as Renoise's pattern sync: playing, it starts at the next pattern and Stop ends it at the end of one (or after the LENGTH set); stopped, it starts the song from the cursor's pattern. Stopping the song while it records plays on to the end of the pattern, then stops with the take. Press Stop again to end it at once. If LENGTH is Until Stop, the take is cut when the song stops. EXTRA LATENCY moves the take if it lands early or late. The take can then be edited and kept in a pad; <b>Edit sample…</b> on a sample layer opens the same editor on a loaded sample (APPLY writes it back, and Start and the loop points move with the audio). In the editor: drag to select, click to place the cursor (Shift-click stretches the selection); the wheel or a pinch zooms at the pointer, − / + zoom at the cursor, FIT shows all, SEL the selection; Shift+wheel or a sideways swipe scrolls, and the overview above moves the view; F fits the whole take. ● Record over a take you haven't kept asks first (keep it in the pad, discard it, or cancel). Tools: crop, cut, silence, snap to zero crossings, auto-trim, normalize, ±3 dB, fades, reverse, invert, remove DC, to mono / stereo, append a file, undo; FIT TO TEMPO sets the pad's instruments to SYNC with the take's beats. The note keys play the take chromatically (C-4 as recorded), OCT − + beside Play. <code>FLY</code> is Flex's second bank, 255 more for IDM, in the spirit of Aphex Twin and Autechre: <code>FLY 01</code>–<code>0F</code> are one of each family to try first, then by the first digit 1 pitch rolls (drill'n'bass: every repeat a step higher or lower), 2 euclidean gates (REPEAT holds the last hit instead of a gap), 3 probability (slices muted, repeated or ratcheted by chance), 4 slice pitch (slices jump to octaves, fifths or anywhere), 5 freeze, buzz and smear, 6 CD skips and dropouts, 7 bouncing, speeding and slowing rolls, 8 mutating shuffles (a little different each bar), 9 stutter edits, A polymeter (a loop of 3/16, 5/16… against the bar), B warp (every slice bends in pitch), C reverse rolls and rewinds, D grains, E texture (crush, filters and chops on random slices), F chaos 2. Most change every bar over a four-bar cycle; FIXED ones repeat the same every bar. <code>FLZ</code> is a third bank of 255, each one chaining two or three of these moves (stutter + crush, juggle + pitch, reverse + gate…); <code>FLZ 01</code>–<code>0F</code> are one of each of its 15 families. FLX, FLY and FLZ drive the same Flex, so the last one written plays. <b>Step gate</b> is a 16-step gate in time with the song: 15 patterns, or CUSTOM from two hex values (STEPS 1–8 and 9–16, where 1 is an open step); <code>GAT 01</code>–<code>0F</code> pick a pattern, <code>GAT 10</code> the CUSTOM steps, and <code>GAT 00</code> stops it (the gate opens until the next GAT). <b>Retrigger</b> catches a slice when it starts and repeats it, each repeat quieter (DECAY) or pitched (PITCH): <code>RTG 32</code> repeats 1/16 slices for two rows, or set MODE to ALWAYS and switch it with FXO. All three follow the song's tempo and bar (they pass the sound through when the song is stopped). Each command needs its effect in one of the track's (or the master's) slots: type <code>FLX</code>, <code>GAT</code> or <code>RTG</code> where it's missing and it is added to the first free slot. Pattern names give note values: <i>ROLL 1/16</i> rolls sixteenth notes, <i>STUTTER 1/32 EVERY 1/4</i> repeats a 32nd at the start of every quarter. <b>STARTS</b> on a Flex or Step gate: <b>ON FLX</b> / <b>ON GAT</b> (new slots) keeps it off (Step gate: open) until a command turns it on in the song, or <code>FXO</code> switches its slot on (then it plays its own PATTERN); it stays on until <code>FLX 00</code> (or FXO off), and waits again after STOP. Starting mid-song, the last command before that row is played at the start. <b>AT PLAY</b> plays its PATTERN from PLAY. Retrigger's MODE: RTG ONLY works the same way. In the FX bar, each of these slots draws the pattern it plays now with a playhead: Flex as a time map (where in the bar it plays from: repeats are saw teeth, reverses fall, half speed is a shallower line), its level along the bottom and its filter or crush; Step gate its steps; Retrigger its repeats.</p>
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine pump ones; pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, ALT (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and ALT + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's pump EQ in its own window, adding one to a free slot if needed; pump EQ works on every track, the other pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
@@ -3839,7 +3839,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=48"></script>
+<script src="waves/waves-worklet.js?v=49"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8878,7 +8878,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=48', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=49', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -19160,7 +19160,7 @@ const CC_NAMES = {0:'bank select', 1:'mod wheel', 2:'breath', 4:'foot', 5:'glide
 // A port letter's cable on this device, for INST.
 const portName = p => { const o = midiOut(p); return o ? (o.name || 'connected') : midi.outIds[p] ? 'not connected now' : 'no cable: Settings › MIDI'; };
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8'];   // new commands go on the end, so saved songs keep their numbers
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8','FLZ'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
@@ -19245,6 +19245,7 @@ const FXI = {
   BYP:v => { const X = v >> 4, Y = v & 15, w = X ? `chains module ${hx(X).slice(1)}` : 'every numbered chains module';
     return (Y === 0 ? `Put ${w} back in` : Y === 1 ? `Bypass ${w} (its dry sound passes)` : `Switch ${w} the other way from the patch for ${Y} rows, then back`) + ' on this track'; },
   ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(k => ['KN' + k, v => `Set knob K${k} of this track’s chains patch to ${Math.round(v / 2.55)}% (its Knob modules; back to their own Value when the song stops)`])),
+  FLZ:v => `Flex FLZ pattern ${hx(v)}: ${FlexCore.NAMES3[v]} (chained IDM / glitch bank; for this track’s Flex effect, or the master’s in the MST column)`,
   FLY:v => `Flex FLY pattern ${hx(v)}: ${FlexCore.NAMES2[v]} (IDM bank; for this track’s Flex effect, or the master’s in the MST column)`,
   FLX:v => { const k = flxCap(v); return `Flex pattern ${hx(k)}: ${FlexCore.NAMES[k]}${k !== v ? ' (this song keeps FLX 11–FF as pattern 10: Project → FLX 11–FF)' : ''} (on this track's Flex effect; in the MST column, the master's)`; },
   GAT:v => v === 0 ? 'Step gate off: the gate opens until the next GAT' : v >= 16 ? 'Step gate: the slot’s CUSTOM steps (STEPS 1-8, 9-16)' : `Step gate pattern ${v}: ${StepGateCore.NAMES[v]}`,
@@ -19323,7 +19324,7 @@ class FlexCore {
         const t = x * d * 1.5; if (Math.abs(t - 1) < 1e-9) return '1/' + d + 'T'; }
       return fr(b) + ' BEAT'; };
     const st = s => { const v = Math.round(12 * Math.log2(s)); return (v > 0 ? '+' : '') + v; };
-    const T = new Array(512).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
+    const T = new Array(768).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
     put(1, [null, ...[[3, 1/2], [3, 1/3], [3, 1/4], [3, 1/6], [3, 1/8], [3, 1/12], [3, 1/16], [3, 1/32], [2, 1/4], [2, 1/8], [2, 1/16], [3.5, 1/16], [3.5, 1/32], [3.5, 1/64], [0, 1/16]]
       .map(([s, L]) => ({f:'roll', s, L, n:`ROLL ${nv(L)} FROM BEAT ${s + 1}`}))]);
     put(2, [[1, 1/3], [1, 1/4], [1, 1/8], [1, 1/16], [1/2, 1/4], [1/2, 1/6], [1/2, 1/8], [1/2, 1/16], [2, 1], [2, 1/2], [2, 1/4], [4, 1/2], [4, 1/3], [4, 3/4], [4, 1/8], [1/4, 1/16]]
@@ -19429,6 +19430,11 @@ class FlexCore {
       .map(([G, d, set, fx]) => ({f:'tex', G, d, set, nb:fx ? 0 : 1, n:`${{all:'TEXTURE', crush:'CRUSH SLICES', filt:'FILTER SLICES', chop:'CHOP SLICES', cf:'CRUSH+FILTER SLICES'}[set]} ${nv(G)} ${Math.round(d * 100)}%${fx ? ' FIXED' : ''}`})));
     put2(15, [[1/4, .25], [1/4, .4], [1/4, .55], [1/4, .7], [1/4, .85], [1/4, 1], [1/2, .4], [1/2, .6], [1/2, .8], [1/8, .4], [1/8, .6], [1/3, .5], [1/4, .5, 1], [1/2, .5, 1], [1, .5], [1/4, .6, 0, 1]]
       .map(([G, d, fx, slow]) => ({f:'chaos2', G, d, nb:fx ? 0 : 1, slow:slow || 0, n:`CHAOS 2 ${nv(G)} ${Math.round(d * 100)}%` + (fx ? ' FIXED' : slow ? ' SLOW' : '')})));
+    // FLZ (owner, 23 Nov: "more effects like FLX and FLY"): a third bank, k 512–767 (flx param 512 + FLZ value). Each pattern is a
+    // `chain` of existing patterns run one after another on the read position (FlexCore.chain): x0 = now, x1 = stage 1's read of x0,
+    // x2 = stage 2's read of x1… A texture stage (gate, filter, crush) put first follows the beat grid; put later, it follows the
+    // replayed audio. Every stage reads only what has played, so the chain does too (tests/flex.test.js scans all of FLZ).
+    FlexCore.FLZ(T, nv);
     // 01–0F: one of each family
     [0x10, 0x22, 0x34, 0x41, 0x50, 0x61, 0x70, 0x81, 0x91, 0xA0, 0xB3, 0xC0, 0xD1, 0xE1, 0xF2].forEach((x, i) => { T[256 + 1 + i] = T[256 + x]; });
     return T;
@@ -19440,6 +19446,270 @@ class FlexCore {
     for (let k = 17; k < 256; k++) N[k] = T[k] ? T[k].n : 'OFF';
     return (FlexCore._N = N);
   }
+  // FLZ's table (k 512–767): filled by FLZ_LIST below; each entry {f:'chain', S:[k…], n}. Stage ks are FLX (1–255) / FLY (257–511) patterns.
+  static FLZ(T, nv){ const L = FlexCore.FLZ_LIST || []; for (let v = 1; v < 256 && v <= L.length; v++){ const e = L[v - 1]; if (e) T[512 + v] = {f:'chain', S:e[0], n:e[1]}; } }
+  // FLZ_LIST: entry i is FLZ v = i + 1, [[stage ks…], NAME]. Plain data (the class is stringified into the worklets). Stage ks: FLX 17–255, FLY 257–511.
+  static FLZ_LIST = [
+    // 01–0F: the 2nd variant of each family 1–F
+    [[0x21, 0xB1], 'STUTTER 1/16 + CRUSH 6 BIT'],
+    [[0xD0, 0x146], 'JUGGLE 1/16 + DETUNE'],
+    [[0x13, 0x7E], 'ROLL 1/16 + WARBLE'],
+    [[0x52, 0xA0], 'HALF 1/8 + LOW-PASS DOWN'],
+    [[0x42, 0x90], 'REVERSE 1/16S + GATE 1/32'],
+    [[0xA2, 0x31], 'HP RISER + BUILD 1/16'],
+    [[0x1D0, 0xB1], 'GRAINS 1/64 + CRUSH 6 BIT'],
+    [[0x80, 0x93], 'SCRATCH 1/4 + PUMP 1/4'],
+    [[0x1A1, 0x21], 'POLYMETER 5/16 + STUTTER'],
+    [[0x1B8, 0xD8], 'WARP UP 1/4 + JUGGLE 1/8'],
+    [[0xC3, 0xA0, 0x7B], 'ECHO 1/8 + LP DOWN + WOW'],
+    [[0x161, 0xB1], 'CD SKIP 35% + CRUSH 6 BIT'],
+    [[0x122, 0x112], 'EUCLID 5/16 + PITCH ROLL -1'],
+    [[0xE1, 0x93], 'SWING 1/8 + PUMP 1/4'],
+    [[0xF2, 0x1F1], 'CHAOS 1/4 58% + CHAOS 2'],
+    // 10–FF: the families by the first hex digit (1 BITMANGLE STUTTER · 2 PITCHED JUGGLE · 3 TAPE ROLL · 4 HALF / DOUBLE TIME · 5 REVERSE GATE · 6 FILTER BUILD · 7 GRAIN CRUSH · 8 SCRATCH CHOP · 9 POLY STUTTER · A WARP JUGGLE · B DUB ECHO · C SKIP CRUSH · D EUCLID PITCH · E SWING CHOP · F DOUBLE CHAOS)
+    [[0x21, 0xB0], 'STUTTER 1/16 + CRUSH 8 BIT'],
+    [[0x21, 0xB1], 'STUTTER 1/16 + CRUSH 6 BIT'],
+    [[0x24, 0xB1], 'STUTTER 1/16 EV 1/8 + 6 BIT'],
+    [[0x22, 0xB3], 'STUTTER 1/32 + DOWNSAMPLE ÷4'],
+    [[0x2A, 0xB2], 'STUTTER 1/16 EV 1/2 + 4 BIT'],
+    [[0x23, 0xB4], 'STUTTER 1/64 + DOWNSAMPLE ÷8'],
+    [[0x191, 0xB6], 'STUTTER EDIT 1/16 + ÷8 6 BIT'],
+    [[0x192, 0xBB], 'STUTTER EDIT 60% + 3 BIT'],
+    [[0x31, 0xB1], 'BUILD 1/16-1/64 + 6 BIT'],
+    [[0x34, 0xB2], 'BUILD 1/8-1/64 + 4 BIT'],
+    [[0x35, 0xBD], 'BUILD TO 1/128 + ÷4 4 BIT'],
+    [[0x196, 0xB7], 'STUTTER EDIT +2 + CRUSH RISE'],
+    [[0x19A, 0xB8], 'FADING STUTTER + CRUSH FALL'],
+    [[0x39, 0xBB], 'TRIPLET BUILD + 3 BIT'],
+    [[0x23, 0xB5], 'STUTTER 1/64 + DOWNSAMPLE ÷16'],
+    [[0x2F, 0x19C, 0xBB], 'DOUBLE STUTTER + 3 BIT MUSH'],
+    [[0xD8, 0x140], 'JUGGLE 1/8 + OCTAVE SLICES'],
+    [[0xD0, 0x146], 'JUGGLE 1/16 + DETUNE'],
+    [[0xD0, 0x141], 'JUGGLE 1/16 + OCT+5TH'],
+    [[0xD1, 0x143], 'JUGGLE #2 + SLICES UP'],
+    [[0xD9, 0x142], 'JUGGLE 1/8 #2 + SLICES DOWN'],
+    [[0xD2, 0x144], 'JUGGLE #3 + CHROMATIC'],
+    [[0xDC, 0x147], 'JUGGLE 1/8T + OCTAVE 1/8'],
+    [[0xD3, 0x145], 'JUGGLE #4 + WIDE PITCH'],
+    [[0xDA, 0x148], 'JUGGLE 1/8 #3 + OCT+5TH'],
+    [[0xD4, 0x149], 'JUGGLE #5 + CHROMATIC 1/8'],
+    [[0xDD, 0x144], 'JUGGLE 1/16T + CHROMATIC'],
+    [[0xD5, 0x14A], 'JUGGLE #6 + WIDE 1/32'],
+    [[0xDE, 0x141], 'JUGGLE ALL + OCT+5TH'],
+    [[0xDE, 0x145], 'JUGGLE ALL + WIDE PITCH'],
+    [[0xDF, 0x14B], 'JUGGLE 1/32 + OCTAVES 1/32'],
+    [[0xDF, 0x14A, 0x144], 'JUGGLE 1/32 + 2X PITCH'],
+    [[0x19, 0x7B], 'ROLL 1/16 + WOW'],
+    [[0x13, 0x7E], 'ROLL 1/16 + WARBLE'],
+    [[0x34, 0x7B], 'BUILD + WOW'],
+    [[0x70, 0x13], 'TAPE STOP + ROLL 1/16'],
+    [[0x174, 0x7D], 'ACCEL ROLL + FLUTTER'],
+    [[0x36, 0x70], 'BUILD + TAPE STOP BEAT 4'],
+    [[0x170, 0x7C], 'BOUNCE + DEEP WOW'],
+    [[0x72, 0x15], 'TAPE STOP 1/2 + ROLL 1/32'],
+    [[0x3A, 0x7C], 'SLOW DOWN BUILD + DEEP WOW'],
+    [[0x37, 0x71], 'BUILD 1/32 + TAPE STOP HALF'],
+    [[0x178, 0x76], 'DECEL ROLL + TAPE START'],
+    [[0x75, 0x174], 'TAPE STOP 1/8 + ACCEL ROLL'],
+    [[0x73, 0x33], 'TAPE STOP EVERY BEAT + BUILD'],
+    [[0x17E, 0x79], 'DECEL + TAPE START /BEAT'],
+    [[0x74, 0x177], 'TAPE STOP 2 BEATS + BUZZ'],
+    [[0x17B, 0x73, 0x7C], 'BOUNCE + STOPS + DEEP WOW'],
+    [[0x51, 0xA4], 'HALF SPEED + LOW-PASS DROP'],
+    [[0x52, 0xA0], 'HALF 1/8 + LOW-PASS DOWN'],
+    [[0x62, 0xA5], 'DOUBLE 1/2 + HIGH-PASS UP'],
+    [[0x50, 0xA6], 'HALF 1/4 + LP WOBBLE'],
+    [[0x60, 0xA8], 'DOUBLE 1/8 + HP WOBBLE'],
+    [[0x53, 0xA1], 'DOWN -5 + LOW-PASS UP'],
+    [[0x64, 0xA2], 'UP +7 1/4 + HP RISER'],
+    [[0x58, 0xA7], 'DOWN -24 + LP WOBBLE 1/8'],
+    [[0x61, 0xAC], 'DOUBLE 1/16 + BAND SWEEP'],
+    [[0x5B, 0xAE], 'HALF 1/16 + LP EACH BEAT'],
+    [[0x59, 0x6B, 0xAB], 'HALF THEN DOUBLE + BAND'],
+    [[0x6C, 0xA9], 'DOUBLE ALT 1/8 + LP CLOSED'],
+    [[0x5F, 0xAD], 'DOWN -24 1/8 + LP 1/4T'],
+    [[0x69, 0xA3], 'UP +24 1/16 + HP DOWN'],
+    [[0x5E, 0x6A, 0xA7], 'HALF / DOUBLE + WOBBLE'],
+    [[0x5B, 0x6A, 0xAF], 'HALF + DOUBLE + PHONE'],
+    [[0x41, 0x91], 'REVERSE 1/2S + GATE 1/8T'],
+    [[0x42, 0x90], 'REVERSE 1/16S + GATE 1/32'],
+    [[0x4A, 0x98], 'REVERSE BEAT 4 + GATE MASK'],
+    [[0x46, 0x93], 'REVERSE ALT 1/4 + PUMP 1/4'],
+    [[0x43, 0x99], 'REVERSE 1/32S + GATE MASK 2'],
+    [[0x47, 0x9A], 'REVERSE ALT 1/8 + GATE MASK 3'],
+    [[0x4C, 0x94], 'REVERSE 1/16 BEAT 4 + PUMP'],
+    [[0x48, 0x9B], 'REVERSE ALT 1/16 + MASK 4'],
+    [[0x1C1, 0x9C], 'REVERSE ROLL 1/8 + MASK 5'],
+    [[0x1C0, 0x9D], 'REVERSE ROLL 1/16 + MASK 6'],
+    [[0x4F, 0x9E], 'RANDOM REVERSE + MASK 7'],
+    [[0x1C4, 0x9F], 'PING-PONG ROLL + MASK 8'],
+    [[0x4D, 0x92], 'REVERSE HALF SPEED + GATE'],
+    [[0x1C2, 0x98], 'REVERSE ROLL 1/32 + MASK'],
+    [[0x1C9, 0x99], 'REWIND + GATE MASK 2'],
+    [[0x4B, 0x1C0, 0x9E], 'REVERSE x2 + GATE MASK 7'],
+    [[0xA0, 0x36], 'LOW-PASS DOWN + BUILD'],
+    [[0xA2, 0x31], 'HP RISER + BUILD 1/16'],
+    [[0xA4, 0x30], 'LP DROP + BUILD BEAT 3'],
+    [[0xA5, 0x37], 'HP UP + BUILD 1/32'],
+    [[0xAC, 0x34], 'BAND SWEEP + BUILD'],
+    [[0xA2, 0x33], 'HP RISER + BUILD 1/4'],
+    [[0xA0, 0x3D], 'LP DOWN + LONG BUILD'],
+    [[0xA7, 0x35], 'LP WOBBLE 1/8 + BUILD'],
+    [[0xA1, 0x3C], 'LP UP + BUILD 1/128'],
+    [[0xA2, 0x3E], 'HP RISER + BUILD 1/2'],
+    [[0xAE, 0x32], 'LP EACH BEAT + BUILD'],
+    [[0xA8, 0x3D], 'HP WOBBLE + LONG BUILD'],
+    [[0xA0, 0xA2, 0x35], 'LP DOWN + HP RISER + BUILD'],
+    [[0xAD, 0x38], 'LP 1/4T + TRIPLET BUILD'],
+    [[0xA3, 0xA1, 0x3D], 'HP DOWN + LP UP + BUILD'],
+    [[0xAC, 0xA8, 0x35], 'BAND + HP WOBBLE + BUILD'],
+    [[0x1D1, 0xB0], 'GRAINS 1/32 + CRUSH 8 BIT'],
+    [[0x1D0, 0xB1], 'GRAINS 1/64 + CRUSH 6 BIT'],
+    [[0x1D2, 0xB3], 'GRAINS 1/16 + ÷4'],
+    [[0x1DA, 0xB1], 'GRAINS BEAT 4 + 6 BIT'],
+    [[0x1D5, 0xB4], 'GRAINS REVERSE + ÷8'],
+    [[0x1D3, 0xB2], 'GRAINS 1/64 BAR + 4 BIT'],
+    [[0x1D7, 0xB6], 'GRAIN GAPS + ÷8 6 BIT'],
+    [[0x1DB, 0xBB], 'GRAINS HALF BAR + 3 BIT'],
+    [[0x1D6, 0xB3], 'GRAINS 1/64 REV + ÷4'],
+    [[0x1D8, 0xB2], 'SPARSE GRAINS + 4 BIT'],
+    [[0x1DC, 0xB7], 'DENSE GRAINS + CRUSH RISE'],
+    [[0x1DF, 0xBD], 'GRAINS 1/8 GAPS + ÷4 4 BIT'],
+    [[0x1DD, 0xBB], 'REVERSE GRAINS + 3 BIT'],
+    [[0x1DE, 0xB4], 'SHIMMER GRAINS + ÷8'],
+    [[0x1D4, 0xB8], 'GRAINS 1/128 + CRUSH FALL'],
+    [[0x1D5, 0x1DC, 0xBB], 'GRAIN CLOUD + 3 BIT'],
+    [[0x82, 0x91], 'SCRATCH 1/8 + GATE 1/8T'],
+    [[0x80, 0x93], 'SCRATCH 1/4 + PUMP 1/4'],
+    [[0x81, 0x1E9], 'SCRATCH x2 + CHOP SLICES'],
+    [[0x83, 0x90], 'SCRATCH 1/16 + GATE 1/32'],
+    [[0x8B, 0x94], 'SCRATCH 1/8 x2 + PUMP'],
+    [[0x85, 0x1E9], 'SCRATCH 1/4 x4 + CHOP'],
+    [[0x9D, 0x88], 'CHIRP 1/16 + GATE MASK 6'],
+    [[0x92, 0x8D], 'TRANSFORM + GATE 1/16T'],
+    [[0x84, 0x9A], 'SCRATCH 1/2 x4 + MASK 3'],
+    [[0x86, 0x1E4], 'CHIRP 1/8 + TEXTURE 1/32'],
+    [[0x8E, 0x9B], 'CHIRP x4 + GATE MASK 4'],
+    [[0x87, 0x9C], 'CHIRP 1/4 + GATE MASK 5'],
+    [[0x8A, 0x9E], 'SCRATCH x8 + GATE MASK 7'],
+    [[0x8C, 0x1E7], 'SCRATCH 1/2 + FILTER SLICES'],
+    [[0x89, 0xA6], 'SCRATCH BAR x8 + LP WOBBLE'],
+    [[0x91, 0x8E, 0x8A], 'DOUBLE SCRATCH + GATE 1/8T'],
+    [[0x1A0, 0x24], 'POLYMETER 3/16 + STUTTER'],
+    [[0x1A1, 0x21], 'POLYMETER 5/16 + STUTTER'],
+    [[0x28, 0x1A2], 'STUTTER 1/4 + POLY 3/8'],
+    [[0x1A3, 0x2A], 'POLY 7/16 + STUTTER 1/16'],
+    [[0x1A8, 0x22], 'POLY 3/16 BEAT 3 + 1/32'],
+    [[0x1A4, 0x24], 'POLY 9/16 + STUTTER 1/16'],
+    [[0x1AB, 0x21], 'POLY 1/4T + STUTTER 1/16'],
+    [[0x1A5, 0x2F], 'POLY 5/8 + STUTTER 1/64'],
+    [[0x1AC, 0x22], 'POLY PING-PONG + 1/32'],
+    [[0x1A9, 0x23], 'POLY 5/16 BEAT 3 + 1/64'],
+    [[0x1A6, 0x25], 'POLY 11/16 + STUTTER 1/16T'],
+    [[0x1AD, 0x2F], 'POLY 5/16 PING + 1/64'],
+    [[0x1A7, 0x1A0, 0x22], 'TWO POLYMETERS + 1/32'],
+    [[0x1AE, 0x23], 'POLY 7/16 PING + 1/64'],
+    [[0x1AF, 0x2A, 0x1A1], 'POLY 5/6 + STUT + POLY'],
+    [[0x1AA, 0x1A3, 0x23], 'POLY BEAT 4 + 7/16 + 1/64'],
+    [[0x1B0, 0xD0], 'WARP UP 1/16 + JUGGLE'],
+    [[0x1B8, 0xD8], 'WARP UP 1/4 + JUGGLE 1/8'],
+    [[0x1B1, 0xD1], 'WARP DOWN 1/16 + JUGGLE #2'],
+    [[0x1B4, 0xD9], 'WARP UP 1/8 + JUGGLE 1/8'],
+    [[0x1B2, 0xD2], 'WARP ZIGZAG + JUGGLE #3'],
+    [[0x1B5, 0xDA], 'WARP DOWN 1/8 + JUGGLE'],
+    [[0x1B9, 0xDC], 'WARP DOWN 1/4 + JUGGLE 1/8T'],
+    [[0x1B6, 0xD3], 'WARP ZIGZAG 1/8 + JUGGLE'],
+    [[0x1B3, 0xD4], 'WARP RANDOM + JUGGLE #5'],
+    [[0x1BB, 0xDD], 'WARP UP 1/2 + JUGGLE 1/16T'],
+    [[0x1B7, 0xD5], 'WARP RANDOM 1/8 + JUGGLE'],
+    [[0x1BD, 0xDE], 'WARP RANDOM 1/8T + JUGGLE ALL'],
+    [[0x1BA, 0xD6], 'WARP RANDOM 1/4 + JUGGLE'],
+    [[0x1BE, 0xDF], 'WARP RANDOM 1/32 + JUGGLE'],
+    [[0x1B3, 0xDE, 0x1BE], 'WARP + JUGGLE ALL + WARP'],
+    [[0x1B7, 0xD7, 0x1B2], 'WARP + JUGGLE + ZIGZAG'],
+    [[0xC0, 0xA0, 0x7B], 'ECHO 1/16 + LP DOWN + WOW'],
+    [[0xC3, 0xA0, 0x7B], 'ECHO 1/8 + LP DOWN + WOW'],
+    [[0xC2, 0xA6, 0x7E], 'ECHO 1/8T + LP WOBBLE'],
+    [[0xC4, 0xAE, 0x7B], 'ECHO 3/16 + LP EACH BEAT'],
+    [[0xC7, 0xA4, 0x7C], 'ECHO 1/8 BAR + LP + DEEP WOW'],
+    [[0xC5, 0xA0, 0x7D], 'ECHO 1/4 + LP DOWN + FLUTTER'],
+    [[0xCA, 0xA7, 0x7B], 'ECHO 1/16T + LP WOBBLE 1/8'],
+    [[0xC6, 0xA8, 0x7C], 'ECHO 3/16 BAR + HP WOBBLE'],
+    [[0xCC, 0xAD, 0x7E], 'ECHO 1/8T + LP 1/4T + WARBLE'],
+    [[0xCB, 0xA2, 0x7B], 'ECHO 1/16 BAR + HP RISER'],
+    [[0xC1, 0xAC, 0x7D], 'ECHO 1/32 + BAND SWEEP'],
+    [[0xCE, 0xA0, 0x7C], 'ECHO 3/8 + LP DOWN + WOW'],
+    [[0xCF, 0xAE, 0x7C], 'ECHO 1/2 + LP EACH BEAT'],
+    [[0xC8, 0xA6, 0x7E], 'ECHO 1/32 + LP WOBBLE'],
+    [[0xC9, 0xAD, 0x7C], 'ECHO 1/64 + LP 1/4T + WOW'],
+    [[0xCD, 0x7B, 0xA7], 'ECHO 1/64 + WOW + LP WOBBLE'],
+    [[0x160, 0xB0], 'CD SKIP 20% + CRUSH 8 BIT'],
+    [[0x161, 0xB1], 'CD SKIP 35% + CRUSH 6 BIT'],
+    [[0x164, 0xB1], 'CD SKIP 1/8 35% + 6 BIT'],
+    [[0x162, 0xB3], 'CD SKIP 50% + ÷4'],
+    [[0x166, 0xB2], 'CD SKIP 1/32 30% + 4 BIT'],
+    [[0x169, 0xB4], 'CD STUCK 1/16 + ÷8'],
+    [[0x16B, 0xB1], 'DROPOUTS 1/16 + 6 BIT'],
+    [[0x165, 0xB6], 'CD SKIP 1/8 60% + ÷8 6 BIT'],
+    [[0x16D, 0xB3], 'SKIP BACK 1/16 + ÷4'],
+    [[0x163, 0xBB], 'CD SKIP 70% + 3 BIT'],
+    [[0x16A, 0xB2], 'CD STUCK 1/32 + 4 BIT'],
+    [[0x16E, 0xBD], 'SKIP BACK 1/8 + ÷4 4 BIT'],
+    [[0x167, 0xB7], 'CD SKIP 1/32 50% + RISE'],
+    [[0x168, 0xB8], 'CD SKIP 90% + CRUSH FALL'],
+    [[0x16C, 0xB5], 'DROPOUTS 1/32 + ÷16'],
+    [[0x16A, 0x167, 0xBB], 'DOUBLE SKIP + 3 BIT'],
+    [[0x120, 0x110], 'EUCLID 3/8 + PITCH ROLL +1'],
+    [[0x122, 0x112], 'EUCLID 5/16 + PITCH ROLL -1'],
+    [[0x121, 0x116], 'EUCLID 5/8 + ROLL BEAT 3'],
+    [[0x123, 0x111], 'EUCLID 7/16 + ROLL +2'],
+    [[0x124, 0x141], 'EUCLID 9/16 + OCT+5TH'],
+    [[0x126, 0x113], 'EUCLID 5/12 + ROLL -2'],
+    [[0x127, 0x147], 'EUCLID 7/12 + OCTAVES 1/8'],
+    [[0x125, 0x14B], 'EUCLID 11/16 + OCTAVES 1/32'],
+    [[0x128, 0x144], 'EUCLID 4/9 + CHROMATIC'],
+    [[0x12C, 0x114], 'EUCLID REPEAT 3/8 + ROLL'],
+    [[0x129, 0x145], 'EUCLID 5/11 + WIDE PITCH'],
+    [[0x12D, 0x11A], 'EUCLID REPEAT 5/16 + +3'],
+    [[0x12A, 0x119], 'EUCLID 7/13 + ROLL 1/64'],
+    [[0x12E, 0x144], 'EUCLID REPEAT 7/16 + CHROMA'],
+    [[0x12B, 0x115, 0x149], 'EUCLID +2 + ROLL + CHROMA'],
+    [[0x12F, 0x11F, 0x143], 'EUCLID REPEAT + ROLL + UP'],
+    [[0xE0, 0x91], 'SWING 1/8 LIGHT + GATE 1/8T'],
+    [[0xE1, 0x93], 'SWING 1/8 + PUMP 1/4'],
+    [[0xE3, 0x94], 'SWING 1/16 LIGHT + PUMP 1/8'],
+    [[0xE4, 0x90], 'SWING 1/16 + GATE 1/32'],
+    [[0xE6, 0x92], '6/8 FEEL + GATE 1/16T'],
+    [[0xE2, 0x1E9], 'SWING 1/8 HARD + CHOP'],
+    [[0xE5, 0x98], 'SWING 1/16 HARD + MASK 1'],
+    [[0xE7, 0x9A], '6/8 FEEL 1/8 + MASK 3'],
+    [[0xE8, 0x99], '5-TUPLET + GATE MASK 2'],
+    [[0xEC, 0x9B], 'DRUNK + GATE MASK 4'],
+    [[0xED, 0x93], 'LAID-BACK + PUMP 1/4'],
+    [[0xEE, 0x9C], 'SWING EXTREME + MASK 5'],
+    [[0xEF, 0x9D], 'SWING 1/16 EXTREME + MASK 6'],
+    [[0xE8, 0x9E, 0x1E9], '5-TUPLET + MASK 7 + CHOP'],
+    [[0xEC, 0x9F, 0x1E7], 'DRUNK + MASK 8 + FILTER'],
+    [[0xEF, 0xE6, 0x98], 'SWING + 6/8 + GATE MASK'],
+    [[0xF0, 0x1F0], 'CHAOS 1/4 + CHAOS 2 25%'],
+    [[0xF2, 0x1F1], 'CHAOS 1/4 58% + CHAOS 2'],
+    [[0xF4, 0x1F6], 'CHAOS 1/8 + CHAOS 2 1/8'],
+    [[0xF6, 0x1F2], 'CHAOS 1/8 45% + CHAOS 2'],
+    [[0xFA, 0x1F3], 'CHAOS 1/16 + CHAOS 2 70%'],
+    [[0xF0, 0x1F0, 0x1E5], 'CHAOS x2 + CRUSH SLICES'],
+    [[0xFC, 0x1F8], 'CHAOS 1/16 + CHAOS 2 1/8'],
+    [[0xF8, 0x1FC, 0x1E7], 'CHAOS + CHAOS 2 + FILTER'],
+    [[0xF1, 0x1F4], 'CHAOS NEW + CHAOS 2 85%'],
+    [[0xF3, 0x1F7, 0x1E9], 'CHAOS + CHAOS 2 + CHOP'],
+    [[0xFE, 0x1F2, 0x1E0], 'CHAOS 65% + 2 + TEXTURE'],
+    [[0xF5, 0x1FA, 0x1EA], 'CHAOS NEW + 2 + CRUSH FILT'],
+    [[0xFB, 0x1F5, 0x1E2], 'CHAOS 35% + 2 100% + TEX'],
+    [[0xF9, 0x1FF, 0x1EB], 'CHAOS 75% + 2 SLOW + TEX'],
+    [[0xFD, 0x1F9, 0x1E5], 'CHAOS 55% + 2 1/32 + CRUSH'],
+    [[0xFF, 0x1F5, 0x1EC], 'CHAOS 75% + 2 100% + TEX'],
+  ];
+  // FLZ's names, 00–FF (the flx param plays FLZ v as 512 + v)
+  static get NAMES3(){ if (FlexCore._N3) return FlexCore._N3; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[512 + v] ? T[512 + v].n : 'OFF'; return (FlexCore._N3 = N); }
   // FLY's names, 00–FF (the flx param plays FLY v as 256 + v)
   static get NAMES2(){ if (FlexCore._N2) return FlexCore._N2; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[256 + v] ? T[256 + v].n : 'OFF'; return (FlexCore._N2 = N); }
   // Per-sample helpers, once (ext() / pat() run for every sample of a playing pattern: a closure or an array literal made in them was audio-thread garbage).
@@ -19505,6 +19775,16 @@ class FlexCore {
           if (FlexCore.hh(o.seed, s, key * 7 + 3) < o.c){ const op = Math.floor(FlexCore.hh(o.seed, s, key * 7 + 4) * 7);
             if (op === 0) r = p - G; else if (op === 1) r = c - u; else if (op === 2) r = c - G + u * 2; else if (op === 3) r = c + u / 2;
             else if (op === 4) r = c + u % (G / 4); else if (op === 5) g = u < G / 2 ? 1 : 0; else r = c + u - u * u / (2 * G); } } break;
+        // ===== FLZ (23 Nov): k 513–767, a chain of FLX / FLY stages (see SPEC). Gains multiply; filters take the closest (lowest low-pass,
+        // highest high-pass); crush takes the strongest hold and the fewest bits. Stage ks below 17 (the first sixteen, made by pat())
+        // are not allowed in a chain (FLZ_LIST uses 17–255 and 257–511; tests/flex.test.js checks).
+        // (CodeRabbit on #297: a stage that reads back into the bar before hands the next one a negative phase; each stage now sees its
+        // input as a phase in [0, 4) of the right bar, and the result moves back by the same bars; gains are never negative.)
+        case 'chain': { let x = p; for (let i = 0; i < o.S.length; i++){ const sk = o.S[i]; if (!(sk > 16 && sk < 512)) continue;
+            const sh = Math.floor(x / 4 + 1e-9) * 4, xp = Math.max(0, x - sh);
+            x = this.ext(sk, xp, bar + Math.round(sh / 4)) + sh; g *= Math.max(0, this.pg); if (this.plp < lp) lp = this.plp; if (this.php > hp) hp = this.php; if (this.pcr > cr) cr = this.pcr;
+            if (this.pbt > 0 && (bt === 0 || this.pbt < bt)) bt = this.pbt; }
+          r = x; } break;
         // ===== FLY (5 Nov): k 257–511. Each reads only what has played (r ≤ p); see the notes by SPEC's FLY families.
         case 'proll': if (p >= o.a){ const n = Math.floor((p - o.a) / o.L + 1e-9), u = p - o.a - n * o.L;   // repeat n: speed ≤ n + 1 keeps it behind now
           if (n > 0) r = o.a + u * Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))); } break;
@@ -19609,7 +19889,7 @@ class FlexCore {
     const N = this.N, bL = this.bL, bR = this.bR, bp = tr && tr.bp, spb = clkSpb(this, bp, n), live = !!(bp && bp.length > 1);
     // WAITS FOR ITS COMMAND (owner, 3 Nov): STARTS ON FLX (dp.wait) plays nothing until an FLX sets a pattern or an FXO
     // switches the slot on (tr.sw: that slot's FXO, then its own PATTERN); the switches go back to −1 on STOP, so it waits again.
-    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(511, Math.round(tr.flx)) : dp.wait && !(tr && tr.sw > 0.5) ? 0 : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
+    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(767, Math.round(tr.flx)) : dp.wait && !(tr && tr.sw > 0.5) ? 0 : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
     const XF = Math.max(16, Math.round(this.sr * (dp ? dp.xf : 5) / 1000)), gk = 1 - Math.exp(-1 / (this.sr * 0.002));
     // Lock our position to the clock: gently while close (the clock's own float32 steps stay out), at once when it jumps.
     const q0 = live ? bp[0] : -1;
@@ -20546,7 +20826,7 @@ class ThunderFx extends AudioWorkletProcessor {
   // FLEX CHECK (3 Nov): maxValue was 64 for all of them, so on the Page sequencer (whose setValueAtTime the AudioParam
   // clamps) FLX 41–FF all played pattern 40; the core's values skip the AudioParam and were right. 255 now (tests/flex.test.js).
   static get parameterDescriptors(){ const k = (name, d) => ({name, defaultValue:d, minValue:-1, maxValue:255, automationRate:'k-rate'});
-    return [{name:'bp', defaultValue:0, minValue:-2, maxValue:64, automationRate:'a-rate'}, ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => k('sw' + i, -1)), {...k('flx', -1), maxValue:511}, k('gat', -1), k('rtg', -1)]; }
+    return [{name:'bp', defaultValue:0, minValue:-2, maxValue:64, automationRate:'a-rate'}, ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => k('sw' + i, -1)), {...k('flx', -1), maxValue:767}, k('gat', -1), k('rtg', -1)]; }
   constructor(o){
     super();
     const op = o.processorOptions || {};
@@ -20974,7 +21254,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=59')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=60')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -21954,11 +22234,14 @@ const isOffPhrase = p => !!p && !isEmptyPhrase(p) && p.every(r => r.slice(0, NCO
 // the master column is all commands, so there a block looks like an OFF-only block when it switches something off
 // (FLX 00 Flex off, GAT 00 step gate off, RTG 0Y retrigger off, FXO X0 an effect slot off) and switches nothing on (FLX,
 // GAT, RTG or FXO to a pattern / on). Other commands (VOL FF back to full, TPO…) don't count either way.
-const fxOnOff = (c, v) => { const n = FXC[c]; if (n === 'FLX' || n === 'FLY' || n === 'GAT') return v === 0 ? -1 : 1; if (n === 'RTG') return (v >> 4) === 0 ? -1 : 1;
+const FLEX_C = new Set(['FLX', 'FLY', 'FLZ']);
+const fxOnOff = (c, v) => { const n = FXC[c]; if (n === 'FLX' || n === 'FLY' || n === 'FLZ' || n === 'GAT') return v === 0 ? -1 : 1; if (n === 'RTG') return (v >> 4) === 0 ? -1 : 1;
   if (n === 'FXO') return (v >> 4) === 0 ? 0 : (v & 15) === 0 ? -1 : 1; return 0; };
 const isOffCmdPhrase = p => { if (!p || isEmptyPhrase(p)) return false; let off = 0;
   for (const r of p){ for (let k = 0; k < NCOL; k++) if (r[k] >= 0 && r[k] !== OFF) return false;
-    for (let k = FX0; k + 1 < RW; k += 2) if (r[k] >= 0){ const q = fxOnOff(r[k], r[k + 1]); if (q > 0) return false; if (q < 0) off++; } }
+    // (CodeRabbit on #297: FLX / FLY / FLZ share one Flex and the rightmost on a row is the one that plays, so only that one counts)
+    let fl = -1; for (let k = FX0; k + 1 < RW; k += 2) if (r[k] >= 0 && FLEX_C.has(FXC[r[k]])) fl = k;
+    for (let k = FX0; k + 1 < RW; k += 2) if (r[k] >= 0){ if (FLEX_C.has(FXC[r[k]]) && k !== fl) continue; const q = fxOnOff(r[k], r[k + 1]); if (q > 0) return false; if (q < 0) off++; } }
   return off > 0; };
 const sectMstOff = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffCmdPhrase) && P.every(p => isEmptyPhrase(p) || isOffCmdPhrase(p)); };
 const sectOffOnly = v => { const c = S.chains[v]; if (!c) return false; const P = c.filter(r => r[0] >= 0).map(r => S.phrases[r[0]]); return P.length > 0 && P.some(isOffPhrase) && P.every(p => isEmptyPhrase(p) || isOffPhrase(p)); };
@@ -22542,6 +22825,7 @@ function makeSeq(S, mode, o){
         (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at2, track:t, p:'sw' + k, v:sw}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
+      if (fx.FLZ != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLZ ? 512 + fx.FLZ : 0}); slotWake('FLZ', fx.FLZ > 0); }   // FLZ (23 Nov): the third bank, 512 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
         if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
@@ -22646,8 +22930,8 @@ function makeSeq(S, mode, o){
           }
           T.last = {c, v}; cmds.push({c, v});
         }
-        // FLX and FLY share one Flex, so on one row the rightmost of the two is the one that plays (8 Nov)
-        const fx = {}; for (const q of cmds){ if (q.c === 'FLX') delete fx.FLY; else if (q.c === 'FLY') delete fx.FLX; fx[q.c] = q.v; }
+        // FLX, FLY and FLZ share one Flex, so on one row the rightmost of the three is the one that plays (8 Nov; FLZ 23 Nov)
+        const fx = {}; for (const q of cmds){ if (q.c === 'FLX'){ delete fx.FLY; delete fx.FLZ; } else if (q.c === 'FLY'){ delete fx.FLX; delete fx.FLZ; } else if (q.c === 'FLZ'){ delete fx.FLX; delete fx.FLY; } fx[q.c] = q.v; }
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
@@ -24036,11 +24320,11 @@ function playWaitFor(o){
 // feeds it. Every way an effect or chain comes into use reaches rtFx(t) (fxChanged, rtAllFx after a song, undo or kit load,
 // setChainOn, chainsPush, AUTO SLOT's fxNeed), and rtInit asks for every track.
 // A slot that is filled but switched off (every new song has the master's pump slots so) counts only if a pattern command can
-// switch it on later (FXO, FLX, FLY, GAT, RTG: slotWake) or the player meets such a switch (play: 'sw', sw = true).
+// switch it on later (FXO, FLX, FLY, FLZ, GAT, RTG: slotWake) or the player meets such a switch (play: 'sw', sw = true).
 let wkCmdS = null, wkCmdV = -1, wkCmdR = false;
 function wkFxCmds(){
   if (wkCmdS === S && wkCmdV === songVer) return wkCmdR;
-  const ids = new Set(['FXO', 'FLX', 'FLY', 'GAT', 'RTG'].map(c => FXC.indexOf(c))); let hit = false;
+  const ids = new Set(['FXO', 'FLX', 'FLY', 'FLZ', 'GAT', 'RTG'].map(c => FXC.indexOf(c))); let hit = false;
   for (const ph of S.phrases) if (ph && !hit) for (const r of ph){ if (!r) continue; for (let m = FX0; m < RW; m += 2) if (ids.has(r[m])){ hit = true; break; } if (hit) break; }
   wkCmdS = S; wkCmdV = songVer; return wkCmdR = hit;
 }
@@ -24323,7 +24607,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=14', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=48', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=49', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -24990,7 +25274,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = 'yk0qds';
+const CORE_REV = 'ro0cep';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -26881,7 +27165,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 671;
+const BUILD = 672;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -28306,7 +28590,7 @@ function defInst(){
    the master's) FX slots, and without one they did nothing at all, which read as the command being broken. Typing one of
    them now puts that effect in the first free slot of the track being edited (the master on the master column), with a
    toast, once the cell has held it for a moment (scrolling or typing past it does nothing). A slot that already has it is left alone (an off one is only pointed out: FXO may have turned it off on purpose). */
-const FX_NEEDS = {FLX:'flex', FLY:'flex', GAT:'sgate', RTG:'retrig'};
+const FX_NEEDS = {FLX:'flex', FLY:'flex', FLZ:'flex', GAT:'sgate', RTG:'retrig'};
 let fxNeedT = 0;
 function fxNeed(t, type){
   if (!(t >= 0) || t > MT || !TFX[type]) return;
@@ -28481,7 +28765,7 @@ const FXB = {ATK:'Fade notes in from here on: 00 quick – FE slow, FF its own a
   PVB:'Vibrato: X speed, Y depth', SED:'Seed chance so it repeats, in renders too (master column: the song; a track: that track; 00 hands back)', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
   STA:'Start part way into the sound', PAN:'Pan left or right (80 center)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
-  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(k => ['KN' + k, `Knob K${k} of this track’s chains patch (its Knob modules): 00 lowest – FF highest, from here on; STOP gives the patch its own Value back`])), FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', FLY:'Flex, second bank: IDM patterns (00 off, 01–0F one of each family; 10–FF: 1 pitch rolls, 2 euclid, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2). Plays on the same Flex as FLX: the later one wins', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'FX stutter: switches the Retrigger effect on, X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00). Needs the Retrigger effect in a slot (added if one is free)',
+  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(k => ['KN' + k, `Knob K${k} of this track’s chains patch (its Knob modules): 00 lowest – FF highest, from here on; STOP gives the patch its own Value back`])), FLZ:'Flex pattern from the third bank (00 off; 01–0F one of each family, then by the first digit): 255 chains of two or three FLX / FLY moves, e.g. stutter + crush. Plays on the same Flex as FLX and FLY; the last one written wins. A Flex set to STARTS ON FLX is switched on by it too', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', FLY:'Flex, second bank: IDM patterns (00 off, 01–0F one of each family; 10–FF: 1 pitch rolls, 2 euclid, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2). Plays on the same Flex as FLX: the later one wins', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'FX stutter: switches the Retrigger effect on, X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00). Needs the Retrigger effect in a slot (added if one is free)',
   PGM:'MIDI program change (00–7F)', CSL:'MIDI CC glide: this row’s CCA–CCD move to their value over XY ticks (00 the step)',
   CND:'Condition: 0 FILL, 1 !FILL, 2 PRE, 3 !PRE, 4 NEI, 5 !NEI, 6 1ST, 7 !1ST (NEI: X the track, 0 = the left one), 8 NOT (turns the row’s NTH or chance round)', NUD:'Nudge ± ticks (early or late)',
   RTV:'Note repeat (RET) curve: + rises to the last hit, − fades', SLC:'Play slice XX of a sliced sound', XFD:'Crossfader 00 scene A … FF scene B',
@@ -28498,7 +28782,7 @@ const FXC_GROUPS = [
   ['Sound', ['INS', 'STA', 'SLC', 'PLY', 'WOB', 'MUT', 'GEN', 'CUT', 'RES', 'DEC', 'ATK', 'REL']],
   ['Chance and random', ['CHA', 'TCH', 'PRB', 'CND', 'NTH', 'SED', 'SKP', 'CHD', 'ONE', 'RND', 'RNL', 'REP']],
   ['Perform', ['XFD', 'MAC', 'LK1', 'LK2', 'LK3', 'LK4', 'PRT']],
-  ['Effects and FX patterns', ['FXO', 'FXS', 'FXV', 'BYP', 'KN1', 'KN2', 'KN3', 'KN4', 'KN5', 'KN6', 'KN7', 'KN8', 'FLX', 'FLY', 'GAT', 'RTG']],
+  ['Effects and FX patterns', ['FXO', 'FXS', 'FXV', 'BYP', 'KN1', 'KN2', 'KN3', 'KN4', 'KN5', 'KN6', 'KN7', 'KN8', 'FLX', 'FLY', 'FLZ', 'GAT', 'RTG']],
   ['Tempo and groove', ['TPO', 'TIC', 'LPB', 'PDL', 'GRV', 'GGR']],
   ['Play order', ['HOP', 'DIR', 'END', 'JMP']],
   ['MIDI', ['PGM', 'CCA', 'CCB', 'CCC', 'CCD', 'CSL', 'MPB', 'MAT']]];
@@ -28508,7 +28792,7 @@ const fxcByGroup = names => [...new Set(names.map(fxcGroup))].flatMap(g => names
 const FXLIST_ALL = [-1, ...fxcByGroup([...FXC_GROUPS.flatMap(([, l]) => l), ...FXC.filter(n => fxcGroup(n) === 'More').sort()])
   .map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 // Master phrases offer only the commands that mean something on the master bus: its level and effects first, then timing.
-const MST_FXC = ['END', 'JMP', 'VOL', 'FXO', 'FLX', 'FLY', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'TCH', 'NTH', 'CND', 'REP', 'RND', 'RNL', 'SED', 'PRB', 'FXS', 'FXV', 'SCG', 'LPB', 'PDL', 'STP', 'XFD', 'MAC', 'PRT', 'LK1', 'LK2', 'LK3', 'LK4'];
+const MST_FXC = ['END', 'JMP', 'VOL', 'FXO', 'FLX', 'FLY', 'FLZ', 'GAT', 'RTG', 'TPO', 'TIC', 'GGR', 'HOP', 'DEL', 'CHA', 'TCH', 'NTH', 'CND', 'REP', 'RND', 'RNL', 'SED', 'PRB', 'FXS', 'FXV', 'SCG', 'LPB', 'PDL', 'STP', 'XFD', 'MAC', 'PRT', 'LK1', 'LK2', 'LK3', 'LK4'];
 const FXLIST_MST = [-1, ...fxcByGroup(MST_FXC).map(n => FXC.indexOf(n)).filter(i => i >= 0)];
 let FXLIST = FXLIST_ALL;
 const fxListNow = () => (FXLIST = mstView() ? FXLIST_MST : FXLIST_ALL);
@@ -33837,9 +34121,10 @@ let dkFlexC = null, dkPatN = 0;   // dkPatN: pictures drawn (test hook)
 function dkFxPatState(f, k, t, at){
   const sw = fxcNow(t, 'sw' + k, at), on = sw < -0.5 ? !!f.on : sw > 0.5;
   if (f.type === 'flex'){ const c = fxcNow(t, 'flx', at), wait = c < 0 && !!f.wait && !(sw > 0.5);
-    const p = c >= 0 ? Math.min(511, Math.round(c)) : wait ? 0 : f.pat | 0;
-    const fly = p >= 256;   // FLY: the param carries 256 + its value
-    return {on, wait, src:c >= 0 ? (fly ? 'FLY' : 'FLX') : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:(fly ? 'FLY ' + hx(p - 256) + ' · ' + (FlexCore.NAMES2[p - 256] || '?') : 'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?'))}; }
+    const p = c >= 0 ? Math.min(767, Math.round(c)) : wait ? 0 : f.pat | 0;
+    const fly = p >= 256 && p < 512, flz = p >= 512;   // FLY / FLZ: the param carries 256 / 512 + its value
+    if (c >= 0 && p === 0) return {on, wait, src:'FLEX OFF', p, name:'FLEX OFF'};   // (CodeRabbit on #297: FLX / FLY / FLZ 00 all send 0, so the bank can't be named)
+    return {on, wait, src:c >= 0 ? (flz ? 'FLZ' : fly ? 'FLY' : 'FLX') : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:(flz ? 'FLZ ' + hx(p - 512) + ' · ' + (FlexCore.NAMES3[p - 512] || '?') : fly ? 'FLY ' + hx(p - 256) + ' · ' + (FlexCore.NAMES2[p - 256] || '?') : 'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?'))}; }
   if (f.type === 'sgate'){ const c = fxcNow(t, 'gat', at), g = c >= 0 ? Math.round(c) : -1, wait = g === 0 || (g < 0 && !!f.wait && !(sw > 0.5)), p = g > 0 ? (g >= 16 ? 0 : g) : f.pat | 0;
     return {on, wait, src:g === 0 ? 'GAT 00' : c >= 0 ? 'GAT' : wait ? 'WAITS FOR GAT' : 'PATTERN', p, name:wait ? 'OPEN' : (g >= 16 ? 'GAT 10' : 'GAT ' + hx(p)) + ' · ' + StepGateCore.NAMES[p]}; }
   if (f.type === 'retrig'){ const c = fxcNow(t, 'rtg', at), eng = c > 0.5 ? true : c > -0.5 ? false : (f.mode | 0) === 1, di = c > 0.5 ? Math.min(7, Math.round(c) - 1) : Math.min(7, f.div | 0);
@@ -37335,6 +37620,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [672, '23 Nov', ['New command FLZ: a third bank of 255 Flex patterns for IDM and glitch punch-ins, each a chain of two or three FLX / FLY moves (a stutter into a bit crush, a juggle with slice pitches, a tape stop on a roll, reverse into a gate mask\u2026). FLZ 01\u20130F are one of each family to try first, then by the first digit: 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos. It plays on the same Flex as FLX and FLY (the last one on a row wins) and works in the MST column too.']],
   [671, '23 Nov', ['File ▾ → Drive folder…: choose which Google Drive folder Save / Open use (any folder in My Drive or Shared with me); it is remembered on this device.']],
   [670, '23 Nov', ['Google Drive moved to a new sign-in setup (a personal Google Cloud project).']],
   [669, '23 Nov', ['Google Drive is switched on: File ▾ → Save to Drive / Open latest from Drive / Open from Drive… (the first time, Google asks you to sign in and allow it).']],

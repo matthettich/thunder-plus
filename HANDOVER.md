@@ -882,13 +882,26 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
    Alternative the owner also asked about: Monomodule itself (free AU / VST3 that runs the original DSP program in a DSP56300
    emulator, user supplies the Monomachine OS file) through VST hosting in the native desktop app, desktop only. Never build it
    into the web app (needs a JIT emulator; licence as above).
-9. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
+9. **Planned (owner, 23 Nov): a Flex pattern editor.** Your own patterns, saved in the song: a new command (e.g. `FLU 01–FF`, appended to
+   `FXC`) played by the same Flex effect. A **step editor** (16 or 32 steps over 1–2 bars, in the app's skin, phone and desktop, audition
+   while editing): per step the slice of the bar it plays, repeat rate, reverse, pitch, gate, filter / crush. **Copy a built-in to edit**
+   ("copy FLX 3A / FLY / FLZ to my bank"): rolls, stutters, juggles, reverses and gates convert exactly; the gliding families (tape, scratch,
+   chaos, wow) only roughly. Engine: one new FlexCore family `step` that plays a song-stored grid (the grid reaches the worklet by port
+   message or a song table; read only what has played, r ≤ p, as tests/flex.test.js checks), FlexCore regenerated with
+   `node tools/make-fx-cores.mjs`. The lead writes the engine family; editor, saving and tests can be delegated. Songs keep their user
+   bank (Drive sync carries it). Not started.
+10. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
 
 ### Pump re-pin: waits on pump (18 Nov)
 
 The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/pump-synth.wasm`). It re-pins once pump builds FREEZE's seven spectra lazily per source, or in chunks, or behind a build option, so creation no longer costs about 0.9 s on the audio thread. The request to pump is in `docs/port/PUMP-REQUESTS.md` on the `native` branch. When it lands: re-pin both wasm files, regenerate the six golden rows (`tests/golden/chains-modules.json`, `tests/golden/pump-synth.json`), and flip `tests/pump-wob-extreme.test.js` (it asserts the known WOB trap today).
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
+
+**FLZ, Flex's third bank (23 Nov; build 672, branch flz-bank)**
+- [ ] **Computer: FLZ 01–0F on a drum loop (the Flex in a track's FX slot):** put FLZ 01, 02, 03… on a row in turn. Pass: each one is a different, audible stutter / juggle / tape / reverse / filter / grain / chop move that comes back to the beat; none is silent or clicks badly; FLX / FLY on the same row: the rightmost plays. Tell me which families (first hex digit 1–F) you want more of and which sound the same as an FLX / FLY.
+- [ ] **Computer: FLZ on the master (MST column):** FLZ 03, 0B, 0F with a Flex in a master slot. Pass: the whole mix is punched in and out; FLZ 00 turns it off.
+- [ ] **Phone (audio-thread sequencer): FLZ 01–0F and 10–1F:** Pass: they play as on the computer, and the FX bar shows "FLZ xx · name" for the pattern playing.
 
 - [ ] **Drive folder (build 671; phone)**: File ▾ shows "Drive folder: Thunder Plus…". Tap it, go into a folder (and ↑ Up), tap "✓ Use this folder"; the menu label and the toast show the new name. Save to Drive puts the song in that folder; Open from Drive… lists that folder.
 - [ ] **Drive folder (build 671; computer)**: reload the page: the chosen folder is still used. Pick "Shared with me" and a shared folder you can edit, save there. Trash the chosen folder in Drive, reload, Save: a toast says it is gone and "Thunder Plus" is used.
@@ -1760,6 +1773,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 23 Nov (FLZ: Flex's third bank, 255 chained glitch patterns; build 672, branch `flz-bank`)
+
+Owner: "more effects like FLX and FLY". `FlexCore.FLZ_LIST` (static data, 255 entries `[[stage ks], NAME]`) fills k 513–767 through the `chain` engine of the previous commit; no engine change. Families by first hex digit (16 variants gentler to wilder, 2 or 3 stages each): 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos; 01–0F are the 2nd variant of each. FLZ is wired like FLY (end of `FXC`, event 512 + v, one Flex per row: rightmost of FLX / FLY / FLZ wins, slot wake, FX_NEEDS, tooltip, help, MST, FX bar). Tests in `tests/flex.test.js` scan all 255 (no read ahead, at most 8 beats back, mean gain above 0.15). Worklets rebuilt (chains ?v=60, waves ?v=49). Nobody has listened yet: punch list. The sparsest are the scratch + gate families (8x), gain about 0.2.
 
 ## 23 Nov (Drive folder chooser; build 671)
 Owner: let me choose the Drive folder. `index.html` Drive block: File ▾ "Drive folder: <name>…" runs `driveChoose` (askPick walk: ✓ Use this folder, ↑ Up, subfolders by name via `driveSubfolders`, Shared with me at root). Choice stored per device as `folder:{id,name}` in `thunderplus-drive-v1`; `driveFolderId()` uses it, verified once per session with files.get (404 or trashed: toast, choice cleared, default Thunder Plus find/create). Save / Open toasts and the empty-folder message name the folder. `sw.js` v671; docs/GOOGLE-DRIVE-SETUP.md; tests in `tests/drive-sync.test.js`.

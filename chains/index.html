@@ -2989,7 +2989,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=59';
+    const url = opts.url || './chains-worklet.js?v=60';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes, pumpBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
