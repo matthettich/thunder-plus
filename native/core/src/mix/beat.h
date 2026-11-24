@@ -30,15 +30,23 @@ class BeatClock {
   // the output NT block: beat + 1 while playing, 0 stopped, as float32 (the worklet output); scratch: N doubles
   void render(float* C, int N, double t0, double dt, double* scratch);
   // page mode (see above): set before the first event. render() then gives the clkBus value itself (the caller adds no -1)
-  void setPage(bool on) { page_ = on; A_.reset(on ? -1 : 0); }
+  void setPage(bool on, double sr) { page_ = on; sr_ = sr; A_.reset(on ? -1 : 0); pn_ = 0; }
   bool page() const { return page_; }
   bool on() const { return on_; }
   double base() const { return base_; }
-  uint32_t dropped() const { return A_.dropped; }
+  uint32_t dropped() const { return A_.dropped + pdrop_; }
   int peak() const { return peak_; }
  private:
   AutoN<kAuto> A_{0};
   bool on_ = false, page_ = false;
+  // page mode: the ConstantSource offset's own timeline (set / linear ramp events), evaluated as Chrome's AudioParamTimeline does for a linear ramp:
+  // per chunk of frames inside one ramp (a render block, cut at an event's frame) four lanes then `value += inc4` per four frames, float32 (see beat.cpp)
+  struct PEv { double t, v; int k; };
+  static constexpr int kPEv = 128;
+  PEv pev_[kPEv]; int pn_ = 0; uint32_t pdrop_ = 0; double sr_ = 48000;
+  void pins(int k, double v, double t);
+  void pcancel(double t);
+  void prender(float* C, int N, double t0);
   double base_ = 0;
   int peak_ = 0;
 };
