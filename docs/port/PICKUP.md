@@ -19,7 +19,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Machine: 2 cores, about 7 GB free disk. At most two compiling workers; delete build directories of merged work. One git network operation at a time per
   worker; `gh` through REST only (GraphQL is blocked); no CI runs on a push to `native`, only on PRs.
 
-## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); about 70% of the whole port by the lead's estimate (21 Nov, 22:05, after #283 and #281) (the lists below are older: see START HERE)
+## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); FX1 merged 24 Nov; about 70% of the whole port by the lead's estimate (21 Nov, 22:05, after #283 and #281) (the lists below are older: see START HERE)
 - **Stage N1 (playback core):** every worker-buildable unit is merged, pump effect hosting (U18) and Marbles / Tides included. **Left: steps 10 and 11, the
   lead's own: U34 (offline render API and pad renders through the core), U35 (MIDI scheduling), U37 (bridge and host switch: `core.wasm` behind the Settings
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
@@ -30,7 +30,23 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (23 Nov, 21:50): the state for a new chat. Everything below this section is history, newest first.
+## START HERE (24 Nov, 02:35): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 02:35)."
+
+**The owner's rules:** those of the 21 Nov 18:18 section below, unchanged. From 23 Nov, 22:31: delegate whenever possible, switch chats as often as is useful, and no update while he sleeps (one update at 07:30; the overnight check-ins work silently). His weekly usage reset on Mon 23 Nov 18:59 Mountain.
+
+**FX1 is MERGED: #286, squash `d934c0f` (24 Nov, 02:30).** CI all green on `e546a21` (the merged head `a018c52` differs by one notes line). Independent verifier (Sonnet): "merge after test hardening", no crash or wrong-audio defect found; its report is on `review/verify-286` (if that branch is missing, the push failed: the findings are summarised here). After the 21:50 section was written:
+- The lead read the rest of the audio path (`fxhost` / `fxsong` / `fxpump` / `fxbank`) and accepted it. Known and accepted: a final block shorter than 128 frames runs a full 128-frame module block (Chrome only renders 128s).
+- Hardening (`286c48f`, `83765a8`): `render_api_oom` tolerates a pump-side leak only when it EQUALS the pump_new blocks still live, ours must be 0, tolerated cases capped (4: Linux sees 1, macOS 2); the no-pump ELECTRO check (only where the effects library is built); static_asserts and run-time guards tying `modfxtable.inc` / `pumpparams.inc` to `kModMax` / `kModMaxParams`; `fx_make_mod` refuses a module without outputs.
+- Pump's C++ is built `-fexceptions` on every host build (owner: "Build with exceptions"). macOS arm64 aborted in `render_api_oom` (uncaught bad_alloc) until `native/CMakeLists.txt` got `-funwind-tables` on APPLE (files built `-fno-exceptions` have no unwind tables there). The sanitizer job: LeakSanitizer does not track what pump_new allocates in that test; `test_fxsong` without the vptr check.
+- **TWO SESSIONS drove #286 overnight** (this chat and the previous chat's builder, which kept pushing: every push cancels a 70-minute CI run). The owner was told to close the old chat. Before starting a unit, check via REST that its branch does not already exist.
+- **Open after FX1** (`docs/port/FX1-NOTES.md`, "Open after FX1"): FX1b (BETA's master pump chain -69.0 dB against Chrome, cause not found; bmod -69.7; lverb / room -69.9); the tape-then-cab rounding on ELECTRO track 7 (older than FX1); Convolve IRs, the BETA golden file, sidechain, NOTES FROM, pump FXV; an owner for the raw arrays in pump's `verb` `Engine::prepare` (the one remaining out-of-memory-only leak; in the pump repo, not here: the owner asked "do we need to fix pump at all" and was told no, not for the port). Verifier's remaining notes, not done: `test_fxsong` compares the host with a re-implementation of `modRun` (a shared transcription error would pass); the test aid `thunder_pump_create_depth` lives in `fxpump.cpp`; dead `page_ ? -1 : 0` at `beat.cpp` about line 67.
+
+**Web side:** #299 is merged into `beta` (found merged on 23 Nov, 22:37). Otherwise as in the 21:50 section below.
+
+**Next, in order:** U37 P3 (effects, master chain, PDC, meters in `LiveHost`, with R1 and R2 of the 21 Nov 18:18 section): a Sonnet builder on `n1/u37-p3`, notes `docs/port/U37-P3-NOTES.md` ON THAT BRANCH (if the branch exists, the notes say where it stands; if not, it was never started). Then P4, P5; C2; the Android shell on the live host. Kept open as before: the U31 engine's OOM leak; FX1b; the web items in HANDOVER on `beta`.
+
+## START HERE of 23 Nov, 21:50 (now history)
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (23 Nov, 21:50)."
 
 **The owner's rules:** those of the 21 Nov 18:18 section below, unchanged (delegate to Sonnet builders, the lead reviews every audio-path line, an independent Sonnet verifier per PR, squash-merge into `native` when ALL CI is green; a two-hour "moving or stalled" line; notify him rarely; push often). His weekly usage reset on Mon 23 Nov 18:59 Mountain. This session's permission rules refuse a merge into `beta` (and edits some builders try) without his words in chat: ask in one line.
