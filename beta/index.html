@@ -3839,7 +3839,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=49"></script>
+<script src="waves/waves-worklet.js?v=50"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8878,7 +8878,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=49', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=50', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -23909,7 +23909,9 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     for (const [t, pad, poly] of list){ const V = kit.voices[pad]; if (!V || !isLivePad(pad) || !buses[t]) continue;
       try { if (poly && isVoxV(V)) for (let j = 1; j <= POLY; j++) bassNode(t, pad, j); else bassNode(t, pad); } catch(e){ tpLog('live warm', e); } }
     made = bassN.size - n0; return made; }   // how many were new (they start up on the audio thread over the next moment)
-  return {aliveN:() => alive.size, play, warm, coreTake, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop, wlDoc};
+  // PATCH KNOBS: the page keeps knSt for knobs the core took (it skips their events), so …waves nodes made later start right
+  const knSet = (t, p, v) => { const K = knSt.get(t) || new Float32Array(9).fill(-1); K[+p.slice(1)] = v; knSt.set(t, K); };
+  return {aliveN:() => alive.size, play, warm, coreTake, knSet, clkBus, clkReset, out, stopAll, applyMix, setFx, routeTrack, buses, clockTo, setMfx, dispose, tapsSync, busSync, setBusOff, pdcSync, mfxKeys:() => fxKeySync(mfx, S.mfx), psLoad, psDrop, wlDoc};
 }
 
 /* ---------- live playback ---------- */
@@ -24607,7 +24609,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=14', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=49', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=50', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -25274,7 +25276,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = 'ro0cep';
+const CORE_REV = 'p0e7w3';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -25619,6 +25621,7 @@ function coreMsg(d){
       { const k = (e.core ? 'core ' : 'page ') + e.type + (e.type === 'note' && (e.vk || e.tw) ? ' var' : '') + (e.type === 'note' && !e.core ? ' pad ' + e.pad : ''); core.tally.set(k, (core.tally.get(k) || 0) + 1); }
       const midiOnly = moEv(e);
       if (e.type === 'fxc' || e.type === 'fxreset' || e.type === 'beat') fxcNote(e);   // FX BAR: what the pattern effects play now
+      if (e.core && e.type === 'chc' && e.p && e.p[0] === 'k' && rt.pl.knSet) rt.pl.knSet(e.track, e.p, e.v);   // PATCH KNOBS (CodeRabbit on #298): the page's knSt follows a knob the core took, for …waves nodes it makes later
       if (e.core){ if (e.type === 'note'){ coreWireT(e.track); rt.pl.coreTake(e); if (e.t >= ctx.currentTime - 0.03) padBlink(e); }
         else if (e.type === 'tvl' || e.type === 'tva' || e.type === 'tpn' || e.type === 'mvol' || e.type === 'mout') coreMixT(e);
         continue; }   // (a beat: the core drives the effects' clock; moEv above still kept MIDI clock's mx.beat)
@@ -27165,7 +27168,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 672;
+const BUILD = 673;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37620,6 +37623,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [673, '23 Nov', ['Patch knobs: a knob change on a quiet waves patch is heard at once (it used to wait for a note); knob values reach waves voices made later at the right time.']],
   [672, '23 Nov', ['New command FLZ: a third bank of 255 Flex patterns for IDM and glitch punch-ins, each a chain of two or three FLX / FLY moves (a stutter into a bit crush, a juggle with slice pitches, a tape stop on a roll, reverse into a gate mask\u2026). FLZ 01\u20130F are one of each family to try first, then by the first digit: 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos. It plays on the same Flex as FLX and FLY (the last one on a row wins) and works in the MST column too.']],
   [671, '23 Nov', ['File ▾ → Drive folder…: choose which Google Drive folder Save / Open use (any folder in My Drive or Shared with me); it is remembered on this device.']],
   [670, '23 Nov', ['Google Drive moved to a new sign-in setup (a personal Google Cloud project).']],
