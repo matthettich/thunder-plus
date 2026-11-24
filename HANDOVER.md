@@ -882,7 +882,15 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
    Alternative the owner also asked about: Monomodule itself (free AU / VST3 that runs the original DSP program in a DSP56300
    emulator, user supplies the Monomachine OS file) through VST hosting in the native desktop app, desktop only. Never build it
    into the web app (needs a JIT emulator; licence as above).
-9. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
+9. **Planned (owner, 23 Nov): a Flex pattern editor.** Your own patterns, saved in the song: a new command (e.g. `FLU 01–FF`, appended to
+   `FXC`) played by the same Flex effect. A **step editor** (16 or 32 steps over 1–2 bars, in the app's skin, phone and desktop, audition
+   while editing): per step the slice of the bar it plays, repeat rate, reverse, pitch, gate, filter / crush. **Copy a built-in to edit**
+   ("copy FLX 3A / FLY / FLZ to my bank"): rolls, stutters, juggles, reverses and gates convert exactly; the gliding families (tape, scratch,
+   chaos, wow) only roughly. Engine: one new FlexCore family `step` that plays a song-stored grid (the grid reaches the worklet by port
+   message or a song table; read only what has played, r ≤ p, as tests/flex.test.js checks), FlexCore regenerated with
+   `node tools/make-fx-cores.mjs`. The lead writes the engine family; editor, saving and tests can be delegated. Songs keep their user
+   bank (Drive sync carries it). Not started.
+10. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
 
 ### Pump re-pin: waits on pump (18 Nov)
 
