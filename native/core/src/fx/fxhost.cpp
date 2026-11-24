@@ -2,6 +2,7 @@
 #include "fx/fxhost.h"
 #include <memory>
 
+#include "fx/fxmod.h"
 #include "fx/pumpfx.h"
 
 #include <algorithm>
@@ -115,7 +116,7 @@ struct PumpHold : Fx {
   ~PumpHold() override { delete ps; }
   void process(float*, float*, int) override {}
 };
-static Fx* make_pump(const FxEntry& e, double sr) { PumpSlot* p = PumpSlot::make(e, sr); return p ? new PumpHold(p) : nullptr; }
+static Fx* make_pump(const FxEntry& e, double sr) { PumpSlot* p = PumpSlot::make(e, sr); if (!p) return nullptr; try { return new PumpHold(p); } catch (...) { delete p; throw; } }
 
 static void copyKey(char* d, const char* s) { std::snprintf(d, kFxKey, "%s", s); }
 static bool keyHas(const char* k, const char* needle) { return std::strstr(k, needle) != nullptr; }
@@ -140,17 +141,18 @@ FxHost::~FxHost() {
 uint32_t FxHost::laneDropped() const { uint32_t n = 0; for (int i = 0; i < 11; i++) n += lanes_[i]->dropped; return n; }
 
 // ---- control thread --------------------------------------------------------------------------------------------------------------------
-FxPlan* FxHost::plan(const FxEntry* e, int n) {
+FxPlan* FxHost::plan(const FxEntry* e, int n, modfx::Seeds* seeds) {
   std::unique_ptr<FxPlan> plp(new FxPlan); FxPlan* pl = plp.get();   // (U34a: an allocation failure part way frees the plan and the effects it has made)
   bool used[kFxSlots] = {false}; Fx* nf[kFxSlots] = {nullptr};
+  modfx::SeedCounter ownSeeds; modfx::Seeds& sd = seeds ? *seeds : ownSeeds;   // (the JS's counter is one per audio thread: the caller shares it among the hosts of a render)
   for (int i = 0; i < n && pl->n_ < kFxSlots; i++) {
-    const bool pmp = fx_is_pump(e[i].t);
-    if (e[i].t < 0 || (e[i].t > 33 && !fx_is_core(e[i].t) && !pmp)) continue;   // not an effect hosted here: left out (the sound passes)
+    const bool pmp = fx_is_pump(e[i].t), mdf = fx_is_mod(e[i].t) && fx_mod_key(e[i].t) != nullptr;
+    if (e[i].t < 0 || (e[i].t > 33 && !fx_is_core(e[i].t) && !pmp && !mdf)) { refused_[kRefUnknown]++; continue; }   // not an effect hosted here: left out (the sound passes), counted
     int j = -1; for (int k = 0; k < nCtl_; k++) if (!used[k] && std::strcmp(ctl_[k].key, e[i].key) == 0) { j = k; break; }
     const int w = pl->n_;
     if (j >= 0) { used[j] = true; pl->reuse_[w] = true; nf[w] = ctlFx_[j]; }
-    else { Fx* f; if (pmp) f = make_pump(e[i], sr_); else if (fx_is_core(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
-    pl->e_[w] = e[i]; pl->n_++;
+    else { Fx* f; if (pmp) f = make_pump(e[i], sr_); else if (mdf) f = fx_make_mod(e[i], sr_, sd); else if (fx_is_core(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) { refused_[kRefNoEngine]++; continue; } pl->fx_[w] = f; nf[w] = f; }
+    pl->e_[w] = e[i]; pl->e_[w].pst = nullptr; pl->n_++;
     if (pmp) {   // LATENCY COMP counts pumpLatencyOf(slot): a temporary instance with the slot's values; the one measured for the same values before is kept
       FxEntry& c = pl->e_[w]; const int jj = j;
       if (jj >= 0 && ctl_[jj].npv == c.npv && ctl_[jj].bi == c.bi && std::memcmp(ctl_[jj].pv, c.pv, sizeof(float) * (size_t)c.npv) == 0) c.lat = ctl_[jj].lat;
@@ -161,9 +163,17 @@ FxPlan* FxHost::plan(const FxEntry* e, int n) {
   return plp.release();
 }
 
-bool FxHost::entryFromSlot(Json o, int slot, double sr, double bpm, double restartN, FxEntry* out) {
+bool FxHost::entryFromSlot(Json o, int slot, double sr, double bpm, double restartN, FxEntry* out, FxSlotText* txt, int* why) {
+  if (why) *why = -1;
   if (!o.isObj()) return false;
-  const int id = fx_type_of(o.str("type")); if (id < 0) return false;
+  const std::string_view type = o.str("type");
+  const int id = fx_type_of(type);
+  if (id < 0) {   // FX1: a pump effect ("p" + the plugin's type) or a MODFX module
+    if (type.size() > 1 && type[0] == 'p') for (int pt = 0; pt < kPumpTypes; pt++) if (type.substr(1) == fx_pump_key(pt)) return fx_entry_pump(o, slot, pt, out, txt, why);
+    const int m = fx_mod_index(type); if (m >= 0) return fx_entry_mod(o, slot, m, bpm, out, why);
+    if (why) *why = kRefUnknown;
+    return false;
+  }
   FxEntry& c = *out; c = FxEntry();
   c.nvals = fx_param_count(id); for (int i = 0; i < c.nvals; i++) c.vals[i] = fx_norm_value(o.get(kFxKeyOf(id, i)), id, i);
   Json on = o.get("on"); c.on = !(on.isBool() && !on.asBool());
@@ -171,10 +181,14 @@ bool FxHost::entryFromSlot(Json o, int slot, double sr, double bpm, double resta
   fx_map(id, c.vals, sr, bpm, restartN, c.p);
   return true;
 }
-FxPlan* FxHost::planFromSong(Json slots, double bpm, double restartN) {
-  FxEntry e[kFxSlots]; int n = 0;
-  for (int k = 0; k < kFxSlots; k++) if (entryFromSlot(slots.at((size_t)k), k, sr_, bpm, restartN, &e[n])) n++;
-  return plan(e, n);
+FxPlan* FxHost::planFromSong(Json slots, double bpm, double restartN, modfx::Seeds* seeds) {
+  FxEntry e[kFxSlots]; FxSlotText txt[kFxSlots]; int n = 0;
+  for (int k = 0; k < kFxSlots; k++) {
+    int why = -1; Json o = slots.at((size_t)k);
+    if (entryFromSlot(o, k, sr_, bpm, restartN, &e[n], &txt[n], &why)) n++;
+    else if (why >= 0 && why < kRefN) refused_[why]++;   // a slot the song holds and this host does not play: counted (an empty slot is not)
+  }
+  return plan(e, n, seeds);
 }
 
 // ---- audio thread ----------------------------------------------------------------------------------------------------------------------
@@ -193,6 +207,7 @@ void FxHost::applyEntry(Slot& s, const FxEntry& c, bool fresh) {
     }
     u.sck = c.sck; u.cr = c.cr; u.clk = c.clk; return;
   }
+  if (fx_is_mod(c.t)) { if (s.fx) fx_mod_set(s.fx, c); if (c.bpm > 0) bpm_ = c.bpm; s.wi = -1; s.nn = false; return; }   // a MODFX slot: its module values (and `if (c.bpm) this.bpm = c.bpm`)
   s.wi = c.t == 8 ? 4 : c.t == 20 ? 7 : c.t == 24 ? 3 : -1;   // REVERB MIX: Galactic, Space and Room run fully wet; the blend is rvMix
   s.nn = keyHas(c.key, "vinyl") || keyHas(c.key, "pcrush");
   double pp[12]; for (int i = 0; i < 12; i++) pp[i] = c.p[i];
@@ -220,10 +235,16 @@ void FxHost::kill() { dead_flag_ = true; }
 void FxHost::psetAt(double at, int slot, const double* p12) {
   if (nq_ >= kFxQueue) { qDropped_++; return; }
   int i = nq_; while (i > 0 && q_[i - 1].at > at) { q_[i] = q_[i - 1]; i--; }
-  q_[i].at = at; q_[i].slot = slot; for (int k = 0; k < 12; k++) q_[i].p[k] = p12[k]; nq_++;
+  q_[i].at = at; q_[i].slot = slot; q_[i].n = 12; for (int k = 0; k < 12; k++) q_[i].p[k] = p12[k]; nq_++;
 }
-void FxHost::applyPset(int slot, const double* p12) {   // onmessage {pset}: the chain's entry for the slot gets p, then set(chain) again
-  for (int i = 0; i < nChain_; i++) if (chain_[i].slot == slot) for (int k = 0; k < 12; k++) chain_[i].p[k] = p12[k];
+void FxHost::psetMod(double at, int slot, const double* mp, int n) {
+  if (nq_ >= kFxQueue) { qDropped_++; return; }
+  if (n > kModMaxParams) n = kModMaxParams;
+  int i = nq_; while (i > 0 && q_[i - 1].at > at) { q_[i] = q_[i - 1]; i--; }
+  q_[i].at = at; q_[i].slot = slot; q_[i].n = n; for (int k = 0; k < n; k++) q_[i].p[k] = mp[k]; nq_++;
+}
+void FxHost::applyPset(int slot, const double* p12, int n) {   // onmessage {pset}: the chain's entry for the slot gets p (or mp: a MODFX slot), then set(chain) again
+  for (int i = 0; i < nChain_; i++) if (chain_[i].slot == slot) { if (fx_is_mod(chain_[i].t)) { for (int k = 0; k < n && k < chain_[i].nmp; k++) chain_[i].mp[k] = p12[k]; } else for (int k = 0; k < 12 && k < n; k++) chain_[i].p[k] = p12[k]; }
   for (int i = 0; i < nSlots_; i++) applyEntry(slots_[i], chain_[i]);
   pumpUp(); idle_ = 0;
 }
@@ -258,6 +279,7 @@ void FxHost::runClk(Slot& s, bool feed, int n) {
 void FxHost::slotRun(Slot& s, int n) {
   if (!s.fx) return;
   if (s.pu) { pumpRun(s, n); return; }
+  if (fx_is_mod(s.t)) { modRun(s, n); return; }
   if (fx_is_core(s.t)) { runClk(s, false, n); return; }   // (a core slot runs its JS core)
   std::memcpy(cL_, Lb_, sizeof(float) * (size_t)n); std::memcpy(cR_, Rb_, sizeof(float) * (size_t)n);
   s.fx->process(Lb_, Rb_, n);
@@ -315,7 +337,7 @@ bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn
   PumpGate gate(nPump_ > 0); pumpOk_ = nPump_ > 0 && gate.ok; if (nPump_ > 0 && !gate.ok) gated_++;
   t0_ = t0; nPtelTmp_ = 0;
   if (nqp_ > 0) { const double due = t0 + 64 / sr_; while (nqp_ > 0 && qp_[0].at <= due) { Qp q = qp_[0]; for (int i = 1; i < nqp_; i++) qp_[i - 1] = qp_[i]; nqp_--; applyPumpPset(q.slot, q.pv, q.n); } }   // FXV of a pump slot at its time
-  if (nq_ > 0) { const double due = t0 + 64 / sr_; while (nq_ > 0 && q_[0].at <= due) { Q q = q_[0]; for (int i = 1; i < nq_; i++) q_[i - 1] = q_[i]; nq_--; applyPset(q.slot, q.p); } }   // THUNDER CORE: FXV at its time
+  if (nq_ > 0) { const double due = t0 + 64 / sr_; while (nq_ > 0 && q_[0].at <= due) { Q q = q_[0]; for (int i = 1; i < nq_; i++) q_[i - 1] = q_[i]; nq_--; applyPset(q.slot, q.p, q.n); } }   // THUNDER CORE: FXV at its time
   float* L = Lb_; float* R = Rb_;
   const bool rest = restAt_ > 0 && t0 >= restAt_;
   float ip = 0; bool bad = false;

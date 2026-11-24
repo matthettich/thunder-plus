@@ -36,11 +36,12 @@ static bool writeWav(const std::string& path, const std::vector<float>& L, const
 }
 
 int main(int argc, char** argv) {
-  if (argc < 4) { std::fprintf(stderr, "usage: thunder-render <song.thunder> <padsDir> <out.wav> [--frames N] [--block N] [--page-timing] [--fx] [--master] [--chains]\n"); return 2; }
+  if (argc < 4) { std::fprintf(stderr, "usage: thunder-render <song.thunder> <padsDir> <out.wav> [--frames N] [--block N] [--page-timing] [--fx] [--pdc] [--master] [--chains]\n"); return 2; }
   const std::string songPath = argv[1], dir = argv[2], outPath = argv[3]; int64_t frames = -1; int block = 128;
   bool pageTiming = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--page-timing")) { pageTiming = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
   bool fxOn = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--fx")) { fxOn = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
   bool chainsOn = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--chains")) { chainsOn = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
+  bool pdc = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--pdc")) { pdc = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }   // FX1: LATENCY COMP auto (the page's default): matters once an effect has latency (pump)
   bool master = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--master")) { master = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
   for (int i = 4; i + 1 < argc; i += 2) { if (!std::strcmp(argv[i], "--frames")) frames = std::atoll(argv[i + 1]); else if (!std::strcmp(argv[i], "--block")) block = std::atoi(argv[i + 1]); }
   if (block < 1 || block > 8192) { std::fprintf(stderr, "thunder-render: --block 1..8192\n"); return 2; }
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
   if (frames < 0 && I.get("frames").isNum()) frames = (int64_t)I.num("frames");
   const std::string varsJson = json_write(I.get("vars"));   // the page's coreVars(), handed on as text
   thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = (uint32_t)sizeof o;
-  o.sample_rate = sr; o.effects = fxOn; o.chains = chainsOn; o.master_chain = master; o.page_timing = pageTiming;
+  o.sample_rate = sr; o.effects = fxOn; o.chains = chainsOn; o.pdc_mode = pdc ? 1 : 0; o.master_chain = master; o.page_timing = pageTiming;
   if (frames >= 0) { o.use_frames = 1; o.frames = frames; }
   if (I.get("vars").isObj()) { o.vars_json = (const uint8_t*)varsJson.data(); o.vars_bytes = varsJson.size(); }
   char err[256];

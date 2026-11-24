@@ -85,6 +85,11 @@ if(NOT IS_WASM AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64|i[3-6]86
 endif()
 set(DEFS PUMP_SYNC_KERNELS=1 PFFFT_STATIC_DEFINE NDEBUG)
 set(OPT_CXX ${OPT} -fno-exceptions -fno-rtti)
+if(NOT IS_WASM)
+  # FX1 (owner: "build with exceptions"): host builds compile pump's C++ WITH exceptions. A std::bad_alloc thrown inside a plugin constructor (pumpfx_new_* -> Engine::Engine / prepare)
+  # then runs the destructors of the members already made (render_api_oom, ELECTRO). The wasm build keeps build.sh's flags. No pump source is changed.
+  set(OPT_CXX ${OPT} -fexceptions -fno-rtti)
+endif()
 
 function(pump_obj name src)
   cmake_parse_arguments(O "C" "" "INCS" ${ARGN})

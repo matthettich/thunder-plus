@@ -32,18 +32,25 @@ class FxBank {
   // LATENCY COMP: one record per track slot (the pump slots' measured latency: the page counts only pump effects) for pdc_plan; returns the count (<= max)
   int pdcSlots(PdcSlot* out, int max) const;
   void setBpm(double bpm) { bpm_ = bpm; }
+  // FX1: the master's pump effects' latency in samples, as pass() adds it to a render's start (`pumpChainLatency(S.mfx, sr)`: a slot counts when it is ON or has a bypass of its own)
+  int64_t masterPumpLatency() const;
+  // FX1: slots of the song left out of a host, by reason (FxRefusal), over all hosts; FXV events for a pump slot (not played yet) and for slots that are not there
+  uint32_t refused(int why) const { uint32_t n = 0; for (int t = 0; t <= kSongNT; t++) n += h_[t]->refused(why); return n; }
+  uint32_t fxvRefused() const { return fxvRefused_; }
+  uint32_t modRemakes() const { uint32_t n = 0; for (int t = 0; t <= kSongNT; t++) n += h_[t]->modRemakes(); return n; }
+  uint32_t modDead() const { uint32_t n = 0; for (int t = 0; t <= kSongNT; t++) n += h_[t]->modDead(); return n; }
   uint32_t pendDropped() const { return pendDropped_; }
   int pending() const { return nPend_; }
 
  private:
   struct Pend { int track, p; double v, t; };
-  struct Ov { double v[12]; unsigned mask; };
+  struct Ov { double v[kModMaxParams]; unsigned mask; };
   void flush(int track, double now);
   double sr_, bpm_ = 120, restartN_ = 0;
   const Mixer* mix_ = nullptr;   // attach(): the hooks read the beat clock each effects node hears (Mixer::beat) from it
   std::unique_ptr<FxHost> h_[kSongNT + 1];
   static constexpr int kPend = 256;
-  Pend pend_[kPend]; int nPend_ = 0; uint32_t pendDropped_ = 0;
+  Pend pend_[kPend]; int nPend_ = 0; uint32_t pendDropped_ = 0, fxvRefused_ = 0;
   Ov ov_[kSongNT + 1][kFxSlots];
 };
 

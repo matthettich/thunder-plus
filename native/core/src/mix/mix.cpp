@@ -380,7 +380,8 @@ double Mixer::clockDelaySec(int t) const { if (t < 0 || t >= kMixTracks) return 
 void Mixer::clockBlock(int N, double t0) {
   const size_t mb = (size_t)maxBlock_; float* lane = clkLane_.get(); float* bus = clkBus_.get();
   clk_.render(lane, N, t0, dt_, d_.get());
-  for (int i = 0; i < N; i++) bus[i] = lane[i] + -1.0f;
+  if (clk_.page()) { for (int i = 0; i < N; i++) bus[i] = lane[i]; }   // (the page player's clock: the offset itself)
+  else for (int i = 0; i < N; i++) bus[i] = lane[i] + -1.0f;
   for (int t = 0; t < kMixTracks; t++) {
     if (!(t < kNT ? fx_[t].fn != nullptr : mfx_.fn != nullptr)) { clkRd_[t] = nullptr; continue; }
     Rd& R = rd_[t]; R.ring.push(bus, nullptr, N); clkRd_[t] = bus;

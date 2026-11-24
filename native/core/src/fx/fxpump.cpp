@@ -50,11 +50,17 @@ float* pump_stage(); int pump_new(int type, double sr); void pump_free(int h); f
 void pump_process(int h, int n, int sc); int pump_latency(int h); float* pump_tel(int h); int pump_tel_len(int type); int pump_nparams(int type);
 void pump_midi(int h, int frame, int status, int d1, int d2); void pump_transport(int h, double bpm, double ppq, int playing);
 void pump_hold(int h, int kind, float a, float b, float c, float d);
+char* pump_text(); void pump_state_set(int h);
 }
 namespace pump {
 bool available() { return true; }
 int nparams(int type) { return pump_nparams(type); }
-int create(int type, double sr) { return pump_new(type, sr); }
+}
+// A test aid (test_render_api_oom): non-zero while the plugin's own pump_new runs (control thread only; never on the audio path), so the test can tell an allocation that
+// failed inside the pinned plugin from one of ours.
+extern "C" volatile int thunder_pump_create_depth = 0;
+namespace pump {
+int create(int type, double sr) { struct D { D() { thunder_pump_create_depth = thunder_pump_create_depth + 1; } ~D() { thunder_pump_create_depth = thunder_pump_create_depth - 1; } } d; return pump_new(type, sr); }
 void destroy(int h) { pump_free(h); }
 float* stage() { return pump_stage(); }
 int tel_len(int type) { return pump_tel_len(type); }
@@ -67,8 +73,16 @@ float* values(int h) { return pump_values(h); }
 void commit(int h) { pump_commit(h); }
 float* io(int ch) { return pump_io(ch); }
 void process(int h, int n, int sc) { pump_process(h, n, sc); }
+// pumpState: "key\0value\0" in pump_text (65536 chars; a longer one is not given), then pump_state_set. Plain ASCII (`& 127`, as the worklet writes it).
+void state_set(int h, const std::string& k, const std::string& v) {
+  if (k.size() + v.size() + 2 > 65536) return;
+  char* b = pump_text(); std::memcpy(b, k.data(), k.size()); b[k.size()] = 0;
+  for (size_t i = 0; i < v.size(); i++) b[k.size() + 1 + i] = (char)((unsigned char)v[i] & 127);
+  b[k.size() + 1 + v.size()] = 0; pump_state_set(h);
+}
 }
 #else   // no pump library (MSVC, THUNDER_WITH_PUMP=OFF): no instance can be made, so a pump slot is left out of the chain and the sound passes (the worklet before pump.wasm arrives)
+extern "C" volatile int thunder_pump_create_depth = 0;   // (see above; no plugin here, always 0)
 namespace pump {
 bool available() { return false; }
 int nparams(int) { return 0; }
@@ -85,6 +99,7 @@ float* values(int) { return nullptr; }
 void commit(int) {}
 float* io(int) { static float b[4096]; return b; }
 void process(int, int, int) {}
+void state_set(int, const std::string&, const std::string&) {}
 }
 #endif
 
@@ -118,15 +133,16 @@ static int stagedNew(int pt, const float* pv, int npv, int bi, bool byp, bool wi
 PumpSlot* PumpSlot::make(const FxEntry& e, double sr) {
   if (!pump::available() || !fx_is_pump(e.t)) return nullptr;
   const int pt = e.t - kPumpT0, np = pump::nparams(pt);
-  PumpSlot* u = new PumpSlot;
+  std::unique_ptr<PumpSlot> up(new PumpSlot); PumpSlot* u = up.get();   // (an allocation failure below frees it: the destructor frees what was made)
   u->pt = pt; u->bi = e.bi; u->byp = !e.on; u->sck = e.sck; u->cr = e.cr; u->clk = e.clk;
   u->npv = e.npv < np ? e.npv : np;   // (the JS writes pv.length values into pump_values, which holds nparams: a longer list would write past it)
   if (u->npv < 0) u->npv = 0;
   std::memcpy(u->pv, e.pv, sizeof(float) * (size_t)u->npv);
   if (u->bi >= 0) { u->rbl = new float[kPumpRestMax + 128](); u->rbr = new float[kPumpRestMax + 128](); }
-  { CtlGate g; u->h = stagedNew(pt, u->pv, u->npv, u->bi, u->byp, true, sr); }
-  if (u->h < 0) { delete u; return nullptr; }
-  return u;
+  if (e.pst) for (int i = 0; i < e.pst->n && i < 2; i++) { u->stKey[i] = e.pst->key[i]; u->stVal[i] = e.pst->val[i]; u->nSt = i + 1; }   // FX1: pumpNew's `pst` (MASTER's analysis, TUNE's notes), kept for a fresh instance
+  { CtlGate g; u->h = stagedNew(pt, u->pv, u->npv, u->bi, u->byp, true, sr); if (u->h >= 0) u->giveState(); }
+  if (u->h < 0) return nullptr;
+  return up.release();
 }
 int PumpSlot::probeLatency(const FxEntry& e, double sr) {
   if (!pump::available() || !fx_is_pump(e.t)) return -1;
@@ -150,8 +166,10 @@ PumpSlot::~PumpSlot() {
 bool PumpSlot::renew(double sr) {   // audio thread, inside a PumpGate that is ok: no control thread is in pump now
   if (h >= 0) pump::destroy(h);
   h = stagedNew(pt, pv, npv, bi, byp, true, sr); dirty = false;
+  if (h >= 0) giveState();
   return h >= 0;
 }
+void PumpSlot::giveState() { for (int i = 0; i < nSt; i++) if (!stVal[i].empty()) pump::state_set(h, stKey[i], stVal[i]); }
 
 // ---- FxHost: the pump parts ----------------------------------------------------------------------------------------------------------------------
 static double jsMax(double a, double b) { return (a != a || b != b) ? std::nan("") : (a > b ? a : b); }   // Math.max
@@ -195,8 +213,9 @@ void FxHost::pumpUp() {
 void FxHost::pumpClock(const float* bp, int bpn, int n) {
   const bool on = bp[0] >= 0 && bp[bpn - 1] >= 0;
   if (on) clk_spb(node_, bp, bpn, n);
+  if (on && !wasOn_) startN_++;   // (JS) `if (!this.wasOn) this.startN++`: the modules' transport counts the starts
+  tempo_ = on ? jsMax(20, jsMin(999, 60 * sr_ / node_.spb)) : bpm_;   // (JS) this.bpm: 120 until a MODFX entry names the song's tempo
   wasOn_ = on; playing_ = on;
-  tempo_ = on ? jsMax(20, jsMin(999, 60 * sr_ / node_.spb)) : 120;
   // (JS) bp[n - 1] is undefined when the clock is a constant (length 1) and the block is longer: the song position is then NaN
   const double last = n - 1 < bpn ? (double)bp[n - 1] : std::nan("");
   ppq_ = on ? jsMax(0, last + node_.cu - (n - 1) * tempo_ / 60 / sr_) : 0;

@@ -24,6 +24,13 @@ if(THUNDER_SANITIZE)
   endif()
 endif()
 
+# FX1 (render_api_oom on macOS arm64): clang's Darwin driver emits NO unwind tables for a file built -fno-exceptions (or for C) on arm64 (Darwin::IsUnwindTablesDefault: only x86_64 is
+# exempt), so a std::bad_alloc thrown from operator new cannot pass through any frame of such a file (or a linker-picked copy of an inline function made there): the unwinder finds no
+# entry and calls terminate. Linux / GCC / clang always emit .eh_frame. This only adds the metadata (no code change, no audio change); the -fno-exceptions / -fexceptions choices stay.
+if(APPLE)
+  add_compile_options(-funwind-tables)
+endif()
+
 add_subdirectory(core)
 if(THUNDER_WITH_LXR AND NOT MSVC)
   add_subdirectory(lxr)

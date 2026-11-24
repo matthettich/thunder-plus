@@ -17,15 +17,15 @@
 #    voice differently in two places (voice/voice.h, setPageTiming), so a song with slides, bends or a note a hair above a sample
 #    differs there between the web app's own two players, and so between the reference and the core-timed render.
 set -euo pipefail
-SONG="${1:?usage: render-compare.sh <song.thunder> [--master]}"; MASTER=""; FX=""; [ "${2:-}" = "--master" ] && MASTER=1; [ "${2:-}" = "--fx" ] && FX=1
+SONG="${1:?usage: render-compare.sh <song.thunder> [--master | --fx | --fx-all]}"; MASTER=""; FX=""; FXALL=""; [ "${2:-}" = "--master" ] && MASTER=1; [ "${2:-}" = "--fx" ] && FX=1; [ "${2:-}" = "--fx-all" ] && { FX=1; FXALL=1; }   # --fx-all (FX1): every effect slot ON (pump and MODFX too)
 HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$(cd "$HERE/../.." && pwd)"
-NAME="$(basename "$SONG" .thunder)${MASTER:+-master}${FX:+-fx}"; REF="${THUNDER_REF:-/tmp/thunder-ref}/$NAME"; BUILD="${THUNDER_BUILD:-/tmp/u09}"
+NAME="$(basename "$SONG" .thunder)${MASTER:+-master}${FX:+-fx}${FXALL:+-all}"; REF="${THUNDER_REF:-/tmp/thunder-ref}/$NAME"; BUILD="${THUNDER_BUILD:-/tmp/u09}"
 case "$SONG" in /*) SONGP="$SONG";; *) SONGP="$ROOT/$SONG"; [ -f "$SONGP" ] || SONGP="$PWD/$SONG";; esac
 [ -f "$SONGP" ] || { echo "render-compare: no such song: $SONG"; exit 2; }
 command -v node >/dev/null || { echo "render-compare: Node is needed (the reference and the comparison)"; exit 2; }
 if [ ! -f "$REF/ref.f32" ] || [ ! -f "$REF/index.json" ] || [ "$SONGP" -nt "$REF/ref.f32" ] || [ "$HERE/song-ref.mjs" -nt "$REF/ref.f32" ]; then
   echo "render-compare: making the reference in headless Chrome (a minute or two)..."
-  (cd "$ROOT" && node "$HERE/song-ref.mjs" "$SONGP" "$REF" ${MASTER:+--master} ${FX:+--fx}) || { echo "render-compare: the reference could not be made (Chrome + playwright needed: CHROME=, PLAYWRIGHT=)"; exit 2; }
+  (cd "$ROOT" && node "$HERE/song-ref.mjs" "$SONGP" "$REF" ${MASTER:+--master} ${FX:+--fx} ${FXALL:+--fx-all}) || { echo "render-compare: the reference could not be made (Chrome + playwright needed: CHROME=, PLAYWRIGHT=)"; exit 2; }
 else
   node -e '
     const fs = require("fs"), c = require("crypto"), [ref, gp] = process.argv.slice(1);
@@ -40,10 +40,10 @@ fi
 BIN="$BUILD/tools/thunder-render/thunder-render"
 if [ ! -x "$BIN" ]; then cmake -S "$ROOT/native" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build "$BUILD" -j8 --target thunder-render >/dev/null; fi
 OUT="${TMPDIR:-/tmp}/thunder-render-$NAME"
-"$BIN" "$REF/song.thunder" "$REF" "$OUT-page.wav" --page-timing ${MASTER:+--master} ${FX:+--fx}
+"$BIN" "$REF/song.thunder" "$REF" "$OUT-page.wav" --page-timing ${MASTER:+--master} ${FX:+--fx --pdc}
 set +e
 node "$HERE/render-diff.mjs" "$OUT-page.wav" "$REF/ref.f32" "voices timed as the page player's (the reference's own): "; A=$?
-"$BIN" "$REF/song.thunder" "$REF" "$OUT-core.wav" ${MASTER:+--master} ${FX:+--fx} >/dev/null; RC=$?
+"$BIN" "$REF/song.thunder" "$REF" "$OUT-core.wav" ${MASTER:+--master} ${FX:+--fx --pdc} >/dev/null; RC=$?
 node "$HERE/render-diff.mjs" "$OUT-core.wav" "$REF/ref.f32" "voices timed as the core's (not part of the verdict; see voice/voice.h setPageTiming): "
 set -e
 [ $RC -eq 0 ] || { echo "render-compare: FAIL: the core-timed render reported lost events or a voice that never ended (exit $RC)"; exit 1; }
