@@ -81,14 +81,15 @@ struct PlayPlan {
   bool hasMaster = false;
   PdcPlan pdc; PdcMode pdcMode = PdcMode::Auto;      // pdc_plan(bus, slots of `fx` as planned, sr, mode)
   int64_t t0 = -1; int spp = 0;
+  uint64_t cfgOrd = 0;                               // P3: the control side's ordinal of this play's master / PDC configuration; a pdc_set / master_config published later has a higher one and wins (one counter, `cfgOrd_`)
   const SeqSession* sess = nullptr;                  // P2: identity of the PLAY's session: applyPlay starts the runner only on a snapshot of THIS session (an adopt stalled by a full return ring leaves the old Seq current)
   ~PlayPlan();                                       // control: deletes any plan the audio side did not take
 };
 
 // A PDC plan or a master configuration published beside the song: one slot each (rt/snap.h SnapSlot<T>, plain adopt()), adopted at step 2.
-struct LivePdcMsg { PdcPlan plan; PdcMode mode = PdcMode::Auto; };
+struct LivePdcMsg { PdcPlan plan; PdcMode mode = PdcMode::Auto; uint64_t ord = 0; };   // ord: see PlayPlan::cfgOrd
 struct LiveBusMsg { BusPlan plan; };                 // built from the song's chain patch by song_publish; published with it
-struct LiveMasterMsg { MasterChainConfig cfg; };
+struct LiveMasterMsg { MasterChainConfig cfg; uint64_t ord = 0; };
 
 // An event record waiting for poll(): fixed slots so that the audio side writes one without allocating. `bytes` of `data` are valid (thunder_live_ev_* of live.h).
 struct LiveEvSlot { uint16_t bytes = 0; alignas(8) uint8_t data[THUNDER_LIVE_EV_MAX] = {0}; };   // (the record is 8-aligned in the slot)
@@ -175,6 +176,7 @@ class LiveHost {
   int play(const thunder_live_play_opts& o);
   void testSetEvSeq(uint32_t v) { evSeq_ = v; }                 // TEST ONLY (no audio thread running): starts the record numbering at `v` (the 2^32 wrap)
   void setTestSeam(void (*f)(void*), void* user) { testSeam_ = f; testSeamUser_ = user; }   // TEST ONLY: `f` runs inside play(), between the push of the Play command and the publish of its snapshot (verify-283 F9)
+  void setTestAudioSeam(void (*f)(void*), void* user) { testAudioSeam_ = f; testAudioSeamUser_ = user; }   // TEST ONLY (single thread): `f` runs on the audio side right after a started play was given back to the control side (R1: the window between giveBack and the state's store)
   // stop(): queues LiveCmd::Stop; controlPlaying_ = false (a later songPublish no longer reaches the sequencer).
   int stop(int64_t at);
   int hold(int64_t at);                              // LiveCmd::Hold
@@ -249,10 +251,23 @@ class LiveHost {
   void reanchor(int64_t frame0);                     // process(): the host timeline moves (off_ only: nothing in the engine does), count, ERROR record (live.h TIME)
   void dropSeq();                                    // the runner lets go of its Seq (stop, ENDED timeout, a new play); seqGone() follows in the next adopt()
   void giveBack(PlayPlan* p);                        // a PlayPlan back to the control side (playBack_)
+  // ---- P3: effects, master chain, PDC, meters (audio) ----
+  void commitFxLive(int track, FxPlan* pl, int64_t qStart);   // FxBank::commitLive + the master hook rule; the plan stays with its owner (PlayPlan / the FxCommit command, which returns it)
+  void commitPlayFx(PlayPlan* p, int64_t qStart);             // every plan of a play, master first then the tracks (the order FxBank::load commits in); null entries are left alone
+  void commitWaitingFx(int64_t qStart, int track = -1);       // the FxCommits waiting in pend_ (all tracks or one) are committed in list order and returned; marked done (p = nullptr), not removed
+  void dropPlay(PlayPlan* p, int64_t qStart);                 // a play that never started: its plans are committed anyway (the control side planned them against each other: FxHost::plan's rule), then it goes back
+  void setMasterHook();                                       // Mixer::setMasterFx: the hook is on while the master chain exists or the master effects host has slots (SongRenderer::setEffects / setMasterChain)
+  static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);   // SongRenderer::masterHook
+  void applyPdc(int64_t qStart, bool nowGlide);               // pdc_apply(mix, pdcCur_, ...) at the mixer's time
+  void applyFxParams(int64_t qStart);                         // step 1: drain fxParams_ into FxHost::psetAt (after the commands, so a param sent after a commit meets the new chain)
+  void clearWaiting(int64_t qStart);                          // a stop / a started play: the waiting list is cleared; an FxCommit in it is committed first (its plan must not be lost)
+  int64_t latencyFrames() const;                              // the output's lateness behind the song: master chain + PDC trim + master pump effects (SongRenderer::latencyFrames)
+  void postMeters();                                          // step 9: the bank's events as METERS records
   // ---- control helpers ----
   int push(const LiveCmd& c);                        // cmds_.push; E_BUSY + cmd_busy when full
   void refreshCtl();                                 // the control-side numbers statsGet reads
   void dropStagedVars(int pad);
+  void noteFxPlanned(int track, const FxPlan* p);    // P3: the pump slots of the track's newest plan, for pdc_plan (control side)
 
   // ============================================================================================================================================================================================
   // STATE
@@ -268,6 +283,9 @@ class LiveHost {
   void (*testSeam_)(void*) = nullptr; void* testSeamUser_ = nullptr;   // TEST ONLY: called in play() between the two statements of F9
   bool controlPlaying_ = false;                      // control's view: a play was issued and no stop
   FxPlan* stagedFx_[kSongNT + 1] = {nullptr};        // fxPlan() staged, fxCommit() moved to the ring
+  int fxOut_ = 0;                                    // P3: FxCommit commands issued and their plans not yet collected (fxBack_ holds 64)
+  PdcSlot ctlPdc_[kSongNT][kFxSlots]; int ctlPdcN_[kSongNT] = {0};   // P3: the pump slots of each track's LAST PLANNED chain (what pdc_plan reads; FxPlan::entry, not the audio thread's chain_)
+  void (*testAudioSeam_)(void*) = nullptr; void* testAudioSeamUser_ = nullptr;
   std::unique_ptr<LiveFont> fonts_[THUNDER_LIVE_MAX_FONTS];
   int sfFont_[kRenderPads]; size_t sfBytes_[kRenderPads];   // which font a pad's preset came from; its PCM bytes (for fontRemove and the budget)
   size_t liveBytes_[kRenderPads];                    // LivePool::padBytes (live_pool.h:75) of each live pad
@@ -280,6 +298,7 @@ class LiveHost {
   uint64_t songOrd_ = 0;                             // the ordinal of the last snapshot published (SongSnap::ord)
   bool sessionFullSeen_ = false;                     // control: the ERROR SESSION_FULL request was made for this play
   // P2: staged pad changes (control only). `padsDirty_`: something was staged since the last publish. Variations are staged here (ruling 6) and handed to PadsHost::setPad once per pad at padsPublish().
+  uint64_t cfgOrd_ = 0;                              // P3: the ordinal of the last PDC / master configuration issued (play, pdc_set, master_config)
   bool padsDirty_ = false;
   struct VarStage { int ii = 0; char kind = 0; int num = 0, frames = 0; double sr = 0; std::vector<float> own; const float* data = nullptr; };   // `data` borrows the pad's current PadBuf (seeded) or points at `own`
   struct PadVars { bool active = false; std::vector<VarStage> v; };
@@ -318,6 +337,10 @@ class LiveHost {
   std::unique_ptr<FxBank> fxBank_;                   // F_EFFECTS (fxbank.h:21)
   std::unique_ptr<MasterChain> mchain_;              // F_MASTER (chain.h)
   std::unique_ptr<MeterBank> meterBank_;             // F_METERS (meter.h)
+  bool metersOn_ = false;                            // AUDIO: thunder_live_meters_want switched the bank on (it is fed and advanced only then)
+  PdcPlan pdcCur_; PdcMode pdcMode_ = PdcMode::Auto; bool pdcHave_ = false;   // AUDIO: the PDC plan in force (the play's or pdc_set's); re-applied with playing = false at a stop
+  int64_t playQ_ = -1;                               // AUDIO: the engine frame of the quantum a play started in (applyPdc: the 10 ms glide applies in that quantum only)
+  uint64_t pdcOrd_ = 0, masterOrd_ = 0;              // AUDIO: the ordinals of the PDC / master configuration in force (a published message older than a play's own is ignored)
   thunder_midi* midi_ = nullptr;                     // F_MIDI: made by create(), a raw non-atomic pointer the audio side reads; it outlives every call (it is NEVER swapped: duty D-8 (e))
   SeqRunner runner_;                                 // runner.h
   std::unique_ptr<SeqEvent[]> evs_;                  // kRenderEvents (12288 x 456 B = 5.6 MB), allocated once

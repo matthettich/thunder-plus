@@ -26,6 +26,13 @@ void FxBank::attach(Mixer& m, bool master) {
   for (int t = 0; t < kSongNT; t++) m.setFx(t, h_[t]->slotCount() > 0 ? &FxBank::hook : nullptr, this);
   if (master && h_[kSongNT]->slotCount() > 0) m.setMasterFx(&FxBank::hook, this);
 }
+void FxBank::commitLive(int track, FxPlan* p, Mixer& m, double now) {
+  if (track < 0 || track > kSongNT || !p) return;
+  mix_ = &m;
+  h_[track]->commit(p);
+  if (track < kSongNT) m.setFx(track, h_[track]->slotCount() > 0 ? &FxBank::hook : nullptr, this);
+  if (h_[track]->slotCount() > 0) flush(track, now);
+}
 void FxBank::hook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed*, int) {
   FxBank* b = (FxBank*)user; if (track < 0 || track > kSongNT) return;
   // the clock this node hears (clkBus through the node's own delay), valid during the mixer's render: the node's `bp` param, `frames` long

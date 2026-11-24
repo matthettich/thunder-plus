@@ -1252,6 +1252,14 @@ add_test(NAME live_pads COMMAND test_live_pads)
 thunder_live_test(test_live_threads test_live_threads.cpp)
 add_test(NAME live_threads COMMAND test_live_threads)
 add_test(NAME live_step_dump COMMAND test_live_step_dump)
+# U37 P3: effects, master chain, PDC and meters in LiveHost bit-equal to SongRenderer (docs/port/U37-P3-NOTES.md); R1 / R2 of the P2 verifier
+thunder_live_test(test_live_fx test_live_fx.cpp)
+if(THUNDER_SANITIZE)
+  target_compile_definitions(test_live_fx PRIVATE THUNDER_SANITIZE_BUILD=1)   # the reduced matrix and shorter spans (as test_fx)
+endif()
+add_test(NAME live_fx COMMAND test_live_fx)
+thunder_live_test(test_live_r1r2 test_live_r1r2.cpp)
+add_test(NAME live_r1r2 COMMAND test_live_r1r2)
 
 # FX1: the pump and MODFX effect slots of a song (core/src/fx/fxsong.cpp): the reader against the page's own code (golden/fxsong_cases.json, tools/fxsong-dump.mjs), a MODFX slot through
 # FxHost against the module itself, a pump slot against the hand-made entry, counted refusals, the master pump latency, FXV on a MODFX slot, ELECTRO's 25 slots.

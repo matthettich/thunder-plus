@@ -1,5 +1,5 @@
 // THE LIVE HOST (U37 P2): see live_host.h (the declaration, one comment per method) and include/thunder/live.h (the contract). This file is the core of it: life, song, pads, transport, the quantum, the events and the
-// step dump. NOT here (later units): effects and the master chain (P3), PDC (P3), MIDI (P4), meters beyond a stub, the C API functions (P5), SoundFont and live-engine pads (answered E_UNSUPPORTED, see below).
+// step dump, and (P3) the track and master effects, the master chain, PDC and the meters. NOT here (later units): MIDI (P4), the C API functions (P5), SoundFont and live-engine pads (answered E_UNSUPPORTED, see below).
 //
 // BUILT WITH EXCEPTIONS (core/CMakeLists.txt, like render.cpp and pads_snap.cpp): the CONTROL side calls Song::load, Seq / SeqSession construction and std::vector code that throw std::bad_alloc, which is caught
 // here and returned as E_MEMORY (live.h, OUT OF MEMORY). The AUDIO side (process() and everything it calls) throws nothing, allocates nothing, takes no lock, frees nothing and does no I/O.
@@ -18,6 +18,7 @@
 
 #include "engine/layer_pe.h"
 #include "live/dump_plain.h"
+#include "modfx/modfx.h"
 #include "render/render.h"
 #include "rt/num.h"
 
@@ -30,7 +31,7 @@ static_assert(sizeof(thunder_live_ev_head) == 16 && sizeof(thunder_live_ev_clock
 namespace {
 // stats.* of the audio side, in pub_[]: the audio thread stores each once a quantum (relaxed), any thread loads (relaxed)
 enum Pub { P_FRAMES, P_ORIGIN, P_QUANTA, P_CALLS, P_STEPS, P_EVENTS, P_SEQDROP, P_SKIPS, P_CMDS, P_DUMPDROP, P_VOICES, P_PEAKV, P_NOTES, P_NPLAYED, P_NLATE, P_NNOPAD, P_NLIVE, P_NSF, P_NVARMISS,
-  P_NSTRETCH, P_EVIGN, P_CMDLATE, P_EVTDROP, P_EVTCRIT, P_REANCH, P_PREP, P_LIVEFAIL, P_LIVELATE, P_SONGADOPT, P_CLEARED, P_NOSEQ, P_COUNT };
+  P_NSTRETCH, P_EVIGN, P_CMDLATE, P_EVTDROP, P_EVTCRIT, P_REANCH, P_PREP, P_LIVEFAIL, P_LIVELATE, P_SONGADOPT, P_CLEARED, P_NOSEQ, P_LATENCY, P_FXREMAKE, P_FXFAIL, P_COUNT };
 constexpr double kEndStopSec = 0.3;          // the web's frame() rule: the MIDI stop 0.3 s after the song's end (live.h, THE STATE MACHINE)
 constexpr int64_t kMaxHostFrame = (int64_t)1 << 62;   // frame0, t0 and `at` above this are E_ARG: engine + offset arithmetic cannot overflow
 constexpr double kPlayDelaySec = 0.08;       // t0 < 0: the next quantum's start + 0.08 s (live.h, thunder_live_play_opts::t0)
@@ -58,10 +59,10 @@ LiveHost* LiveHost::create(const thunder_live_opts& o, char* err, size_t errCap)
   if (maxVoices < 1 || maxVoices > 256) return fail("max_voices outside 1 .. 256");
   const int dumpSteps = o.dump_steps == 0 ? 256 : o.dump_steps;
   if (dumpSteps < 1 || dumpSteps > 4096) return fail("dump_steps outside 1 .. 4096");
-  constexpr uint32_t kBuilt = THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_DUMP_STEPS | THUNDER_LIVE_F_PAGE_TIMING;
-  if (o.flags & ~(kBuilt | THUNDER_LIVE_F_MIDI | THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER)) return fail("unknown flag");
-  // P2 does not make the MIDI scheduler (P4), the effects hosts or the master chain (P3): a host asked for them is refused here, not silently made without.
-  if (o.flags & (THUNDER_LIVE_F_MIDI | THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER)) return fail("F_MIDI / F_EFFECTS / F_MASTER are not built in this unit (U37 P3 / P4)");
+  constexpr uint32_t kBuilt = THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_DUMP_STEPS | THUNDER_LIVE_F_PAGE_TIMING | THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER;
+  if (o.flags & ~(kBuilt | THUNDER_LIVE_F_MIDI)) return fail("unknown flag");
+  // P3 makes the effects hosts, the master chain and the meters; the MIDI scheduler is P4's: a host asked for it is refused here, not silently made without.
+  if (o.flags & THUNDER_LIVE_F_MIDI) return fail("F_MIDI is not built in this unit (U37 P4)");
 
   std::unique_ptr<LiveHost> h(new (std::nothrow) LiveHost());
   if (!h) return fail("out of memory");
@@ -72,9 +73,14 @@ LiveHost* LiveHost::create(const thunder_live_opts& o, char* err, size_t errCap)
     h->players_.reset(new Players(nullptr, sr, maxVoices));        // no pads until the first snapshot: PadsHost::create publishes an EMPTY one, the first quantum adopts it
     h->players_->setDropLate(true);                                // ruling D-4: a note more than 0.15 s late is not played (stats.notes_late)
     if (o.flags & THUNDER_LIVE_F_PAGE_TIMING) h->players_->pool().setPageTiming(true);
+    // (set below, once the mixer exists: FX1: page timing also means the page player's beat clock, as render_api.cpp sets it)
     h->padsHost_ = PadsHost::create(*h->players_);                 // after Players: the board covers exactly its pools
     if (!h->padsHost_) return fail("out of memory (pads)");
     h->mix_.reset(new Mixer(sr, kLiveQuantum));
+    if (o.flags & THUNDER_LIVE_F_PAGE_TIMING) h->mix_->setPageClock(true);
+    if (o.flags & THUNDER_LIVE_F_EFFECTS) h->fxBank_.reset(new FxBank(sr));          // (33 hosts; their hooks are set by the commits)
+    if (o.flags & THUNDER_LIVE_F_MASTER) { h->mchain_.reset(new MasterChain(sr, kLiveQuantum)); h->setMasterHook(); }   // SongRenderer::setMasterChain: the hook is on from the start, the chain configured by the first play
+    if (o.flags & THUNDER_LIVE_F_METERS) h->meterBank_.reset(new MeterBank(sr));
     h->evs_.reset(new (std::nothrow) SeqEvent[kRenderEvents]);
     h->step_.reset(new (std::nothrow) SeqStep());
     h->q_.reset(new (std::nothrow) float[(size_t)kLiveQuantum * 2]());
@@ -94,8 +100,11 @@ LiveHost* LiveHost::create(const thunder_live_opts& o, char* err, size_t errCap)
 
 LiveHost::~LiveHost() {
   // The audio thread has stopped (live.h, thunder_live_destroy). A host left PLAYING needs no quantum here in P2: there is no MIDI scheduler whose note-offs would be owed (P4 adds that quantum).
-  LiveCmd c; while (cmds_.pop(c)) if (c.type == LiveCmdType::Play) delete static_cast<PlayPlan*>(c.p);
+  LiveCmd c; while (cmds_.pop(c)) { if (c.type == LiveCmdType::Play) delete static_cast<PlayPlan*>(c.p); else if (c.type == LiveCmdType::FxCommit) delete static_cast<FxPlan*>(c.p); }
+  for (int i = 0; i < nPend_; i++) if (pend_[i].type == LiveCmdType::FxCommit) delete static_cast<FxPlan*>(pend_[i].p);
   delete stalledPlay_; stalledPlay_ = nullptr;
+  for (int t = 0; t <= kSongNT; t++) { delete stagedFx_[t]; stagedFx_[t] = nullptr; }
+  { FxPlan* fp; while (fxBack_.pop(fp)) delete fp; }
   PlayPlan* pp; while (playBack_.pop(pp)) delete pp;
   delete padsHost_; padsHost_ = nullptr;   // frees every buffer, whatever the voices say; Players is destroyed after this body and does not dereference its pads
 }
@@ -113,6 +122,7 @@ int LiveHost::collect() {
   n += (int)songSlot_.collect(); n += (int)busSlot_.collect(); n += (int)pdcSlot_.collect(); n += (int)masterSlot_.collect();
   n += (int)padsHost_->collect();
   PlayPlan* p; while (playBack_.pop(p)) { delete p; n++; playOut_--; }
+  { FxPlan* fp; while (fxBack_.pop(fp)) { delete fp; n++; fxOut_--; } }   // a committed plan: the effects it retired go with it, freed HERE (never on the audio thread)
   refreshCtl();
   return n;
 }
@@ -317,9 +327,14 @@ int LiveHost::play(const thunder_live_play_opts& o) {
   if (o.reserved0 != 0 || o.mode < THUNDER_LIVE_MODE_SONG || o.mode > THUNDER_LIVE_MODE_PHRASE || o.row < 0 || o.row > 255 || o.track < 0 || o.track >= THUNDER_LIVE_TRACKS || o.sect < -1 || o.phrase < -1
       || (o.has_loop && (o.loop_y0 < 0 || o.loop_y1 < o.loop_y0)) || o.spp < -1 || o.spp > 16383 || o.pdc_mode < 0 || o.pdc_mode > 2) return THUNDER_LIVE_E_ARG;
   if (o.t0 > kMaxHostFrame) return THUNDER_LIVE_E_ARG;
+  // R2 (verify-283): test_once / test_sim are the goldens' options and belong to a test host: without F_DUMP_STEPS they are refused, so that a product can never loop-less play by a stray field
+  if ((o.test_once != 0 || o.test_sim != 0) && !(flags_ & THUNDER_LIVE_F_DUMP_STEPS)) return THUNDER_LIVE_E_ARG;
   if (!songCur_) return THUNDER_LIVE_E_STATE;                       // no song published
+  for (int t = 0; t <= kSongNT; t++) if (stagedFx_[t]) return THUNDER_LIVE_E_STATE;   // an effects plan staged by fx_plan and not committed (live.h: FxHost::plan reuses the objects of the previous plan, so plans commit in order)
   collect();
-  if (cmds_.space() == 0 || playOut_ >= 8 || songSlot_.room() == 0) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // checked BEFORE anything is built: the session of a refused play is never made
+  const bool fx = (flags_ & THUNDER_LIVE_F_EFFECTS) != 0 && fxBank_;
+  // (the play's 33 effects plans may have to be sent as plain commits if planning fails part way: room for them, and for their return, is checked BEFORE anything is made)
+  if (cmds_.space() == 0 || (fx && (cmds_.space() < (uint32_t)kSongNT + 3 || fxOut_ + kSongNT + 1 > 64)) || playOut_ >= 8 || songSlot_.room() == 0) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // checked BEFORE anything is built: the session of a refused play is never made
   SeqOpts so;
   so.row = o.row; so.hasLoop = o.has_loop != 0; so.loopY0 = o.loop_y0; so.loopY1 = o.loop_y1;
   so.once = o.test_once != 0; so.live = false; so.sim = o.test_sim != 0;   // live.h: the page's play loops the song (test_once / test_sim: TEST ONLY, the goldens' options)
@@ -339,6 +354,30 @@ int LiveHost::play(const thunder_live_play_opts& o) {
   } catch (...) { if (sess) sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }
   plan->song = songCur_; plan->t0 = o.t0; plan->spp = o.spp; plan->pdcMode = o.pdc_mode == 0 ? PdcMode::Off : o.pdc_mode == 2 ? PdcMode::On : PdcMode::Auto; plan->sess = sess.get();
   snap->rev = songRev_; snap->ord = songOrd_ + 1;
+  if (mchain_) { plan->master = master_chain_from_song(songCur_->mst, songCur_->limiter); plan->hasMaster = true; }   // the song's own master chain (SongRenderer's caller: master_chain_from_song(song.mst, song.limiter))
+  plan->cfgOrd = ++cfgOrd_;
+  // THE SONG'S EFFECTS, planned LAST (every plan made must be committed, in order: FxHost::plan's rule), master first and then the tracks 0..31 (FxBank::load's order: the MODFX modules draw their seeds from ONE counter).
+  // A failure part way sends the plans already made as plain commits (they must reach their hosts), then the play is given up.
+  if (fx) {
+    bool bad = false;
+    try {
+      modfx::SeedCounter seeds;
+      plan->fx[kSongNT] = fxBank_->host(kSongNT).planFromSong(songCur_->mfx, songCur_->bpm, 0, &seeds);
+      for (int t = 0; t < kSongNT && !bad; t++) { plan->fx[t] = fxBank_->host(t).planFromSong(songCur_->tfx.at((size_t)t), songCur_->bpm, 0, &seeds); noteFxPlanned(t, plan->fx[t]); }
+    } catch (...) { bad = true; }
+    if (bad) {
+      for (int t = 0; t <= kSongNT; t++) if (plan->fx[t]) { LiveCmd fc; fc.type = LiveCmdType::FxCommit; fc.i0 = t; fc.p = plan->fx[t]; if (cmds_.push(fc)) { plan->fx[t] = nullptr; fxOut_++; } }
+      sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY;
+    }
+    try {   // PDC: from the plans just made (FxPlan::entry), not from the audio thread's chains
+      PdcSlot all[kSongNT * kFxSlots]; int n = 0;
+      for (int t = 0; t < kSongNT; t++) for (int i = 0; i < ctlPdcN_[t]; i++) all[n++] = ctlPdc_[t][i];
+      plan->pdc = pdc_plan(bm->plan, all, n, sr_, plan->pdcMode);
+    } catch (...) {   // (the plans are made: they go as commits, as above)
+      for (int t = 0; t <= kSongNT; t++) if (plan->fx[t]) { LiveCmd fc; fc.type = LiveCmdType::FxCommit; fc.i0 = t; fc.p = plan->fx[t]; if (cmds_.push(fc)) { plan->fx[t] = nullptr; fxOut_++; } }
+      sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY;
+    }
+  }
   // ORDER (verify-283 F9): the Play command goes into the ring FIRST, the snapshot is published SECOND. A quantum that runs between the two finds a Play whose snapshot is not there yet and keeps it stalled
   // (tryStartPlay); the audio side adopts nothing else while a play is stalled (adopt()), so the running runner is never re-pointed at the unstarted Seq of a session whose Play has not been applied.
   // Room in both rings was checked above and only this thread fills them, so neither push can fail.
@@ -390,17 +429,79 @@ int LiveHost::mixSet(int track, int key, double value, double ramp, int64_t at) 
   LiveCmd c; c.type = LiveCmdType::MixSet; c.at = at; c.i0 = track; c.i1 = key; c.x = value; c.y = ramp; return push(c);
 }
 
-// Not built in P2 (P3): the effects hosts, the master chain, PDC. Each answers as live.h says for a host made without the part (E_STATE) or for a part the build lacks (E_UNSUPPORTED).
-int LiveHost::pdcSet(int mode) { if (mode < 0 || mode > 2) return THUNDER_LIVE_E_ARG; return THUNDER_LIVE_E_UNSUPPORTED; }
-int LiveHost::fxPlan(int, const uint8_t*, size_t, double) { return THUNDER_LIVE_E_STATE; }
-int LiveHost::fxCommit(int, int64_t) { return THUNDER_LIVE_E_STATE; }
-int LiveHost::fxParam(int, int, const double*, int64_t) { return THUNDER_LIVE_E_STATE; }
-int LiveHost::masterConfig(const uint8_t*, size_t, bool) { return THUNDER_LIVE_E_STATE; }
+// P3: effects, master chain, PDC, meters (control side). The plans are made here (objects are made on the control thread: Fx::operator new is malloc), committed by the audio side at a quantum's top and come back through fxBack_.
+void LiveHost::noteFxPlanned(int track, const FxPlan* p) {
+  if (track < 0 || track >= kSongNT) return;
+  int n = 0;
+  if (p) for (int i = 0; i < p->size(); i++) { const FxEntry& e = p->entry(i); const bool pump = fx_is_pump(e.t); ctlPdc_[track][n++] = PdcSlot{track, e.slot, e.on, pump && e.bi >= 0, pump ? e.lat : 0.0}; }   // FxHost::slotBypass / slotLatency, read from the entry
+  ctlPdcN_[track] = n;
+}
+int LiveHost::pdcSet(int mode) {
+  if (mode < 0 || mode > 2) return THUNDER_LIVE_E_ARG;
+  if (!songCur_) return THUNDER_LIVE_E_STATE;
+  collect();
+  const PdcMode m = mode == 0 ? PdcMode::Off : mode == 2 ? PdcMode::On : PdcMode::Auto;
+  LivePdcMsg* msg = new (std::nothrow) LivePdcMsg(); if (!msg) return THUNDER_LIVE_E_MEMORY;
+  try {
+    PdcSlot all[kSongNT * kFxSlots]; int n = 0;
+    for (int t = 0; t < kSongNT; t++) for (int i = 0; i < ctlPdcN_[t]; i++) all[n++] = ctlPdc_[t][i];
+    msg->plan = pdc_plan(bus_plan(songCur_->chainPatch, songCur_->chainOn), all, n, sr_, m);
+  } catch (...) { delete msg; return THUNDER_LIVE_E_MEMORY; }
+  msg->mode = m; msg->ord = ++cfgOrd_;
+  if (!pdcSlot_.publish(msg)) { delete msg; cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }
+  return THUNDER_LIVE_OK;
+}
+int LiveHost::fxPlan(int track, const uint8_t* json, size_t n, double bpm) {
+  if (!(flags_ & THUNDER_LIVE_F_EFFECTS) || !fxBank_) return THUNDER_LIVE_E_STATE;
+  if (track < 0 || track > THUNDER_LIVE_MASTER || !json || n == 0 || !finite(bpm) || bpm <= 0) return THUNDER_LIVE_E_ARG;
+  if (stagedFx_[track]) return THUNDER_LIVE_E_STATE;   // at most one staged plan per track
+  collect();
+  FxPlan* pl = nullptr;
+  try {
+    JsonDoc doc; JsonError je;
+    if (!doc.parse(reinterpret_cast<const char*>(json), n, &je) || !doc.root().isArr()) return THUNDER_LIVE_E_ARG;
+    pl = fxBank_->host(track).planFromSong(doc.root(), bpm, 0, nullptr);   // (the entries are copied: the document is not needed after)
+  } catch (...) { return THUNDER_LIVE_E_MEMORY; }
+  if (!pl) return THUNDER_LIVE_E_UNSUPPORTED;          // no effects library in this build
+  stagedFx_[track] = pl; noteFxPlanned(track, pl);
+  return THUNDER_LIVE_OK;
+}
+int LiveHost::fxCommit(int track, int64_t at) {
+  if (!(flags_ & THUNDER_LIVE_F_EFFECTS) || !fxBank_) return THUNDER_LIVE_E_STATE;
+  if (track < 0 || track > THUNDER_LIVE_MASTER) return THUNDER_LIVE_E_ARG;
+  if (!stagedFx_[track]) return THUNDER_LIVE_E_STATE;
+  collect();
+  if (fxOut_ >= 64) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }   // the return ring holds 64: the plan stays staged
+  LiveCmd c; c.type = LiveCmdType::FxCommit; c.at = at; c.i0 = track; c.p = stagedFx_[track];
+  const int rc = push(c); if (rc) return rc;           // E_BUSY / E_ARG: the plan stays staged
+  stagedFx_[track] = nullptr; fxOut_++;
+  return THUNDER_LIVE_OK;
+}
+int LiveHost::fxParam(int track, int slot, const double* p12, int64_t at) {
+  if (!(flags_ & THUNDER_LIVE_F_EFFECTS) || !fxBank_) return THUNDER_LIVE_E_STATE;
+  if (track < 0 || track > THUNDER_LIVE_MASTER || slot < 0 || slot >= kFxSlots || !p12 || at > kMaxHostFrame) return THUNDER_LIVE_E_ARG;
+  LiveFxParam fp; fp.track = track; fp.slot = slot; fp.at = at;
+  for (int i = 0; i < 12; i++) { if (!finite(p12[i])) return THUNDER_LIVE_E_ARG; fp.p[i] = p12[i]; }
+  if (!fxParams_.push(fp)) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }
+  return THUNDER_LIVE_OK;
+}
+int LiveHost::masterConfig(const uint8_t* mst, size_t n, bool safety) {
+  if (!(flags_ & THUNDER_LIVE_F_MASTER) || !mchain_) return THUNDER_LIVE_E_STATE;
+  collect();
+  LiveMasterMsg* m = new (std::nothrow) LiveMasterMsg(); if (!m) return THUNDER_LIVE_E_MEMORY;
+  try {
+    if (!mst || n == 0) m->cfg = master_chain_fresh(safety);
+    else { JsonDoc doc; JsonError je; if (!doc.parse(reinterpret_cast<const char*>(mst), n, &je)) { delete m; return THUNDER_LIVE_E_ARG; } m->cfg = master_chain_from_song(doc.root(), safety); }   // (a document that is not an object gives freshMst, as the page's normMst)
+  } catch (...) { delete m; return THUNDER_LIVE_E_MEMORY; }
+  m->ord = ++cfgOrd_;
+  if (!masterSlot_.publish(m)) { delete m; cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }
+  return THUNDER_LIVE_OK;
+}
 int LiveHost::midiLead(double) { return THUNDER_LIVE_E_STATE; }   // no F_MIDI in this unit
 int LiveHost::meters(double rateHz) {
-  if (!(flags_ & THUNDER_LIVE_F_METERS)) return THUNDER_LIVE_E_STATE;
+  if (!(flags_ & THUNDER_LIVE_F_METERS) || !meterBank_) return THUNDER_LIVE_E_STATE;
   if (!finite(rateHz) || rateHz < 0 || rateHz > 30) return THUNDER_LIVE_E_ARG;
-  return rateHz == 0 ? THUNDER_LIVE_OK : THUNDER_LIVE_E_UNSUPPORTED;   // a stub: F_METERS is honoured as OFF; the bank and the METERS records are P3
+  LiveCmd c; c.type = LiveCmdType::Meters; c.x = rateHz; return push(c);   // applied at the top of the next quantum
 }
 
 // =========================================================================================================================================================================================================
@@ -467,7 +568,7 @@ bool LiveHost::statsGet(thunder_live_stats* out) const {
   s.seq_dropped = P(P_SEQDROP); s.runner_skips = P(P_SKIPS); s.cmds_applied = P(P_CMDS);
   s.pad_bytes_held = ctlPadHeld_.load(std::memory_order_relaxed); s.pad_bytes_retired = ctlPadRetired_.load(std::memory_order_relaxed); s.pad_budget = budget_;
   s.session_bytes = ctlSessionBytes_.load(std::memory_order_relaxed); s.dump_dropped = P(P_DUMPDROP);
-  s.latency_frames = 0;   // no master chain, no PDC in this unit
+  s.latency_frames = (int32_t)(int64_t)P(P_LATENCY); s.fx_remakes = (uint32_t)P(P_FXREMAKE); s.fx_failed_blocks = (uint32_t)P(P_FXFAIL);
   s.voices = (int32_t)P(P_VOICES); s.peak_voices = (int32_t)P(P_PEAKV);
   s.notes = (int32_t)P(P_NOTES); s.notes_played = (int32_t)P(P_NPLAYED); s.notes_late = (int32_t)P(P_NLATE); s.notes_no_pad = (int32_t)P(P_NNOPAD); s.notes_live = (int32_t)P(P_NLIVE); s.notes_sf = (int32_t)P(P_NSF);
   s.notes_var_missing = (int32_t)P(P_NVARMISS); s.notes_stretched = (int32_t)P(P_NSTRETCH); s.events_ignored = (int32_t)P(P_EVIGN);
@@ -523,8 +624,9 @@ void LiveHost::quantum() {
   const double t0 = (double)qStart / sr_;
   // 1. APPLY COMMANDS
   retryStalledPlay(qStart);
-  if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)nPend_; nPend_ = 0; }   // (a stalled play that started now)
+  if (clearPend_) { clearPend_ = false; clearWaiting(qStart); }   // (a stalled play that started now)
   applyCommands(qStart, qStart + kLiveQuantum);
+  applyFxParams(qStart);
   // 2. ADOPT: seq_adopt, then seqGone() if the Seq was dropped, then PadsHost::beginQuantum(players, runner's Seq) every quantum
   adopt(qStart);
   // 3. CLOCKS
@@ -552,10 +654,12 @@ void LiveHost::applyCommands(int64_t qStart, int64_t qEnd) {
   int w = 0;
   for (int i = 0; i < nPend_; i++) {
     const LiveCmd p = pend_[i];
+    if (p.type == LiveCmdType::FxCommit && !p.p) continue;   // already committed (and returned) by commitWaitingFx: done, not kept, not counted
     if (p.at < 0 || p.at < qEnd + off_) {
+      if (p.type == LiveCmdType::FxCommit) pend_[i].p = nullptr;   // this one is being applied (from the copy `p`): commitWaitingFx, called by applyOne, must not take it a second time
       applyOne(p, qStart);
-      if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)(w + (nPend_ - i - 1)); w = 0; break; }
-    } else pend_[w++] = p;
+      if (clearPend_) { clearPend_ = false; for (int k = i + 1; k < nPend_; k++) pend_[w++] = pend_[k]; nPend_ = w; clearWaiting(qStart); w = 0; break; }   // what was kept and what was not yet looked at: cleared (an FxCommit among them is committed first)
+    } else { if (w != i && p.type == LiveCmdType::FxCommit) pend_[i].p = nullptr; pend_[w++] = p; }   // moved down: the old slot must not stay a second live copy (commitWaitingFx walks the whole list while this loop runs)
   }
   nPend_ = w;
   // (b) the ring, in ring order: due now: applied; not due: waits; the list is full (64): applied at once instead and counted
@@ -563,13 +667,13 @@ void LiveHost::applyCommands(int64_t qStart, int64_t qEnd) {
   while (cmds_.pop(c)) {
     if (c.at < 0 || c.at < qEnd + off_) {   // `at` is a HOST frame, judged against the mapping in force now (a re-anchor in between: a gap's commands are due)
       applyOne(c, qStart);
-      if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)nPend_; nPend_ = 0; }
+      if (clearPend_) { clearPend_ = false; clearWaiting(qStart); }
       continue;
     }
     if (nPend_ < kLiveCmdWait) { pend_[nPend_++] = c; continue; }
     cmdLate_++; if (!lateErr) { lateErr = true; thunder_live_ev_error e; std::memset(&e, 0, sizeof e); e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = qStart; e.where = THUNDER_LIVE_WHERE_CMD; post(&e, sizeof e); }   // at most one record a quantum
     applyOne(c, qStart);
-    if (clearPend_) { clearPend_ = false; cmdsCleared_ += (uint32_t)nPend_; nPend_ = 0; }
+    if (clearPend_) { clearPend_ = false; clearWaiting(qStart); }
   }
   if (ackPend_) { ackPend_ = false; postSong(ackPendRev_, qStart); ackValid_ = true; ackRev_ = ackPendRev_; }
 }
@@ -589,11 +693,12 @@ void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
     case LiveCmdType::SongAck: ackPend_ = true; ackPendRev_ = c.i64a; break;   // one SONG record for the newest of the quantum's acks (applyCommands)
     case LiveCmdType::Play: applyPlay(static_cast<PlayPlan*>(c.p), qStart); break;
     case LiveCmdType::Stop: {
-      if (stalledPlay_) { giveBack(stalledPlay_); stalledPlay_ = nullptr; }   // a play that never started is cancelled too
+      if (stalledPlay_) { dropPlay(stalledPlay_, qStart); stalledPlay_ = nullptr; }   // a play that never started is cancelled too
       const int prev = stateA_;
       dropSeq();
       players_->stopAll(at); mix_->songLanesReset(); mix_->clockStop(at);
       endStopAt_ = -1; stateA_ = THUNDER_LIVE_STATE_IDLE; clearPend_ = true;   // a stop clears the waiting list (live.h TIME)
+      if (prev != THUNDER_LIVE_STATE_IDLE) applyPdc(qStart, true);             // LATENCY COMP AUTO is in force only while a song plays: the delays glide back to 0 (the mode On keeps them)
       if (prev != THUNDER_LIVE_STATE_IDLE) postState(qStart, THUNDER_LIVE_ST_STOPPED, 0);   // from IDLE: no record
       break; }
     case LiveCmdType::Hold: runner_.hold(); break;   // arms the flag only, whatever the state (also with no Seq)
@@ -608,13 +713,21 @@ void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
       MixSet m; m.tr = c.i0; m.k = static_cast<MixKey>(c.i1); m.i = c.i2; m.v = c.x; m.ramp = c.y; m.at = at;   // sample-accurate from `at` (a time before this quantum is its start)
       mix_->set(m);
       break; }
-    case LiveCmdType::FxCommit: case LiveCmdType::Meters: break;   // P3
+    case LiveCmdType::FxCommit: {   // the plan comes back through fxBack_ (its room is guaranteed: fxCommit() allows 64 outstanding and the ring holds 64)
+      commitWaitingFx(qStart, c.i0);   // an FxCommit of this track that still waits in pend_ was planned BEFORE this one (FxHost::plan reuses the previous plan's objects): it is committed first
+      FxPlan* pl = static_cast<FxPlan*>(c.p);
+      commitFxLive(c.i0, pl, qStart);
+      const bool ok = fxBack_.push(pl); assert(ok); (void)ok;
+      break; }
+    case LiveCmdType::Meters:
+      if (meterBank_) { if (c.x > 0) { meterBank_->setRate(c.x); metersOn_ = true; } else metersOn_ = false; }
+      break;
   }
 }
 
 // PLAY (live.h, thunder_live_play): adopt the play's snapshot (the runner starts on ITS Seq), setTime(t0), the mixer from the song at once (no ramp), the tempo seed, state PLAYING.
 void LiveHost::applyPlay(PlayPlan* p, int64_t qStart) {
-  if (stalledPlay_) { giveBack(stalledPlay_); stalledPlay_ = nullptr; }   // a newer play replaces one that never started
+  if (stalledPlay_) { dropPlay(stalledPlay_, qStart); stalledPlay_ = nullptr; }   // a newer play replaces one that never started
   if (!tryStartPlay(p, qStart)) stalledPlay_ = p;
 }
 void LiveHost::retryStalledPlay(int64_t qStart) { if (stalledPlay_ && tryStartPlay(stalledPlay_, qStart)) stalledPlay_ = nullptr; }
@@ -631,10 +744,87 @@ bool LiveHost::tryStartPlay(PlayPlan* p, int64_t qStart) {
   if (busSlot_.adopt()) mix_->setPlan(busSlot_.get()->plan);
   mix_->load(*sn->song); mix_->songLanesReset(); mix_->clockStop((double)qStart / sr_);
   players_->live().tempo((double)qStart / sr_, runner_.seq()->bpm());   // the tempo consumers are seeded: SEV_TEMPO is emitted only on a change (seq.cpp:995)
+  const bool fromIdle = stateA_ == THUNDER_LIVE_STATE_IDLE;
+  playQ_ = qStart;
   endStopAt_ = -1; songOverDone_ = false; stateA_ = THUNDER_LIVE_STATE_PLAYING; clearPend_ = true;   // a play that starts clears the waiting list
   postState(qStart, THUNDER_LIVE_ST_PLAYING, 0);
+  // P3: the song's effects, the master chain and the PDC plan (SongRenderer's setEffects / setMasterChain / setPlan, in the order a render calls them). The tempo the effects were mapped for is the song's (FxBank::load(S, S.bpm)).
+  if (fxBank_) { fxBank_->setBpm(p->song->bpm); commitWaitingFx(qStart); commitPlayFx(p, qStart); }   // a waiting FxCommit was planned before the play's own plans: it goes first
+  if (mchain_ && p->hasMaster && p->cfgOrd >= masterOrd_) { mchain_->configure(p->master); masterOrd_ = p->cfgOrd; }
+  if ((flags_ & THUNDER_LIVE_F_EFFECTS) && p->cfgOrd >= pdcOrd_) { pdcCur_ = p->pdc; pdcMode_ = p->pdcMode; pdcHave_ = true; pdcOrd_ = p->cfgOrd; applyPdc(qStart, !fromIdle); }   // from IDLE the delays are set AT ONCE as a render sets them (nothing of this play sounds yet: the first note is >= 80 ms away); over a running song they glide 10 ms
+  // R1 (verify-283): the published state is stored BEFORE the play goes back. The control side decides "playing" from `playOut_ > 0 || state_ == PLAYING`, and a collect() that pops this plan lowers playOut_ at once:
+  // with the store after the quantum (afterBlock) a song_publish between the two took the IDLE path and the running song missed its edit.
+  state_.store(THUNDER_LIVE_STATE_PLAYING, std::memory_order_release);
   giveBack(p);
+  if (testAudioSeam_) testAudioSeam_(testAudioSeamUser_);   // TEST ONLY: where the window was
   return true;
+}
+
+// P3 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// The master hook is on while the master chain exists or the master effects host has slots (SongRenderer::setMasterChain / setEffects); it runs the master effects, then the chain (SongRenderer::masterHook).
+void LiveHost::masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds) {
+  LiveHost* h = static_cast<LiveHost*>(user);   // MASTER VOL -> master effects -> [mastering -> safety limiter] -> OUT
+  // The master node hears the beat clock like a track node (page: setMfx calls clockTo(mfx)); without it master Flex / Step gate / Retrigger see a stopped clock.
+  if (h->fxBank_ && h->fxBank_->host(kSongNT).slotCount() > 0) h->fxBank_->host(kSongNT).process(L, R, frames, t0, h->mix_->beat(kSongNT), frames);
+  if (h->mchain_) MasterChain::hook(h->mchain_.get(), track, L, R, frames, t0, feeds, nFeeds);
+}
+void LiveHost::setMasterHook() { mix_->setMasterFx((mchain_ || (fxBank_ && fxBank_->host(kSongNT).slotCount() > 0)) ? &LiveHost::masterHook : nullptr, this); }
+void LiveHost::commitFxLive(int track, FxPlan* pl, int64_t qStart) {
+  if (!fxBank_ || !pl || track < 0 || track > kSongNT) return;
+  fxBank_->commitLive(track, pl, *mix_, (double)qStart / sr_);
+  if (track == kSongNT) setMasterHook();
+}
+void LiveHost::commitPlayFx(PlayPlan* p, int64_t qStart) {
+  if (p->fx[kSongNT]) commitFxLive(kSongNT, p->fx[kSongNT], qStart);   // the master first, then the tracks 0..31 (FxBank::load)
+  for (int t = 0; t < kSongNT; t++) if (p->fx[t]) commitFxLive(t, p->fx[t], qStart);
+}
+void LiveHost::dropPlay(PlayPlan* p, int64_t qStart) { commitWaitingFx(qStart); commitPlayFx(p, qStart); giveBack(p); }
+// Commits, in list order, the FxCommits that wait in pend_ (all tracks, or only `track`) and returns their plans through fxBack_. COMMITTED IN PLANNING ORDER: FxHost::plan (control) reuses the objects of the previous plan of the track,
+// so a later plan must never be committed before an earlier one. Entries are marked done (p = nullptr, type kept) and NOT removed: applyCommands iterates pend_ by index while calling applyOne (which may land here), and a
+// compaction here would corrupt its `w` / `i` loop; that loop and clearWaiting skip an FxCommit with a null p, and the loop drops it at its next compaction.
+void LiveHost::commitWaitingFx(int64_t qStart, int track) {
+  for (int i = 0; i < nPend_; i++) {
+    if (pend_[i].type != LiveCmdType::FxCommit || !pend_[i].p || (track >= 0 && pend_[i].i0 != track)) continue;
+    FxPlan* pl = static_cast<FxPlan*>(pend_[i].p); pend_[i].p = nullptr;
+    commitFxLive(pend_[i].i0, pl, qStart);
+    const bool ok = fxBack_.push(pl); assert(ok); (void)ok;
+  }
+}
+void LiveHost::applyPdc(int64_t qStart, bool glide) {
+  if (!pdcHave_) return;
+  mix_->setTime((double)qStart / sr_);   // SongRenderer::setPlan: the delays are set at the block's start
+  PdcApply a; a.mode = pdcMode_; a.live = glide; a.playing = stateA_ != THUNDER_LIVE_STATE_IDLE; a.now = glide && stateA_ == THUNDER_LIVE_STATE_PLAYING && qStart == playQ_;
+  pdc_apply(*mix_, pdcCur_, a);
+}
+void LiveHost::applyFxParams(int64_t qStart) {
+  LiveFxParam fp;
+  while (fxParams_.pop(fp)) {
+    if (!fxBank_) continue;
+    const double now = (double)qStart / sr_, at = fp.at < 0 || fp.at - off_ < qStart ? now : (double)(fp.at - off_) / sr_;
+    fxBank_->host(fp.track).psetAt(at, fp.slot, fp.p);   // FXV's queue (FxHost::psetAt): applied by the first block that starts within 64 samples of `at`
+  }
+}
+void LiveHost::clearWaiting(int64_t qStart) {
+  for (int i = 0; i < nPend_; i++) {
+    if (pend_[i].type == LiveCmdType::FxCommit && !pend_[i].p) continue;   // done (commitWaitingFx)
+    if (pend_[i].type == LiveCmdType::FxCommit) { FxPlan* pl = static_cast<FxPlan*>(pend_[i].p); commitFxLive(pend_[i].i0, pl, qStart); const bool ok = fxBack_.push(pl); assert(ok); (void)ok; }   // the plan was made against the chain before it: it is committed, not dropped
+    else cmdsCleared_++;
+  }
+  nPend_ = 0;
+}
+int64_t LiveHost::latencyFrames() const {   // SongRenderer::latencyFrames: the master chain, the PDC's T (in force: the mode On, or Auto while a song plays), the master's pump effects
+  const bool inForce = pdcHave_ && (pdcMode_ == PdcMode::On || (pdcMode_ == PdcMode::Auto && stateA_ != THUNDER_LIVE_STATE_IDLE));
+  return (mchain_ ? mchain_->latency() : 0) + (inForce ? pdc_trim_frames(pdcCur_, sr_) : 0) + (fxBank_ ? fxBank_->masterPumpLatency() : 0);
+}
+void LiveHost::postMeters() {
+  MeterEvent me;
+  while (meterBank_ && meterBank_->pop(&me)) {
+    thunder_live_ev_meters e; std::memset(&e, 0, sizeof e);
+    e.h.type = THUNDER_LIVE_EV_METERS; e.h.f = toFrame(me.at, sr_);   // the frame at the end of the window (post() maps it to the host's)
+    std::memcpy(e.a, me.a, sizeof e.a);
+    std::memcpy(&e.reserved[0], &me.seq, 4);                           // the bank's own count (the head's seq is the ring's order: poll merges by it)
+    post(&e, sizeof e);
+  }
 }
 
 // ONE SONG record for the newest rev adopted in a quantum (live.h, song_publish); a play that adopts the snapshot an IDLE publish already acknowledged posts none.
@@ -655,18 +845,20 @@ void LiveHost::adopt(int64_t qStart) {
   if (runner_.seq()) hadSeq_ = true;
   if (padsNew) { thunder_live_ev_pads e; std::memset(&e, 0, sizeof e); e.h.type = THUNDER_LIVE_EV_PADS; e.h.f = qStart; e.id = (int64_t)padsHost_->current()->id; post(&e, sizeof e); }
   if (busSlot_.adopt()) mix_->setPlan(busSlot_.get()->plan);   // never earlier than the song (it was published after it)
+  if (pdcSlot_.adopt()) { const LivePdcMsg* m = pdcSlot_.get(); if (m->ord > pdcOrd_) { pdcCur_ = m->plan; pdcMode_ = m->mode; pdcHave_ = true; pdcOrd_ = m->ord; applyPdc(qStart, true); } }   // a pdc_set: the delays glide 50 ms (a play's own plan, of a later ordinal, wins)
+  if (masterSlot_.adopt()) { const LiveMasterMsg* m = masterSlot_.get(); if (mchain_ && m->ord > masterOrd_) { mchain_->configure(m->cfg); masterOrd_ = m->ord; } }   // a master_config: the processors keep their states
   if (noteSessionFull_.load(std::memory_order_acquire) && noteSessionFull_.exchange(false, std::memory_order_acq_rel)) {
     thunder_live_ev_error e; std::memset(&e, 0, sizeof e); e.h.type = THUNDER_LIVE_EV_ERROR; e.h.f = qStart; e.where = THUNDER_LIVE_WHERE_SESSION; post(&e, sizeof e);   // informational, once
   }
 }
 
-// SeqEvent routing: SongRenderer::dispatch (render.cpp:28) without the effects bank (P3): the mixer's events, the beat clock, then the Players.
+// SeqEvent routing: SongRenderer::dispatch (render.cpp:28) without chains: the mixer's events, the beat clock, the effects bank's, then the Players.
 void LiveHost::dispatch(const SeqEvent& e, const Seq& seq, const Song& song) {
   events_++;
   switch (e.type) {
     case SEV_TVL: case SEV_TVA: case SEV_TPN: case SEV_MVOL: case SEV_MOUT: mix_->event(e); return;
     case SEV_BEAT: mix_->event(e); return;
-    case SEV_FXC: case SEV_FXP: return;   // (no effects bank in this unit)
+    case SEV_FXC: case SEV_FXP: if (fxBank_) fxBank_->event(e, mix_->now(), *mix_); return;   // FXO / FLX / GAT / RTG lanes and FXV (SongRenderer::dispatch)
     default: break;
   }
   if (!players_->dispatch(e, seq, song)) st_.eventsIgnored++;   // chc, eng, tempo, the MIDI events: no route (counted)
@@ -751,15 +943,17 @@ void LiveHost::songEnded(double t0, int64_t qStart, const SeqPump& pr) {
   if (stateA_ == THUNDER_LIVE_STATE_ENDED && endStopAt_ >= 0 && t0 >= endStopAt_) {
     dropSeq();                                     // no sequencer exists in IDLE (seqGone() follows at the next quantum's adopt)
     endStopAt_ = -1; stateA_ = THUNDER_LIVE_STATE_IDLE;
+    applyPdc(qStart, true);                          // the song is over: LATENCY COMP AUTO lets go (as a stop)
     postState(qStart, THUNDER_LIVE_ST_STOPPED, 1);   // the MIDI stop's place (P4)
   }
 }
 
-// Step 8: the voices into the tracks' inputs, then the mixer (render.cpp:112-117 without the tap and the meters).
+// Step 8: the voices into the tracks' inputs, then the mixer and the meters (render.cpp:112-117 without the tap and the chains).
 void LiveHost::render(double t0, int64_t qStart) {
   players_->render(mix_->inputsL(), mix_->inputsR(), kLiveQuantum, t0, qStart);
   float* const qL = q_.get(); float* const qR = q_.get() + kLiveQuantum;
-  mix_->render(qL, qR, kLiveQuantum, t0);
+  mix_->render(qL, qR, kLiveQuantum, t0);   // (the track effects, the master effects and the master chain run inside, through the hooks)
+  if (metersOn_ && meterBank_) { meters_feed(*meterBank_, *mix_, qL, qR, kLiveQuantum); meterBank_->advance(kLiveQuantum, t0 + (double)kLiveQuantum / sr_); }   // render.cpp: after the mixer
 }
 
 // Step 9: CLOCK (10 a second), POS (30 a second, while playing, when a step was played), LATE (4 a second, when a counter changed), the published numbers, the state.
@@ -781,6 +975,7 @@ void LiveHost::afterBlock(int64_t qStart) {
     e.h.type = THUNDER_LIVE_EV_LATE; e.h.f = qStart; e.notes_late = (uint32_t)ps.notesLate; e.runner_skips = (uint32_t)runner_.skips();
     post(&e, sizeof e); lateLast_[0] = (uint32_t)ps.notesLate; lateLast_[1] = (uint32_t)runner_.skips(); nextLateAt_ = qStart + (int64_t)std::llround(sr_ / 4);
   }
+  postMeters();
   publish();
   state_.store(stateA_, std::memory_order_release);
 }
@@ -795,6 +990,8 @@ void LiveHost::publish() {
   S(P_NOTES, (uint64_t)ps.notes); S(P_NPLAYED, (uint64_t)ps.notesPlayed); S(P_NLATE, (uint64_t)ps.notesLate); S(P_NNOPAD, (uint64_t)ps.notesNoPad); S(P_NLIVE, (uint64_t)ps.notesLive); S(P_NSF, (uint64_t)ps.notesSf);
   S(P_NVARMISS, (uint64_t)ps.notesVarMissing); S(P_NSTRETCH, (uint64_t)ps.notesStretched); S(P_EVIGN, (uint64_t)st_.eventsIgnored);
   S(P_CMDLATE, cmdLate_); S(P_CLEARED, cmdsCleared_); S(P_NOSEQ, cmdsNoSeq_); S(P_EVTDROP, evtDropped_); S(P_EVTCRIT, evtCritDropped_); S(P_REANCH, reanchors_); S(P_PREP, (uint64_t)thread_prepares_);
+  S(P_LATENCY, (uint64_t)(int64_t)latencyFrames());
+  if (fxBank_) { uint64_t rm = 0, fb = 0; for (int t = 0; t <= kSongNT; t++) { rm += fxBank_->host(t).audioRemakes(); fb += fxBank_->host(t).failedBlock(); } S(P_FXREMAKE, rm); S(P_FXFAIL, fb); }
   const LiveStats ls = players_->live().stats(); S(P_LIVEFAIL, players_->live().failedNodes()); S(P_LIVELATE, ls.late);
 }
 

@@ -592,8 +592,11 @@ static int run_pads_snap() {
 static int run_live_host() {
   using namespace thunder;
   std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
-  for (int pass = 0; pass < 2; pass++) {
-    thunder_live_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.sample_rate = 48000; o.max_block = 1024; o.flags = pass ? THUNDER_LIVE_F_DUMP_STEPS : 0;
+  // pass 2 (U37 P3): effects + master chain + meters on; ELECTRO's pump slot made a tfx reverb (a pump slot that wakes from its rest makes an instance in the audio thread: accepted, counted, and not what is policed here)
+  const std::string textPump = text; std::string textNoPump = text; for (size_t at; (at = textNoPump.find("\"type\":\"pverb\"")) != std::string::npos;) textNoPump.replace(at, std::strlen("\"type\":\"pverb\""), "\"type\":\"reverb\"");
+  for (int pass = 0; pass < 3; pass++) {
+    const std::string& text = pass == 2 ? textNoPump : textPump;
+    thunder_live_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.sample_rate = 48000; o.max_block = 1024; o.flags = pass == 1 ? THUNDER_LIVE_F_DUMP_STEPS : pass == 2 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS) : 0;
     char err[256] = {0}; LiveHost* H = LiveHost::create(o, err, sizeof err); if (!H) return fail("LiveHost::create");
     char e2[128]; if (H->songPublish((const uint8_t*)text.data(), text.size(), nullptr, 0, 1, e2, sizeof e2)) return fail("LiveHost song publish");
     const int PN = 64, NS = 24000; std::vector<float> d((size_t)NS);
@@ -626,20 +629,25 @@ static int run_live_host() {
       else if (k == 79 && calls > 600 && calls % 2 == 0) { H->stop(THUNDER_LIVE_NOW); }   // stop (voices let go, waiting list cleared), the play above restarts it
       else if (k == 83 && calls > 600) { thunder_live_play_opts pe = po; pe.has_only = 1; pe.only = 0; H->play(pe); }   // a song that ends at once: Players::songOver, ENDED, the 0.3 s timer, STOPPED
       else if (k == 89 && calls > 600 && calls % 4 == 1) { H->bpm(90, frame + 5000); H->stop(frame + 9000); }   // a timed command and a timed stop
+      else if (pass == 2 && k == 13) { static const char* js[] = {"[{\"type\":\"delay\",\"on\":true}]", "[{\"type\":\"tape\"},{\"type\":\"reverb\"}]", "[]", "[{\"type\":\"filter\"},{\"type\":\"flex\"},{\"type\":\"autopan\"}]"}; const int t = (int)(rnd() * 33), j = (int)(rnd() * 4); if (H->fxPlan(t, (const uint8_t*)js[j], std::strlen(js[j]), 120) == 0) H->fxCommit(t, rnd() < 0.5 ? THUNDER_LIVE_NOW : frame + 3000); }
+      else if (pass == 2 && k == 37) { double p12[12]; for (int i = 0; i < 12; i++) p12[i] = rnd(); H->fxParam((int)(rnd() * 33), (int)(rnd() * 8), p12, rnd() < 0.5 ? THUNDER_LIVE_NOW : frame + 777); }
+      else if (pass == 2 && k == 43) { H->pdcSet((int)(rnd() * 3)); }
+      else if (pass == 2 && k == 19) { static const char* m[] = {"{\"on\":true,\"comp\":{\"thr\":-25,\"ratio\":6}}", "{\"on\":false}", "{\"on\":true,\"lim\":{\"on\":true,\"ceil\":-3}}"}; const char* q = m[(int)(rnd() * 3)]; H->masterConfig((const uint8_t*)q, std::strlen(q), rnd() < 0.5); }
+      else if (pass == 2 && k == 7) { H->meters(rnd() < 0.3 ? 0.0 : 30.0); }
       else if (k == 73) { for (int i = 0; i < 20; i++) H->mixSet(i, THUNDER_LIVE_MIX_VOL, 100.0 + i, 0, frame + i * 300); }
       int64_t f0 = frame; if (calls == 700) f0 += 777; if (calls == 1500) f0 = frame / 2; if (calls == 2200) f0 = frame + 123456;   // three re-anchors: forward, backward, forward
       { rt_guard g; if (H->process(L, R, n, f0, 0)) return fail("LiveHost::process"); }
       frame = f0 + n; calls++;
       for (int i = 0; i < n; i++) { if (!(L[i] == L[i]) || !(R[i] == R[i])) finite = false; peak = std::max(peak, (double)std::fabs(L[i])); }
       for (int r; (r = H->poll(buf, sizeof buf)) > 0;) { int o2 = 0; while (o2 < r) { thunder_live_ev_head hd; std::memcpy(&hd, buf + o2, sizeof hd); recs++; if (hd.type == THUNDER_LIVE_EV_STATE) { thunder_live_ev_state es; std::memcpy(&es, buf + o2, sizeof es); if (es.state == THUNDER_LIVE_ST_ENDED) endedSeen++; if (es.state == THUNDER_LIVE_ST_STOPPED) stoppedSeen++; } if (hd.type == THUNDER_LIVE_EV_HELD) heldSeen++; o2 += hd.bytes; } }
-      if (pass) for (int r; (r = H->dumpStep(js, sizeof js)) > 0;) dumped++;
+      if (pass == 1) for (int r; (r = H->dumpStep(js, sizeof js)) > 0;) dumped++;
     }
     thunder_live_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; H->statsGet(&st);
     if (!finite || peak < 0.01) return fail("LiveHost run: silent or non-finite");
     if (st.reanchors != 3 || st.quanta < 5000 || st.steps < 100 || st.cmds_applied < 50) return fail("LiveHost run did too little (3 re-anchors, quanta, steps or commands)");
     if (endedSeen < 1 || stoppedSeen < 2 || heldSeen < 1) return fail("LiveHost run never ended a song or never stopped (ENDED / STOPPED / HELD paths not exercised)");
-    if (pass && dumped < 50) return fail("LiveHost step dump delivered too little");
-    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records (%d ENDED, %d STOPPED, %d HELD), %ld dumped steps, no allocation in process\n", pass ? " (with the step dump)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, endedSeen, stoppedSeen, heldSeen, dumped);
+    if (pass == 1 && dumped < 50) return fail("LiveHost step dump delivered too little");
+    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records (%d ENDED, %d STOPPED, %d HELD), %ld dumped steps, no allocation in process\n", pass == 1 ? " (with the step dump)" : pass == 2 ? " (effects, master chain, PDC, meters)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, endedSeen, stoppedSeen, heldSeen, dumped);
     delete H;
   }
   return 0;
