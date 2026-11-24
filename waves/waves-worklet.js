@@ -6335,7 +6335,7 @@ class WavesLiveProc extends AudioWorkletProcessor {
     if (this.dead){ try { e.dispose(); } catch (_) {} return false; }
     const t0 = Date.now();
     const bpm = P.bpm ? P.bpm[0] : 120; if (bpm !== this.bpm){ e.setTransport({ tempo:bpm }); this.bpm = bpm; }
-    for (let k = 1; k <= 8; k++){ const a = P[WL_K[k]]; e.knobs[k] = a ? a[0] : -1; }   // PATCH KNOBS: KN1–KN8
+    for (let k = 1; k <= 8; k++){ const a = P[WL_K[k]], v = a ? a[0] : -1; if (v !== e.knobs[k]){ e.knobs[k] = v; this.quiet = 0; } }   // PATCH KNOBS: KN1–KN8 (a change wakes the idle gate: CodeRabbit on #298)
     let any = false;
     for (let j = 0; j < WL_LANES; j++){
       const ln = this.lane[j], T = P[WL_T[j]], G = P[WL_G[j]];

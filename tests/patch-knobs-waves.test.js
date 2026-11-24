@@ -53,8 +53,8 @@ test('index.html makePlayer: knSt is kept per track, applied to live nodes on ch
 });
 
 test('core: source has knSt/knTouched, the chc k handler, lnode catch-up and the stopAll reset', () => {
-  for (const re of [/this\.knSt = new Array\(NT\)\.fill\(null\); this\.knTouched = new Set\(\)/, /p\.__wl && key\.startsWith\(pre\)\)\{ this\.knPut\(p, key, ev\.p, ev\.v, at\)/,
-    /const K = proc\.__wl && this\.knSt\[t\]; if \(K\) for \(let k = 1; k <= 8; k\+\+\) if \(K\[k\] >= 0\) this\.knPut\(/, /this\.knTouched\.clear\(\); this\.knSt\.fill\(null\)/]) assert.match(coreSrc, re);
+  for (const re of [/this\.knSt = new Array\(NT\)\.fill\(null\); this\.knT = new Array\(NT\)\.fill\(null\); this\.knTouched = new Set\(\)/, /p\.__wl && key\.startsWith\(pre\)\)\{ this\.knPut\(p, key, ev\.p, ev\.v, at\)/,
+    /const K = proc\.__wl && this\.knSt\[t\], KT = this\.knT\[t\]; if \(K\) for \(let k = 1; k <= 8; k\+\+\) if \(K\[k\] >= 0\) this\.knPut\(proc, key, 'k' \+ k, K\[k\], Math\.max\(currentTime, KT \? KT\[k\] : 0\)\)/, /this\.knTouched\.clear\(\); this\.knSt\.fill\(null\); this\.knT\.fill\(null\)/]) assert.match(coreSrc, re);
 });
 
 function coreWith() {
@@ -98,4 +98,11 @@ test('core: a waves node met after a KN gets it (lnode); stopAll resets k1-k8 to
 test('core/seq-core.js is current (tools/make-core.mjs --check)', () => {
   const r = spawnSync(process.execPath, ['tools/make-core.mjs', '--check'], { cwd: H.ROOT, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('CodeRabbit on #298: knob changes wake the waves idle gate; the page keeps knSt for core-taken knobs', () => {
+  const ww = H.read('waves/waves-worklet.js'), src = H.read('index.html');
+  assert.match(ww, /if \(v !== e\.knobs\[k\]\)\{ e\.knobs\[k\] = v; this\.quiet = 0; \}/);
+  assert.match(src, /if \(e\.core && e\.type === 'chc' && e\.p && e\.p\[0\] === 'k' && rt\.pl\.knSet\) rt\.pl\.knSet\(e\.track, e\.p, e\.v\);/);
+  assert.match(src, /const knSet = \(t, p, v\) => \{ const K = knSt\.get\(t\)/);
 });
