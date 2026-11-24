@@ -55,7 +55,12 @@ char* pump_text(); void pump_state_set(int h);
 namespace pump {
 bool available() { return true; }
 int nparams(int type) { return pump_nparams(type); }
-int create(int type, double sr) { return pump_new(type, sr); }
+}
+// A test aid (test_render_api_oom): non-zero while the plugin's own pump_new runs (control thread only; never on the audio path), so the test can tell an allocation that
+// failed inside the pinned plugin from one of ours.
+extern "C" volatile int thunder_pump_create_depth = 0;
+namespace pump {
+int create(int type, double sr) { struct D { D() { thunder_pump_create_depth = thunder_pump_create_depth + 1; } ~D() { thunder_pump_create_depth = thunder_pump_create_depth - 1; } } d; return pump_new(type, sr); }
 void destroy(int h) { pump_free(h); }
 float* stage() { return pump_stage(); }
 int tel_len(int type) { return pump_tel_len(type); }
@@ -77,6 +82,7 @@ void state_set(int h, const std::string& k, const std::string& v) {
 }
 }
 #else   // no pump library (MSVC, THUNDER_WITH_PUMP=OFF): no instance can be made, so a pump slot is left out of the chain and the sound passes (the worklet before pump.wasm arrives)
+extern "C" volatile int thunder_pump_create_depth = 0;   // (see above; no plugin here, always 0)
 namespace pump {
 bool available() { return false; }
 int nparams(int) { return 0; }
