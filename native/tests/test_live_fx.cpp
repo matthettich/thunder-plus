@@ -177,7 +177,7 @@ int main() {
       CHECK(L.st.cmds_cleared == 0, "the stale commit is committed, not counted as cleared (%u)", (unsigned)L.st.cmds_cleared);
       std::printf("stale waiting fx_commit, then a play: %s\n", bad + bad2 + c1 + c2 ? "DIFFERENT" : "bit-equal");
     }
-    {   // (b) a future-`at` commit, then a NOW commit of a later plan, same track: the chain ends as the LATER plan's (both committed, in planning order)
+    {   // (b) a commit with a later `at` (quantum 40), then a NOW commit of a later plan, same track: the NOW commit applies first and takes the earlier plan with it; the chain ends as the LATER plan's
       std::vector<std::pair<int64_t, RefOp>> rops;
       rops.push_back({0, [&](SongRenderer& R) {
         FxPlan* a = planFor(R, 0, slotsDelay); FxPlan* b = planFor(R, 0, slotsTape);
@@ -187,13 +187,13 @@ int main() {
         std::vector<std::pair<int64_t, LiveOp>> lops;
         lops.push_back({0, [&](Host& H, int64_t) {
           CHECK(H->fxPlan(0, (const uint8_t*)slotsDelay.data(), slotsDelay.size(), song.bpm) == 0, "order: fx_plan A");
-          CHECK(H->fxCommit(0, (int64_t)1 << 40) == 0, "order: fx_commit A (future)");
+          CHECK(H->fxCommit(0, 40 * 128) == 0, "order: fx_commit A (quantum 40)");
           CHECK(H->fxPlan(0, (const uint8_t*)slotsTape.data(), slotsTape.size(), song.bpm) == 0, "order: fx_plan B");
           CHECK(H->fxCommit(0, THUNDER_LIVE_NOW) == 0, "order: fx_commit B (now)"); }});
         const Run L = live(text, ps, FX, 0, cs, 0, N3, true, lops);
         size_t first; const size_t bad = diff(L.l, ref.l, &first), bad2 = diff(L.r, ref.r, &first);
-        CHECK(bad == 0 && bad2 == 0, "a future commit then a now commit (call size %d): %zu + %zu samples differ, first at %zu", cs, bad, bad2, first);
-        std::printf("future fx_commit then a now fx_commit, call size %4d: %s\n", cs, bad + bad2 ? "DIFFERENT" : "bit-equal");
+        CHECK(bad == 0 && bad2 == 0, "a commit at quantum 40 then a now commit (call size %d): %zu + %zu samples differ, first at %zu", cs, bad, bad2, first);
+        std::printf("fx_commit at quantum 40 then a now fx_commit, call size %4d: %s\n", cs, bad + bad2 ? "DIFFERENT" : "bit-equal");
       }
     }
   }
