@@ -30,8 +30,19 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (24 Nov, 13:05): the state for a new chat. Everything below this section is history, newest first.
-**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 13:05)."
+## START HERE (24 Nov, 17:35): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 17:35)."
+
+**The owner's rules:** as the 13:05 section below. Lead: Fable (new chat, 17:07).
+
+**C2 (the chains host LIVE) is DESIGNED and being built.** The design and the lead's rulings R1..R15: `docs/port/C2-DESIGN.md` (read it before anything else). Two Sonnet builders, each in its own worktree under `/home/claude/wt/`:
+- **C2a** `n1/c2-cdiff`: `chains/cdiff.{h,cpp}` (the page's `chnDiff`, classified Same / Params / Structural; `bus_plan_equal`), a Node golden tool; notes `docs/port/C2A-NOTES.md` on that branch.
+- **C2b** `n1/c2-live`: `ChainsHost` live additions (`keepPatch`, `play` / `stop`, `param`, the `live` flag) and the `LiveHost` wiring (F_CHAINS, the plan in `PlayPlan` / `ChainsCommit`, `chBack_`, the edit ring, `thunder_live_chain_edit`, stats); notes `docs/port/C2-NOTES.md` on that branch. It merges `n1/c2-cdiff` when that is pushed.
+A new chat has neither builder: read each branch's notes and re-brief a builder from them and from C2-DESIGN.md. Then: an independent Sonnet verifier per PR (`review/verify-c2a`, `review/verify-c2b`), the lead reads the lines listed at the end of C2-DESIGN.md, squash-merge when all CI is green.
+
+**After C2, in order:** the Android shell on the live host (N2; the call order is in U37-P5-NOTES.md, plus F_CHAINS); P3b; C3, C4.
+
+## START HERE of 24 Nov, 13:05 (now history: P4 / P5 merged, C2 next)
 
 **The owner's rules:** the 21 Nov 18:18 section, plus (23 Nov, 22:31): delegate whenever possible, switch chats as often as is useful, no update while he sleeps. A two-hour "moving or stalled" line while he is awake.
 
