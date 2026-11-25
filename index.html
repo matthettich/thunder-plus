@@ -8762,7 +8762,7 @@ let ctx = null, master = null;
    Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
 const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
 const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
-  s.src = 'thunder-core-client.js?v=2';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.src = 'thunder-core-client.js?v=3';   // bump with the ?v= in sw.js OPTIONAL when the file changes
   s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}, ncSongHost())); } catch(e){ tpLog('native core client: attach failed', e); } };
   s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
   document.head.appendChild(s); };
@@ -15937,7 +15937,7 @@ const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Ba
 /* (14 Nov, build 615) three values: aset.pdcMode 'auto' (the default) | 'on' | 'off'; pdc (the old boolean) is still written, as pdcMode === 'on', for an older build. */
 const PDC_HELP = {auto:'AUTO: lines every track up when an effect with look-ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…) sits on a track or bus: the others wait for it while the song plays. Does nothing otherwise. Stopped, pads answer at once.',
   on:'ON: the same, also while stopped (pads feel later whenever such an effect is loaded).', off:'OFF: never: a track or bus with such an effect plays late.'};
-function pdcSet(v){ aset.pdcMode = v === 'on' || v === 'off' ? v : 'auto'; aset.pdc = aset.pdcMode === 'on'; asetSave(); moFxAt = -1e9;
+function pdcSet(v){ aset.pdcMode = v === 'on' || v === 'off' ? v : 'auto'; aset.pdc = aset.pdcMode === 'on'; asetSave(); moFxAt = -1e9; try { if (NCON()) NC().edit(); } catch(e){}
   try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
   let T = 0; try { T = pdcPlan(ctx ? ctx.sampleRate : 48000).T; } catch(e){}
   const ms = Math.round(T * 1000), m = aset.pdcMode;
@@ -19016,6 +19016,7 @@ window.thunderChains = {
     const before = name === 'track' ? chainsAutoTracks() : null;
     const m = d.modules.find(x => x.id === id); if (m) (m.params = m.params || {})[name] = value;
     if (before){ chainsAutoOn(before); chainsPush(); }   // a Track In / Chain Out moved: re-route the tracks either way
+    if (NCON()) return NC().chainParam(id, name, value);   // NATIVE CORE (PC4): one chain.edit while it plays; the song carries the value too
     if (!rt || !rt.pl) return;
     if (name === 'src' && rt.pl.tapsSync) rt.pl.tapsSync();   // a Sidechain In switched between the bus and a track
     if (name === 'pre' && rt.pl.busSync){ rt.pl.busSync(); if (view === 'tracker') draw(); }   // PRE SENDS: a Track In's Bus send before / after its fader
@@ -24826,7 +24827,7 @@ function rtRoute(){
 }
 // The master OUT fader's level to the live graph (GAIN STAGING, 27 Oct). Gliding, and without rtRoute's rewire, so a drag
 // neither zips nor clicks.
-function moApply(){ if (rt && rt.mo && ctx) rt.mo.gain.setTargetAtTime(curve(S.mout == null ? 255 : S.mout), ctx.currentTime, 0.012); }
+function moApply(){ try { if (NCON()) NC().edit(); } catch(e){} if (rt && rt.mo && ctx) rt.mo.gain.setTargetAtTime(curve(S.mout == null ? 255 : S.mout), ctx.currentTime, 0.012); }
 // Sends a track's (or with t = NT, the master's) effect list to the live worklets.
 function rtFx(t){
   if (!rt) return;
@@ -24975,6 +24976,10 @@ const ncSongHost = () => ({
     songBtn(); draw(); if (typeof frameWake === 'function') frameWake(); wakeLock(true);   // (no bgPlay: the shell holds the media session and the process)
     return o;
   },
+  // PC4 (live edits): what the client needs to tell what changed. fxSlot: the page's own mapping of one effect slot (tfxChain's, without pumpSync's side effect); chainMods: id -> type of the chains patch's modules; pdc: the latency mode as the core's number.
+  fxSlot:(f, sr, bpm) => { const T = f && TFX[f.type]; if (!T) return null; if (T.pump) return {kind:'pump'}; if (T.mod) return {kind:'mod'}; const p = new Array(12).fill(0); T.map(f, sr, bpm).forEach((v, i) => p[i] = v); return {kind:'fx', p}; },
+  chainMods:() => { const o = {}; if (S.chainPatch && Array.isArray(S.chainPatch.modules)) for (const m of S.chainPatch.modules) if (m && m.id != null) o[m.id] = m.type; return o; },
+  pdc:() => ({off:0, auto:1, on:2})[pdcModeOf()],
   // The shell's engine cannot play this PLAY: the old engine does, from the top of tStart (o._nf keeps the native engine from being asked again)
   fallback:(mode, o) => { try { tStop(true); } catch(e){} tStart(mode, Object.assign({}, o, {_nf:true})); },
   // The shell stopped (a song's end, a fatal error, headphones pulled): the transport shows stopped
@@ -27275,7 +27280,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 678;
+const BUILD = 679;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31942,7 +31947,7 @@ let mfDrag = null;
 const mfY = (d, top, bot, rowH) => d >= 0 ? top - Math.min(1, d / 6) * rowH * 0.5 : d <= -60 ? bot + rowH * 0.5 + 1 : d <= -48 ? bot : top + (-d / 48) * (bot - top);
 const mfVol = (y, top, bot, rowH) => dbVol(y <= top ? Math.min(6, (top - y) / (rowH * 0.5) * 6) : y >= bot + rowH * 0.5 ? -999 : y >= bot ? -48 : -(y - top) / (bot - top) * 48);
 const mfToast = t => toast('Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)), 900);
-function mfSet(t, v){ v = clamp(Math.round(v), 0, 255); if (v === S.mix[t].vol) return; S.mix[t].vol = v; if (rt) rt.pl.applyMix(); }
+function mfSet(t, v){ v = clamp(Math.round(v), 0, 255); if (v === S.mix[t].vol) return; S.mix[t].vol = v; if (rt) rt.pl.applyMix(); try { if (NCON()) NC().edit(); } catch(e){} }   // (a drag saves only when let go: the native engine hears each step)
 const mfReset = t => { S.mix[t].vol = TRK_UNITY; mixChanged(); draw(); toast('Track ' + d2(t + 1) + ' · VOL E0 · 0.0 dB'); };
 async function mfType(t){ const a = await askText({title:'Track ' + d2(t + 1) + ' · VOL', body:'Now ' + hx(S.mix[t].vol) + ' (' + dB(trackGain(S.mix[t].vol)) + '). Type 00–FF, or a level in dB such as -6 (E0 is 0 dB, FF +6 dB).'}, hx(S.mix[t].vol), 8, 'Set');
   if (a == null) return; const v = parseLevel(a, dbVol); if (v == null) return toast('Not a level: 00–FF or dB, such as -6'); S.mix[t].vol = clamp(v, 0, 255); mixChanged(); draw(); mfToast(t); }
@@ -37749,6 +37754,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [679, '25 Nov', ['Behind the scenes: with the native engine playing, a fader, mute, solo, pan, an effect knob, the master settings, the latency mode and a …chains slider now reach the sound at once, as one small message each (the whole song still follows a moment later).', 'Nothing changes while the native engine is off.']],
   [678, '25 Nov', ['Behind the scenes: with the native engine on, the page can now publish the song, send its pad renders, kit list, variations and chop data (copies, with a memory limit), and press PLAY and STOP on it. A song it cannot play goes back to the old engine with a short message.', 'Nothing changes while the native engine is off.']],
   [677, '25 Nov', ['Behind the scenes: the page can now load the native-engine client file when the Android app (or the Native core test switch) asks for it. Nothing changes while that is off.']],
   [676, '24 Nov', ['Fixed: resizing the window while a song plays no longer hangs the screen. A drag used to redraw the whole tracker and Arrange on every event, and again on every playhead step; now the screen is re-fitted a few times a second during the drag and once more when it ends, and the dogs / piano / FX chain beside the grid are hidden until then, so they cannot sit over the text.', 'Fixed: the master\u2019s SIGNAL chain (and the other panels beside the grid) could sit over the Pattern view\u2019s columns after the window was resized or the view scrolled sideways. It now shows only when the grid is not scrolled sideways.']],

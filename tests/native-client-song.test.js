@@ -306,6 +306,6 @@ test('detach() clears the timers', async () => {
 });
 test('the page hands the client what it needs: the host object of index.html has every function the client calls', () => {
   const src = H.read('index.html'), host = (src.match(/const ncSongHost = \(\) => \(\{[\s\S]*?\n\}\);\n/) || [])[0] || '';
-  for (const k of ['padApi', 'songVer', 'vars', 'title', 'lxp', 'pbLog', 'perf', 'blocked', 'prep', 'begin', 'fallback', 'stopped']) assert.match(host, new RegExp('\\b' + k + ':'), k);
-  for (const k of ['S', 'songVer', 'aset', 'toast', 'now', 'vars', 'title', 'lxp', 'perf', 'blocked', 'prep', 'begin', 'fallback', 'stopped', 'pbLog']) assert.ok(CLIENT.includes('host.' + k), 'the client reads host.' + k + ' (' + k + ')');
+  for (const k of ['padApi', 'songVer', 'vars', 'title', 'lxp', 'pbLog', 'perf', 'blocked', 'prep', 'begin', 'fallback', 'stopped', 'fxSlot', 'chainMods', 'pdc']) assert.match(host, new RegExp('\\b' + k + ':'), k);
+  for (const k of ['S', 'songVer', 'aset', 'toast', 'now', 'vars', 'title', 'lxp', 'perf', 'blocked', 'prep', 'begin', 'fallback', 'stopped', 'pbLog', 'fxSlot', 'chainMods', 'pdc']) assert.ok(CLIENT.includes('host.' + k), 'the client reads host.' + k + ' (' + k + ')');
 });
