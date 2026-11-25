@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.graphics.Typeface
@@ -42,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var runLines: TextView
     private lateinit var resultsBox: TextView
     private lateinit var midiLine: TextView   // U36 T9: debug MIDI out
+    private lateinit var root: FrameLayout
     private lateinit var liveLine: TextView   // N2 H1a: the live engine's status
     private val green = Color.rgb(40, 200, 90)
     private val red = Color.rgb(235, 60, 60)
@@ -86,13 +88,15 @@ class MainActivity : Activity() {
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
 
         MidiPorts.get(this).start()   // U36 T9: hot-plug callback + first scan
-        val root = FrameLayout(this)
+        root = FrameLayout(this)
         webView = WebView(this)
         root.addView(webView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         root.addView(buildOverlay(), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)   // the insets above place the content (already so on Android 15)
         setContentView(root)
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
-            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            // the keyboard too (N2 H5): with it open the page's window shrinks above it instead of being covered; a fold / unfold changes the bars and the cutout the same way
+            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
             v.setPadding(b.left, b.top, b.right, b.bottom)
             WindowInsetsCompat.CONSUMED
         }
@@ -110,6 +114,7 @@ class MainActivity : Activity() {
         bridge.install()
         SongFiles.attach(this)            // N2 H3: the folder pickers answer to this activity
         SongFiles.onIntent(this, intent)  // a project opened from a file manager (VIEW / SEND)
+        if (Build.VERSION.SDK_INT >= 33) registerBack()
         webView.loadUrl(base + "index.html")
         if (UpdateCheck.checkOnStart(this)) runUpdateCheck(false)   // only when the owner switched it on
     }
@@ -229,8 +234,26 @@ class MainActivity : Activity() {
 
     override fun onResume() { super.onResume(); ui.post(refresh) }
     override fun onPause() { ui.removeCallbacks(refresh); super.onPause() }
-    override fun onDestroy() { bridge.close(); webView.destroy(); super.onDestroy() }
+    override fun onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33) unregisterBack()
+        bridge.close(); webView.destroy(); super.onDestroy()   // the engine and the service are NOT touched: a song keeps playing when the screen is closed
+    }
 
+    /** N2 H5: fold / unfold, rotation, split screen, a keyboard attached, dark mode, font size: the Activity is NOT re-created (android:configChanges), the same WebView just resizes, and nothing here touches the engine. */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        ViewCompat.requestApplyInsets(root)   // new bars / cutout / hinge area: place the content again
+        ui.post(refresh)
+    }
+
+    /** N2 H5: Back (the gesture, the button, predictive back): the WebView's history first, otherwise the app goes to the background and KEEPS PLAYING; it never finishes the activity (ShellPolicy.back). */
+    private var backCb: Any? = null   // an android.window.OnBackInvokedCallback (API 33): held as Any so that Android 10 to 12 never load the class
+    @android.annotation.TargetApi(33) private fun registerBack() {
+        val cb = android.window.OnBackInvokedCallback { handleBack() }; backCb = cb
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb)
+    }
+    @android.annotation.TargetApi(33) private fun unregisterBack() { (backCb as? android.window.OnBackInvokedCallback)?.let { onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it) }; backCb = null }
+    private fun handleBack() { when (ShellPolicy.back(webView.canGoBack())) { ShellPolicy.Back.WEB_BACK -> webView.goBack(); ShellPolicy.Back.TO_BACKGROUND -> moveTaskToBack(true) } }
     @Deprecated("Deprecated in Java")
-    override fun onBackPressed() { if (webView.canGoBack()) webView.goBack() else super.onBackPressed() }
+    override fun onBackPressed() { handleBack() }   // Android 12 and older (and 13+ when the dispatcher is not used)
 }
