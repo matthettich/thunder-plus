@@ -60,24 +60,31 @@ object ThunderHost {
         appCtx?.let { c -> main.post { command(c, "{\"t\":\"stop\"}") } }
     }
 
-    /** NOT on the main thread when the live engine may be up: the live engine's nativeShutdown can wait behind a project load. It is awaited HERE, before ThunderHost's lock is taken (the worker needs that lock to start). */
+    /** NOT on the main thread when the live engine may be up: the live engine's nativeShutdown can wait behind a project load. It is awaited HERE, before ThunderHost's lock is taken (the worker needs that lock to start).
+     *  A4 (verifier): a live start can slip in between that wait and the lock: then the lock is released and the wait is done again (3 rounds at most), so the N0 core never opens the output beside the live one. */
     fun ensureRunning(ctx: Context): Boolean {
-        if (!running) LiveEngine.shutdownAndWait()   // N2 H1a: the live host and the N0 test core would both open the output
-        return ensureRunningLocked(ctx)
+        for (round in 0 until 3) {
+            if (!running) LiveEngine.shutdownAndWait()   // N2 H1a: the live host and the N0 test core would both open the output
+            when (startLocked(ctx)) { 1 -> return true; 0 -> return false }
+        }
+        return false
     }
 
-    @Synchronized private fun ensureRunningLocked(ctx: Context): Boolean {
-        if (running) return true
-        LiveEngine.shutdown()   // (already ended above; a no-op unless a live start slipped in)
+    private fun ensureRunningLocked(ctx: Context): Boolean = startLocked(ctx) == 1
+
+    /** 1: running; 0: the core did not start; -1: the live engine is (being) started again: the caller waits for its shutdown OUTSIDE this lock and retries. */
+    @Synchronized private fun startLocked(ctx: Context): Int {
+        if (running) return 1
+        if (LiveEngine.isUpOrStarting()) { LiveEngine.shutdown(); return -1 }
         val sr = NativeEngine.nativeStart()
-        if (sr <= 0) return false
+        if (sr <= 0) return 0
         sampleRate = sr
         appCtx = ctx.applicationContext
         running = true
         clock.reset()
         poller = Thread({ pollLoop() }, "thunder-poller").also { it.start() }
         try { ctx.startForegroundService(Intent(ctx, ThunderService::class.java)) } catch (e: Exception) { /* engine still runs; the owner is told by the overlay */ }
-        return true
+        return 1
     }
 
     private fun pollLoop() {
@@ -126,7 +133,10 @@ object ThunderHost {
 
     /** A command from the page or the overlay (JSON text). `open` / `close` / `play` / `stop` also manage the engine and service. */
     fun command(ctx: Context, json: String): Boolean {
-        if (!running && (json.contains("\"open\"") || json.contains("\"play\""))) LiveEngine.shutdownAndWait()   // before the lock, see ensureRunning
+        if (!running) {   // A8 (verifier): the parsed `t`, not a substring of the payload (a name or title that contains "play" must not end the live engine)
+            val t = try { JSONObject(json).optString("t") } catch (e: Exception) { "" }
+            if ((t == "open" || t == "play") && !ensureRunning(ctx)) return false   // waits for the live shutdown before the lock, see ensureRunning
+        }
         return commandLocked(ctx, json)
     }
 

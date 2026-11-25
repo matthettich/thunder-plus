@@ -108,7 +108,9 @@ int LiveEngine::call(std::function<int(thunder_live*)> fn, int timeoutMs) {
   auto t = std::make_shared<Task>();
   t->fn = std::move(fn);
   t->deadlineNs = monoNs() + (int64_t)timeoutMs * 1000000LL;
-  { std::lock_guard<std::mutex> g(qm_); q_.push_back(t); }
+  { std::lock_guard<std::mutex> g(qm_);
+    if (!run_.load()) return -1000;   // A5 (verifier): stopThreads may have drained q_ since the check above: a task pushed now would never be run or completed
+    q_.push_back(t); }
   qcv_.notify_all();
   std::unique_lock<std::mutex> lk(t->m);
   if (!t->cv.wait_for(lk, std::chrono::milliseconds(timeoutMs + 500), [&] { return t->done; })) { t->abandoned = true; return t->started ? -1001 : -1000; }   // under t->m: the control thread sets `started` under it before fn, so -1000 = dropped, -1001 = may still apply

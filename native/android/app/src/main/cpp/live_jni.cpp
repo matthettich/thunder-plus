@@ -512,8 +512,11 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFit(J
 // put + buf.use kind 'pad': `l` (and `r` for a stereo pad) are little-endian float32 as the page sent them. The block comes from thunder_live_alloc, all of L then all of R (pad_take's layout).
 // The kit entry (choke, syn, rel) is the one of the last kit.load for that slot (0, 0, 0 without one). The caller publishes with nativePadsPublish.
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadTake(JNIEnv* env, jobject, jint pad, jbyteArray l, jbyteArray r, jint frames, jdouble rate) {
-  std::lock_guard<std::mutex> lk(g_life);
-  auto eng = g.eng.get(); if (!eng) return -2;
+  // A3 (verifier): g_life only to copy the engine and the kit entry; it is NOT held across the alloc, the copy or the control call (up to 10 s): a shutdown / start / reopen must not wait behind a pad take
+  std::shared_ptr<tpa::LiveEngine> eng; int choke = 0; bool syn = false; double rel = 0;
+  { std::lock_guard<std::mutex> lk(g_life);
+    eng = g.eng.get(); if (!eng) return -2;
+    if (frames > 0 && pad >= 0 && pad < THUNDER_LIVE_PADS && g.kitDoc) tpa::kitEntryOf(g.kitDoc->root(), (size_t)pad, &choke, &syn, &rel); }
   if (frames <= 0 || pad < 0 || pad >= THUNDER_LIVE_PADS || !l) return -1;
   const jsize nl = env->GetArrayLength(l), nr = r ? env->GetArrayLength(r) : 0;
   const int ch = r ? 2 : 1;
@@ -524,8 +527,6 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadTake(
   env->GetByteArrayRegion(l, 0, (jsize)frames * 4, reinterpret_cast<jbyte*>(b));
   if (r) env->GetByteArrayRegion(r, 0, (jsize)frames * 4, reinterpret_cast<jbyte*>(b + frames));
   if (env->ExceptionCheck()) { env->ExceptionClear(); return -1; }
-  int choke = 0; bool syn = false; double rel = 0;
-  if (g.kitDoc) tpa::kitEntryOf(g.kitDoc->root(), (size_t)pad, &choke, &syn, &rel);
   const int rc = eng->call([=](thunder_live* L) {
     if (blk->owned) {   // an E_BUSY retry repeats the lambda from the start: once the core has the block (owned == false) pad_take must NOT be called again, only pad_kit
       int x = thunder_live_pad_take(L, pad, blk->p, r ? 1 : 0, frames, rate);   // E_BUSY: not taken, the retry repeats it

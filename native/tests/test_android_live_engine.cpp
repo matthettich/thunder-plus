@@ -295,6 +295,25 @@ int main() {
     CHECK(dms < 200, "destroy waited %lld ms behind a call in its E_BUSY loop", (long long)dms);
     CHECK(busyRc.load() == -1000 && cms < 200, "the call must return -1000 fast, got %d after %lld ms", busyRc.load(), (long long)cms);
     CHECK(tries.load() >= 2, "the task did retry"); }
+  // verify A5 (25 Nov): LiveEngine::call checks run_ again under qm_ when it enqueues, so a task pushed after stopThreads drained q_ is refused (-1000) at once instead of waiting timeout + 500 ms.
+  // Two callers hammer an engine (timeout 100 ms: a stranded task would show as ~600 ms) while the main thread stops and restarts its threads 150 times.
+  { LiveEngine E3; LiveEngine::Config c3; c3.sampleRate = 48000; c3.maxBlock = 256; std::string e3;
+    CHECK(E3.create(c3, &e3), "create E3: %s", e3.c_str());
+    E3.startThreads();
+    std::atomic<bool> go{true}; std::atomic<long long> worstMs{0}; std::atomic<long> n{0}, refused{0};
+    auto hammer = [&] { while (go.load()) {
+      const auto a = std::chrono::steady_clock::now();
+      const int r = E3.call([](thunder_live*) { return 0; }, 100);
+      const long long ms = (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - a).count();
+      long long w = worstMs.load(); while (ms > w && !worstMs.compare_exchange_weak(w, ms)) {}
+      n++; if (r == -1000) refused++;
+      std::this_thread::yield(); } };
+    std::thread h1(hammer), h2(hammer);
+    for (int i = 0; i < 150; i++) { E3.stopThreads(); E3.startThreads(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+    go = false; h1.join(); h2.join();
+    std::printf("A5: %ld calls, %ld refused, worst %lld ms\n", n.load(), refused.load(), worstMs.load());
+    CHECK(worstMs.load() < 300, "a call waited %lld ms: a task was enqueued after stopThreads drained the queue", worstMs.load());
+    E3.destroy(); }
   E.destroy();
   CHECK(!E.created(), "destroyed");
   // a destroyed engine renders silence and refuses calls
