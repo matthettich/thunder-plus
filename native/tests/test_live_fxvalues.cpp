@@ -18,12 +18,14 @@ using namespace lt;
 
 // ---- a counting allocator (armed around the audio-side work only) ----
 static std::atomic<long> g_alloc{0}; static std::atomic<bool> g_arm{false}, g_count{false};   // g_count: tests that use blocks() below ask for the audio work to be counted (blocks() arms around process only)
+#if !defined(THUNDER_SANITIZE_BUILD) && !defined(__SANITIZE_ADDRESS__) && !defined(__SANITIZE_THREAD__)   // (under a sanitizer the allocator is the sanitizer's: the counts stay 0 and the allocation checks pass trivially; live_fxvalues_alloc is the real audit)
 void* operator new(std::size_t n) { if (g_arm.load(std::memory_order_relaxed)) g_alloc.fetch_add(1); if (void* p = std::malloc(n ? n : 1)) return p; throw std::bad_alloc(); }
 void* operator new[](std::size_t n) { if (g_arm.load(std::memory_order_relaxed)) g_alloc.fetch_add(1); if (void* p = std::malloc(n ? n : 1)) return p; throw std::bad_alloc(); }
 void operator delete(void* p) noexcept { std::free(p); }
 void operator delete[](void* p) noexcept { std::free(p); }
 void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
+#endif
 
 namespace {
 constexpr int kSeg = 64;   // quanta before the change
