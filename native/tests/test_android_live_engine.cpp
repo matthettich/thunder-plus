@@ -4,6 +4,7 @@
 //   3. LiveEngine: create, threads, song_publish + pad_take + pads_publish + play through the control thread (E_BUSY retried while no callback runs), a fake audio callback calling render()
 //      in blocks of 480 frames, the poller sees PLAYING, the audio is finite and not silent, nothing dropped, stop, destroy.
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -42,6 +43,33 @@ int main() {
     CHECK(extractMember("[1,2]", "a").empty(), "not an object");
     CHECK(extractMember(R"({"a": {"b": )", "a").empty(), "malformed");
     CHECK(extractMember("", "a").empty(), "empty");
+  }
+  // padFxApplies against the PAGE (verify-n2 F14): the table is kept by hand, so read index.html and the pump engine file and fail on drift
+  {
+    const std::string page = readFile(std::string(THUNDER_ROOT) + "/index.html"), pump = readFile(std::string(THUNDER_ROOT) + "/pump/synth/pump-synth-engine.js");
+    CHECK(page.find("const engFx = V => isBlipV(V) || (isXEngV(V) && !(XENG[V.engine] && XENG[V.engine].live));") != std::string::npos, "the page's engFx rule changed: re-read it and update padFxApplies (pad_filler.cpp)");
+    CHECK(page.find("if (isBassV(V)) return renderBass(V, sr, hold);\n  if (isVoxV(V)) return renderVox(V, sr);") != std::string::npos, "renderVoice no longer returns for Bass and Voice before padFx: padFxApplies(bass / vox) must be re-checked");
+    CHECK(!padFxApplies("bass") && !padFxApplies("vox") && padFxApplies("layers") && padFxApplies("blip"), "bass / vox dry, layers / blip wet");
+    int n = 0, bad = 0;
+    const size_t a = page.find("const XENG = {"), b = page.find("const isXEngV", a);
+    CHECK(a != std::string::npos && b != std::string::npos, "XENG table not found");
+    size_t at = a;
+    while ((at = page.find("\n  ", at)) != std::string::npos && at < b) {   // lines `  name:{live:true|false, ...`
+      at += 3; size_t e = at; while (e < b && (std::isalnum((unsigned char)page[e]) || page[e] == '_')) e++;
+      if (e > at && page.compare(e, 7, ":{live:") == 0) {
+        const bool live = page.compare(e + 7, 4, "true") == 0; const std::string name = page.substr(at, e - at);
+        n++; if (padFxApplies(name) == live) { bad++; std::printf("  padFxApplies(%s) = %d but the page has live:%d\n", name.c_str(), (int)padFxApplies(name), (int)live); }
+      }
+    }
+    CHECK(n >= 24 && bad == 0, "XENG entries read: %d, disagreeing: %d", n, bad);
+    int tw = 0, twBad = 0;
+    const size_t pa = pump.find("const LIVE = {"), pb = pump.find("\n};", pa);
+    CHECK(pa != std::string::npos && pb != std::string::npos, "pump LIVE table not found");
+    for (size_t q = pa; (q = pump.find("\n  ", q)) != std::string::npos && q < pb;) {
+      q += 3; size_t e = q; while (e < pb && std::isalnum((unsigned char)pump[e])) e++;
+      if (e > q && pump.compare(e, 7, ":{twin:") == 0) { tw++; if (padFxApplies(pump.substr(q, e - q))) { twBad++; std::printf("  pump live twin %s takes pad effects\n", pump.substr(q, e - q).c_str()); } }
+    }
+    CHECK(tw >= 13 && twBad == 0, "pump live twins read: %d, wet: %d", tw, twBad);
   }
   // relOf
   {
@@ -95,9 +123,26 @@ int main() {
     FitResult h = songFit(synthSong, synthKit, THUNDER_LIVE_CAP_EFFECTS | 0x200u, 0, false);
     std::string codes; for (auto& r : h.reasons) codes += r.code + " ";
     CHECK(codes.find("stretch") != std::string::npos && codes.find("sidechain") != std::string::npos && codes.find("font") != std::string::npos && codes.find("no-lxr") != std::string::npos && codes.find("no-chains") == std::string::npos, "synthetic fit codes: %s", codes.c_str());
-    CHECK(songFit(R"({"insts":[],"chainOn":[]})", "", THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "an empty song fits");
-    CHECK(!songFit("not json", "", THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "garbage does not fit");
-    CHECK(!songFit(R"({"insts":[]})", "", THUNDER_LIVE_CAP_EFFECTS, 10, true).ok, "too big");
+    const std::string emptyKit = R"({"voices":[]})";
+    CHECK(songFit(R"({"insts":[],"chainOn":[]})", emptyKit, THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "an empty song fits");
+    CHECK(!songFit("not json", emptyKit, THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "garbage does not fit");
+    CHECK(!songFit(R"({"insts":[]})", emptyKit, THUNDER_LIVE_CAP_EFFECTS, 10, true).ok, "too big");
+    // verify-n2 F6: NO kit, NO verdict (pending, never ok); an unreadable kit is a reason
+    { FitResult np = songFit(R"({"insts":[],"chainOn":[]})", "", THUNDER_LIVE_CAP_EFFECTS, 0, true);
+      CHECK(!np.ok && np.pending && np.reasons.size() == 1 && np.reasons[0].code == "no-kit", "no kit: pending, not ok");
+      CHECK(np.json(1).find("\"pending\":true") != std::string::npos, "pending in the json: %s", np.json(1).c_str());
+      CHECK(!songFit(R"({"insts":[]})", "{broken", THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "an unreadable kit does not fit"); }
+    // the song-level reasons the verifier found missing: Resample, a pump module in a chain, an unknown module, lxp with key follow, MIDI clock follow
+    { const uint32_t caps = THUNDER_LIVE_CAP_EFFECTS | 0x200u;
+      auto codesOf = [&](const std::string& song, FitContext ctx = FitContext()) { std::string c; for (auto& r : songFit(song, emptyKit, caps, 0, true, ctx).reasons) c += r.code + " "; return c; };
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"resample"}]}})").find("resample") != std::string::npos, "resample");
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"pecho"}]}})").find("pump-in-chain") != std::string::npos, "pump module in a chain");
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"nosuchmodule"}]}})").find("module") != std::string::npos, "unknown module");
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"vcf"},{"type":"chainOut"}]}})").empty(), "known modules fit: '%s'", codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"vcf"},{"type":"chainOut"}]}})").c_str());
+      FitContext lx; lx.lxpActive = true; FitContext ck; ck.clockIn = true;
+      CHECK(codesOf(R"({"insts":[{"kf":true}]})", lx).find("lxp") != std::string::npos, "lxp with a key-follow instrument");
+      CHECK(codesOf(R"({"insts":[{"kf":false}]})", lx).empty() && codesOf(R"({"insts":[{"kf":true}]})").empty(), "lxp alone, or kf alone, is no reason");
+      CHECK(codesOf(R"({"insts":[]})", ck).find("clock-follow") != std::string::npos, "clock follow"); }
     const std::string js = h.json(7);
     CHECK(js.find("\"t\":\"fit\"") != std::string::npos && js.find("\"rev\":7") != std::string::npos && js.find("\"ok\":false") != std::string::npos, "fit json: %s", js.c_str());
   }
@@ -176,7 +221,10 @@ int main() {
     CHECK(ev.size() > 2 && ev[0] == '{' && ev.back() == '}' && ev.find("}\n{") != std::string::npos, "events are JSON objects, one per line"); }
   rc = E.call([&](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); });
   CHECK(rc == 0, "stop: %d", rc);
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  { bool idle = false;   // verify-n2 F3: a user Stop shows as IDLE (0), not as "ended" (2)
+    for (int i = 0; i < 200 && !idle; i++) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); idle = E.statusJson().find("\"state\":0") != std::string::npos; }
+    CHECK(idle, "after Stop the state must read 0 (IDLE): %s", E.statusJson().c_str()); }
+  CHECK(stateOfRecord(THUNDER_LIVE_ST_PLAYING) == 1 && stateOfRecord(THUNDER_LIVE_ST_STOPPED) == 0 && stateOfRecord(THUNDER_LIVE_ST_ENDED) == 2, "stateOfRecord");
   stop = true; audio.join();
   E.destroy();
   CHECK(!E.created(), "destroyed");

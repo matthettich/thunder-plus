@@ -63,6 +63,7 @@ void LiveEngine::stopThreads() {
 
 void LiveEngine::destroy() {
   stopThreads();
+  std::unique_lock<std::shared_mutex> w(lifeM_);   // waits for every any-thread reader (statsJson, engineOffset) that is inside the host; later ones see L_ == nullptr
   if (L_) { thunder_live_destroy(L_); L_ = nullptr; }
   l_.clear(); l_.shrink_to_fit(); r_.clear(); r_.shrink_to_fit();
 }
@@ -145,7 +146,8 @@ void LiveEngine::pollLoop() {
         switch (h.type) {
           case THUNDER_LIVE_EV_CLOCK: { thunder_live_ev_clock c; std::memcpy(&c, p, sizeof c); st_.clockF = c.h.f; st_.voices = c.voices; st_.under = c.under; st_.outLat = c.out_lat; break; }
           case THUNDER_LIVE_EV_POS: { thunder_live_ev_pos q; std::memcpy(&q, p, sizeof q); st_.row = q.row; st_.step = q.step; st_.bpm = q.bpm10 / 10.0; break; }
-          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; std::memcpy(&s, p, sizeof s); st_.state = s.state; break; }
+          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; std::memcpy(&s, p, sizeof s); st_.state = stateOfRecord(s.state); break; }
+          case THUNDER_LIVE_EV_HELD: st_.state = THUNDER_LIVE_STATE_HELD; break;
           case THUNDER_LIVE_EV_SONG: { thunder_live_ev_song s; std::memcpy(&s, p, sizeof s); st_.songRev = s.rev; break; }
           case THUNDER_LIVE_EV_PADS: { thunder_live_ev_pads s; std::memcpy(&s, p, sizeof s); st_.padsId = s.id; break; }
           case THUNDER_LIVE_EV_METERS: { thunder_live_ev_meters m; std::memcpy(&m, p, sizeof m); st_.masterPk[0] = m.a[66]; st_.masterPk[1] = m.a[68]; break; }
@@ -176,7 +178,15 @@ std::string LiveEngine::statusJson() {
   return b;
 }
 
+int64_t LiveEngine::engineOffset() {
+  std::shared_lock<std::shared_mutex> rd(lifeM_);
+  int64_t o = 0;
+  if (L_) thunder_live_engine_offset(L_, &o);
+  return o;
+}
+
 std::string LiveEngine::statsJson() {
+  std::shared_lock<std::shared_mutex> rd(lifeM_);   // destroy() cannot free the host while this runs
   if (!L_) return "{}";
   thunder_live_stats s; std::memset(&s, 0, sizeof s); s.size = (uint32_t)sizeof s;
   if (thunder_live_stats_get(L_, &s) != 0) return "{}";

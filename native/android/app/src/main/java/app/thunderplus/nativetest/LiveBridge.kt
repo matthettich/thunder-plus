@@ -18,6 +18,16 @@ object LiveBridge {
     private val timers = Executors.newSingleThreadScheduledExecutor { Thread(it, "thunder-live-timers").also { t -> t.isDaemon = true } }
     private val puts = PutStore()
     @Volatile private var flag = false
+    /** True from the page's hello {live:true} until a hello without live (verify-n2 F16): it survives engine.reset and a failed stream reopen, so a page that talks to the live host never falls through to the N0 test core while the engine is down. */
+    @Volatile private var session = false
+    val liveSession: Boolean get() = session
+    fun endSession() { session = false }
+    /** What only the page knows and SongFit needs (songfit.h FitContext): bit 0 live transpose on (lxp st != 0), bit 1 external MIDI clock follow (midi.cfg clockIn; set by H2's MIDI handling). */
+    @Volatile private var lxpActive = false
+    @Volatile var clockFollow = false
+    private fun fitFlags(): Int = (if (lxpActive) 1 else 0) or (if (clockFollow) 2 else 0)
+    /** The fit event again (a condition the verdict depends on changed). */
+    fun refit() { if (LiveEngine.active) emit(LiveNative.nativeFit(lastRev, fitFlags())) }
     private var pump: ScheduledFuture<*>? = null
     @Volatile private var lastRev = 0L
 
@@ -53,6 +63,13 @@ object LiveBridge {
     private fun check(where: String, rc: Int) { if (rc != 0) err(where, "rc $rc" + (if (rc == -9) " (not supported by this build)" else if (rc == -2) " (not allowed now: " + (if (!LiveEngine.active) "engine off" else "state") + ")" else "")) }
 
     private fun execute(ctx: Context, c: BridgeTranslator.LiveCall, type: String) {
+        // The engine is down (engine.reset in progress, or a stream reopen failed and the page was told engine up:false): nothing goes to the N0 test core; the page gets an error and, for an ask, an error reply (F16)
+        if (!LiveEngine.active && c !is BridgeTranslator.LiveCall.Hello && c !is BridgeTranslator.LiveCall.EngineReset) {
+            val msg = "the live engine is down; the page re-sends its state after {t:'engine',up:true}"
+            err(type, msg)
+            if (c is BridgeTranslator.LiveCall.SongLoad) reply(idOf(String(c.raw, Charsets.UTF_8)), JSONObject().put("ok", false).put("err", msg))
+            return
+        }
         when (c) {
             is BridgeTranslator.LiveCall.Hello -> hello(ctx, c)
             is BridgeTranslator.LiveCall.SongLoad -> {
@@ -61,15 +78,17 @@ object LiveBridge {
                 val id = idOf(text); lastRev = revOf(text)
                 val r = LiveNative.nativeSongLoad(c.raw)
                 val published = FlatJson.bool(r, "ok") ?: false
-                val fit = if (published) LiveNative.nativeFit(lastRev) else ""
+                val fit = if (published) LiveNative.nativeFit(lastRev, fitFlags()) else ""
                 val fitOk = published && (FlatJson.bool(fit, "ok") ?: false)
                 val reasons = if (published) FlatJson.stringArray(fit, "reasonTexts") else listOf(FlatJson.str(r, "err").orEmpty().ifEmpty { "the native engine refused the song (rc " + FlatJson.num(r, "rc") + ")" })
                 val warn = if (published) FlatJson.stringArray(fit, "warn") else emptyList()
                 if (!published) err("song.load", reasons[0])
                 if (fit.isNotEmpty()) emit(fit)
-                reply(id, JSONObject().put("ok", fitOk).put("rev", lastRev).put("reasons", org.json.JSONArray(reasons)).put("warn", org.json.JSONArray(warn)))
+                // pending: no kit.load has reached the shell yet, so this is NOT a verdict (ok:false only because none can be given); the `fit` event after kit.load carries it (verify-n2 F6)
+                reply(id, JSONObject().put("ok", fitOk).put("pending", FlatJson.bool(fit, "pending") ?: false).put("rev", lastRev).put("reasons", org.json.JSONArray(reasons)).put("warn", org.json.JSONArray(warn)))
             }
-            is BridgeTranslator.LiveCall.PadsCommit -> check("pads.commit", LiveNative.nativePadsPublish())
+            is BridgeTranslator.LiveCall.PadsCommit -> { puts.sweep(force = true); check("pads.commit", LiveNative.nativePadsPublish()) }   // transfers still open at the commit never finished: released (F5)
+            is BridgeTranslator.LiveCall.Lxp -> { val on = c.st != 0; if (on != lxpActive) { lxpActive = on; refit() } }
             is BridgeTranslator.LiveCall.PadChop -> check("pad.chop", LiveNative.nativePadChop(c.pad, c.loopSecs, c.nSlices, c.slices))
             is BridgeTranslator.LiveCall.PdcSet -> check("pdc.set", LiveNative.nativePdcSet(c.mode))
             is BridgeTranslator.LiveCall.EngineReset -> engineReset(ctx)
@@ -77,7 +96,7 @@ object LiveBridge {
                 val r = LiveNative.nativeKitLoad(c.raw)
                 if (!(FlatJson.bool(r, "ok") ?: false)) { err("kit.load", FlatJson.str(r, "err").orEmpty().ifEmpty { "rc " + FlatJson.num(r, "rc") }); return }
                 emit("{\"t\":\"kit\"," + r.substring(1))   // {ok, rc, err, pads, skipped, dry, renderMs, empty:[the slots the page must put]}
-                emit(LiveNative.nativeFit(lastRev))
+                emit(LiveNative.nativeFit(lastRev, fitFlags()))
             }
             is BridgeTranslator.LiveCall.Play -> check(type, LiveNative.nativePlayEx(c.mode, c.row, c.track, c.sect, c.phrase, c.hasLoop, c.y0, c.y1, c.t0, c.hasSeed, c.seed, c.pdc, c.onlyBits, c.hasOnly))
             is BridgeTranslator.LiveCall.Stop -> check(type, LiveNative.nativeTransportStop(c.at))
@@ -110,15 +129,15 @@ object LiveBridge {
 
     private fun revOf(raw: String): Long = Regex("\"rev\"\\s*:\\s*(-?[0-9]+)").findAll(raw.takeLast(200)).lastOrNull()?.groupValues?.get(1)?.toLongOrNull() ?: 0L
 
-    /** The engines the core's pad renderer has (xeng.h and the layer stack; GUESS: kept by hand, a mismatch costs a fit reason, never a wrong sound) and the effect families (GUESS). */
-    private val ENGINES = listOf("layers", "tone", "modal", "swarm", "drift", "piano", "ep", "organ", "breath", "strings", "fmdrum", "wind", "phase", "partials", "skin", "chip", "table", "vector", "scanned", "resynth", "bytebeat", "acid", "mach", "blip", "bass", "vox", "lxdrum", "lxsnare", "lxcym", "lxhat")
+
 
     private fun hello(ctx: Context, h: BridgeTranslator.LiveCall.Hello) {
+        session = h.live
         if (!LiveEngine.start(ctx)) { err("hello", "the live engine did not start"); reply(h.id, JSONObject().put("err", "live engine did not start")); return }
         flag = h.live
         startPump()
         val caps = LiveNative.nativeCaps()
-        val engines = org.json.JSONArray(); ENGINES.forEach { engines.put(it) }
+        val engines = org.json.JSONArray(); BridgeTranslator.engineList(LiveNative.nativeHasLxr()).forEach { engines.put(it) }
         val stats = LiveNative.nativeStats()
         val body = JSONObject().put("v", 1).put("core", "n2-live").put("sampleRate", LiveEngine.sampleRate)
             .put("sr", LiveEngine.sampleRate).put("outLat", (FlatJson.num(LiveNative.nativeStatus(), "outLat") ?: 0.0).toInt()).put("host", "android")   // CORE-BRIDGE 7 G1
