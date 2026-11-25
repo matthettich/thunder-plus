@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
     Json c = C.at(ci); const std::string name(c.str("name")); if (!filt.empty() && name.find(filt) == std::string::npos) continue;
     const bool voice = c.str("kind") == "voice", refused = c.str("kind") == "refused"; ran++; if (voice) nVoices++;
     EngVoice V; if (!eng_voice_from_json(V, c.obj("v"), c.arr("L"), c.arr("fx"))) { std::printf("%s: loader refused  FAIL\n", name.c_str()); fails++; continue; }
-    EngRenderOpts o; o.sr = c.num("sr"); o.hold = c.num("hold"); o.bpm = c.num("bpm", 120);
+    EngRenderOpts o; o.libFx = false; o.sr = c.num("sr"); o.hold = c.num("hold"); o.bpm = c.num("bpm", 120);
     if (refused) { static float tmp[1 << 16]; size_t nn = 0; nRefused++; if (eng_render_voice(V, o, tmp, sizeof tmp / 4, &nn) != kEngUnsupported) { std::printf("%-34s a knob outside the sliders' range must be refused  FAIL\n", name.c_str()); fails++; } continue; }
     if (rowOf.find(name) == rowOf.end()) { std::printf("%-34s no reference row  FAIL\n", name.c_str()); fails++; continue; }
     const size_t bound = eng_render_bound(V, o);

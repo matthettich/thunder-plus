@@ -48,7 +48,7 @@ static void firstDiff(const std::string& path, const std::vector<float>& buf, si
 static int renderOne(Json c, double sr, double hold, double bpm, std::vector<float>& buf, std::string* hex, size_t* n, std::string* kind) {
   XengVoice V; if (!xeng_voice_from_json(V, c.obj("v"), c.arr("fx"))) return -100;
   *kind = std::string(c.obj("v").str("engine"));
-  EngRenderOpts o; o.sr = sr; o.hold = hold; o.bpm = bpm;
+  EngRenderOpts o; o.libFx = false; o.sr = sr; o.hold = hold; o.bpm = bpm;
   const size_t bound = xeng_render_bound(V, o); buf.assign(bound + 8, 12345.0f);
   *n = 0; const int st = xeng_render_voice(V, o, buf.data(), bound, n);
   if (st != kEngOk) return st;

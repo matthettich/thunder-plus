@@ -70,6 +70,7 @@ static Fx* make_fx(int type, float sr) {
 #else
 static Fx* make_fx(int, float) { return nullptr; }
 #endif
+Fx* fx_make_tfx(int id, float sr) { return id >= 0 && id <= 33 ? make_fx(id, sr) : nullptr; }
 
 // U15: a tempo-locked core in a slot. It is an Fx so that the plan, commit and retirement of U14 own, keep and delete it as they do the wasm effects (reuse by key,
 // retired by commit(), deleted on the control thread); process() is never called, the host runs the core itself (runClk). dp: the slot's mapped parameters,
