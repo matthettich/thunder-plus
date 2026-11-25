@@ -131,7 +131,7 @@ const fakeCore = reply => { const sent = []; return { sent, ask: (m) => { sent.p
 test('client: hello handshake turns it on only for v 1 + caps.nativeAudio + a sample rate, then re-renders pads once', async () => {
   const tc = fakeCore({ t: 'reply', v: 1, core: 'r1', caps: { nativeAudio: true }, sr: 44100, outLat: 256, host: 'android' }); const { sb, host } = clientRig(tc);
   assert.equal(sb.__thunderClient.on, false); assert.equal(await sb.__thunderClient.attach(host), true);
-  assert.equal(JSON.stringify(tc.sent), JSON.stringify([{ t: 'hello', v: 1, app: 678 }])); assert.equal(sb.__thunderClient.on, true); assert.equal(sb.__thunderClient.sr, 44100); assert.equal(sb.__pre, 1);
+  assert.equal(JSON.stringify(tc.sent), JSON.stringify([{ t: 'hello', v: 1, live: true, app: 678 }])); assert.equal(sb.__thunderClient.on, true); assert.equal(sb.__thunderClient.sr, 44100); assert.equal(sb.__pre, 1);
   sb.__thunderClient.detach(); assert.equal(sb.__thunderClient.on, false);
 });
 test('client: every failure leaves it off and the page untouched', async () => {

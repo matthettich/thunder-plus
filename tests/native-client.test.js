@@ -26,7 +26,7 @@ function rig({ maxPadBytes = 0, sr = 48000, transfer = true, putMs = 1, putFail 
   const toasts = [];
   // the page: a cache of renders, a kit, instruments
   const page = { cache: [], insts: [], kv: [{ choke: 0, syn: false, rel: 0 }], n: 4, kitHits: 0 };
-  const api = { cache: i => page.cache[i] || null, nslots: () => page.n, kitV: () => page.kv, insts: () => page.insts,
+  const api = { cache: i => page.cache[i] || null, nslots: () => page.n, kitV: () => page.kv, kitJSON: () => ({ app: 'thunder', voices: page.kv.map((v, i) => ({ name: 'p' + i, kv: v })) }), insts: () => page.insts,
     loopSecs: (pad, data, sr0) => data.length / sr0, slicePoints: (pad, I, data, sr0) => Array.from({ length: I.slc }, (_, k) => k / I.slc), toast: m => toasts.push(m) };
   const host = { tpLog: () => {}, build: () => 678, prerender: () => {}, now: () => Date.now() };
   const NC = sb.__thunderClient;
@@ -70,7 +70,7 @@ test('the same render is not sent twice; a newer render replaces it and only the
 test('kit.load goes first, then the pads; it is sent again only when the voice list changed', async () => {
   const r = await on(rig()); r.render(0, 10, 1); r.render(2, 10, 1);
   r.NC.kit(r.api); await wait(30);
-  assert.deepEqual(r.types().slice(0, 3), ['kit.load', 'put', 'put-done']); assert.deepEqual(r.log[0][1].kv, r.page.kv); assert.equal(r.log[0][1].rev, 1);
+  assert.deepEqual(r.types().slice(0, 3), ['kit.load', 'put', 'put-done']); assert.deepEqual(plain(r.log[0][1].kit.voices.map(v => v.kv)), plain(r.page.kv)); assert.equal(r.log[0][1].kv, undefined); assert.equal(r.log[0][1].rev, 1);
   await wait(60); const kits = () => r.log.filter(l => l[0] === 'send' && l[1].t === 'kit.load').map(l => l[1]);
   const before = r.log.length; r.NC.kit(r.api); await wait(10); assert.equal(r.log.length, before, 'same list, same pads: nothing'); assert.equal(kits().length, 1);
   r.page.kv = [{ choke: 1, syn: true, rel: 0.1 }]; r.NC.kit(r.api); await wait(10); assert.equal(kits().length, 2); assert.equal(kits()[1].rev, 2);
@@ -131,7 +131,7 @@ test('chop data follows its pad: loop seconds, slices only with SMODE, again aft
   const r = await on(rig()); r.page.insts = [{ pad: 0, slc: 4, smode: 1 }, { pad: 1, sync: 2 }]; r.render(0, 48000, 1); r.render(1, 24000, 1); r.render(2, 100, 1);
   r.NC.padsAll(r.api); await wait(80);
   const chops = () => r.log.filter(l => l[0] === 'send' && l[1].t === 'pad.chop').map(l => l[1]);
-  assert.deepEqual(plain(chops()), [{ t: 'pad.chop', pad: 0, loopSecs: 1, n: 4, slices: [0, 0.25, 0.5, 0.75] }, { t: 'pad.chop', pad: 1, loopSecs: 0.5, n: 2, slices: [] }], 'pad 2 has no chopping instrument');
+  assert.deepEqual(plain(chops()), [{ t: 'pad.chop', pad: 0, loopSecs: 1, n: 4, slices: [0, 12000, 24000, 36000] }, { t: 'pad.chop', pad: 1, loopSecs: 0.5, n: 2, slices: [] }], 'pad 2 has no chopping instrument');
   const order = r.types(); assert.ok(order.indexOf('pad.chop') > order.indexOf('buf.use'), 'after the pad');
   r.NC.chopAll(r.api); await wait(20); assert.equal(chops().length, 2, 'nothing changed: nothing sent');
   r.page.insts = [{ pad: 0, slc: 8, smode: 0 }]; r.NC.chopAll(r.api); await wait(20); assert.equal(chops().length, 4); assert.equal(chops()[2].slices.length, 0); assert.equal(chops()[2].n, 8);

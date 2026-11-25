@@ -25432,7 +25432,7 @@ function coreVar(ev, rec){ if (NCON()) return NC().variation(ev, rec); if (!core
 function coreBuf(i){ if (NCON()) return NC().pad(i, ncPadApi()); if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); coreVarGone(i); corePost({op:'buf', pad:i, data:null}); } return; }
   if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); coreVarGone(i); const d = c.data.slice(), d2 = c.data2 ? c.data2.slice() : null; corePost({op:'buf', pad:i, data:d, data2:d2, sr:c.sr}, d2 ? [d.buffer, d2.buffer] : [d.buffer]); }
 /* NATIVE CORE (PC2): what the client's pad code reads from the page, handed over per call so the loader's attach() list stays as PC1 made it. */
-const ncPadApi = () => ({cache:i => slotAt(cache, i), nslots:() => nslots(), kitV:() => coreKitV(), insts:() => S.insts, loopSecs, slicePoints, toast});
+const ncPadApi = () => ({cache:i => slotAt(cache, i), nslots:() => nslots(), kitV:() => coreKitV(), kitJSON:() => kitToJSON(true), insts:() => S.insts, loopSecs, slicePoints, toast});
 /* SONG SYNC (owner, Fold, 2 Nov: stutters on STOP, on Shift-navigating, on the screen going off and on, and a late note
    preview). Posting the whole song after every save made the audio thread unpack hundreds of KB in its own time: a glitch
    each time. Now only what changed goes: top-level fields whole, and the big lists (phrases, chains, song rows,

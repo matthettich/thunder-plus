@@ -32,7 +32,7 @@
       host = hostApi || {};
       tc = window.thunderCore || null;
       if (!tc || typeof tc.ask !== 'function') return settle(off('no window.thunderCore'));
-      NC.ready = tc.ask({ t: 'hello', v: BRIDGE_V, app: typeof host.build === 'function' ? host.build() : 0 }, HELLO_MS)
+      NC.ready = tc.ask({ t: 'hello', v: BRIDGE_V, live: true, app: typeof host.build === 'function' ? host.build() : 0 }, HELLO_MS)
         .then(onHello, function (e) { return off('hello failed: ' + (e && e.message ? e.message : e)); })
         .then(settle);
       return NC.ready;
@@ -233,7 +233,7 @@
     for (var k = 0; k < insts.length; k++) { var x = insts[k]; if (!x || x.pad !== i) continue; if ((x.slc | 0) >= 2 && x.smode) { I = x; break; } if (!J && ((x.slc | 0) >= 2 || (x.sync | 0))) J = x; }
     I = I || J; if (!I) return null;
     var n = Math.max(2, Math.min(64, I.slc | 0)), pts = [];
-    if (I.smode && (I.slc | 0) >= 2) pts = api.slicePoints(i, I, c.data, c.sr).slice(0, n);   // seconds into the loop, as the page's slicePoints (live.h pad_hits takes seconds)
+    if (I.smode && (I.slc | 0) >= 2) pts = api.slicePoints(i, I, c.data, c.sr).slice(0, n).map(function (s) { return Math.round(s * NC.sr); });   // FRAMES at the engine's rate (CORE-BRIDGE 7 G4): the shell divides by its rate (nativePadChop)
     return { t: 'pad.chop', pad: i, loopSecs: api.loopSecs(i, c.data, c.sr), n: n, slices: pts };
   }
   function runChop(op) {
@@ -281,9 +281,10 @@
   // The kit's voice list {choke, syn, rel, live, lk, sf} per slot, then the pads. Sent only when it changed (or after a reset).
   NC.kit = function (api) {
     wire(api); if (!NC.on || !P.api) return;
-    var kv; try { kv = P.api.kitV(); } catch (e) { log('native core client: kit list failed', e); return; }
+    var kv, kit; try { kv = P.api.kitV(); kit = P.api.kitJSON(); } catch (e) { log('native core client: kit list failed', e); return; }
     var sig = JSON.stringify(kv); P.kitT = nowMs();
-    if (sig !== P.kitSig) { P.kitSig = sig; P.kitRev++; tc.send({ t: 'kit.load', kv: kv, rev: P.kitRev }); }
+    // kit.load {kit, rev}: the page's kit (voice definitions, no sample data) is what the shell renders pads from (pad_filler renderPads); it answers `kit {empty:[slots]}`. Sent only when the voice list (kv) changed.
+    if (sig !== P.kitSig) { P.kitSig = sig; P.kitRev++; tc.send({ t: 'kit.load', kit: kit, rev: P.kitRev }); }
     NC.padsAll(P.api);
   };
   // The page's 200 ms look at whether the kit changed while the core plays (coreKitCheck).
