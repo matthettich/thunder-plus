@@ -90,6 +90,13 @@ test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 o
   assert.ok(/function saveS\(\)\{[^\n]*try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'saveS publishes through the client, after coreSong');
   assert.ok(/const corePost = \(m, tr\) => \{ if \(tp\.nc\) return NC\(\)\.legacy\(m\); try \{ core\.node\.port/.test(src), 'corePost: the JS core body is unchanged behind the tp.nc line');
 });
+test('(b) PC4: the four live-edit branches are one guarded line each, and the host gives the client its three hooks', () => {
+  assert.ok(/function mfSet\(t, v\)\{[^\n]*if \(rt\) rt\.pl\.applyMix\(\); try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'mfSet: after the old line, in a try');
+  assert.ok(/function moApply\(\)\{ try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\} if \(rt && rt\.mo && ctx\)/.test(src), 'moApply: the old body is behind it');
+  assert.ok(/function pdcSet\(v\)\{[^\n]*asetSave\(\); moFxAt = -1e9; try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}\n/.test(src), 'pdcSet');
+  assert.ok(/\n    if \(NCON\(\)\) return NC\(\)\.chainParam\(id, name, value\);[^\n]*\n    if \(!rt \|\| !rt\.pl\) return;/.test(src), 'thunderChains.param: after the patch update, before the rt guard (branch 13)');
+  assert.equal((src.match(/\.chainParam\(/g) || []).length, 1); assert.equal((src.match(/NC\(\)\.edit\(\)/g) || []).length, 4, 'saveS, mfSet, moApply, pdcSet');
+});
 test('(b) __thunderClient appears only inside the loader block; thunder-core-client.js only in comments and loadClient\'s one src line', () => {
   const lines = src.split('\n'), start = lines.findIndex(l => l.startsWith('/* NATIVE CORE CLIENT (PC1')), endIdx = lines.findIndex((l, i) => i > start && l.includes('document.head.appendChild(s); };'));
   assert.ok(start > 0 && endIdx > start);
