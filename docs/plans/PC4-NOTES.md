@@ -1,7 +1,7 @@
 # PC4: live edits (build 679, branch `pc4/live-edits`, draft PR into `beta`)
 
 Design: `docs/port/N2-PAGE-CLIENT.md` 4.4 step 1 and 4.3 branch 13; contract `docs/port/CORE-BRIDGE.md` section 7; the shell's parsing is `BridgeTranslator.kt` (`origin/n1/n2-anr`).
-Builds on PC1..PC3 (merged, build 678). Test counts: before 1944 tests / 1887 pass / 0 fail / 57 skipped (`npm test` on `beta` 088a4f4); after: see the PR.
+Builds on PC1..PC3 (merged, build 678). Test counts: before 1944 tests / 1887 pass / 0 fail / 57 skipped (`npm test` on `beta` 088a4f4); after 1972 tests / 1915 pass / 0 fail / 57 skipped (+28 tests: 27 in `tests/native-client-live.test.js`, 1 inert guard).
 
 ## What it does
 While a native PLAY runs, `saveS()` -> `NC.edit()` starts ONE diff task per 16 ms. It compares the live state with `L.sent` (the signature of what the core holds) and sends one small message per changed thing:
