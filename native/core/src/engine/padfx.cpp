@@ -1,5 +1,6 @@
 #include "engine/padfx.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <cstring>
@@ -133,9 +134,19 @@ namespace {
 inline float fl(double v) { return (float)v; }
 
 #ifdef THUNDER_HAVE_TFX
+extern "C" void thunder_wasi_rand_use(uint64_t* state);
+extern "C" void thunder_fx_state_use(uint32_t* stmlib_rng, uint32_t* daisy_myrand);
+// The effect sources' statics (libc rand, stmlib's generator, DaisySP's myrand) are per wasm instance on the page and per process here: each pad effect gets its own set at the values of
+// a fresh instance, as the track host gives each host (fx/fxhost.cpp ModuleState). (The page shares ONE tfx instance among all pads of a render worker, so its pad effects depend on what ran
+// before; the first use of a fresh instance is the one reproducible choice.)
+struct StateScope {
+  uint64_t r = 0; uint32_t stm = 0x21, daisy = 1;
+  StateScope() { thunder_wasi_rand_use(&r); thunder_fx_state_use(&stm, &daisy); }
+  ~StateScope() { thunder_wasi_rand_use(nullptr); thunder_fx_state_use(nullptr, nullptr); }
+};
 // txRun (dither = true, clip = true, mono = (L + R) / 2) and the raw wrappers (aw_density, aw_totape: the left side as it is)
 bool runFx(const Def& d, const double* v, const float* a, size_t n, double sr, double bpm, std::vector<float>& out, bool txMode) {
-  std::unique_ptr<Fx> fx(fx_make_tfx(d.id, (float)sr)); if (!fx) return false;
+  StateScope ss; std::unique_ptr<Fx> fx(fx_make_tfx(d.id, (float)sr)); if (!fx) return false;
   double p[12]; for (int k = 0; k < 12; k++) p[k] = 0; d.map(v, sr, bpm, p);
   for (int k = 0; k < 12; k++) fx->p[k] = fl(p[k]);
   out.assign(n, 0.0f);
@@ -156,21 +167,22 @@ bool runFx(const Def& d, const double* v, const float* a, size_t n, double sr, d
 }
 // the pad wrappers with a twin in tfx: Decimator (crush), Chorus
 bool runCrushChorus(const Def& d, const double* v, const float* a, size_t n, double sr, double bpm, std::vector<float>& out) {
-  std::vector<float> w;
-  if (!runFx(d, v, a, n, sr, bpm, w, false)) return false;
   const bool cr = d.cls == kCrush; const double mix = v[cr ? 2 : 4];
   out.assign(n, 0.0f);
-  if (cr) { for (size_t i = 0; i < n; i++) out[i] = fl((double)a[i] * (1 - mix) + (double)w[i] * mix); return true; }
+  if (cr) {
+    std::vector<float> w; if (!runFx(d, v, a, n, sr, bpm, w, false)) return false;
+    for (size_t i = 0; i < n; i++) out[i] = fl((double)a[i] * (1 - mix) + (double)w[i] * mix); return true; }
   // chorus: the wasm wrapper gives the dry-free left and right (x 1.4 in the tfx twin); the pad takes their mean at the page's 1.6 gain. Run again for the right side.
-  std::unique_ptr<Fx> fx(fx_make_tfx(d.id, (float)sr)); if (!fx) return false;
+  StateScope ss; std::unique_ptr<Fx> fx(fx_make_tfx(d.id, (float)sr)); if (!fx) return false;
   double p[12] = {0}; d.map(v, sr, bpm, p); for (int k = 0; k < 12; k++) fx->p[k] = fl(p[k]);
-  float L[128], R[128];
-  for (size_t off = 0; off < n; off += 128) {
-    const int m = (int)(n - off < 128 ? n - off : 128);
-    std::memset(L, 0, sizeof L); std::memset(R, 0, sizeof R);
-    for (int i = 0; i < m; i++) L[i] = R[i] = a[off + i];
-    fx->process(L, R, m);
-    for (int i = 0; i < m; i++) { const double wet = ((double)L[i] + (double)R[i]) * 0.5 / 1.4f;
+  // `chunked`: 4032 samples per call (the last one rounded up to 96 with zeros), the wrapper sets the knobs once per call, and DaisySP's Chorus is not the same when they are set every 128 samples
+  std::vector<float> L(4032), R(4032);
+  for (size_t off = 0; off < n; off += 4032) {
+    const int k = (int)(n - off < 4032 ? n - off : 4032), m = std::min(4032, (k + 95) / 96 * 96);
+    std::fill(L.begin(), L.end(), 0.0f); std::fill(R.begin(), R.end(), 0.0f);
+    for (int i = 0; i < k; i++) L[i] = R[i] = a[off + i];
+    fx->process(L.data(), R.data(), m);
+    for (int i = 0; i < k; i++) { const double wet = ((double)L[i] + (double)R[i]) * 0.5 / 1.4f;
       out[off + i] = fl((double)a[off + i] * (1 - mix) + wet * mix * 1.6); }
   }
   return true;
