@@ -19,7 +19,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Machine: 2 cores, about 7 GB free disk. At most two compiling workers; delete build directories of merged work. One git network operation at a time per
   worker; `gh` through REST only (GraphQL is blocked); no CI runs on a push to `native`, only on PRs.
 
-## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); FX1 and U37 P3 merged 24 Nov; about 74% of the whole port by the lead's estimate (24 Nov, 13:05) (the lists below are older: see START HERE)
+## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); FX1, U37 P3, P4 and P5 merged 24 Nov; about 77% of the whole port by the lead's estimate (24 Nov, 17:05) (the lists below are older: see START HERE)
 - **Stage N1 (playback core):** every worker-buildable unit is merged, pump effect hosting (U18) and Marbles / Tides included. **Left: steps 10 and 11, the
   lead's own: U34 (offline render API and pad renders through the core), U35 (MIDI scheduling), U37 (bridge and host switch: `core.wasm` behind the Settings
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
@@ -37,7 +37,11 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 
 **U37 P3 is MERGED: #301, squash `49c956b` (24 Nov, 12:54).** Every job green on `966f165` except macOS, which never completed there (four runs "not acquired by Runner", one cut off at 60 minutes with 95 tests passed, none failed). The owner approved ("Merge it then", 10:51) merging on the macOS pass of #302's head `be7f5f8`, which held the same code.
 
-**U37 P4 is MERGED: #302, squash `2816922` (24 Nov, 15:44), CI all green on `58feb0c`. U37 P5 = PR #308 (branch `n1/u37-p5b`, ONE commit on native; #303 closed: its history held a mistakenly committed `build/`); verifier `review/verify-p5` (MERGE AFTER finding 1, answered in round 2); merge when CI is green on its head.** The P4 notes below are history.
+**U37 P4 MERGED (#302, `2816922`) and U37 P5 MERGED (#308, 24 Nov 17:05 Mountain; CI all green on `5b2e090`).** P5 = the C API over `LiveHost` (`live_api.cpp`), notes `docs/port/U37-P5-NOTES.md`; verifier `review/verify-p5`; the engine offset is `thunder_live_engine_offset` (one atomic; never derive it from stats). Not implemented (E_UNSUPPORTED, caps off): `font_add`, `font_remove`, `pad_sf`, `pad_live`. #303 was closed (its history held a mistakenly committed `build/`).
+
+**Next, in order (supersedes the list below):** C2, the chains host LIVE (plan / commit command, a returned-plan ring before `settle()`, `beginBlock(engine frame)` from `LiveHost::quantum()` at the marked hook, `thunder_live_chain_edit`; design in `docs/port/CHAINS-HOST-DESIGN-DRAFT.md`): design-heavy audio-thread work, the owner was told it is the point to switch the lead back to Fable; then the Android shell on the live host (N2; the call order is in U37-P5-NOTES.md); P3b; C3, C4. Estimate: about 77% of the whole port.
+
+The P4 notes below are history.
 
 **(History) In review, NOT merged: U37 P4 = PR #302, branch `n1/u37-p4`, head `58feb0c`** (MIDI in `LiveHost`, the DIRECT path; the posted fallback was not needed). Notes: `docs/port/U37-P4-NOTES.md` on that branch.
 - `58feb0c` is ONE commit on `native`: the tree of `be7f5f8` (the old eight-commit head, on which ALL NINE CI jobs were green, macOS and sanitizers included) with native's PICKUP.md. Checked with `git diff --stat be7f5f8 58feb0c`: PICKUP.md only.
