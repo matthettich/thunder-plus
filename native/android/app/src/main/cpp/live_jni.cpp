@@ -537,6 +537,13 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadTake(
   }, 10000);
   return rc;
 }
+// buf.use kind 'pad' with frames 0: the page took the pad out (live.h pad_set: frames == 0 removes; its variations and chop data go with it). Audible at the page's pads.commit.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadRemove(JNIEnv*, jobject, jint pad) {
+  std::shared_ptr<tpa::LiveEngine> eng; double sr = 0;
+  { std::lock_guard<std::mutex> lk(g_life); eng = g.eng.get(); if (!eng) return -2; sr = (double)g.device.sampleRate; }
+  if (pad < 0 || pad >= THUNDER_LIVE_PADS) return -1;
+  return eng->call([=](thunder_live* L) { return thunder_live_pad_set(L, pad, nullptr, nullptr, 0, sr); }, 10000);
+}
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadsPublish(JNIEnv*, jobject) {
   auto eng = g.eng.get(); if (!eng) return -2;
   return eng->call([](thunder_live* L) { return thunder_live_pads_publish(L); }, 10000);

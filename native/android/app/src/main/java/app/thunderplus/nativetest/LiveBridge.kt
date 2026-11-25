@@ -125,6 +125,7 @@ object LiveBridge {
             is BridgeTranslator.LiveCall.MetersWant -> check(type, LiveNative.nativeMetersWant(c.hz))
             is BridgeTranslator.LiveCall.BufFree -> puts.free(c.id)
             is BridgeTranslator.LiveCall.BufUse -> {
+                if (c.kind == "pad" && c.frames == 0) { check("buf.use", LiveNative.nativePadRemove(c.pad)); return }   // the page's removal: no put, zero frames (live.h pad_set: frames == 0 removes)
                 val b = puts.take(c.id) ?: run { err("buf.use", "no put with id ${c.id}"); return }
                 if (c.kind == "var") { check("buf.use", LiveNative.nativeVarSet(c.ii, c.vk, c.num, c.pad, b.data[0], b.frames, b.sr)); return }
                 check("buf.use", LiveNative.nativePadTake(c.pad, b.data[0], if (b.ch > 1) b.data[1] else null, b.frames, b.sr))   // audible at the page's pads.commit

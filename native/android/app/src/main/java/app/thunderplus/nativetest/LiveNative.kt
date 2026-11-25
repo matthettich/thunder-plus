@@ -35,6 +35,7 @@ object LiveNative {
     external fun nativeHasLxr(): Boolean
     /** put + buf.use 'pad': little-endian float32 channels; r is null for a mono pad. */
     external fun nativePadTake(pad: Int, l: ByteArray, r: ByteArray?, frames: Int, rate: Double): Int
+    external fun nativePadRemove(pad: Int): Int   // pad_set with 0 frames: the pad is gone (audible at the next pads.commit)
     external fun nativePadsPublish(): Int
     external fun nativeVarSet(ii: Int, kind: Int, num: Int, pad: Int, l: ByteArray, frames: Int, rate: Double): Int
     external fun nativePlayEx(mode: Int, row: Int, track: Int, sect: Int, phrase: Int, hasLoop: Int, y0: Int, y1: Int, t0: Long, hasSeed: Int, seed: Int, pdc: Int, onlyBits: Long, hasOnly: Int): Int
