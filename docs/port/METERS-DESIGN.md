@@ -1,5 +1,7 @@
 # METERS-DESIGN: effect and chains level meters on the new engine (DRAFT)
 
+> **Owner, 25 Nov 13:55:** chains meters = per-track chains in / out levels only (phase 1). Tracks watched: lead recommends one (pending his reply).
+
 **Status: DRAFT, 25 Nov 2026. Written by a builder on a cheaper model; the lead reads it on the top model before anything is built.** Nothing here is built, and no code changed. Owner, 25 Nov: "effect and chains level meters" come FIRST on the new engine, before pad flashes and the click.
 
 Sources read: `native/core/include/thunder/live.h` section 8 and `thunder_live_meters_want`; `native/core/src/meter/meter.h`; `native/core/src/fx/fxhost.h` / `fxhost.cpp` / `fxpump.cpp`; `native/core/src/master/master.h`, `chain.h`; `native/core/src/chains/chains.h`, `cengine.cpp`; `native/core/src/live/live_host.{h,cpp}`; the shell's `live_events.cpp`, `live_jni.cpp` (`origin/n1/n2-anr`); `index.html` on `origin/beta` (line numbers below are that file as fetched on 25 Nov); `docs/port/CORE-BRIDGE.md` sections 3, 4, 6.8, 7 (G6) and `docs/port/N2-PAGE-CLIENT.md` (G6 rows).
