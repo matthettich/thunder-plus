@@ -466,6 +466,24 @@ int thunder_live_fx_commit(thunder_live* L, int track, int64_t at);
    controls; the page's {pset}). slot 0 .. 7. `p12` is copied. Errors: E_ARG, E_STATE, E_BUSY (THUNDER_LIVE_FXPARAM_RING). A slot's ON / OFF is a plan change (a FxEntry with `on`): fx_plan + fx_commit. */
 int thunder_live_fx_param(thunder_live* L, int track, int slot, const double* p12, int64_t at);
 
+/* PP (docs/port/PP-NOTES.md). CONTROL. THE KNOBS OF A PUMP OR A MODULAR EFFECT SLOT, at once (THUNDER_LIVE_CAP_FXVALUES; the page's {pset:{slot, pv}} for a pump slot, {pset:{slot, mp}} for a MODFX slot).
+   `kind`: THUNDER_LIVE_FXV_PUMP (1) or THUNDER_LIVE_FXV_MOD (2). `v`, `n` doubles, copied: for a pump slot the slot's WHOLE value list in the plugin's own parameter order (pumpPv: the page's `pv`; n = the plugin's
+   parameter count, the same n the slot was planned with; each value is stored as a float32, as the page's Float32Array does; the slot's own bypass entry is overwritten by the slot's ON / OFF); for a modular slot
+   the module's values in the table's order (the page's `mp`: TFX[k].map(...); n = the effect's control count). The caller maps its controls to these values; the core does not. `slot` 0 .. 7 as in the song's slot list.
+   `track` 0 .. 31 or THUNDER_LIVE_MASTER. `at`: as fx_param (THUNDER_LIVE_NOW, or a host frame: applied by the first block that starts within 64 samples of it). Queued on a ring of THUNDER_LIVE_FXVALUES_RING
+   records; drained at step 1 after the commands, with the same snapshot rule as fx_param (a record pushed after an fx_commit that the quantum's command loop did not see waits for the next quantum and meets the new chain).
+   JUDGED ON THE CONTROL SIDE against the track's LAST PLANNED chain (the last fx_plan, or the plan play() made; staged or committed): E_ARG when the slot is not a hosted slot of that kind there (a tfx slot, a slot
+   the plan left out, an empty one), when n is not the planned count, when a value is NaN / infinite (or does not fit a float32 for a pump slot), when `kind` is not 1 or 2, `at` above 2^62, `v` NULL. E_STATE: no
+   F_EFFECTS (or a dead handle). E_BUSY: the ring is full, nothing changed, the caller retries after the next process() (live.h ERRORS). Nothing is posted and nothing changes for a tfx slot (use fx_param).
+   The audio side applies a record to the chain IN FORCE at that time: a slot that is no longer of that kind then (a later-timed commit changed it) is left as it is. A pump slot that is RESTING (OFF by its own setting)
+   stores the values and does not wake: nothing is audible from it, and no instance is made on the audio thread; it is made with them when it is switched on. Values do not change what a plan commits later:
+   the page sends the plan's values again with the next fx_plan; a song's own FXV for the same slot still computes from its planned values. */
+#define THUNDER_LIVE_FXVALUES_RING 16
+#define THUNDER_LIVE_FXV_PUMP 1
+#define THUNDER_LIVE_FXV_MOD 2
+#define THUNDER_LIVE_CAP_FXVALUES 0x800u   /* bit 11 (bit 10 is M1's THUNDER_LIVE_CAP_METERS2): thunder_live_fx_values exists. Set in every build; without the pump library / with no effects it answers E_STATE / E_ARG as above */
+int thunder_live_fx_values(thunder_live* L, int track, int slot, int kind, const double* v, int n, int64_t at);
+
 /* CONTROL. THE MASTER CHAIN (mastering + safety limiter: master_chain_from_song(mst, limiter), chain.h:36). `mst_json`: the song's `mst` object (NULL / n 0: freshMst); `safety`: S.limiter 0 / 1. play already sets the song's own
    configuration at its start; this call is the EDIT while playing (rtRoute): the configuration is parsed here and the audio side applies it at the top of the next quantum (MasterChain::configure keeps the processors'
    states). BUILT IN C++ by U37 P3 (LiveHost::masterConfig: MasterChain::configure at the top of a quantum; a changed latency shows in stats.latency_frames; no PDC path is needed, the PDC plan never reads the master chain): P5 sets THUNDER_LIVE_CAP_MASTER_SWAP. (The sentence below about E_UNSUPPORTED is for a build without it.) Without the cap: E_UNSUPPORTED,

@@ -175,6 +175,11 @@ class FxHost {
   void kill();                                  // the `null` message: dead, the objects are retired by the next commit (or the destructor)
   // ---- pump effects (U18; audio thread, between blocks) ----
   void psetPump(double at, int slot, const float* pv, int n);   // FXV for a pump slot, the core's `{pset:{slot, pv}}` at a time (the slot's whole value list)
+  /* PP (docs/port/PP-NOTES.md): the LIVE host's knobs (thunder_live_fx_values). Queued like psetAt / psetMod / psetPump (same queues, same `at` rule: applied by the first block that starts within 64 samples of `at`), but
+     applied by applyPumpRt / applyModRt: only the one slot, and only if it is still a pump / a MODFX slot at that time (a slot of another kind is left alone: nothing is written); a pump slot that is RESTING
+     (rs 1: OFF by its own setting, the sound is its delay line) takes the values into its stored list without waking (no fresh plugin instance, so no allocation: the values are in force when it is next switched on). */
+  void psetPumpRt(double at, int slot, const float* pv, int n);
+  void psetModRt(double at, int slot, const double* mp, int n);
   void pmidi(int slot, double at, int status, int d1, int d2);  // {pmidi}: a note for a creative effect (NOTES FROM), `at` in seconds on the block clock; kept in time order
   void hold(const char* key, int kind, double a, double b, double c, double d);   // {phold}: pump_hold on the slot with this chain key (listen / audition / MASTER LEARN)
   // SOURCE (COMP's External sidechain, `sck`): this block's inputs 1 and 2 of the node, as pointers valid for the next process() call: taps[c] the sound of the
@@ -223,11 +228,13 @@ class FxHost {
     double g = 0, zq = 0, rvDry = 1, rvWet = 0;
     float lip = 0, lop = 0;
   };
-  struct Q { double at; int slot; int n; double p[kModMaxParams]; };
+  struct Q { double at; int slot; int n; double p[kModMaxParams]; bool rt; };   // rt (PP): from psetModRt
   void seedPlan(FxPlan* pl);                      // P3b (control thread)
   void applyEntry(Slot& s, const FxEntry& c, bool fresh = false);   // fresh: a slot made by this commit (the JS's new slot: not `dirty`)
   void applyPset(int slot, const double* p, int n);
   void applyPumpPset(int slot, const float* pv, int n);
+  void applyPumpRt(int slot, const float* pv, int n);   // PP
+  void applyModRt(int slot, const double* mp, int n);   // PP
   // U18 (fxpump.cpp): the worklet's pumpRun, pumpRest, restDelay and the latency bookkeeping (`s.up`, {plat})
   void pumpRun(Slot& s, int n);
   bool pumpRest(Slot& s, int n, bool tg, bool pqOn);
@@ -276,7 +283,7 @@ class FxHost {
   bool wasOn_ = false, playing_ = false, pumpSeen_ = false, pumpOk_ = false; int nPump_ = 0;   // pumpSeen_: a pump slot was ever in this host (the worklet's `globalThis.__pumpX` exists)
   double tempo_ = 120, ppq_ = 0, fr_ = 0, t0_ = 0;   // T.tempo, this.ppq, this.fr (frames since the last half-second report), currentTime of this call
   PumpMidi pq_[kPumpMidi]; int pqn_ = 0; uint32_t pqDropped_ = 0;   // this.pq
-  struct Qp { double at; int slot; int n; float pv[kPumpMaxParams]; };
+  struct Qp { double at; int slot; int n; float pv[kPumpMaxParams]; bool rt; };   // rt (PP): from psetPumpRt
   Qp qp_[kPumpQueue]; int nqp_ = 0; uint32_t qpDropped_ = 0;       // FXV for pump slots (the core's queue, as q_)
   const float* const* taps_ = nullptr; const float* const* sends_ = nullptr; int nTaps_ = 0, nSends_ = 0, srcOff_ = 0;
   short tapIdx_[128]; float zero_[kFxBlock + 2];                    // this.tapIdx, this.zero

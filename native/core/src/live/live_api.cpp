@@ -71,6 +71,7 @@ uint32_t thunder_live_abi(void) { return THUNDER_LIVE_ABI; }
 uint32_t thunder_live_caps(void) {
   // What THIS build has. The live host does not build SoundFonts, live-engine pads or a live-engine swap yet (LiveHost::fontAdd / padSf / padLive answer E_UNSUPPORTED): CAP_SF, CAP_LIVE_SWAP and CAP_ENGINES stay 0.
   uint32_t c = THUNDER_LIVE_CAP_MASTER_SWAP | THUNDER_LIVE_CAP_TAKE | THUNDER_LIVE_CAP_CHAINS;   // LiveHost::masterConfig (P3), PadsHost::setPadTake (P2), ChainsHost live (C2: F_CHAINS, chain_edit)
+  c |= THUNDER_LIVE_CAP_FXVALUES;   // PP
 #ifdef THUNDER_HAVE_TFX
   c |= THUNDER_LIVE_CAP_EFFECTS;
 #endif
@@ -190,6 +191,7 @@ int thunder_live_fx_plan(thunder_live* L, int track, const uint8_t* slots_json, 
 }
 int thunder_live_fx_commit(thunder_live* L, int track, int64_t at) { return ctl(L, [&](LiveHost& h) { return h.fxCommit(track, at); }); }
 int thunder_live_fx_param(thunder_live* L, int track, int slot, const double* p12, int64_t at) { return ctl(L, [&](LiveHost& h) { return h.fxParam(track, slot, p12, at); }); }
+int thunder_live_fx_values(thunder_live* L, int track, int slot, int kind, const double* v, int n, int64_t at) { return ctl(L, [&](LiveHost& h) { return h.fxValues(track, slot, kind, v, n, at); }); }   // PP
 int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t n, int safety) {
   return ctl(L, [&](LiveHost& h) {
     if (n > (size_t)THUNDER_LIVE_MAX_VARS_BYTES) return (int)THUNDER_LIVE_E_LIMIT;
