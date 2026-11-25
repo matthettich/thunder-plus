@@ -92,3 +92,35 @@ WRITTEN. Host-tested (new ctest `android_midi_live`, the sink test and the live-
 
 ## C2b merged: F_CHAINS on (lead's request, after native 6bff2af)
 `origin/native` (C2b #311, squash fad450f) was merged, never rebased, into `n1/n2-live-shell` (#312), then that into `n1/n2-h1b` (#313), that into `n1/n2-h1c` (#315), that into `n1/n2-h2` (#316). All four merged without a conflict. The shell already asked for `THUNDER_LIVE_F_CHAINS` behind `#ifdef`, so the header now having it turns it on by itself (`chains_bytes` still the GUESS of 256 MiB; H1d decides it). `LiveEngine::statsJson` now reports `chainsNodes / chainsPlans / chainsRefused / chainsOver / chainsFailed / chainsBlocks`; the host test (`android_live_engine`, on #316) checks that ELECTRO plays with `chainsNodes` 1 (a node exists), nothing refused, no failed block: measured `chainsNodes 1, chainsPlans 1, chainsRefused 0, chainsFailed 0, chainsBlocks 2085` after 6 s.
+
+## H3 (branch n1/n2-h3, stacked on n1/n2-h2; contains #312, #313, #315, #316)
+WRITTEN. The rules are pure and JVM-tested (`FileModel.kt`, `FileModelTest.kt`: newest-first, sample-folder order, changed-underneath, names, the byte round trip); `SongFiles.kt` (the Storage Access Framework calls), the manifest filters and the MainActivity hooks are NOT compiled here (CI) and nothing ran on a device.
+
+**What it does.** Songs folder and samples folder picked once (`ACTION_OPEN_DOCUMENT_TREE`, `takePersistableUriPermission`, kept in the app's preferences; a revoked or deleted folder reads as "none"). A `.thunder` opened from a file manager (VIEW / SEND, filters on `application/x-thunder`, on the file name `*.thunder` under any mime, and SEND of octet-stream / json) becomes a `file.opened` event, held until the page says `file.ready`. The page lists, opens, saves and saves-as through `file.*`. **The shell moves bytes and never parses or rewrites the song JSON**: the page owns the project, and the page sends `song.load` / `kit.load` to the live engine (the page's `songOut` format; the shell cannot make it from a project file; the only shell-side path from a project file is the H1a test button).
+- **Gate (WORKPLAN H3: open, edit, save, reopen gives identical song JSON):** `TextCodec` is exact UTF-8 both ways (a leading BOM is kept off the text and put back on save; invalid UTF-8 is refused, never repaired; a lone surrogate is refused rather than written as "?"). `FileModelTest.roundTripIsByteIdentical` and `bomCrlfAndBigFilesSurvive` (a 14 MB file) check bytes -> text -> bytes, and an edit saved and reopened. Reopening on the desktop reads the same bytes.
+- **Changed underneath:** the shell stamps (last modified, size) at open and after each save. A save over a file whose stamp moved (or that is gone) answers `{ok:false, changed:true, gone, open, now}` and writes nothing; the page asks the owner and sends the save again with `force:true`. A provider with no modification time is judged by size; one with neither gets no check. A same-size edit inside one timestamp tick is not seen (UNVERIFIED how fine each provider's clock is).
+- **Save safety:** SAF cannot rename, so there is no `.saving` + rename as on the desktop. Instead the previous content is copied to `filesDir/song-backups/` (the last 3 per file) before each overwrite, the write is `"wt"`, and the size on disk is checked after; a short file is reported `{short:true}` with the backup named in the text. A read-only file (a VIEW from an app that granted read only) answers `{readOnly:true}` and the page uses `file.saveAs`.
+- **Songs folder missing:** `file.saveAs` without a songs folder (or with `dialog:true`) shows the system "save as" screen (`ACTION_CREATE_DOCUMENT`); with a folder it creates `name.thunder` there (`name 2.thunder` when taken).
+
+**Proposed shapes for CORE-BRIDGE section 7 (the desktop `thunderDesktop.files` is the model; all additive; every request may carry `id` and is answered by a `reply`; `uri` is the page's "path": a content:// document URI it keeps and gives back).** `hello` caps add `files:true`.
+| message | fields | reply / event |
+|---|---|---|
+| `file.folders` | `{id}` | `{ok, songs:{uri,name}\|null, samples:{uri,name}\|null}` |
+| `file.pick` | `{id, kind:'songs'\|'samples'}` | opens the system folder picker; reply = `file.folders` plus `picked`, or `{ok:false, cancelled:true}` |
+| `file.forget` | `{id, kind}` | forgets the folder; reply = `file.folders` |
+| `file.list` | `{id, kind, dir?}` (`dir` = a folder entry's `id`; omitted = the root) | `{ok, kind, files:[{uri,name,mtime,size,dir?,id?}]}`: songs newest first (only .thunder / .json); samples = folders first then audio files by name; `{ok:false, needFolder:true}` when no folder is chosen |
+| `file.open` | `{id, uri}` or `{id, dialog:true}` (the system file picker) | `{ok, uri, name, text, mtime, size}` (or `{ok:false, error}`; `cancelled`) |
+| `file.read` | `{id, uri}` (a sample) | `{ok, uri, name, size, b64}` (at most 64 MiB; GAP: base64 in the reply, a binary `take` is the later route) |
+| `file.save` | `{id, uri, text, force?}` | `{ok, uri, name, mtime, size}` / `{ok:false, changed:true, gone, open:{mtime,size}, now:{mtime,size}}` / `{ok:false, readOnly\|noSession\|short, error}` |
+| `file.saveAs` | `{id, name, text, dialog?}` | `{ok, uri, name, mtime, size}`, `{ok:false, cancelled\|needFolder, error}` |
+| `file.ready` | `{}` | the page can take `file.opened` (sent after every page load) |
+| `file.opened` (event) | `{t, ok, uri, name, text, mtime, size, writable}` | a project opened from a file manager |
+- **Gaps for the page client:** the page keeps `uri` where the desktop keeps `projPath`; `file.opened` for a file bigger than a few MB crosses the port as one string (a 128 MiB cap; a chunked form is later); samples travel as base64 in `file.read`; the shell does NOT watch the folder for changes (the page lists again when it wants to); the song's font path on another device is the page's (WORKPLAN 253-255).
+
+**Owner's tests for H3 (device; none run):**
+1. Settings > Songs folder: pick a folder once; kill the app, reopen: the folder is still chosen (no new picker). Same for the samples folder.
+2. The song list shows newest first and a song saved a minute ago is on top.
+3. Open a `.thunder` from the file manager's "Open with" (and "Share" to the app): the page loads it; edit, save, then open the same file on the desktop: the same song, the same bytes (compare file sizes).
+4. Save over a file that changed meanwhile (edit it on the desktop through a sync tool, or just touch it): the page asks before overwriting; "keep mine" saves, "cancel" does not.
+5. A song in a read-only place (opened from a mail attachment): Save offers Save As.
+6. Pull the SD card / revoke the folder in Android settings: the page says the folder is gone and offers to pick again; nothing crashes.

@@ -25,6 +25,32 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- N2 H3: a .thunder project opened from a file manager (VIEW) or shared to the app (SEND). File managers often report a project as */* or octet-stream, so the VIEW filters also match the file name
+                 (pathPattern has no "any number of dots": one pattern per depth). UNVERIFIED on the owner's file manager. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" /><data android:scheme="file" />
+                <data android:mimeType="application/x-thunder" /><data android:mimeType="application/vnd.thunderplus.project" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" /><data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.thunder" />
+                <data android:pathPattern=".*\\..*\\.thunder" />
+                <data android:pathPattern=".*\\..*\\..*\\.thunder" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.thunder" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-thunder" /><data android:mimeType="application/vnd.thunderplus.project" /><data android:mimeType="application/octet-stream" /><data android:mimeType="application/json" />
+            </intent-filter>
         </activity>
 
         <service

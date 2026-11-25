@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.graphics.Typeface
@@ -107,6 +108,8 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String) { bridge.attach() }
         }
         bridge.install()
+        SongFiles.attach(this)            // N2 H3: the folder pickers answer to this activity
+        SongFiles.onIntent(this, intent)  // a project opened from a file manager (VIEW / SEND)
         webView.loadUrl(base + "index.html")
     }
 
@@ -195,6 +198,14 @@ class MainActivity : Activity() {
         } catch (e: Exception) {
             Toast.makeText(this, "The clipboard refused: select the yellow text and copy it by hand.", Toast.LENGTH_LONG).show()
         }
+    }
+
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); SongFiles.onIntent(this, intent) }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        SongFiles.onResult(applicationContext, requestCode, resultCode, data)
     }
 
     override fun onResume() { super.onResume(); ui.post(refresh) }

@@ -127,7 +127,7 @@ object LiveBridge {
         val body = JSONObject().put("v", 1).put("core", "n2-live").put("sampleRate", LiveEngine.sampleRate)
             .put("sr", LiveEngine.sampleRate).put("outLat", (FlatJson.num(LiveNative.nativeStatus(), "outLat") ?: 0.0).toInt()).put("host", "android")   // CORE-BRIDGE 7 G1
             .put("maxPadBytes", (FlatJson.num(stats, "padBudget") ?: (128.0 * 1048576)).toLong()).put("maxSongBytes", 16L * 1048576)
-            .put("caps", JSONObject().put("nativeAudio", true).put("midi", LiveNative.nativeMidiOn()).put("link", false).put("plugins", false).put("inputs", false).put("render", false)
+            .put("caps", JSONObject().put("nativeAudio", true).put("midi", LiveNative.nativeMidiOn()).put("link", false).put("plugins", false).put("inputs", false).put("render", false).put("files", true)
                 .put("live", true).put("chains", LiveNative.nativeChainsOn()).put("sf", (caps and 8) != 0).put("engines", engines)
                 .put("fx", org.json.JSONArray(listOf("tfx", "pump", "modfx", "master"))).put("abi", 1).put("liveCaps", caps))
         reply(h.id, body)
