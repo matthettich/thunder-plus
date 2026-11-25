@@ -233,6 +233,14 @@ run('syn/cable-dup-removed-one', S([M('a', {})], [C(['a', 'o'], ['b', 'i']), C([
 run('syn/cable-fb-true-vs-fb-true', S([M('a', {})], [C(['a', 'o'], ['b', 'i'], { fb: true })]), S([M('a', {})], [C(['a', 'o'], ['b', 'i'], { fb: true })]));
 run('syn/cable-extra-fields-ignored', S([M('a', {})], [C(['a', 'o'], ['b', 'i'], { bend: 1, color: 'x' })]), S([M('a', {})], [C(['a', 'o'], ['b', 'i'], { bend: 2 })]));
 run('syn/cable-third-element-ignored', S([M('a', {})], [C(['a', 'o', 'z'], ['b', 'i', 'y'])]), S([M('a', {})], [C(['a', 'o', 'q'], ['b', 'i', 'w'])]));
+run('syn/module-null-in-both-throws', ed(S0, q => { q.modules.push(null); }), ed(S0, q => { q.modules.push(null); }));
+run('syn/cable-null-in-both-throws', ed(S0, q => { q.cables.push(null); }), ed(S0, q => { q.cables.push(null); }));
+run('syn/cable-without-from-in-both-throws', ed(S0, q => { q.cables.push({ to: ['b', 'in'] }); }), ed(S0, q => { q.cables.push({ to: ['b', 'in'] }); }));
+run('syn/cable-without-to-in-both-throws', ed(S0, q => { q.cables.push({ from: ['b', 'in'] }); }), ed(S0, q => { q.cables.push({ from: ['b', 'in'] }); }));
+run('syn/cable-key-null-part-equals-string-null', S([M('a', {})], [C([null, 'o'], ['b', 'i'])]), S([M('a', {})], [C(['null', 'o'], ['b', 'i'])]));
+run('syn/cable-key-missing-part-equals-string-undefined', S([M('a', {})], [C(['a'], ['b', 'i'])]), S([M('a', {})], [C(['a', 'undefined'], ['b', 'i'])]));
+run('syn/param-order-index-keys-raw-unsorted', null, null, ['{"format":"chains.patch","modules":[{"id":"a","params":{"b":1,"2":1,"a":1,"1":1,"10":1}}]}', '{"format":"chains.patch","modules":[{"id":"a","params":{"b":2,"2":2,"a":2,"1":2,"10":2}}]}']);
+run('syn/param-order-index-keys-raw-with-duplicates', null, null, ['{"format":"chains.patch","modules":[{"id":"a","params":{"b":1,"7":1,"3":1}}]}', '{"format":"chains.patch","modules":[{"id":"a","params":{"b":2,"7":2,"x":5,"3":2,"7":9}}]}']);
 run('syn/param-and-cable-both-change-is-structural', S0, ed(S0, q => { q.modules[0].params.x = 5; q.cables.pop(); }));
 run('syn/param-and-text-change-is-structural', S([M('a', { x: 1 }, { text: 'p' })], []), S([M('a', { x: 2 }, { text: 'q' })], []));
 run('syn/param-then-non-numeric-param-is-structural', S([M('a', { x: 1, y: 1 })], []), S([M('a', { x: 2, y: 'no' })], []));
