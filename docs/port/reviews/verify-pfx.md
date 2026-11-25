@@ -52,7 +52,7 @@ The port is faithful where it is tested: the golden tool really is the page's co
 - MSVC: no compiler here; read for portability only (variadic-macro lambdas in the `kDefs` table, `thread_local` arrays, `std::string_view`) and found nothing obviously non-portable. padfx_mi.cc is not built on MSVC at all (it is in the dsp group).
 - The wasm CI job was not run (no wasm toolchain here); only checked statically that padfx_mi.cc is excluded when IS_WASM and that no wasm binary changed.
 - Whether the track-effect host has the same Beads crash (F1) with its own map.
-- Android behaviour: pad_filler.cpp read on origin/n1/n2-live-shell, not built or run; timings are x86-64 on a shared 2-core machine (a phone is likely 3 to 6 times slower: the worst 312 s pad would be 25 to 50 s for spectral; typical pads are a few seconds long, so ms).
+- Android behaviour: pad_filler.cpp read on origin/n1/n2-live-shell, not built or run; timings are x86-64 on a shared 2-core machine (a phone is likely 3 to 6 times slower: the worst 312 s pad would be 25 to 50 s for spectral; typical pads are a few seconds long, so well under a second).
 - Page behaviour beyond Node 22 / x86-64 Linux (the goldens are pinned to it, as every other golden).
 - The songfit fallback branch (n1/n2-h1b) that PFX-NOTES says must stop counting non-live-engine fx as unhosted; not looked at.
 - Memory pressure on a real phone for a 312 s pad through rings / clouds (290 / 250 MB measured here on top of the pad's own buffers).
