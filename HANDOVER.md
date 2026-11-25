@@ -900,6 +900,22 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/pump-synth.wasm`). It re-pins once pump builds FREEZE's seven spectra lazily per source, or in chunks, or behind a build option, so creation no longer costs about 0.9 s on the audio thread. The request to pump is in `docs/port/PUMP-REQUESTS.md` on the `native` branch. When it lands: re-pin both wasm files, regenerate the six golden rows (`tests/golden/chains-modules.json`, `tests/golden/pump-synth.json`), and flip `tests/pump-wob-extreme.test.js` (it asserts the known WOB trap today).
 
+### Owner's to-do: what only Matt can do (keep it current; newest state 25 Nov)
+
+**When the owner asks "what do I need to do?" (or "what's waiting on me?"): answer from THIS section, most useful first, in a few lines; then offer the punch list below.** An item leaves when he says it is done or decides against it. Add an item whenever work is waiting on him (a decision, a secret, a device test, an account). Port details: `docs/port/PICKUP.md` on `native`.
+
+1. **Android signing secrets (blocks only the installable release APK).** On a computer:
+   - Make a keystore once and keep the file and password safe (losing it means a later build cannot install over an earlier one):
+     `keytool -genkeypair -v -storetype PKCS12 -keystore thunderplus.p12 -alias thunderplus -keyalg RSA -keysize 4096 -validity 10000` (it asks for a password and a name).
+   - Base64 it: Mac `base64 -i thunderplus.p12 | pbcopy`; Windows PowerShell `[Convert]::ToBase64String([IO.File]::ReadAllBytes("thunderplus.p12")) | Set-Clipboard`.
+   - GitHub, repo `matthettich/thunder-plus` → Settings → Secrets and variables → Actions → New repository secret, four times: `ANDROID_KEYSTORE_B64` (the pasted base64), `ANDROID_KEYSTORE_PASS` (the password), `ANDROID_KEY_ALIAS` (`thunderplus`), `ANDROID_KEY_PASS` (the same password: a PKCS12 keystore has one).
+   - Then tell Claude "the secrets are set": it runs the Native workflow with `release` ticked and checks the APK name ends `-signed.apk`.
+2. **Build 677 / 678 on the web app (2 minutes, phone and computer):** the app opens and plays as before; Settings → Audio → Sequencer shows only the two old choices. (Items in the punch list below.)
+3. **Later, not yet: sideload the Android test APK on the Fold** and run `native/tests/ANDROID-CHECKLIST.md`. Claude says when there is an APK (after the N2 stack and the page client are merged).
+4. **Open, no hurry:** an Apple Developer membership (only if a signed Mac / iOS build is wanted); whether the page client's fallback message, the 2.5 s "engine stopped" wait and "a refused edit keeps playing" are as wanted once he has used the Android beta.
+
+**Decided 25 Nov (nothing to do):** pad removal fix pushed; on the new engine the effect and chains level meters come first, then the pad flashes / dogs, then the metronome click; hand-played pads and keys stay on the old engine for the first Android beta; the fallback message shows on the first PLAY of each song; Resume restarts the row; no verdict within 5 s = the old engine plays; Claude merges PRs without asking once CI and the lead's review pass.
+
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 **Native-core client loader, switch off (25 Nov; build 677, PR #321)** (nothing should change; the file is fetched only by the Android app)
