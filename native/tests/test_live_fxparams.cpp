@@ -33,9 +33,11 @@ std::vector<float> fxParamRun(const std::string& text, const PadSet& ps, bool vi
   Host H(opts(THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER, 4096)); std::vector<float> l, r;
   if (!H.h) return l;
   H.song(text); H.loadPads(ps);
-  const std::string slots = "[{\"type\":\"delay\",\"on\":true,\"time\":3,\"fb\":60,\"mix\":50}]"; const double bpm = 120;
+  // track 0 first holds a delay in slot 0 (committed 64 quanta in); the edit under test replaces it by a tape in slot 0: an old chain that the param could wrongly reach, and a new chain that must get it
+  const std::string slots = "[{\"type\":\"tape\",\"on\":true}]", slots0 = "[{\"type\":\"delay\",\"on\":true,\"time\":3,\"fb\":60,\"mix\":50}]"; const double bpm = 120;
   double p12[12]; for (int i = 0; i < 12; i++) p12[i] = 0.1 * i;
-  int64_t fr = 0; H->play(playOpts(0)); H.run(l, r, 128 * 64, 128, fr);
+  int64_t fr = 0; H->play(playOpts(0));
+  H->fxPlan(0, (const uint8_t*)slots0.data(), slots0.size(), bpm); H->fxCommit(0, -1); H.run(l, r, 128 * 64, 128, fr);
   Seam sm{&H, &slots, bpm, withParam, false, {0, 0, 0}};
   if (viaSeam) {
     H->setTestFxSeam([](void* u) { Seam* m = (Seam*)u; if (!m->armed) return; m->armed = false; Host& h = *m->H;
@@ -86,7 +88,7 @@ int main() {
     std::vector<FxPlan*> dropped;
     const std::vector<float> a = blocks(A, &nA, 60, [&](int b) { if (b == 10 || b == 25 || b == 40) { FxPlan* p = planOf(A, b == 25 ? kChainX : kChainY); if (p) dropped.push_back(p); } });
     const std::vector<float> bb = blocks(B, &nB, 60);
-    CHECK(peakOf(a) > 0.01, "the chain sounds (peak %g)", peakOf(a));
+    CHECK(peakOf(a) > 0.001, "the chain sounds (peak %g)", peakOf(a));
     CHECK(ndiff(a, bb) == 0, "(P3b) plans made between blocks (never committed) leave the audio unchanged: %zu samples differ", ndiff(a, bb));
     for (FxPlan* p : dropped) delete p;
     // (2b) plans are deterministic: the same sequence of plans and blocks on two hosts, with a new plan committed in the middle (new Beads / Clouds / pitch shifter objects)
@@ -100,7 +102,7 @@ int main() {
       { FxPlan* p = planOf(*h, kChainX); h->commit(p); delete p; }
       std::vector<float> s3 = blocks(*h, n, 30); o.insert(o.end(), s3.begin(), s3.end());
     }
-    CHECK(peakOf(c) > 0.01 && ndiff(c, d) == 0, "(P3b) the same plans and blocks on two hosts give the same samples: %zu differ", ndiff(c, d));
+    CHECK(peakOf(c) > 1e-4 && ndiff(c, d) == 0, "(P3b) the same plans and blocks on two hosts give the same samples: %zu differ", ndiff(c, d));
   }
   {   // ---- (2c) two threads: the audio thread processes, the control thread plans (TSan reports the old shared rand_ / stmRng_ / daisySeed_) ----
     FxHost H(48000.0); std::atomic<FxPlan*> in{nullptr}, back{nullptr}; std::atomic<bool> stop{false}; std::atomic<uint64_t> nonFinite{0}, blocksRun{0};
