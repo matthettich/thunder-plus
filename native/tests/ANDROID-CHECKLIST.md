@@ -35,8 +35,8 @@ app shows one) the line under "native live engine" in the dark panel. Press **CO
 | 2.2 | Open the app again from the home screen or the notification. | The page is **exactly as it was** (not reloaded). |
 | 2.3 | Tap **Bridge test** in the panel, then swipe back. | You return to the app page (one step back), the sound is unchanged. |
 | 2.4 | On the app page swipe back again. | As 2.1 (home, still playing). |
-| 2.5 | Start the back gesture slowly and look at the preview (Android 13 and newer). | It shows the **home screen** (the app is not about to close). Let go to cancel: nothing changes. |
-| 2.6 | Swipe the app away in the recent-apps list **while playing**. | Report what happens: the page goes; does the sound stop? (Not decided: expected is the notification stays and the sound continues until you press stop in it. Say what you saw.) |
+| 2.5 | Start the back gesture slowly and look at the preview (Android 13 and newer). | No preview and no jump: the app registers its own Back handler, so Android shows no home-screen preview. Back at the page's top sends the app to the background and the sound keeps playing (owner decision 2). |
+| 2.6 | Swipe the app away in the recent-apps list **while playing**. | Owner decision 3 (25 Nov): the **sound stops** and the notification goes. Before that, if you had changes you had not saved, the shell kept a recovery copy (the page asks nothing: it is gone). Open the app again: it sends `{t:'recovery'}` after `hello`; until the page's "Restore unsaved changes" prompt exists (a later page-client PR) check only that the sound stopped and the app starts normally. |
 
 ## 3. Keyboard
 

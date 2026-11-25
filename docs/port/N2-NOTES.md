@@ -110,12 +110,12 @@ WRITTEN. The rules are pure and JVM-tested (`FileModel.kt`, `FileModelTest.kt`: 
 | `file.forget` | `{id, kind}` | forgets the folder; reply = `file.folders` |
 | `file.list` | `{id, kind, dir?}` (`dir` = a folder entry's `id`; omitted = the root) | `{ok, kind, files:[{uri,name,mtime,size,dir?,id?}]}`: songs newest first (only .thunder / .json); samples = folders first then audio files by name; `{ok:false, needFolder:true}` when no folder is chosen |
 | `file.open` | `{id, uri}` or `{id, dialog:true}` (the system file picker) | `{ok, uri, name, text, mtime, size}` (or `{ok:false, error}`; `cancelled`) |
-| `file.read` | `{id, uri}` (a sample) | `{ok, uri, name, size, b64}` (at most 64 MiB; GAP: base64 in the reply, a binary `take` is the later route) |
+| `file.read` | `{id, uri}` (a sample) | `{ok, uri, name, size, b64}` (at most 16 MiB, was 64; GAP: base64 in the reply, a binary `take` is the later route) |
 | `file.save` | `{id, uri, text, force?}` | `{ok, uri, name, mtime, size}` / `{ok:false, changed:true, gone, open:{mtime,size}, now:{mtime,size}}` / `{ok:false, readOnly\|noSession\|short, error}` |
 | `file.saveAs` | `{id, name, text, dialog?}` | `{ok, uri, name, mtime, size}`, `{ok:false, cancelled\|needFolder, error}` |
 | `file.ready` | `{}` | the page can take `file.opened` (sent after every page load) |
 | `file.opened` (event) | `{t, ok, uri, name, text, mtime, size, writable}` | a project opened from a file manager |
-- **Gaps for the page client:** the page keeps `uri` where the desktop keeps `projPath`; `file.opened` for a file bigger than a few MB crosses the port as one string (a 128 MiB cap; a chunked form is later); samples travel as base64 in `file.read`; the shell does NOT watch the folder for changes (the page lists again when it wants to); the song's font path on another device is the page's (WORKPLAN 253-255).
+- **Gaps for the page client:** the page keeps `uri` where the desktop keeps `projPath`; `file.opened` for a file bigger than a few MB crosses the port as one string (a 16 MiB cap, was 128; a chunked form is later); samples travel as base64 in `file.read`; the shell does NOT watch the folder for changes (the page lists again when it wants to); the song's font path on another device is the page's (WORKPLAN 253-255).
 
 **Owner's tests for H3 (device; none run):**
 1. Settings > Songs folder: pick a folder once; kill the app, reopen: the folder is still chosen (no new picker). Same for the samples folder.
@@ -221,3 +221,37 @@ On `n1/n2-anr` (verifier items A1-A5, A8):
 - **A5 (LOW)** `LiveEngine::call` re-checks `run_` under `qm_` before the push (-1000). The host test (`A5` in `test_android_live_engine.cpp`) is a stress of stop / start against two callers; the window is a few instructions wide, so it passes with and without the fix (it guards the invariant "no call waits long", it does not prove the window closed).
 - **A8 (LOW)** `ThunderHost.command` parses `t` and compares `open` / `play`.
 - **Known, left as they are**: A6 (-1000 after a half-applied load task), A7 (`loaded` written after a concurrent shutdown), A9 (xruns between the last poll and a reroute are lost), B6, B8. Also: `LiveMidi.engineUp()` and the service start run after the lock is released, so a shutdown right then briefly leaves a service for a dead engine (its onDestroy ends nothing).
+
+## Verifier fixes H3..H5 (25 Nov)
+From `docs/port/review/VERIFY-H345.md` (branch `review/verify-h345`), all on `n1/n2-anr` (it contains h3, h4, h5). Kotlin is NOT compiled here (no Android SDK): CI compiles it and runs the JVM tests (`SaveSafetyTest`, `UpdateCheckTest`). The YAML parses (`yaml.safe_load`).
+
+**H3 (`SongFiles.kt`, pure parts in `FileModel.kt`: `SaveRules`, `Backups`, `GrantRules`)**
+- **H3-1**: `save()` reads the old content and writes a verified backup (`Backups.make`: length checked, older ones pruned only after) BEFORE anything is written; no backup (file unreadable, over 16 MiB, no private space, write failed) = no save, reply `{ok:false, noBackup:true}` (+ `noSpace`). Free space where the provider shows it (`Os.fstatvfs` on the file's descriptor; a provider that does not say is not blocked). Failed or short write: the backup is written back at once, reply carries `restored:true|false`. Not done: staging the new bytes in a private file first (the target is still opened with `"wt"`; a process kill during the write can still leave a short file, the backup is then in `song-backups`), and the "new size under 1/20 of the old" check.
+- **H3-2**: `file.save` / `file.saveAs` need `text` present and non-empty (`SaveRules.refuseText`), reply `{ok:false, noText:true}`.
+- **H3-3**: song text cap 16 MiB (matches `maxSongBytes`), samples 16 MiB (base64 in one JSON reply: 21.4 million characters, copied by JSONObject / toString; larger samples need the binary `take` route, later). The provider's size is checked BEFORE reading (`openUri`, `readSample`). Every request runs under `catch (Throwable)`: an `OutOfMemoryError` becomes an error reply ("out of memory..."), never a dead process. The request type and id are read from the head of the message (no parse of a 16 MiB string on the dispatcher).
+- **H3-4**: dispatcher thread + pool: each request runs on a pool thread and is waited for 20 s (30 s for save / saveAs); then the page gets `{ok:false, timeout:true}` and the next request goes on (a late answer is dropped; a stuck write may still land: the text says so). `file.ready` runs on its own thread and never waits behind a provider. The page should also treat a missing reply as a failed save (page-client side).
+- **H3-5**: `writeNew` deletes the file it was given (`DocumentsContract.deleteDocument`) when the write fails, comes out short, or the text is invalid / too big.
+- **H3-7**: after each pick / open, persisted grants beyond the newest 8 file grants are released (`GrantRules.toRelease`); the songs and samples folder grants are never released by the trim; `file.forget` and picking a new folder release the replaced tree (unless the other kind uses it).
+- Not done (LOW, the verifier said they may follow): H3-6, H3-8, H3-9, H3-10, H3-11, H3-12.
+
+**H4 (`.github/workflows/native.yml`, `UpdateCheck.kt`, `MainActivity.kt`)**
+- **H4-1**: the owner's keystore step runs only when `github.ref == 'refs/heads/native' && github.event_name != 'pull_request'` (push to native, or a manual run from native); every other run (all pull requests) runs a step with no secret and signs with the public debug key. The assemble step that names the four secrets is a separate step with its own `if`, so a PR job never reads one. (A protected GitHub Environment would be a second lock: not set up, it needs the owner in the repository settings.)
+- **H4-2**: `umask 077` on creation; `rm -f "$RUNNER_TEMP/owner.keystore"` with `if: always()` right after the assemble steps.
+- **H4-3**: `set -eo pipefail`, `|| true` dropped on the signature check; the APK's signer SHA-256 (`apksigner verify --print-certs`) is compared with the public debug key's (`a0a17d35...c031`, taken from `native/android/ci-debug.keystore`): a `-signed` APK with the debug key, or a `-DEBUGKEY` one without it, fails the job.
+- **H4-4**: publish matrix `fail-fast: false`; `cancel-in-progress` only for pull requests; both publish jobs (and the N0 attach job) only on `refs/heads/native`; a re-run skips a tag that exists (`gh release view`).
+- **H4-7**: `if (isFinishing || isDestroyed) return@post` before the dialog / toast. **H4-9** (cheap, done too): `ReleaseTags.safePage` only opens a releases page of this repository.
+- **H4-8**: `per_page=100`, up to 5 pages (stops at the first page with a build of this channel), `disconnect()` in `finally`; "none" now says "not found in the newest 500 releases".
+- Not done: H4-5 (versionCode offset), H4-6 (accepted).
+
+**H5**
+- **H5-1 (owner decision 3)**: `ThunderService.onTaskRemoved` (off the main thread): writes the recovery copy, then `LiveEngine.stop()` + `shutdown()` (or `ThunderHost.stop` for the N0 core), then `stopForeground` + `stopSelf()` on the main handler. It asks the page nothing. `Recovery.kt`: `RecoveryTracker` keeps the last `song.load` message the page sent (its bytes, not copied) with its title and the last file opened / saved; "unsaved" = it differs from the `song.load` that was current at the last `file.save` / `file.saveAs` success (or, with no save yet, from the first `song.load` after `hello` / `file.opened`, which is what the page started with). A `song.load` that differs only by its `rev` counts as unsaved: a spare copy is harmless. `RecoveryStore` writes `recovery.thunder` + sidecar `recovery.json` in `filesDir` (temp files, then rename; the sidecar rename is the commit). It never overwrites with "nothing unsaved". CAVEAT for the page client: the text kept is the WHOLE `song.load` message (`{t:'song.load', S, vars, rev, ...}`, the engine snapshot), not the project file text the page saves; the restore prompt must rebuild the song from `S` (or the page must tell the shell its project text, a new message, if `S` is not enough: decide in the page-client PR).
+- **H5-2** and **checklist 2.6**: `native/tests/ANDROID-CHECKLIST.md` items 2.5 (no preview, Back sends the app to the background) and 2.6 (sound stops; recovery copy kept) now match the owner's decisions.
+
+**The three messages for the page's "Restore unsaved changes" prompt (a later page-client PR; nothing in the page uses them yet)**
+| Message | Direction | Body |
+|---|---|---|
+| `recovery` (event) | shell -> page, once after each `hello` reply, only when a copy exists | `{t:'recovery', title, time, file}`: `time` is epoch ms of the swipe-away, `file` the `uri` the page had open / last saved, or null |
+| `recovery.get` | page -> shell, ask | `{id}` -> reply `{ok, title, time, file, text}` (`text`: the saved `song.load` message, see the caveat) or `{ok:false, error}` |
+| `recovery.drop` | page -> shell, ask | `{id}` -> `{ok:true}`; deletes both files (the page sends it after restoring or when the owner declines) |
+
+**Not testable here**: every Kotlin change (no SDK; CI compiles), `Os.fstatvfs` on real providers, the SAF delete, the timeout behaviour with a real stuck provider, `onTaskRemoved` on a device (the swipe-away must be tried: the service must still be alive and the sound must stop), the workflow on a runner (PR build without secrets; push to native with secrets; the fingerprint check).
