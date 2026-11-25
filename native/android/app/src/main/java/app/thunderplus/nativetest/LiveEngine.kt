@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * N2 H1a: process-wide owner of the LIVE engine (LiveNative), the way [ThunderHost] owns the N0 test core. Start opens the stream and the foreground service; [loadAsset] renders and publishes
@@ -35,13 +36,26 @@ object LiveEngine {
     /** THUNDER_LIVE_CAP_* bits of this build (0 before the library is loaded: the call loads it). */
     fun caps(): Int = LiveNative.nativeCaps()
 
-    /** Starts the engine (and the foreground service) if it is not running. false: the stream or the host did not start. */
-    @Synchronized fun start(ctx: Context): Boolean {
-        if (active) return true
+    /** ANR fix (25 Nov): nativeStart / nativeShutdown run on this ONE thread, in the order they were asked. nativeShutdown takes the native life lock, which a project load can hold for seconds: never on the main thread. */
+    private val worker = OrderedWorker("thunder-live-life")
+    private val shutdowns = AtomicInteger(0)   // counts shutdown() calls: a start queued before a shutdown must not leave `active` true after it
+    private var up = false                      // the native engine is started: touched only on the worker
+
+    /** Starts the engine (and the foreground service) if it is not running. false: the stream or the host did not start. Waits for the worker (and so for a shutdown queued before it): NOT on the main thread. */
+    fun start(ctx: Context): Boolean {
+        val gen = shutdowns.get()
+        return worker.call { startOnWorker(ctx, gen) }
+    }
+
+    private fun startOnWorker(ctx: Context, gen: Int): Boolean {
+        if (up) return active
         ThunderHost.shutdown()   // the N0 test core and the live host would both open the output
         val sr = LiveNative.nativeStart(true)
         if (sr <= 0) { Log.i(TAG, "start failed: $sr"); return false }
-        sampleRate = sr; active = true; appCtx = ctx.applicationContext
+        up = true
+        sampleRate = sr; appCtx = ctx.applicationContext
+        if (shutdowns.get() != gen) return false   // a shutdown() was asked after this start: its task is queued behind us and ends the engine
+        active = true
         LiveMidi.engineUp()
         try { ctx.startForegroundService(Intent(ctx, ThunderService::class.java)) } catch (e: Exception) { Log.i(TAG, "service did not start: $e") }
         return true
@@ -116,14 +130,22 @@ object LiveEngine {
         return true
     }
 
-    @Synchronized fun shutdown() {
-        if (!active) return
+    /** Ends the engine. Returns AT ONCE (safe on the main thread): `active` is false before it returns, so every new call is refused; nativeShutdown runs on the worker, behind anything queued before it. */
+    fun shutdown() {
+        shutdowns.incrementAndGet()
         active = false
         LiveBridge.reset()
-        LiveNative.nativeShutdown()
         loaded = null; projectName = ""; projectFile = null; songTitle = "Thunder Plus"
         gateAbort("the engine ended")
+        worker.post {
+            if (!up) return@post
+            up = false
+            try { LiveNative.nativeShutdown() } catch (e: Throwable) { Log.i(TAG, "shutdown: $e") }
+        }
     }
+
+    /** [shutdown], then waits until nativeShutdown has finished (the N0 test core is about to open the output). NOT on the main thread, and not while holding a lock the worker needs (ThunderHost's). */
+    fun shutdownAndWait() { shutdown(); worker.drain() }
 
     /** Stops the service (whose onDestroy ends the engine). */
     fun quit(ctx: Context) { ctx.stopService(Intent(ctx, ThunderService::class.java)); shutdown() }

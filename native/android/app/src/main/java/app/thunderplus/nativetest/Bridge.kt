@@ -75,6 +75,8 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
         sendToPage(caps.toString())
     }
 
+    private val n0Cmds = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "thunder-n0-cmd").also { it.isDaemon = true } }
+
     private fun sendToPage(s: String) {
         main.post { try { port?.postMessage(WebMessageCompat(s)) } catch (e: Exception) { /* page gone */ } }
     }
@@ -94,7 +96,7 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
                     .put("inputs", false).put("render", false).put("files", true)).toString()) }
             "put.header" -> { header = j; if (j.optInt("o") == 0) putStartNs = System.nanoTime() }
             "info" -> sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("info", NativeEngine.nativeInfo()).toString())
-            else -> ThunderHost.command(activity, s)
+            else -> n0Cmds.execute { try { ThunderHost.command(activity, s) } catch (e: Exception) { } }   // ANR fix (25 Nov): "open" / "play" may wait for the live engine's shutdown: never on the main thread (one thread, so the order is kept)
         }
     }
 

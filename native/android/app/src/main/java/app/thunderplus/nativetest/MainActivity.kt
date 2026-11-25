@@ -138,11 +138,16 @@ class MainActivity : Activity() {
         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
     }
 
+    /** ANR fix (25 Nov): starting the N0 test core waits for the live engine's shutdown, which can sit behind a project load: [work] runs on a thread, [done] on the main thread. */
+    private fun <T> off(work: () -> T, done: (T) -> Unit) {
+        Thread({ val r = try { work() } catch (e: Exception) { null }; if (r != null) runOnUiThread { done(r) } }, "thunder-overlay-work").start()
+    }
+
     private fun buildOverlay(): View {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(235, 0, 0, 0)); setPadding(8, 4, 8, 4) }
         fun row(vararg v: View) = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; v.forEach { addView(it) } }
         val runRow = row(*ThunderHost.RUN_LABELS.map { l ->
-            btn("$l 5 min") { if (!ThunderHost.startRun(this, l)) Toast.makeText(this, "Audio did not start", Toast.LENGTH_LONG).show() }
+            btn("$l 5 min") { off({ ThunderHost.startRun(this, l) }) { ok -> if (!ok) Toast.makeText(this, "Audio did not start", Toast.LENGTH_LONG).show() } }
         }.toTypedArray())
         val ctlRow = row(
             btn("RESET") { ThunderHost.resetRun(this); resultsBox.text = "" },
@@ -152,7 +157,7 @@ class MainActivity : Activity() {
             btn("Hide") { val v = if (readout.visibility == View.VISIBLE) View.GONE else View.VISIBLE; readout.visibility = v; runLines.visibility = v; midiLine.visibility = v; resultsBox.visibility = if (v == View.GONE) View.GONE else resultsBox.visibility })
         // U36 T9 DEBUG (no live song host yet): MIDI out test = two bars of notes + MIDI clock to port A through the real scheduler / pump / sink; "MIDI A: next" picks the device.
         val midiRow = row(
-            btn("MIDI out test") { midiLine.text = MidiPorts.get(this).runTest(this) },
+            btn("MIDI out test") { off({ MidiPorts.get(this).runTest(this) }) { midiLine.text = it } },
             btn("MIDI A: next device") { midiLine.text = MidiPorts.get(this).cycleA() },
             btn("COPY MIDI") {
                 val t = MidiPorts.get(this).statusText()

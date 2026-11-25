@@ -29,6 +29,8 @@ static int g_fail = 0;
 
 static std::string readFile(const std::string& p) { std::ifstream f(p, std::ios::binary); std::stringstream ss; ss << f.rdbuf(); return ss.str(); }
 
+static int64_t nowNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+
 int main() {
   using namespace tpa;
   // 1. extractMember
@@ -255,7 +257,23 @@ int main() {
     CHECK(ranSlow.load(), "the -1001 task still ran to the end (that is what -1001 warns about)");
     CHECK(!ranQueued.load(), "the -1000 task was dropped: its fn must never run");
     CHECK(E.call([](thunder_live*) { return 7; }) == 7, "the control thread is alive after both"); }
-  stop = true; audio.join();
+  stop = true; audio.join();   // the device is stopped before the host is destroyed, as nativeShutdown does it
+  // ANR fix (25 Nov): a call that sits in the control thread's E_BUSY retry loop (20 s) must not hold destroy() up: stopThreads clears run_, the loop sees it and the call returns -1000 at once
+  { std::atomic<int> busyRc{12345}; std::atomic<bool> entered{false}; std::atomic<int> tries{0};
+    int64_t t0 = 0, t1 = 0;
+    std::thread loadLike([&] { busyRc = E.call([&](thunder_live*) { entered = true; tries++; return (int)THUNDER_LIVE_E_BUSY; }, 20000); t1 = nowNs(); });
+    for (int i = 0; i < 100 && !entered.load(); i++) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));   // inside the retry loop now (no callback runs: it waits in 20 ms rounds)
+    CHECK(entered.load() && busyRc.load() == 12345, "the E_BUSY call is still waiting before destroy");
+    t0 = nowNs();
+    E.destroy();
+    const int64_t dms = (nowNs() - t0) / 1000000;
+    loadLike.join();
+    const int64_t cms = (t1 - t0) / 1000000;
+    std::printf("destroy during an E_BUSY retry loop: %lld ms; the call came back %d after %lld ms (%d tries)\n", (long long)dms, busyRc.load(), (long long)cms, tries.load());
+    CHECK(dms < 200, "destroy waited %lld ms behind a call in its E_BUSY loop", (long long)dms);
+    CHECK(busyRc.load() == -1000 && cms < 200, "the call must return -1000 fast, got %d after %lld ms", busyRc.load(), (long long)cms);
+    CHECK(tries.load() >= 2, "the task did retry"); }
   E.destroy();
   CHECK(!E.created(), "destroyed");
   // a destroyed engine renders silence and refuses calls

@@ -36,7 +36,7 @@ object ThunderHost {
     private var lastRtPush = 0L
 
     /** Resets the logger and the clock cross-check, starts the pattern and times 5 minutes by AUDIO FRAMES (so a locked screen cannot stop the timer). */
-    fun startRun(ctx: Context, label: String): Boolean {
+    fun startRun(ctx: Context, label: String): Boolean {   // may wait for the live engine's shutdown: call it OFF the main thread (MainActivity does)
         if (!ensureRunning(ctx)) return false
         NativeEngine.nativeRtReset(); clock.reset()
         activeRun = label; results.remove(label); lastFinished = null
@@ -60,9 +60,15 @@ object ThunderHost {
         appCtx?.let { c -> main.post { command(c, "{\"t\":\"stop\"}") } }
     }
 
-    @Synchronized fun ensureRunning(ctx: Context): Boolean {
+    /** NOT on the main thread when the live engine may be up: the live engine's nativeShutdown can wait behind a project load. It is awaited HERE, before ThunderHost's lock is taken (the worker needs that lock to start). */
+    fun ensureRunning(ctx: Context): Boolean {
+        if (!running) LiveEngine.shutdownAndWait()   // N2 H1a: the live host and the N0 test core would both open the output
+        return ensureRunningLocked(ctx)
+    }
+
+    @Synchronized private fun ensureRunningLocked(ctx: Context): Boolean {
         if (running) return true
-        LiveEngine.shutdown()   // N2 H1a: the live host and the N0 test core would both open the output
+        LiveEngine.shutdown()   // (already ended above; a no-op unless a live start slipped in)
         val sr = NativeEngine.nativeStart()
         if (sr <= 0) return false
         sampleRate = sr
@@ -119,12 +125,17 @@ object ThunderHost {
     val isRunning: Boolean get() = running
 
     /** A command from the page or the overlay (JSON text). `open` / `close` / `play` / `stop` also manage the engine and service. */
-    @Synchronized fun command(ctx: Context, json: String): Boolean {
+    fun command(ctx: Context, json: String): Boolean {
+        if (!running && (json.contains("\"open\"") || json.contains("\"play\""))) LiveEngine.shutdownAndWait()   // before the lock, see ensureRunning
+        return commandLocked(ctx, json)
+    }
+
+    @Synchronized private fun commandLocked(ctx: Context, json: String): Boolean {
         val t = try { JSONObject(json).optString("t") } catch (e: Exception) { return false }
         return when (t) {
-            "open" -> ensureRunning(ctx)
+            "open" -> ensureRunningLocked(ctx)
             "close" -> { main.post { stop(ctx) }; true }
-            "play" -> ensureRunning(ctx) && NativeEngine.nativePost(json)
+            "play" -> ensureRunningLocked(ctx) && NativeEngine.nativePost(json)
             "stop" -> { NativeEngine.nativePost(json); main.postDelayed({ stop(ctx) }, 150); true }
             else -> running && NativeEngine.nativePost(json)
         }

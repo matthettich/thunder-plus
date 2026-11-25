@@ -96,11 +96,16 @@ typedef int32_t (*fnTs)(void*, int32_t, int64_t*, int64_t*);
 // The clock map's AAudio pair (spec 3.4). Called by MidiHost::audioBlock on the audio thread at most every 20 ms. AAudio's getTimestamp and getFramesWritten read the stream's
 // shared counters (UNVERIFIED on the Fold: that getTimestamp is cheap in the callback; the rate limit is the guard). false: no timestamp (AAudio refuses for a while after start).
 bool tsRead(void*, tpa::TsPair* p) {
+  // ANR / lead's read 25 Nov A: miniaudio re-routes the AAudio stream by itself under rerouteLock, so the pointer and the calls on it are read inside that lock. This runs on the AUDIO thread, and the
+  // reroute job holds the lock while it closes the stream (the close waits for the callback): so TRY-lock only, never wait; a busy lock gives up this round (false: the host asks again in 20 ms).
+  if (pthread_mutex_trylock((pthread_mutex_t*)&g.device.aaudio.rerouteLock) != 0) return false;
   void* stream = (void*)g.device.aaudio.pStreamPlayback;
-  if (!stream || !g.aaTs || !g.aaWritten) return false;
   int64_t pos = 0, ns = 0;
-  if (g.aaTs(stream, CLOCK_MONOTONIC, &pos, &ns) != 0) return false;
-  p->pos = pos; p->ns = ns; p->written = g.aaWritten(stream);
+  bool ok = stream && g.aaTs && g.aaWritten && g.aaTs(stream, CLOCK_MONOTONIC, &pos, &ns) == 0;
+  if (ok) p->written = g.aaWritten(stream);
+  ma_mutex_unlock(&g.device.aaudio.rerouteLock);
+  if (!ok) return false;
+  p->pos = pos; p->ns = ns;
   const uint32_t q = g.tsSeq.load(std::memory_order_relaxed);
   g.tsSeq.store(q + 1, std::memory_order_release);
   g.tsPos.store(p->pos, std::memory_order_release); g.tsNs.store(p->ns, std::memory_order_release); g.tsWritten.store(p->written, std::memory_order_release); g.tsMono.store(monoNs(), std::memory_order_release);
@@ -120,15 +125,23 @@ void probeLoop() {
   auto perf = (fnI32)dlsym(lib, "AAudioStream_getPerformanceMode");
   bool infoDone = false;
   while (g.probeRun.load()) {
-    void* stream = (void*)g.device.aaudio.pStreamPlayback;
+    // lead's read 25 Nov A: the pointer and every AAudio call on it inside rerouteLock (try-lock: a busy lock skips this round; the lock is NOT held across the control-thread call or the host stats below)
+    void* stream = nullptr; int under = 0; int64_t pos = 0, tns = 0; bool have = false; int64_t wr = 0;
+    int bu = 0, bf = 0, sh = -1, pf = -1;
+    if (pthread_mutex_trylock((pthread_mutex_t*)&g.device.aaudio.rerouteLock) == 0) {
+      stream = (void*)g.device.aaudio.pStreamPlayback;
+      if (stream && g.core) {
+        under = xrun ? xrun(stream) : 0;
+        if (!g.midi && ts && written && ts(stream, CLOCK_MONOTONIC, &pos, &tns) == 0) { wr = written(stream); have = true; }   // no MIDI out: this thread is the only reader
+        if (!infoDone && burst && bufsz) { bu = burst(stream); bf = bufsz(stream); sh = sharing ? sharing(stream) : -1; pf = perf ? perf(stream) : -1; }
+      }
+      ma_mutex_unlock(&g.device.aaudio.rerouteLock);
+    }
     if (stream && g.core) {
-      int under = xrun ? xrun(stream) : 0;
       if (under < 0) under = 0;
       g.xrunLast = under;
       rtlog_host_underruns(&g_rt, under - g.xrunBase.load());
       int latFrames = 0;
-      int64_t pos = 0, tns = 0;
-      bool have = false; int64_t wr = 0;
       if (g.midi) {   // the callback owns getTimestamp: read its snapshot (up to 20 ms old; the written count is carried forward at the stream's rate)
         for (int tries = 0; tries < 4 && !have; tries++) {
           const uint32_t a = g.tsSeq.load(std::memory_order_acquire);
@@ -137,7 +150,7 @@ void probeLoop() {
           if (g.tsSeq.load(std::memory_order_acquire) != a) continue;
           wr = w + (int64_t)((double)(monoNs() - m) * 1e-9 * g.device.sampleRate); have = true;
         }
-      } else if (ts && written && ts(stream, CLOCK_MONOTONIC, &pos, &tns) == 0) { wr = written(stream); have = true; }   // no MIDI out: this thread is the only reader
+      }
       if (have) {
         const int64_t now = monoNs();
         // frames still to be played = written - (position presented at `tns`, advanced to now)
@@ -153,7 +166,7 @@ void probeLoop() {
       thunder_host_stats(g.core, latFrames, under);
       if (!infoDone && burst && bufsz) {
         std::snprintf(g.info, sizeof g.info, "sr=%u burstFrames=%d bufferFrames=%d sharing=%d (0 exclusive, 1 shared) perfMode=%d (12 low latency)", g.device.sampleRate,
-                      burst(stream), bufsz(stream), sharing ? sharing(stream) : -1, perf ? perf(stream) : -1);
+                      bu, bf, sh, pf);
         g.infoReady = true; infoDone = true;
       }
     }

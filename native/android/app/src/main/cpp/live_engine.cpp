@@ -130,6 +130,7 @@ void LiveEngine::controlLoop() {
         for (int i = 0; i < 20 && calls_.load(std::memory_order_acquire) == c0 && run_.load(); i++) std::this_thread::sleep_for(std::chrono::milliseconds(1));
         thunder_live_collect(L_);
       }
+      if (rc == THUNDER_LIVE_E_BUSY && !run_.load()) rc = -1000;   // ANR fix: the engine is being shut down while this task still waited for room: nothing was applied (E_BUSY changes nothing), the caller is told like a dropped task
     }
     { std::lock_guard<std::mutex> g(t->m); t->rc = rc; t->done = true; }
     t->cv.notify_all();
