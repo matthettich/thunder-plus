@@ -53,5 +53,18 @@ Fix: `play(tempo, lpb, ticks)` from the Seq's song (or `songCur_`), and in `chai
 | M8 | keep-patch ignored (`plan(..., false)` always) | FAIL | pass | pass | pass | pass |
 All eight are caught, all by `live_chains` alone (the other four binaries do not catch any: they are storms and sweeps, not oracles; M1's real race would need TSan, which is where `live_chains_threads` earns its keep). Only the M1 failure text was read (above); for the other seven the failing test is `live_chains` (the binary exits non-zero; ctest without --output-on-failure), the build of each mutated tree succeeded and the unmutated head passes (41 s earlier), so the failure is the mutation's. M3 and M4 are the two the PR's own notes said survived on the first run; they are killed now.
 
-## STILL RUNNING / NOT YET CHECKED
-TSan on `live_chains` and `chains_song` (running), ASan+UBSan matrix (building), full Release ctest of all targets (only the chains / live subset was built), MSVC safety by compiler (read only).
+## SANITIZER MATRIX (all at head 84e8a9e5 plus my uncommitted test file)
+| binary | TSan (RelWithDebInfo, -fsanitize=thread) | ASan + UBSan (THUNDER_SANITIZE=ON) |
+|---|---|---|
+| live_chains_threads | 5 runs, 0 reports | 0 reports, 9 checks ok |
+| live_threads | 0 reports | not run |
+| live_chains | 0 reports | 162 checks ok, 0 reports |
+| chains_song (goldens arg) | 0 reports (23 exact, 300 LiveHost runs exact) | 0 reports |
+| live_capi | 0 reports | 42 checks ok, 0 reports |
+| live_chains_oom | n/a (counting malloc off under sanitizers) | strict +0 ok |
+| chains_host | not run | ok |
+| test_vadv thr (mine, 30-40 s) | 0 reports, 0 audio-thread allocations, baseline restored | same, 0 reports |
+| test_vadv det (mine) | not run | 0 sanitizer reports (its 4 behavioural FAILs are findings 1 to 4) |
+
+## STILL NOT CHECKED
+Full Release ctest of ALL targets (see the last section for what ran), MSVC safety by compiler (read only), the C++ `live_capi` beyond its own checks.
