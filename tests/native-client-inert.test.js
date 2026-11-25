@@ -94,7 +94,7 @@ test('(b) PC4: the four live-edit branches (mfSet, the OUT bar drag, pdcSet, par
   assert.ok(/function mfSet\(t, v\)\{[^\n]*if \(rt\) rt\.pl\.applyMix\(\); try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'mfSet: after the old line, in a try');
   assert.ok(/  S\.mout = v; moApply\(\); try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\} draw\(\); moToast\(\);/.test(src), 'the master OUT bar drag (moApply itself is untouched)');
   assert.ok(/function pdcSet\(v\)\{[^\n]*asetSave\(\); moFxAt = -1e9; try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}\n/.test(src), 'pdcSet');
-  assert.ok(/\n    if \(NCON\(\)\) return NC\(\)\.chainParam\(id, name, value\);[^\n]*\n    if \(!rt \|\| !rt\.pl\) return;/.test(src), 'thunderChains.param: after the patch update, before the rt guard (branch 13)');
+  assert.ok(/\n    if \(NCON\(\)\) NC\(\)\.chainParam\(id, name, value\);[^\n]*\n    if \(!rt \|\| !rt\.pl\) return;/.test(src), 'thunderChains.param: after the patch update, before the rt guard (branch 13)');
   assert.equal((src.match(/\.chainParam\(/g) || []).length, 1); assert.equal((src.match(/NC\(\)\.edit\(\)/g) || []).length, 4, 'saveS, mfSet, moApply, pdcSet');
 });
 test('(b) __thunderClient appears only inside the loader block; thunder-core-client.js only in comments and loadClient\'s one src line', () => {

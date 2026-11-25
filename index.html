@@ -19016,7 +19016,7 @@ window.thunderChains = {
     const before = name === 'track' ? chainsAutoTracks() : null;
     const m = d.modules.find(x => x.id === id); if (m) (m.params = m.params || {})[name] = value;
     if (before){ chainsAutoOn(before); chainsPush(); }   // a Track In / Chain Out moved: re-route the tracks either way
-    if (NCON()) return NC().chainParam(id, name, value);   // NATIVE CORE (PC4): one chain.edit while it plays; the song carries the value too
+    if (NCON()) NC().chainParam(id, name, value);   // NATIVE CORE (PC4): one chain.edit while the native engine plays; the song carries the value too. NO return: a song that fell back plays on the page's own graph, which the lines below feed (lead's read, 25 Nov)
     if (!rt || !rt.pl) return;
     if (name === 'src' && rt.pl.tapsSync) rt.pl.tapsSync();   // a Sidechain In switched between the bus and a track
     if (name === 'pre' && rt.pl.busSync){ rt.pl.busSync(); if (view === 'tracker') draw(); }   // PRE SENDS: a Track In's Bus send before / after its fader
