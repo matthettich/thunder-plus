@@ -1,9 +1,11 @@
 // The engine foundation (U22): see engine.h. Line for line from index.html's ENGINE block (renderLayer, makeOsc, voiceMod, voiceFilter, voiceAmp, renderLayersOnly, renderVoice,
 // mkVoice, freshLayer, the tables). Every expression keeps the JS's order of operations (contraction is off for this target).
 #include "engine/engine.h"
+#include "engine/padfx.h"
 #include "engine/layers.h"
 
 #include <cmath>
+#include <new>
 #include <cstring>
 #include <vector>
 
@@ -87,6 +89,7 @@ bool eng_type_supported(LType t) { return t != LType::Other; }
 EngFx::EngFx() {
   const double nan = NAN;
   bits = rate = noise = color = follow = dry = wet = nan; note = chord = decay = bright = mode = spread = mix = nan; time = fb = pitch = pitch2 = tone = size = wow = nan;
+  for (double& x : lv) x = nan;
 }
 
 // ---- the oscillator (makeOsc's closures: s(inc) is the sample, blk(...) is a no-op for these types) ------------------------------------------------------
@@ -323,7 +326,7 @@ double pitchTail(const EngFx& f, double sr) {
   const bool rv = f.kind == EngFx::Kind::PitchReverb;
   return js_round(sr * (rv ? 3 + (f.sizeNull ? 0.0 : f.size) * 4 : jmin(8, f.time / 1000 * (1 + 6 * f.fb))));
 }
-inline bool fxReady(const EngFx& f) { return f.kind != EngFx::Kind::Other; }
+inline bool fxReady(const EngFx& f, const EngRenderOpts& o) { return f.kind == EngFx::Kind::Lib ? (o.libFx && f.lib >= 0) : f.kind != EngFx::Kind::Other; }
 
 struct Plan { double N, extN; };
 // renderLayersOnly's lengths (V already has the hold applied)
@@ -337,7 +340,7 @@ Plan planOf(const EngVoice& V, const EngRenderOpts& o) {
   p.extN = jmin(N + tailN, sr * (kSmpMax + 12));
   return p;
 }
-bool anyFxOn(const EngVoice& V) { for (int i = 0; i < V.nFx; i++) if (V.fx[i].on && fxReady(V.fx[i])) return true; return false; }
+bool anyFxOn(const EngVoice& V, const EngRenderOpts& o) { for (int i = 0; i < V.nFx; i++) if (V.fx[i].on && fxReady(V.fx[i], o)) return true; return false; }
 }  // namespace
 
 namespace {
@@ -352,9 +355,9 @@ size_t eng_render_bound(const EngVoice& V0, const EngRenderOpts& o) {
   const Plan p = planOf(V, o);
   if (!(p.N >= 1 && p.N < 4e9)) return 0;
   double len = p.N;
-  if (anyFxOn(V)) {
+  if (anyFxOn(V, o)) {
     double ext = p.extN >= 0 ? std::floor(p.extN) : 0; len = ext > len ? ext : len; double cur = ext;
-    for (int i = 0; i < V.nFx; i++) { const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f)) continue;
+    for (int i = 0; i < V.nFx; i++) { const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f, o)) continue;
       if (f.kind == EngFx::Kind::PitchDelay || f.kind == EngFx::Kind::PitchReverb) { const double t = pitchTail(f, o.sr); if (t >= 0 && t < 4e9) cur += t; if (cur > len) len = cur; } }
   }
   return len < 4e9 ? (size_t)len : 0;
@@ -381,25 +384,28 @@ int eng_render_voice(const EngVoice& V0, const EngRenderOpts& o, float* out, siz
     else for (size_t i = 0; i < N; i++) out[i] = f32((double)out[i] * g);
   }
   size_t len = N;
-  if (anyFxOn(V)) {
+  if (anyFxOn(V, o)) {
     const size_t ext = (size_t)(p.extN > 0 ? std::floor(p.extN) : 0);
     // ext.set(out.subarray(0, Math.min(N, ext.length))): the sound, zeros after it
     if (ext > N) std::memset(out + N, 0, (ext - N) * sizeof(float));
     len = ext;
+    try {
     for (int i = 0; i < V.nFx; i++) {
-      const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f)) continue;   // (applyFx: a type that is not ready returns the sound as it is)
+      const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f, o)) continue;   // (applyFx: a type that is not ready returns the sound as it is)
       std::vector<float> r;
       switch (f.kind) {
         case EngFx::Kind::Degrade: r = pad_degrade(PadDegrade{f.bits, f.rate, f.noise, f.color, f.follow, f.dry, f.wet}, out, len, sr); break;
         case EngFx::Kind::Reson: r = pad_reson(PadReson{f.note, f.chord, f.decay, f.bright, f.mode, f.spread, f.mix}, out, len, sr); break;
         case EngFx::Kind::PitchDelay: r = pad_pitchfx(false, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix, f.sizeNull}, out, len, sr); break;
         case EngFx::Kind::PitchReverb: r = pad_pitchfx(true, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix, f.sizeNull}, out, len, sr); break;
+        case EngFx::Kind::Lib: if (!pad_fx_lib(f, out, len, sr, o.bpm, r)) r.assign(out, out + len); break;   // (a library effect that cannot be made returns the sound, as applyFx does)
         default: break;
       }
       if (r.empty()) return kEngFxThrew;   // (a JS exception: RangeError in new Float32Array / set: renderVoice throws)
       if (r.size() > cap) return kEngTooSmall;
       std::memcpy(out, r.data(), r.size() * sizeof(float)); len = r.size();
     }
+    } catch (const std::bad_alloc&) { return kEngNoMemory; }   // PFX: a pad render that runs out of memory fails cleanly (the host keeps the pad dry / empty), never terminates
   }
   size_t end = len; while (end > 1 && std::fabs((double)out[end - 1]) < 1e-4) end--;
   const size_t rl = end > 1 ? end : 1;
