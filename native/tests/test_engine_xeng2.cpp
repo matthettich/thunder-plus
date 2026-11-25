@@ -49,7 +49,7 @@ static int renderOne(Json c, double sr, double hold, double bpm, std::vector<flo
   XengVoice V; if (!xeng_voice_from_json(V, c.obj("v"), c.arr("fx"))) return -100;
   { Json rd = c.obj("v").obj("rsData"); if (rd.isObj() && rd.get("$blob").isNum()) xeng_rs_from_json(V.rs, blobs.at((size_t)rd.get("$blob").asNum())); }   // the fixture keeps one copy of an analysis in `blobs`
   *kind = std::string(c.obj("v").str("engine"));
-  EngRenderOpts o; o.sr = sr; o.hold = hold; o.bpm = bpm;
+  EngRenderOpts o; o.libFx = false; o.sr = sr; o.hold = hold; o.bpm = bpm;
   const size_t bound = xeng_render_bound(V, o); buf.assign(bound + 8, 12345.0f);
   *n = 0; const int st = xeng_render_voice(V, o, buf.data(), bound, n);
   if (st != kEngOk) return st;

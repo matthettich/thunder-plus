@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
     Json fv = F.at(vi); const std::string key(fv.str("k"));
     if (!filter.empty() && key.find(filter) == std::string::npos) continue;
     EngVoice V; if (!eng_voice_from_json(V, fv.obj("v"), fv.arr("L"), fv.arr("fx"))) { CHECK(false, "%s: too many layers / effects for the loader", key.c_str()); continue; }
-    EngRenderOpts o; o.sr = 48000; o.hold = fv.num("hold");
+    EngRenderOpts o; o.libFx = false; o.sr = 48000; o.hold = fv.num("hold");
     for (int i = 0; i < V.nFx; i++) if (V.fx[i].on && V.fx[i].kind == EngFx::Kind::Other) { passFx++; break; }
     const size_t bound = eng_render_bound(V, o); buf.assign(bound + 8, 12345.0f);
     size_t n = 0; const int st = eng_render_voice(V, o, buf.data(), bound, &n);
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
       Json c = C.at(ci); const std::string name(c.str("name"));
       if (!filter.empty() && name.find(filter) == std::string::npos) continue;
       EngVoice V; if (!eng_voice_from_json(V, c.obj("v"), c.arr("L"), c.arr("fx"))) { CHECK(false, "%s: loader", name.c_str()); continue; }
-      EngRenderOpts o; o.sr = c.num("sr"); o.hold = c.num("hold"); o.bpm = c.num("bpm", 120);
+      EngRenderOpts o; o.libFx = false; o.sr = c.num("sr"); o.hold = c.num("hold"); o.bpm = c.num("bpm", 120);
       if (V.nFx) cfx++;
       const size_t bound = eng_render_bound(V, o); buf.assign(bound + 8, 12345.0f); size_t n = 0; const int st = eng_render_voice(V, o, buf.data(), bound, &n);
       const auto g = cg.find(name); const auto r = cref.find(name); cran++;
