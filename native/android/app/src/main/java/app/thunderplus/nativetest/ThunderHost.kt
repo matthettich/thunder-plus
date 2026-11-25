@@ -62,6 +62,7 @@ object ThunderHost {
 
     @Synchronized fun ensureRunning(ctx: Context): Boolean {
         if (running) return true
+        LiveEngine.shutdown()   // N2 H1a: the live host and the N0 test core would both open the output
         val sr = NativeEngine.nativeStart()
         if (sr <= 0) return false
         sampleRate = sr

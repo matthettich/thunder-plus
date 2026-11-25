@@ -60,6 +60,7 @@ int main() {
   std::printf("pads: %zu rendered, %d skipped, %d dry, %.0f ms\n", ps.pads.size(), ps.skipped, ps.dry, ps.ms);
   for (auto& n : ps.notes) std::printf("  %s\n", n.c_str());
   CHECK(ps.pads.size() >= 36, "ELECTRO has 40 voices, all of engines the core has: %zu rendered", ps.pads.size());
+  CHECK(ps.skipped == 2, "the two lxsnare voices are left empty while the optional drum module is not linked (thunder_lxr_api() is null): %d skipped", ps.skipped);
   CHECK(ps.dry == 2, "ELECTRO has two voices with a pad effect the core does not host (spring, crush): %d", ps.dry);
   { size_t loud = 0; for (auto& p : ps.pads) { float pk = 0; for (int64_t i = 0; i < p.frames; i++) pk = std::fmax(pk, std::fabs(p.block[i])); if (pk > 0.001f) loud++; } CHECK(loud >= 30, "pads with sound: %zu", loud); }
 

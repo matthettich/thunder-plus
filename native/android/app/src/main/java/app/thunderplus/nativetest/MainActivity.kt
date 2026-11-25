@@ -41,6 +41,7 @@ class MainActivity : Activity() {
     private lateinit var runLines: TextView
     private lateinit var resultsBox: TextView
     private lateinit var midiLine: TextView   // U36 T9: debug MIDI out
+    private lateinit var liveLine: TextView   // N2 H1a: the live engine's status
     private val green = Color.rgb(40, 200, 90)
     private val red = Color.rgb(235, 60, 60)
 
@@ -71,6 +72,7 @@ class MainActivity : Activity() {
                 val r = ThunderHost.results[l]
                 "$l: " + (if (r == null) (if (l == active) "running" else "not run yet") else (if (r.pass) "PASS" else "FAIL"))
             }
+            liveLine.text = LiveEngine.statusText()
             if (midiLine.visibility == View.VISIBLE) midiLine.text = MidiPorts.get(this@MainActivity).statusText()
             ui.postDelayed(this, 500)
         }
@@ -135,14 +137,30 @@ class MainActivity : Activity() {
                 try { (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("MIDI out", t)); Toast.makeText(this, "MIDI status copied", Toast.LENGTH_SHORT).show() }
                 catch (e: Exception) { Toast.makeText(this, "The clipboard refused", Toast.LENGTH_LONG).show() }
             })
+        // N2 H1a: the LIVE engine (thunder_live_*): the bundled ELECTRO, its pads rendered by the core, played through the foreground service. The N0 runs above are untouched.
+        val liveRow = row(
+            btn("Play bundled song natively") { playBundledNatively() },
+            btn("Stop (native)") { LiveEngine.async { LiveEngine.stop() } },
+            btn("Quit native") { LiveEngine.async { LiveEngine.quit(applicationContext) } })
+        liveLine = TextView(this).apply { setTextColor(Color.rgb(255, 200, 120)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); text = "native live engine: off" }
         midiLine = TextView(this).apply { setTextColor(Color.rgb(120, 220, 255)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); text = "MIDI out: -" }
         verdict = TextView(this).apply { setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); typeface = Typeface.DEFAULT_BOLD; text = "ready" }
         readout = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f) }
         runLines = TextView(this).apply { setTextColor(Color.LTGRAY); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f) }
         resultsBox = TextView(this).apply { setTextColor(Color.YELLOW); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); setTextIsSelectable(true); visibility = View.GONE }
-        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine)
+        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine); col.addView(liveRow); col.addView(liveLine)
         col.addView(android.widget.ScrollView(this).apply { addView(resultsBox); layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (120 * resources.displayMetrics.density).toInt()) })
         return col
+    }
+
+    /** N2 H1a: start the live engine, render ELECTRO's pads with the core, publish, play. All on a worker thread (the pad render takes seconds). */
+    private fun playBundledNatively() {
+        val started = LiveEngine.async {
+            val r = LiveEngine.loadAsset(applicationContext, LiveEngine.BUNDLED_SONG)
+            val rc = if (r.ok) LiveEngine.play() else r.rc
+            ui.post { Toast.makeText(this, if (r.ok && rc == 0) r.summary() else "native play failed: " + r.summary() + " play rc $rc", Toast.LENGTH_LONG).show() }
+        }
+        if (!started) Toast.makeText(this, "The native engine is busy loading", Toast.LENGTH_SHORT).show()
     }
 
     /** All three runs as text: on the clipboard, and in the selectable box under the buttons in case the clipboard is refused. */
