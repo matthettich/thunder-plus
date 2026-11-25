@@ -8,6 +8,13 @@ plugins {
 val channel: String = (project.findProperty("thunderChannel") as String?) ?: "test"
 val buildNumber: Int = ((project.findProperty("buildNumber") as String?) ?: "1").toIntOrNull()?.coerceAtLeast(1) ?: 1
 
+val repoRoot = rootDir.resolve("../..").canonicalFile   // the repo root is two folders above native/android
+// The beta's launcher icon (the two dogs with swapped colours): a res directory made from electron/icons-beta, wired to the release source set below through the task, so Gradle knows who makes it.
+val betaIcons = tasks.register<Copy>("betaIcons") {
+    from(repoRoot.resolve("electron/icons-beta/plus-icon-192.png")) { rename { "ic_launcher.png" } }
+    into(layout.buildDirectory.dir("betaRes/drawable-nodpi"))
+}
+
 android {
     namespace = "app.thunderplus.nativetest"
     compileSdk = 35
@@ -69,7 +76,7 @@ android {
     // The real app's files, copied (never moved or edited) into the APK's assets.
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("webassets"))
     // the beta's launcher icon: the two dogs with swapped colours (electron/icons-beta, made by tools/make-beta-icon.py); the "release" source set overrides main's drawable-nodpi/ic_launcher.png
-    if (channel == "beta") sourceSets["release"].res.srcDir(layout.buildDirectory.dir("betaRes"))
+    if (channel == "beta") sourceSets["release"].res.srcDir(tasks.named<Copy>("betaIcons").map { it.destinationDir.parentFile })   // betaRes/ (the task writes betaRes/drawable-nodpi/ic_launcher.png)
     androidResources { noCompress += listOf("sf3", "wasm", "json") }
 
     packaging { jniLibs { useLegacyPackaging = false } }
@@ -83,27 +90,17 @@ dependencies {
 }
 
 // Copies the web app into build/webassets (the repo root is two folders above native/android).
-val repoRoot = rootDir.resolve("../..").canonicalFile
 val copyWebAssets = tasks.register<Copy>("copyWebAssets") {
     from(repoRoot) {
         include("index.html", "manifest.webmanifest", "*.js")
         include("chains/**", "waves/**", "core/**", "fonts/**", "icons/**", "sounds/**", "wavetables/**", "pump/**", "lxr/**")
         exclude("lxr/src/**", "**/*.md", "**/node_modules/**")
     }
+    // the beta's art replaces the stable icons the shell shows (notification, media session): the later `from` wins
+    if (channel == "beta") from(repoRoot.resolve("electron/icons-beta")) { include("plus-icon-192.png", "plus-icon-512.png"); into("icons") }
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     into(layout.buildDirectory.dir("webassets"))
 }
-// The beta's icon files: the launcher icon (192) and, in the APK's assets, the 192 / 512 the notification and the media session show (replacing the stable art for the beta build only).
-val betaIcons = tasks.register<Copy>("betaIcons") {
-    from(repoRoot.resolve("electron/icons-beta/plus-icon-192.png")) { rename { "ic_launcher.png" } }
-    into(layout.buildDirectory.dir("betaRes/drawable-nodpi"))
-}
-val betaAssetIcons = tasks.register<Copy>("betaAssetIcons") {
-    from(repoRoot.resolve("electron/icons-beta")) { include("plus-icon-192.png", "plus-icon-512.png") }
-    into(layout.buildDirectory.dir("webassets/icons"))
-    mustRunAfter(copyWebAssets)
-}
 tasks.configureEach {
-    if (channel == "beta" && (name == "mergeReleaseResources" || name == "generateReleaseResValues")) dependsOn(betaIcons)
-    if (channel == "beta" && name.startsWith("merge") && name.endsWith("Assets")) dependsOn(betaAssetIcons)
     if (name.startsWith("merge") && name.endsWith("Assets")) dependsOn(copyWebAssets)
 }

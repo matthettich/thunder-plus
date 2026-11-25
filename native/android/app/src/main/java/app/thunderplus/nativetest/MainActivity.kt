@@ -111,11 +111,25 @@ class MainActivity : Activity() {
         SongFiles.attach(this)            // N2 H3: the folder pickers answer to this activity
         SongFiles.onIntent(this, intent)  // a project opened from a file manager (VIEW / SEND)
         webView.loadUrl(base + "index.html")
+        if (UpdateCheck.checkOnStart(this)) runUpdateCheck(false)   // only when the owner switched it on
     }
 
-    private fun btn(label: String, onClick: () -> Unit) = Button(this).apply {
+    /** The "new build" check. [verbose]: say "up to date" too (the button); the start-up check speaks only when there IS a new build. A new build: a dialog that opens the release page in the browser. */
+    private fun runUpdateCheck(verbose: Boolean) {
+        UpdateCheck.check { v, text ->
+            ui.post {
+                if (v is ReleaseTags.Verdict.NewBuild) {
+                    android.app.AlertDialog.Builder(this).setTitle("New build").setMessage(text + "\nSongs and settings stay when you install it over this one.")
+                        .setPositiveButton("Open download page") { _, _ -> try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(v.release.pageUrl))) } catch (e: Exception) { Toast.makeText(this, "No browser found", Toast.LENGTH_LONG).show() } }
+                        .setNegativeButton("Later", null).show()
+                } else if (verbose) Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun btn(label: String, onClick: (View) -> Unit) = Button(this).apply {
         text = label; isAllCaps = false; setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setPadding(12, 0, 12, 0); minHeight = 0; minimumHeight = 0
-        setOnClickListener { onClick() }
+        setOnClickListener { onClick(it) }
         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
     }
 
@@ -146,13 +160,18 @@ class MainActivity : Activity() {
             btn("Stop (native)") { LiveEngine.async { LiveEngine.stop() } },
             btn("A5 gate 10 min (native)") { startNativeGate() },
             btn("Quit native") { LiveEngine.async { LiveEngine.quit(applicationContext) } })
+        // N2 H4: the owner's "new build" check (UpdateCheck.kt): ONE request, only on this button, or at start-up when the owner switched it on here (default off)
+        val updRow = row(
+            btn("Check for new build") { runUpdateCheck(true) },
+            btn(if (UpdateCheck.checkOnStart(this)) "Check at start: ON" else "Check at start: off") { v ->
+                val on = !UpdateCheck.checkOnStart(this); UpdateCheck.setCheckOnStart(this, on); (v as Button).text = if (on) "Check at start: ON" else "Check at start: off" })
         liveLine = TextView(this).apply { setTextColor(Color.rgb(255, 200, 120)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); text = "native live engine: off" }
         midiLine = TextView(this).apply { setTextColor(Color.rgb(120, 220, 255)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); text = "MIDI out: -" }
         verdict = TextView(this).apply { setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); typeface = Typeface.DEFAULT_BOLD; text = "ready" }
         readout = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f) }
         runLines = TextView(this).apply { setTextColor(Color.LTGRAY); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f) }
         resultsBox = TextView(this).apply { setTextColor(Color.YELLOW); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); setTextIsSelectable(true); visibility = View.GONE }
-        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine); col.addView(liveRow); col.addView(liveLine)
+        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine); col.addView(liveRow); col.addView(liveLine); col.addView(updRow)
         col.addView(android.widget.ScrollView(this).apply { addView(resultsBox); layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (120 * resources.displayMetrics.density).toInt()) })
         return col
     }

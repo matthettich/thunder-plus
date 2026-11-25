@@ -7,7 +7,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- No WAKE_LOCK: audio from a foreground service of type mediaPlayback does not need it (WORKPLAN A3). No INTERNET: the page is served from the APK. -->
+    <!-- No WAKE_LOCK: audio from a foreground service of type mediaPlayback does not need it (WORKPLAN A3). The page is served from the APK.
+         INTERNET (N2 H4): used by ONE thing, the "Check for new build" menu button (UpdateCheck.kt: a single GET of the public GitHub releases list, only when the owner presses it or has switched "Check at start" on; default off). -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="false"
