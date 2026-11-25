@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "engine/engine_json.h"
+#include "engine/padfx.h"
 #include "engine/xeng_util.h"
 #include "fx/u17cores.h"
 
@@ -167,11 +168,11 @@ size_t runEngine(const XengVoice& V, double sr, double hold, double bpm, float* 
 }
 
 // padFx's lengths (index.html padFx, and U22's engine.cpp for the pitch effects' tails)
-inline bool fxReady(const EngFx& f) { return f.kind != EngFx::Kind::Other; }
+inline bool fxReady(const EngFx& f, const EngRenderOpts& o) { return f.kind == EngFx::Kind::Lib ? (o.libFx && f.lib >= 0) : f.kind != EngFx::Kind::Other; }
 // engFx: pad effects run on Blip and on every engine that is not live; Acid and Machine play live in the song, so they stay dry (their voice's fx are not applied)
-bool anyFxOn(const XengVoice& V) {
+bool anyFxOn(const XengVoice& V, const EngRenderOpts& o) {
   if (V.kind == XKind::Acid || V.kind == XKind::Mach || V.kind == XKind::Bass || V.kind == XKind::Vox) return false;   // (renderVoice returns the bass and voice renders before padFx)
-  for (int i = 0; i < V.nFx; i++) { if (V.fx[i].on && fxReady(V.fx[i])) return true; }
+  for (int i = 0; i < V.nFx; i++) { if (V.fx[i].on && fxReady(V.fx[i], o)) return true; }
   return false;
 }
 double pitchTail(const EngFx& f, double sr) { const bool rv = f.kind == EngFx::Kind::PitchReverb; return js_round(sr * (rv ? 3 + (f.sizeNull ? 0.0 : f.size) * 4 : mn(8, f.time / 1000 * (1 + 6 * f.fb)))); }
@@ -226,10 +227,10 @@ size_t xeng_render_bound(const XengVoice& V, const EngRenderOpts& o) {
   const size_t N = runEngine(V, o.sr, o.hold, o.bpm, nullptr, 0);
   if (N == 0 || N == kRefuse) return 0;
   double len = (double)N;
-  if (anyFxOn(V)) {
+  if (anyFxOn(V, o)) {
     const double tailN = js_round(orz(V.tail) * o.sr), extN = mn((double)N + tailN, o.sr * (kSmpMax + 12));
     const double ext = extN >= 0 ? std::floor(extN) : 0; len = ext > len ? ext : len; double cur = ext;
-    for (int i = 0; i < V.nFx; i++) { const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f)) continue;
+    for (int i = 0; i < V.nFx; i++) { const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f, o)) continue;
       if (f.kind == EngFx::Kind::PitchDelay || f.kind == EngFx::Kind::PitchReverb) { const double t = pitchTail(f, o.sr); if (t >= 0 && t < 4e9) cur += t; if (cur > len) len = cur; } }
   }
   return len < 4e9 ? (size_t)len : 0;
@@ -245,20 +246,21 @@ int xeng_render_voice(const XengVoice& V, const EngRenderOpts& o, float* out, si
   size_t len = runEngine(V, sr, o.hold, o.bpm, out, cap);
   if (len == kRefuse) return kEngUnsupported;
   if (len == 0) return kEngTooSmall;
-  if (anyFxOn(V)) {
+  if (anyFxOn(V, o)) {
     const size_t N = len;
     const double tailN = js_round(orz(V.tail) * sr), extN = mn((double)N + tailN, sr * (kSmpMax + 12));
     const size_t ext = (size_t)(extN > 0 ? std::floor(extN) : 0);
     if (ext > N) std::memset(out + N, 0, (ext - N) * sizeof(float));
     len = ext;
     for (int i = 0; i < V.nFx; i++) {
-      const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f)) continue;
+      const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f, o)) continue;
       std::vector<float> r;
       switch (f.kind) {
         case EngFx::Kind::Degrade: r = pad_degrade(PadDegrade{f.bits, f.rate, f.noise, f.color, f.follow, f.dry, f.wet}, out, len, sr); break;
         case EngFx::Kind::Reson: r = pad_reson(PadReson{f.note, f.chord, f.decay, f.bright, f.mode, f.spread, f.mix}, out, len, sr); break;
         case EngFx::Kind::PitchDelay: r = pad_pitchfx(false, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix, f.sizeNull}, out, len, sr); break;
         case EngFx::Kind::PitchReverb: r = pad_pitchfx(true, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix, f.sizeNull}, out, len, sr); break;
+        case EngFx::Kind::Lib: if (!pad_fx_lib(f, out, len, sr, o.bpm, r)) r.assign(out, out + len); break;
         default: break;
       }
       if (r.empty()) return kEngFxThrew;

@@ -81,12 +81,14 @@ struct EngLayer {                       // freshLayer's fields that render (the 
 };
 
 struct EngFx {                          // one entry of V.fx: the four JS effects' values as the page's own (bits, rate in Hz, time in ms ...); a value the JS leaves undefined is NaN
-  enum class Kind : uint8_t { Other, Degrade, Reson, PitchDelay, PitchReverb };
+  enum class Kind : uint8_t { Other, Degrade, Reson, PitchDelay, PitchReverb, Lib };   // Lib (PFX): every other pad effect the library hosts (engine/padfx.h): `lib` is its table index, `lv` its values
   Kind kind = Kind::Other;
   bool on = true;
   double bits, rate, noise, color, follow, dry, wet;            // degrade
   double note, chord, decay, bright, mode, spread, mix;         // reson (mode and mix also pitch fx)
   double time, fb, pitch, pitch2, tone, size, wow;              // pitch delay / reverb
+  int lib = -1;                                                 // Kind::Lib: the padfx table's index of the effect's type
+  double lv[24];                                                // Kind::Lib: the effect's own values in the table's order (NaN: absent, as undefined on the page)
   bool sizeNull = false;                                        // the saved size was JSON null (not absent): the JS's `3 + f.size * 4` is 3 then (null * 4 = 0), while undefined makes the tail NaN (a RangeError)
   EngFx();
 };
@@ -114,6 +116,7 @@ struct EngVoice {                       // mkVoice's fields that render (index.h
 struct EngRenderOpts {
   double sr = 48000;
   double hold = 0;                      // renderVoice's `hold` (seconds; 0 = none): a synth voice renders with its gate held for that long
+  bool libFx = true;                    // PFX: apply the library pad effects (Kind::Lib). false = the old behaviour (the sound passes), for the goldens that were made without the effects library
   double bpm = 120;                     // songBpm(): the tempo the synced LFOs and the mod sequence read (the JS's fallback is 120)
 };
 enum EngStatus { kEngOk = 0, kEngTooSmall = -1, kEngUnsupported = -2, kEngFxThrew = -3 };
