@@ -1,5 +1,6 @@
 #include "engine/engine_json.h"
 #include "engine/layers.h"
+#include "engine/padfx.h"
 #include "engine/layer_pe.h"
 #include "song/song.h"
 
@@ -31,6 +32,7 @@ void eng_layer_from_json(EngLayer& L, Json j) {
 void eng_fx_from_json(EngFx& f, Json j) {
   const std::string_view t = j.str("type");
   f.kind = t == "degrade" ? EngFx::Kind::Degrade : t == "reson" ? EngFx::Kind::Reson : t == "pdelay" ? EngFx::Kind::PitchDelay : t == "preverb" ? EngFx::Kind::PitchReverb : EngFx::Kind::Other;
+  pad_fx_parse(f, j);   // PFX: the library effects (Kind::Lib)
   f.on = j.boolean("on", true);
   num(j, "bits", f.bits); num(j, "rate", f.rate); num(j, "noise", f.noise); num(j, "color", f.color); num(j, "follow", f.follow); num(j, "dry", f.dry); num(j, "wet", f.wet);
   num(j, "note", f.note); num(j, "chord", f.chord); num(j, "decay", f.decay); num(j, "bright", f.bright); num(j, "mode", f.mode); num(j, "spread", f.spread); num(j, "mix", f.mix);
