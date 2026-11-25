@@ -38,5 +38,20 @@ Fix: `play(tempo, lpb, ticks)` from the Seq's song (or `songCur_`), and in `chai
 - Item 5 (`chain_edit`), test_vadv D5 all as designed: E_STATE before the first plan; `at != NOW` E_ARG; NULL E_ARG; n > 1 MiB E_LIMIT; value `1e999` (inf), string value, `"osc1\u0000zz"` (NUL smuggling: compared whole against the module ids, so not found), unknown id (all-or-nothing: the valid first op is not applied), id of trackIn / chainOut, non-param op, non-array: E_ARG; name of 33 bytes E_LIMIT; 256 ops fit exactly (E_BUSY while one record waits, 0 after a quantum), 257 E_LIMIT; a record for a module a swap removed is dropped by `setParam` (harmless); after the swap an edit of that id is E_ARG. A NUL inside a *name* is truncated by the audio side's strlen (acts as the prefix): harmless.
 - Item 9 hygiene: no "lxr" in the added lines of native/core (existing hits are the pre-existing U04 seam and pump CMake comments); no unistd / alloca / VLA / big stack array added (largest new local: `ChainsWork`, a few hundred bytes plus BusPlan); only `native/` and `docs/port/` are touched (`git diff --name-only`); ABI: `thunder_live_opts` 56 -> 64 (`chains_bytes` appended after `reserved2`), `thunder_live_stats` 240 -> 320 (13 fields appended after `cmds_no_seq`, 7 x uint64 then 6 x uint32 = 80 bytes), `thunder_live_create` copies through `abiCopyIn` into a zeroed struct (an older caller gets 0 = default budget); `THUNDER_LIVE_ABI` unchanged (appends only), size asserts updated in test_live_h*.
 
+- TSan `test_live_capi` (the C API, its threaded run): rc 0, 0 warnings (it needs > 280 s under TSan).
+
+## MUTATION TABLE (my own seeds, each applied to the head, rebuilt, run, undone with `git checkout`; Release)
+| # | seeded fault | live_chains | live_chains_threads | live_chains_oom | live_threads | chains_song |
+|---|---|---|---|---|---|---|
+| M1 | settle right after the ChainsCommit push (before the pop) | FAIL (iv: the second publish is no longer E_BUSY, patch count 6 not 5, plans 4) | pass | pass | pass | pass |
+| M2 | commit skipped in `dropPlay` | FAIL | pass | pass | pass | pass |
+| M3 | `busSlot_` applied with a chains host in `adopt()` | FAIL | pass | pass | pass | pass |
+| M4 | param drain before `applyCommands` | FAIL | pass | pass | pass | pass |
+| M5 | `chainsSong_` / bus / feed moved on the E_BUSY failure of `chainsDecide` | FAIL | pass | pass | pass | pass |
+| M6 | queue not cleared in `ChainsHost::stop` | FAIL | pass | pass | pass | pass |
+| M7 | `chains_->play()` removed from `tryStartPlay` | FAIL | pass | pass | pass | pass |
+| M8 | keep-patch ignored (`plan(..., false)` always) | FAIL | pass | pass | pass | pass |
+All eight are caught, all by `live_chains` alone (the other four binaries do not catch any: they are storms and sweeps, not oracles; M1's real race would need TSan, which is where `live_chains_threads` earns its keep). Only the M1 failure text was read (above); for the other seven the failing test is `live_chains` (the binary exits non-zero; ctest without --output-on-failure), the build of each mutated tree succeeded and the unmutated head passes (41 s earlier), so the failure is the mutation's. M3 and M4 are the two the PR's own notes said survived on the first run; they are killed now.
+
 ## STILL RUNNING / NOT YET CHECKED
-TSan on `live_capi`, `live_chains`, `chains_song` (running, slow under TSan), ASan+UBSan matrix, the mutation table, full Release ctest of all targets (only the chains / live subset was built), MSVC safety by compiler (read only).
+TSan on `live_chains` and `chains_song` (running), ASan+UBSan matrix (building), full Release ctest of all targets (only the chains / live subset was built), MSVC safety by compiler (read only).
