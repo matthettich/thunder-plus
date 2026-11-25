@@ -69,6 +69,8 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - #315's CI on 584468b showed one CANCELLED job at 12:55: re-run it (`gh api -X POST repos/matthettich/thunder-plus/actions/runs/RUN_ID/rerun-failed-jobs`) before merging.
 - Not yet looked at for PC5: `draw()` and the page's tick loops with `ctx === null` while `tp.on` (a throw there is a dead screen on the phone).
 
+**UPDATE 13:15 (Fable): #325 (PC2 + PC3, F1..F6 fixed, head 1da33b1) MERGED into `beta` (a7d491b, build 678); #323 / #324 closed; punch-list check added. All Fable reads are done: OPUS from here.** Next for Opus: the stack (#315 with its cancelled job, then up), PC0 (CORE-BRIDGE: `kit.load {kit, rev}`, `buf.use frames:0` = remove, `hello live:true`), plan the meters core unit (G6: per-slot FX and chains levels as events; the owner wants meters first), PC4 (live edits), then PC5. Fable again for: the meters core unit (audio thread), PC4's diff signature code, PC5's `meterRt` stub and the `ctx === null` audit.
+
 **NEXT, in order:**
 1. **Fable:** read the fixer's diff for A and B (small), then squash-merge #312, #313, #315 in order when CI is green (REST, pin the sha; after each: merge `origin/native` into the next branch, never rebase). Then #316 (H2, needs its verifier), #317, #318 (retarget to `native` to get CI; it changes `native.yml`), #319, #320 (P3b).
 2. **Fable:** read every line of PC1's `index.html` / `sw.js` diff before it merges into `beta` (CodeRabbit first).
