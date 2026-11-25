@@ -103,4 +103,6 @@ val copyWebAssets = tasks.register<Copy>("copyWebAssets") {
 }
 tasks.configureEach {
     if (name.startsWith("merge") && name.endsWith("Assets")) dependsOn(copyWebAssets)
+    // lint (incl. the release build's lint-vital model writer) reads the assets srcDir too: give it the dependency explicitly
+    if (name.startsWith("lint") || name.contains("Lint")) dependsOn(copyWebAssets)
 }
