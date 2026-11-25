@@ -902,6 +902,10 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
+**Native-core client loader, switch off (25 Nov; build 677, PR #321)** (nothing should change; the file is fetched only by the Android app)
+- [ ] **Phone (Fold, Chrome) and computer: update to build 677 (Settings → App) and play a song as usual.** Pass: opens and plays exactly as on 676; no new toast or message.
+- [ ] **Computer: Settings → Audio → Sequencer.** Pass: only the two old choices (Audio thread, Page (old)); no "Native core (test)".
+
 **Resizing the window while a song plays (24 Nov; build 676, branch `fix/resize-during-playback`)** (details: the 24 Nov entry "resize during playback" below)
 - [ ] **Mac desktop app, IDM pink paper / IDM / 909: drag the window edge in and out while ELECTRO plays**, on Phrase, Pattern view, Arrange as the Song screen and Mixer. Pass: the screen follows the drag without freezing (it may update in steps a few times a second), the dogs / piano / FX chain beside the grid are hidden while you drag and come back about a fifth of a second after you let go, and nothing sits over the tracker text, Arrange or the Mixer afterwards. Fail: a freeze you can feel, anything over the content once you stopped. If it fails, tell me the screen, the skin, what overlapped (a screenshot) and use Copy playback report.
 - [ ] **Mac: the MASTER track's phrase in Pattern view (the SIGNAL chain panel): resize the window, scroll the Pattern view sideways (the bar under it), move the cursor between columns, stopped and playing.** Pass: the panel shows only beside the text, never over it; while the Pattern view is scrolled sideways it is not shown, and it is back when scrolled to the left edge with room.
