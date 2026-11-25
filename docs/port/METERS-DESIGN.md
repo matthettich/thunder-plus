@@ -1,4 +1,4 @@
-# METERS-DESIGN: effect and chains level meters on the new engine (DRAFT)
+# METERS-DESIGN: effect and chains level meters on the new engine (phase 1 APPROVED 25 Nov: see 5a)
 
 > **Owner, 25 Nov 13:55:** chains meters = per-track chains in / out levels only (phase 1). Tracks watched: lead recommends one (pending his reply).
 
@@ -126,6 +126,20 @@ PC5 already plans "a small view object that replaces the Web Audio analysers" (N
 8. **Contract wording**: this needs a new sub-section in CORE-BRIDGE section 7.x (events 11..16, `meters.want` fields, `hello` caps `meters2`) and the section 4 rate table; the lead's call whether it is frozen with BRIDGE_V 1 (additive) or waits for N3.
 9. **Time base**: the page stamps ages with its own clock when an event arrives (as `n.lvlT`). Any need for the core's `f` on these records on the page (to align to the song)? I assumed no.
 10. **Command ring**: the spec fits `LiveCmd` (`x`, `y`, `i0`, `i64a`); OK to extend the existing `Meters` command rather than add a type? It changes what `thunder_live_meters_want` means internally only.
+
+## 5a. The lead's rulings (25 Nov, top-model read): phase 1 is APPROVED to build
+
+1, 2. **Owner: (a).** Phase 1 = `FXLVL`, `FXDYN`, `CHLVL`, `MASTERM`. `mods`, `shows`, `jacks`, `byp` stay dark until phase 2.
+3. **The API takes the track bitmask as drafted (no cap in the core); the page client subscribes ONE track at a time** (the page's own rule; the owner may ask for more later, which is then a client change only).
+4. **`FXDYN` carries the core's `int16 type`** of the slot; the shell turns it into the page's type string with the core's own table (a small exported lookup, no second table in Kotlin), and the page drops a report whose type is not its slot's.
+5. **Master: the mastering processor only, and only while the page asks** (`master:true`). No `lim2`. THE SWITCH MUST NOT ALLOCATE OR RESET FILTERS ON THE AUDIO THREAD: the meter state is built with the processor (always), a flag turns the work on. M2 reports the cost (ns per quantum on CI Linux, on / off) in its notes; the lead reads M2 on the top model.
+6. Tracks 0..31 and 32 (the master's effects), as drafted.
+7. **TRIM light and the stereo focus pair: not now** (M7 stays optional, after the owner has used the beta).
+8. **Contract: CORE-BRIDGE 7.2, additive, BRIDGE_V stays 1,** `hello.caps.meters2: true`; M6 writes it from what M1..M5 built.
+9. The records keep `f`; the page stamps arrival time, as drafted.
+10. **A NEW command kind (`MetersSet`), not a changed meaning of the existing one.** `thunder_live_meters_want` keeps working alone exactly as today (the shell calls it at hello).
+- **Audio-thread rules for M1..M3 (the lead reads each diff on the top model before merge):** step 9 only copies and posts; `setLevels` / `setTelemetry` are flipped at the top of a quantum from the command; nothing allocates, locks or logs; a full ring drops the newest and counts it; with nothing subscribed the cost is zero (no pops, no peaks: `CHLVL`'s peak loop runs only while subscribed).
+- **Order:** M1 → M4 → M5 first (the FX bar end to end), M3 and M2 after, M6 last.
 
 ## 6. Work split
 
