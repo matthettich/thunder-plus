@@ -5,6 +5,7 @@
 #include "engine/layers.h"
 
 #include <cmath>
+#include <new>
 #include <cstring>
 #include <vector>
 
@@ -388,6 +389,7 @@ int eng_render_voice(const EngVoice& V0, const EngRenderOpts& o, float* out, siz
     // ext.set(out.subarray(0, Math.min(N, ext.length))): the sound, zeros after it
     if (ext > N) std::memset(out + N, 0, (ext - N) * sizeof(float));
     len = ext;
+    try {
     for (int i = 0; i < V.nFx; i++) {
       const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f, o)) continue;   // (applyFx: a type that is not ready returns the sound as it is)
       std::vector<float> r;
@@ -403,6 +405,7 @@ int eng_render_voice(const EngVoice& V0, const EngRenderOpts& o, float* out, siz
       if (r.size() > cap) return kEngTooSmall;
       std::memcpy(out, r.data(), r.size() * sizeof(float)); len = r.size();
     }
+    } catch (const std::bad_alloc&) { return kEngNoMemory; }   // PFX: a pad render that runs out of memory fails cleanly (the host keeps the pad dry / empty), never terminates
   }
   size_t end = len; while (end > 1 && std::fabs((double)out[end - 1]) < 1e-4) end--;
   const size_t rl = end > 1 ? end : 1;

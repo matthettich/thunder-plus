@@ -14,6 +14,8 @@ namespace thunder {
 // A fx object of the voice's `fx` list: sets f.kind = Kind::Lib, f.lib and f.lv when `type` is one of the hosted library effects (else leaves the kind alone).
 void pad_fx_parse(EngFx& f, Json j);
 // applyFx for a Kind::Lib effect: the whole sound `a` (n samples) in, the result (also n samples) in `out`. false: the effect could not be made (the page returns the sound as it is).
+// Clamps the controls it is given to the page's row ranges (a hand-built EngFx is as safe as a parsed one) and catches std::bad_alloc: the effect then is not applied (false, counted in pad_fx_oom_count()).
+unsigned long pad_fx_oom_count();
 bool pad_fx_lib(const EngFx& f, const float* a, size_t n, double sr, double bpm, std::vector<float>& out);
 // The types hosted (for tests and tools): the count, and index i's page key.
 int pad_fx_count();

@@ -1,6 +1,8 @@
 #include "engine/padfx.h"
 
 #include <algorithm>
+#include <atomic>
+#include <new>
 #include <cmath>
 #include <limits>
 #include <cstring>
@@ -103,6 +105,14 @@ bool haveTfx() {
 #endif
 }
 
+// The controls the page keeps as SEGMENTS (FX[type].segs): read with `| 0` or as a truth value, so an absent one is 0 and the effect still runs (a missing ROW is NaN into the wasm: refused).
+bool isSeg(const char* type, const char* key) {
+  static const char* const kSeg[][2] = {{"beads", "media"}, {"beads", "freeze"}, {"tremolo", "shape"}, {"ladder", "mode"}, {"xmod", "carrier"}, {"tgate", "div"}, {"tgate", "pat"}, {"cab", "model"},
+    {"crush", "smooth"}, {"rings", "model"}, {"clouds", "mode"}, {"clouds", "lofi"}, {"clouds", "freeze"}};
+  for (const auto& e : kSeg) if (!std::strcmp(e[0], type) && !std::strcmp(e[1], key)) return true;
+  return false;
+}
+
 // a saved value as the page's maps see it
 double valueOf(Json v) {
   if (v.isNum()) return v.asNum();
@@ -132,10 +142,10 @@ void pad_fx_parse(EngFx& f, Json j) {
   if (i < kNTx && !haveTfx()) return;
   f.lib = i; f.kind = EngFx::Kind::Lib;
   for (double& x : f.lv) x = kNaN;
-  if (i < kNTx) {
+  if (i < kNTx) {   // (no clamp here: pad_fx_lib does it, so a hand-built EngFx is as safe as a parsed one)
     for (int k = 0; k < kDefs[i].n; k++) {
-      double v = valueOf(j.get(kDefs[i].keys[k])), mn, mx;
-      if (v == v && rangeOf(kDefs[i].key, kDefs[i].keys[k], &mn, &mx)) v = v < mn ? mn : v > mx ? mx : v;   // (+-infinity too)
+      double v = valueOf(j.get(kDefs[i].keys[k]));
+      if (v != v && isSeg(kDefs[i].key, kDefs[i].keys[k])) v = 0;   // an absent choice / switch: the page reads it with `| 0` or as a truth value, so it is 0 and the effect runs
       f.lv[k] = v;
     }
     return;
@@ -287,7 +297,8 @@ bool runMod(int mi, const EngFx& f, const float* a, size_t n, double sr, double 
 }
 }  // namespace
 
-bool pad_fx_lib(const EngFx& f, const float* a, size_t n, double sr, double bpm, std::vector<float>& out) {
+namespace {
+bool libImpl(const EngFx& f, const float* a, size_t n, double sr, double bpm, std::vector<float>& out) {
   if (f.kind != EngFx::Kind::Lib || f.lib < 0 || f.lib >= kNTx + kNMod) return false;
   if (n == 0) { out.clear(); return true; }
   if (f.lib >= kNTx) return runMod(f.lib - kNTx, f, a, n, sr, bpm, out);
@@ -306,6 +317,26 @@ bool pad_fx_lib(const EngFx& f, const float* a, size_t n, double sr, double bpm,
 #else
   (void)bpm; return false;
 #endif
+}
+}  // namespace
+
+static std::atomic<unsigned long> g_oom{0};
+unsigned long pad_fx_oom_count() { return g_oom.load(); }
+
+bool pad_fx_lib(const EngFx& f0, const float* a, size_t n, double sr, double bpm, std::vector<float>& out) {
+  if (f0.kind != EngFx::Kind::Lib || f0.lib < 0 || f0.lib >= kNTx + kNMod) return false;
+  EngFx f = f0;
+  if (f.lib < kNTx) {   // the hardening clamp: a control outside its row's range (the page's UI cannot make one) would run the wasm off its tables; a choice of 0 stays 0 (an absent one)
+    const Def& d = kDefs[f.lib];
+    for (int k = 0; k < d.n; k++) {
+      double v = f.lv[k], mn, mx;
+      if (v != v || !rangeOf(d.key, d.keys[k], &mn, &mx)) continue;
+      if (isSeg(d.key, d.keys[k]) && v == 0) continue;
+      f.lv[k] = v < mn ? mn : v > mx ? mx : v;
+    }
+  }
+  try { return libImpl(f, a, n, sr, bpm, out); }
+  catch (const std::bad_alloc&) { g_oom++; out.clear(); return false; }   // the pad stays as it is (dry), counted
 }
 
 }  // namespace thunder

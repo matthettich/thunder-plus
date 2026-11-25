@@ -63,6 +63,25 @@ function cases(E) {
     const f = freshWith(E, t, alt, ++idx);
     out.push({ name: `fx_${t}_${alt ? 'alt' : 'def'}`, kind: 'fx', fx: f, sr: SR, bpm, n: N, hit: HIT, seed: 100 + idx });
   }
+  // REVIEW CASES (PR #314 verification): explicit effect objects
+  const one = (name, type, edit, o) => { const f = E.freshFx(type); edit(f); out.push({ name, kind: 'fx', fx: f, sr: SR, bpm: (o && o.bpm) || bpm, n: (o && o.n) || N, hit: HIT, seed: 500 + (++idx) }); };
+  // F1: Beads, Tail = Hold, Size at its top (the host divided by zero)
+  one('rv_beads_hold_size1', 'beads', f => { f.freeze = true; f.size = 1; });
+  one('rv_beads_hold_size995', 'beads', f => { f.freeze = true; f.size = 0.995; });
+  one('rv_beads_hold_size99', 'beads', f => { f.freeze = true; f.size = 0.99; });
+  one('rv_beads_hold_size1_tape', 'beads', f => { f.freeze = true; f.size = 1; f.media = 0; f.time = 0.6; f.density = 0.3; });
+  // F3: a fully wet spectral pad (the latency pull-back), a null mix; tempo-locked effects at 93 bpm
+  one('rv_spectral_wet', 'spectral', f => { f.mix = 1; }, { n: 40000 });
+  one('rv_spectral_nomix', 'spectral', f => { delete f.mix; }, { n: 40000 });
+  one('rv_spectral_wet_def', 'spectral', f => {}, { n: 40000 });
+  for (const t of ['tgate', 'sgate', 'retrig', 'flex', 'sdelay', 'autopan', 'gdelay']) if (E.FX[t]) one(`rv_${t}_bpm93`, t, f => {}, { bpm: 93 });
+  one('rv_tgate_bpm93_div', 'tgate', f => { f.div = 4; f.pat = 1; }, { bpm: 93 });
+  one('rv_tgate_bpm175', 'tgate', f => { f.div = 1; }, { bpm: 175 });
+  one('rv_beads_media0', 'beads', f => { f.media = 0; });
+  one('rv_beads_media1', 'beads', f => { f.media = 1; });
+  // F4: an ABSENT segment key (the page applies the effect)
+  for (const [t, ks] of [['tgate', ['div']], ['tgate', ['pat']], ['tgate', ['div', 'pat']], ['beads', ['media']], ['beads', ['freeze']], ['crush', ['smooth']], ['tremolo', ['shape']], ['ladder', ['mode']], ['cab', ['model']], ['xmod', ['carrier']], ['rings', ['model']], ['clouds', ['mode']], ['clouds', ['lofi']], ['clouds', ['freeze']]])
+    one(`rv_noseg_${t}_${ks.join('_')}`, t, f => { for (const k of ks) delete f[k]; });
   // the whole pad path: padFx (order, trim, fade) over a chain of library effects
   const chain = (name, list) => out.push({ name, kind: 'pad', fxs: list.map(x => freshWith(E, x[0], x[1], ++idx)), sr: SR, bpm, n: N, hit: HIT, tail: 0.5, seed: 7 });
   chain('pad_crush', [['crush', true]]);

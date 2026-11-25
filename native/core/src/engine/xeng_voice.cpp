@@ -2,6 +2,7 @@
 // (a tail, then the pad effects in order: the four JS ones through U17's pad_* cores, every other type passes the sound through as the golden's Node does: U22's decision; then padFx's own trim and 2 ms fade,
 // which is there only when some effect is on and ready: without one, padFx returns the engine's render as it is).
 #include <cmath>
+#include <new>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -252,6 +253,7 @@ int xeng_render_voice(const XengVoice& V, const EngRenderOpts& o, float* out, si
     const size_t ext = (size_t)(extN > 0 ? std::floor(extN) : 0);
     if (ext > N) std::memset(out + N, 0, (ext - N) * sizeof(float));
     len = ext;
+    try {
     for (int i = 0; i < V.nFx; i++) {
       const EngFx& f = V.fx[i]; if (!f.on || !fxReady(f, o)) continue;
       std::vector<float> r;
@@ -267,6 +269,7 @@ int xeng_render_voice(const XengVoice& V, const EngRenderOpts& o, float* out, si
       if (r.size() > cap) return kEngTooSmall;
       std::memcpy(out, r.data(), r.size() * sizeof(float)); len = r.size();
     }
+    } catch (const std::bad_alloc&) { return kEngNoMemory; }   // PFX: a pad render that runs out of memory fails cleanly (the host keeps the pad dry / empty), never terminates
     len = trim_fade(out, len, sr, 0.002);   // padFx's own tail: the last sample at or above 1e-4, a 2 ms fade into it
   }
   *nOut = len;

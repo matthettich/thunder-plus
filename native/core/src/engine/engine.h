@@ -119,7 +119,7 @@ struct EngRenderOpts {
   bool libFx = true;                    // PFX: apply the library pad effects (Kind::Lib). false = the old behaviour (the sound passes), for the goldens that were made without the effects library
   double bpm = 120;                     // songBpm(): the tempo the synced LFOs and the mod sequence read (the JS's fallback is 120)
 };
-enum EngStatus { kEngOk = 0, kEngTooSmall = -1, kEngUnsupported = -2, kEngFxThrew = -3 };
+enum EngStatus { kEngOk = 0, kEngTooSmall = -1, kEngUnsupported = -2, kEngFxThrew = -3, kEngNoMemory = -4 };   // kEngNoMemory (PFX): a std::bad_alloc inside the pad effects; the render is abandoned, nothing leaks
 // How many floats the caller's buffer must hold for this voice (an upper bound: the render is at most this long), or 0 if the voice cannot be rendered.
 size_t eng_render_bound(const EngVoice& V, const EngRenderOpts& o);
 // renderVoice(V, sr, null, hold) for a voice of this unit's layer types: the finished sound (mono) into `out`, its length in *n. `cap` is the buffer's size in floats.
