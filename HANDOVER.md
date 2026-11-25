@@ -922,6 +922,7 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 - [x] **Phone (Fold, Chrome): build 677 plays as before** (owner, 25 Nov 12:40).
 - [ ] **Computer: update to build 677 (Settings → App) and play a song as usual.** Pass: opens and plays exactly as on 676; no new toast or message.
 - [ ] **Phone (Fold, Chrome) and computer: build 678 (PC2 + PC3, PR #325) opens and plays as before.** Pass: no new toast; PLAY, STOP, loop play, a kit change and opening another song behave as on 677.
+- [ ] **Phone and computer: build 679 (PC4, live edits; draft PR) opens and plays as before.** Pass: no new toast; dragging a track fader, the master OUT bar, a …chains slider and Settings → Audio → Latency compensation behave as on 678 (the new code runs only with the native engine on).
 - [ ] **Computer: Settings → Audio → Sequencer.** Pass: only the two old choices (Audio thread, Page (old)); no "Native core (test)".
 
 **Resizing the window while a song plays (24 Nov; build 676, branch `fix/resize-during-playback`)** (details: the 24 Nov entry "resize during playback" below)
@@ -1816,6 +1817,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 25 Nov (native page client PC4: live edits; build 679, branch `pc4/live-edits`, draft PR into `beta`)
+- With the native engine playing, `NC.edit()` (from `saveS`) now sends one small message per changed thing: `mix.set` (fader, trim, pan, mute, solo, master, OUT), `fx.set` (an effect knob) or `fx.plan` (a slot added, removed, retyped, on / off), `master.config`, `pdc.set`, `chain.edit` (a …chains slider). The whole song still follows 250 ms later. Notes and line ranges for the lead's review: `docs/plans/PC4-NOTES.md`. Nothing changes with the native engine off (`tests/native-client-inert.test.js` counts the four new one-line branches: `mfSet`, `moApply`, `pdcSet`, `thunderChains.param`).
 
 ## 24 Nov (LOOP SEL after a phrase trip; build 675, branch `fix/loop-sel-after-phrase-edit`)
 Owner (build 674): "If you are looping a selection, switch to phrase, edit a note in a phrase, switch back to arrange, the playback loops one pattern row rather than going back to the looped selection."
