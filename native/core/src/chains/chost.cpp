@@ -56,9 +56,9 @@ ChainsPlan* ChainsHost::planImpl(Json chainPatch, const bool* chainOn, uint32_t 
   const bool okPatch = chainPatch.isObj() && chainPatch.str("format") == "chains.patch";   // routeTrack: wantChn = chainsFeed(t) && patch format
   uint32_t want = 0; for (int t = 0; t < kSongNT; t++) if (okPatch && (feedMask >> t & 1u) && (heard >> t & 1u)) want |= 1u << t;
   for (int t = 0; t < kSongNT; t++) if (ctlNode_[t]) P.nodeMask_ |= 1u << t;   // (a no-op plan leaves this)
-  // D7: the memory budget, before anything is built
+  // D7: the memory budget, before anything is built (a node that keeps its patch has no second set: one pb, not two)
   const double pb = docBytes(chainPatch, sr_); P.patchBytes_ = (size_t)pb;
-  { double total = 0; for (int t = 0; t < kSongNT; t++) if (want >> t & 1u) total += (ctlNode_[t] ? (keepPatch ? 1 : 2) * pb : pb) + (double)kChainsNodeOverhead;   // a kept patch has no second set P.bytes_ = (size_t)total;
+  { double total = 0; for (int t = 0; t < kSongNT; t++) if (want >> t & 1u) total += (ctlNode_[t] ? (keepPatch ? 1 : 2) * pb : pb) + (double)kChainsNodeOverhead; P.bytes_ = (size_t)total;
     if (total > (double)budget_) { P.overBudget_ = P.noop_ = true; st_.overBudget++; st_.refused++; return pl.release(); } }
   bool refused = false;
   {

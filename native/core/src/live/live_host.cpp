@@ -1189,6 +1189,7 @@ void LiveHost::songEnded(double t0, int64_t qStart, const SeqPump& pr) {
 void LiveHost::render(double t0, int64_t qStart) {
   if (chains_) chains_->beginBlock(qStart);   // C2 R11, FIRST: the ENGINE frame (a multiple of 128: both due rules are exact): the chc / tempo events due at or before this quantum reach the nodes before any node runs
   players_->render(mix_->inputsL(), mix_->inputsR(), kLiveQuantum, t0, qStart);
+  if (testTap_) testTap_(testTapUser_, *mix_, qStart);   // TEST ONLY (null in a product: one pointer test a quantum)
   float* const qL = q_.get(); float* const qR = q_.get() + kLiveQuantum;
   mix_->render(qL, qR, kLiveQuantum, t0);   // (the track effects, the master effects and the master chain run inside, through the hooks)
   if (metersOn_ && meterBank_) { meters_feed(*meterBank_, *mix_, qL, qR, kLiveQuantum); meterBank_->advance(kLiveQuantum, t0 + (double)kLiveQuantum / sr_); }   // render.cpp: after the mixer

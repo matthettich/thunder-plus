@@ -185,6 +185,9 @@ class LiveHost {
   void testSetEvSeq(uint32_t v) { evSeq_ = v; }                 // TEST ONLY (no audio thread running): starts the record numbering at `v` (the 2^32 wrap)
   void setTestSeam(void (*f)(void*), void* user) { testSeam_ = f; testSeamUser_ = user; }   // TEST ONLY: `f` runs inside play(), between the push of the Play command and the publish of its snapshot (verify-283 F9)
   void setTestAudioSeam(void (*f)(void*), void* user) { testAudioSeam_ = f; testAudioSeamUser_ = user; }   // TEST ONLY (single thread): `f` runs on the audio side right after a started play was given back to the control side (R1: the window between giveBack and the state's store)
+  void setTestTap(void (*f)(void*, Mixer&, int64_t), void* user) { testTap_ = f; testTapUser_ = user; }   // TEST ONLY (single thread): `f` runs in step 8 right after the voices were rendered into the mixer's inputs, with the ENGINE frame of the quantum (SongRenderer::setInputTap's place): the chains goldens' input signals
+  ChainsHost* chainsHostForTest() { return chains_.get(); }   // TEST ONLY: the chains host (events are injected, nodes inspected, only while no audio thread runs)
+  const Mixer& mixerForTest() const { return *mix_; }   // TEST ONLY: the mixer (its bus plan is the commit's alone with a chains host; read only while no audio thread runs)
   // stop(): queues LiveCmd::Stop; controlPlaying_ = false (a later songPublish no longer reaches the sequencer).
   int stop(int64_t at);
   int hold(int64_t at);                              // LiveCmd::Hold
@@ -317,6 +320,7 @@ class LiveHost {
   int fxOut_ = 0;                                    // P3: FxCommit commands issued and their plans not yet collected (fxBack_ holds 64)
   PdcSlot ctlPdc_[kSongNT][kFxSlots]; int ctlPdcN_[kSongNT] = {0};   // P3: the pump slots of each track's LAST PLANNED chain (what pdc_plan reads; FxPlan::entry, not the audio thread's chain_)
   void (*testAudioSeam_)(void*) = nullptr; void* testAudioSeamUser_ = nullptr;
+  void (*testTap_)(void*, Mixer&, int64_t) = nullptr; void* testTapUser_ = nullptr;   // TEST ONLY: setTestTap
   std::unique_ptr<LiveFont> fonts_[THUNDER_LIVE_MAX_FONTS];
   int sfFont_[kRenderPads]; size_t sfBytes_[kRenderPads];   // which font a pad's preset came from; its PCM bytes (for fontRemove and the budget)
   size_t liveBytes_[kRenderPads];                    // LivePool::padBytes (live_pool.h:75) of each live pad
