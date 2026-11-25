@@ -115,3 +115,14 @@ classify every pair as the page's ops say and give the same param list in the sa
 ## For the lead to read line by line
 Every line of `chost.{h,cpp}` that changes; in `live_host.cpp`: `tryStartPlay`, `dropPlay`, `applyOne` (ChainsCommit), the param drain, `adopt` (the two `busSlot_` sites), `render`, `dispatch`, `collect`, `~LiveHost`,
 and the control side of `play` / `songPublish` between the plan and the pushes (R6).
+
+
+## Amendments (24 Nov, after review; merged as #311 on 25 Nov, squash fad450f)
+- **R6 for `play()`:** the chains decision comes BEFORE the effects plans (a refusal changes nothing; a later effects failure abandons the chains plan beside `unwindFx`). The plan is attached to the PlayPlan right before the Play command is pushed.
+- **L1:** a quantum applies only the param records that were in the edit ring before its command loop (`Spsc::avail()` snapshot at the top of step 1); none while a play is stalled.
+- **V3a:** each param record carries `gen`, the count of whole-patch plans handed over; the audio side drops records older than the last committed whole-patch plan (`stats.chains_params_stale`).
+- **V2:** `chain_edit` remembers up to 256 (id, name) pairs; the next decision puts them back to the new song's values; the 257th makes it a whole-patch plan; a failed call keeps them. (Replaces the shell-duty text of L3.)
+- **V4:** a play sends the whole transport (tempo, lpb, ticks); a bpm / lpb / ticks change counts as not-same (a keep-patch plan carries it).
+- **PDC:** `play()` builds the PDC plan from the bus plan the mixer will have.
+- **CI:** the sanitizer build is `-j4`, the macOS build `-j3` (unbounded builds lost runners / hit the 90-minute limit).
+- **Follow-ups:** the U31 engine leak on bad_alloc is met by `live_chains_oom` on GCC 15 (allowance 3 per engine-refused plan); FX params (`fxParams_`) have the same commit-ordering window that L1 closed for chains params.
