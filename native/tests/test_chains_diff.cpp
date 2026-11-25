@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   { std::string_view t = "{\"format\":\"chains.patch\",\"modules\":[{\"id\":\"a\",\"params\":{\"x\":1,\"o\":{}}}],\"cables\":[{\"from\":[\"a\",\"o\"],\"to\":[\"a\",\"i\"]}]}"; JsonDoc d; CHECK("parse", d.parse(t));
     CHECK("same handle: Same", chains_diff(d.root(), d.root()).kind == ChainsDiffKind::Same);
     JsonDoc e; CHECK("parse2", e.parse(t));
-    CHECK("twin documents: an object-valued param differs (!== is identity)", chains_diff(d.root(), e.root()).kind == ChainsDiffKind::Structural); }
+    CHECK("twin documents: an object-valued param is deep-equal, no op (departure from the page)", chains_diff(d.root(), e.root()).kind == ChainsDiffKind::Same); }
   CHECK("missing, missing", chains_diff(Json(), Json()).kind == ChainsDiffKind::Same);
 
   // ---- bus_plan_equal ----

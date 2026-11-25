@@ -11,9 +11,10 @@
 //   - `for (const k in b) if (b[k] !== a[k])` with a = q.params || {}, b = m.params || {}: JS for-in order on an object is the array-index keys ascending (canonical "0".."4294967294"), then the
 //     rest in first-insertion order; a duplicate JSON key keeps its first position and its last value (JSON.parse). b may also be an array (keys "0".."n-1") or a string (a for-in over
 //     its UTF-16 units); a number / boolean has no keys. a[k] reads an object member, an array element or "length", or a string's unit or "length". `!==` is strict: numbers by value (-0 === 0),
-//     strings by content, objects and arrays by identity (the same Json handle). A name that only exists on Object.prototype (constructor, toString, __proto__ when a has no own member) is
+//     strings by content, objects and arrays by identity (the same Json handle), EXCEPT the deep-equal departure below. A name that only exists on Object.prototype (constructor, toString, __proto__ when a has no own member) is
 //     a function there, never equal to a JSON value: absent. A differing value is a `param` op: Params when it is a finite number (Number.isFinite; 1e999 reads as Infinity) and the
 //     module's id is a string, else Structural. (An id that is a number would have to be a string in ChainsParamOp: a decision, see C2A-NOTES.md.)
+//   - DEPARTURE: a param that is an object / array in both documents and deep-equal is no op (deep_eq below); the page would compare by identity and send a harmless repeated op.
 //   - text: ta / tb are the first 200 UTF-16 units of `text` when it is a string, else undefined; ta !== tb is a `text` op: Structural.
 //   - cables: key = from[0] + '.' + from[1] + '>' + to[0] + '.' + to[1] with JS string conversion of each part (number -> Number::toString, null -> "null", undefined -> "undefined",
 //     array -> join(","), object -> "[object Object]"; from / to may be a string (its units), an array, an object ("0" / "1" members), or a number / boolean (undefined parts)). A cable that is
@@ -166,6 +167,36 @@ void to_js_string(const JV& v, std::string& out, int depth) {
   }
 }
 
+// DEPARTURE FROM THE PAGE (lead's ruling on C2a): a param whose value is an object or array in BOTH documents is compared by DEEP structural equality, not identity (the live host always gets two
+// separately parsed songs; identity would make every such param a structural publish). Same types, objects with the same set of keys (JS last-wins for duplicates) and equal values, arrays of the
+// same length with equal elements, numbers by value, strings by content. Containers nested deeper than kDeepMax levels (the param value itself is level 1) compare as NOT equal.
+constexpr int kDeepMax = 64;
+bool deep_eq(Json a, Json b, int level) {
+  if (a.type() != b.type()) return false;
+  switch (a.type()) {
+    case JType::Null: return true;
+    case JType::Bool: return a.asBool() == b.asBool();
+    case JType::Number: return a.asNum() == b.asNum();
+    case JType::String: return a.asStr() == b.asStr();
+    case JType::Array: {
+      if (level > kDeepMax) return false;
+      const size_t n = a.size(); if (n != b.size()) return false;
+      for (size_t i = 0; i < n; i++) if (!deep_eq(a.at(i), b.at(i), level + 1)) return false;
+      return true;
+    }
+    case JType::Object: {
+      if (level > kDeepMax) return false;
+      std::unordered_map<std::string_view, uint32_t> la, lb;
+      for (size_t i = 0; i < a.size(); i++) la[a.keyAt(i)] = (uint32_t)i;
+      for (size_t i = 0; i < b.size(); i++) lb[b.keyAt(i)] = (uint32_t)i;
+      if (la.size() != lb.size()) return false;
+      for (const auto& kv : la) { auto it = lb.find(kv.first); if (it == lb.end() || !deep_eq(a.valAt(kv.second), b.valAt(it->second), level + 1)) return false; }
+      return true;
+    }
+    default: return false;
+  }
+}
+
 // ---- a JS Map keyed by a string: first position, last value --------------------------------------------------------------------------
 struct OMap {
   std::vector<std::string> keys; std::vector<Json> vals; std::unordered_map<std::string, size_t> idx;
@@ -256,7 +287,9 @@ ChainsDiff chains_diff(Json prev, Json next) {
     for (size_t j = 0; j < nk; j++) {
       const std::string k = B.keyAt(j);
       const JV bv = B.get(k);
-      if (strict_eq(bv, A.get(k))) continue;
+      const JV av = A.get(k);
+      if (strict_eq(bv, av)) continue;
+      if (bv.k == JV::Ref && av.k == JV::Ref && deep_eq(bv.ref, av.ref, 1)) continue;   // the departure above
       if (bv.k != JV::Num || !std::isfinite(bv.d) || nm.keys[i][0] != 's') return structural();   // not a finite number, or an id that is not a string
       ChainsParamOp op; op.id = nm.keys[i].substr(1); op.name = k; op.v = bv.d; r.params.push_back(std::move(op));
     }

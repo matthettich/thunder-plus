@@ -44,6 +44,22 @@ const gs = JSON.parse(fs.readFileSync(path.join(ROOT, 'native/tests/golden/chain
 for (const c of gs.cases) if (c.song && c.song.chainPatch && /^(c|f|g|k)\//.test(c.name)) bases[c.name.replace('/', '-')] = c.song.chainPatch;
 if (!bases.electro) { console.error('chains-diff-dump: sounds/ELECTRO.thunder has no chainPatch'); process.exit(2); }
 
+// deep structural equality as the native deep_eq: same types, same key sets (JSON.parse already made duplicates last-wins), equal values, arrays by length and element, numbers by value; containers nested past
+// DEEP_MAX levels (the param value is level 1) are NOT equal
+const DEEP_MAX = 64;
+function deepEq(a, b, level) {
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return a === b;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (level > DEEP_MAX) return false;
+  if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => deepEq(x, b[i], level + 1));
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every(k => Object.prototype.hasOwnProperty.call(b, k) && deepEq(a[k], b[k], level + 1));
+}
+// prev's module for a param op: the LAST module with that id (the page's Map), its params || {}, member `name`
+function prevParamValue(prev, o) {
+  let q; for (const m of prev.modules) if (m.id === o.id) q = m;
+  return (q.params || {})[o.name];
+}
 const cases = [];
 function run(name, prev, next, raw) {
   const c = { name };
@@ -54,8 +70,14 @@ function run(name, prev, next, raw) {
   catch (e) { c.throws = String(e && e.constructor && e.constructor.name) + ': ' + String(e && e.message).slice(0, 80); ops = null; }
   if (ops === null) { c.expectKind = 'Structural'; c.expectParams = []; }
   else if (ops.length === 0) { c.expectKind = 'Same'; c.expectParams = []; }
-  else if (ops.every(o => o.op === 'param' && typeof o.value === 'number' && Number.isFinite(o.value) && typeof o.id === 'string')) { c.expectKind = 'Params'; c.expectParams = ops.map(o => ({ id: o.id, name: o.name, v: o.value })); }
-  else { c.expectKind = 'Structural'; c.expectParams = []; }
+  else {
+    // THE ONE PLACE WHERE THE EXPECTATION DEPARTS FROM THE PAGE (docs/port/C2A-NOTES.md "Departures from the page"): a `param` op whose value is an object / array that is DEEP-EQUAL to prev's value is dropped
+    // (the page's `!==` sees two clones as different and sends a harmless repeated op; the live host always has two separately parsed songs). The ops recorded in `ops` stay the page's own.
+    const kept = ops.filter(o => !(o.op === 'param' && o.value !== null && typeof o.value === 'object' && deepEq(prevParamValue(prev, o), o.value, 1)));
+    if (kept.length === 0) { c.expectKind = 'Same'; c.expectParams = []; }
+    else if (kept.every(o => o.op === 'param' && typeof o.value === 'number' && Number.isFinite(o.value) && typeof o.id === 'string')) { c.expectKind = 'Params'; c.expectParams = kept.map(o => ({ id: o.id, name: o.name, v: o.value })); }
+    else { c.expectKind = 'Structural'; c.expectParams = []; }
+  }
   cases.push(c);
 }
 const ed = (p, f) => { const q = J(p); f(q); return q; };
@@ -262,6 +284,43 @@ run('syn/module-order-differs-ops-follow-next', S([M('a', { x: 1 }), M('b', { x:
   run('electro/knob-drag-sequence-1', P, ed(P, q => { mod(q, 'smixer').params.l1 = 0.81; }));
   run('electro/knob-drag-sequence-2', ed(P, q => { mod(q, 'smixer').params.l1 = 0.81; }), ed(P, q => { mod(q, 'smixer').params.l1 = 0.82; }));
   run('electro/bus-level-and-pre-toggle', P, ed(P, q => { mod(q, 'chainOut').params.level = 0.5; mod(q, 'trackIn').params.pre = 1; })); }
+
+// ---- the deep-equal departure (lead's ruling): objects / arrays as params ----
+{ const D = (extra) => S([M('a', Object.assign({ n: 1, o: { x: 1, y: [1, 2, { z: 3 }], w: { v: null, u: 'q', t: true } }, arr: [1, [2, 3], { k: [4] }] }, extra || {}))], [], { st2: 1, ti2: 1 });
+  const nest = (n, leaf) => { let v = leaf; for (let i = 0; i < n; i++) v = [v]; return v; };
+  const deepP = (n, leaf) => S([M('a', { d: nest(n, leaf) })], []);
+  run('deep/identical-object-and-array-params', D(), D());
+  run('deep/identical-plus-numeric-change', D(), D({ n: 2 }));
+  run('deep/identical-plus-string-change', D(), D({ n: 'x' }));
+  run('deep/object-leaf-differs', D(), D({ o: { x: 1, y: [1, 2, { z: 4 }], w: { v: null, u: 'q', t: true } } }));
+  run('deep/array-leaf-differs', D(), D({ arr: [1, [2, 3], { k: [5] }] }));
+  run('deep/array-longer', D(), D({ arr: [1, [2, 3], { k: [4] }, 0] }));
+  run('deep/object-extra-key', D(), D({ o: { x: 1, y: [1, 2, { z: 3 }], w: { v: null, u: 'q', t: true }, extra: 1 } }));
+  run('deep/object-key-missing', D(), D({ o: { x: 1, y: [1, 2, { z: 3 }], w: { v: null, u: 'q' } } }));
+  run('deep/key-order-differs-same', D(), D({ o: { w: { t: true, u: 'q', v: null }, y: [1, 2, { z: 3 }], x: 1 } }));
+  run('deep/array-order-differs', D(), D({ arr: [[2, 3], 1, { k: [4] }] }));
+  run('deep/null-vs-empty-object', D({ o: null }), D({ o: {} }));
+  run('deep/empty-object-vs-empty-array', D({ o: {} }), D({ o: [] }));
+  run('deep/number-vs-string-leaf', D({ o: [1] }), D({ o: ['1'] }));
+  run('deep/minus-zero-leaf-raw', null, null, ['{"format":"chains.patch","modules":[{"id":"a","params":{"o":[0]}}]}', '{"format":"chains.patch","modules":[{"id":"a","params":{"o":[-0]}}]}']);
+  run('deep/duplicate-keys-last-wins-raw', null, null, ['{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":1,"a":2}}}]}', '{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":2}}}]}']);
+  run('deep/duplicate-keys-last-wins-differs-raw', null, null, ['{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":2,"a":1}}}]}', '{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":2}}}]}']);
+  run('deep/duplicate-keys-in-next-last-wins-raw', null, null, ['{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":2}}}]}', '{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":1,"a":2}}}]}']);
+  run('deep/duplicate-keys-in-next-last-wins-differs-raw', null, null, ['{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":1}}}]}', '{"format":"chains.patch","modules":[{"id":"a","params":{"o":{"a":1,"a":2}}}]}']);
+  run('deep/object-in-prev-number-in-next', S([M('a', { o: { x: 1 } })], []), S([M('a', { o: 5 })], []));
+  run('deep/number-in-prev-object-in-next', S([M('a', { o: 5 })], []), S([M('a', { o: { x: 1 } })], []));
+  run('deep/array-in-prev-missing-in-next-ignored', S([M('a', { o: [1] })], []), S([M('a', {})], []));
+  run('deep/array-new-in-next', S([M('a', {})], []), S([M('a', { o: [1] })], []));
+  run('deep/object-in-prev-string-in-next', S([M('a', { o: { x: 1 } })], []), S([M('a', { o: 'x' })], []));
+  run('deep/nest-60-equal', deepP(60, 1), deepP(60, 1));
+  run('deep/nest-64-equal-at-limit', deepP(64, 1), deepP(64, 1));
+  run('deep/nest-65-past-limit-not-equal', deepP(65, 1), deepP(65, 1));
+  run('deep/nest-200-past-limit-not-equal', deepP(200, 1), deepP(200, 1));
+  run('deep/nest-64-leaf-differs', deepP(64, 1), deepP(64, 2));
+  run('deep/nest-objects-64-equal', S([M('a', { d: (() => { let v = 1; for (let i = 0; i < 64; i++) v = { k: v }; return v; })() })], []), S([M('a', { d: (() => { let v = 1; for (let i = 0; i < 64; i++) v = { k: v }; return v; })() })], []));
+  run('deep/nest-objects-65-not-equal', S([M('a', { d: (() => { let v = 1; for (let i = 0; i < 65; i++) v = { k: v }; return v; })() })], []), S([M('a', { d: (() => { let v = 1; for (let i = 0; i < 65; i++) v = { k: v }; return v; })() })], []));
+  run('deep/params-array-of-objects-equal', S([M('a', [{ x: 1 }, [2]])], []), S([M('a', [{ x: 1 }, [2]])], []));
+  run('deep/params-array-of-objects-differs', S([M('a', [{ x: 1 }, [2]])], []), S([M('a', [{ x: 1 }, [3]])], [])); }
 
 if (cases.length < 60) { console.error('chains-diff-dump: only ' + cases.length + ' cases'); process.exit(2); }
 const names = new Set(); for (const c of cases) { if (names.has(c.name)) { console.error('duplicate case name ' + c.name); process.exit(2); } names.add(c.name); }
