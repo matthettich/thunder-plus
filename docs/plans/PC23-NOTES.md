@@ -20,3 +20,13 @@ One branch (`pc23/pads-song`, from `pc3/song-transport` + a merge of `pc2/pads`)
 - PC2: `setKit` 15258 (`NC().newKit`); `coreKit` 25425; `coreKitCheck` 25432; `coreVar` 25458; `coreBuf` 25462; `ncPadApi` 25465; `setSong` 27220 (`NC()` use).
 - PC3: `saveS` 22298; `perfPush` 22635; `resetAudio` 24273; `ncSongHost` block 24955-24990 (`padApi` at 24958); `tStart` 24991; `corePost` 25423; `tStop` 25792; `msMeta` 26048; `bgPlay` 26053; `perfFill` 33004.
 - CHANGES entry: search `[678,`; BUILD 27278.
+
+## Lead's read of 25 Nov: fixes F1..F6
+All in `thunder-core-client.js` (no `index.html` change; `?v=2` and BUILD 678 kept: the client changed only on this unmerged branch).
+- **F1 watchdog.** (a) The interval remembers its last run (`lastTick`); a tick more than 1500 ms late skips its round and sets `quietUntil` 600 ms ahead (the queued `clock` events run first). (b) `died()` sends `{t:'stop'}` best-effort when a play had been sent. (c) Two reasons apart: `engineUp=false` (from `engine {up:false}`) stays until `{up:true}`; `lost` (watchdog or a fatal `err`) is cleared by the next `clock` event. `failed` for that song stays. `can()` / `refusal()` / `publish()` use `down() = !engineUp || lost`; `state().engineUp` reports `engineUp && !lost`.
+- **F2 first PLAY.** After a good hello: `NC.kit(host.padApi())` (when the page gives an api), then `NC.edit()`. A verdict whose first reason is `no-verdict` is never `current()`: `refusal()` does not refuse on it and `verdictNow()` publishes again. The `fit` event still replaces a settled `no-verdict` for the same `rev` (tested).
+- **F3 page's render wins.** When `NC.kit` really sends a `kit.load` it forgets what the core holds (`P.sent`, `P.bytes`, `P.chopSig`, each variation's `sent`; no `rm`), so the `padsAll` after it puts every pad again. `onKitEvent` and its `kit` listener are REMOVED (the `kr` field stays in `P.sent` entries, unused).
+- **F4.** `PADMEM = /limit|memory|too much|budget|\brc -[45]\b/i` used by the pads `err` listener and `opFailed`.
+- **F5.** One `nowMs` (the `var` near the top; the second declaration is gone).
+- **F6.** `can()` is false for `o._warm`.
+- Tests changed: the no-verdict test now expects `can()` true and a second `song.load` at PLAY; the fatal-err test expects one `stop`; the "empty slots after kit.load" test is replaced by the F3 test. New tests: F1 x4, F2 x2, F4, F6.

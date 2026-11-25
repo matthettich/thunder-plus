@@ -17,6 +17,7 @@
   var SLOW_SEND_MS = 4, SLOW_PUBLISH_MS = 1000;   // 4.4's fallback for a big song: when handing it to the bridge held the page 4 ms or more, the next publish waits for a second of quiet
   var sendCost = 0;          // how long the last song.load took to hand over (the bridge stringifies it: the main-thread cost the design watches)
   var BEAT_PLAY_MS = 2000;   // can(): a `clock` event within 2 s (4.6)
+  var TICK_LATE_MS = 1500;   // a watchdog tick this late skips its round
   var BEAT_LOST_MS = 2500;   // while playing: no `clock` for this long = the engine is gone (the design says 1 s; 2.5 s is the page's own audioInterrupted precedent)
   var revN = 0;              // song.load revision counter
   var verdict = null;        // {rev, ver, sref, ok, pending, reasons[], warn[]}: the answer for the song as last published
@@ -26,6 +27,9 @@
   var sentVer = -1, sentRef = null;   // what the last publish was made of
   var lxpSent = 0;
   var engineUp = true, lastClock = 0, songHeard = 0, quietUntil = 0;
+  var lost = false;          // the watchdog or a fatal err declared the engine gone: the next `clock` event clears it (engineUp=false from an `engine {up:false}` event stays until {up:true})
+  var lastTick = 0;          // when the watchdog interval last ran (a tick that comes late = the page was busy, not the engine dead)
+  function down() { return !engineUp || lost; }
   var playTok = 0, playSent = false, active = false;  // playTok: a new PLAY or a STOP cancels the one still waiting for its verdict; active: a native PLAY is waiting or playing
   var failed = null;         // {ref}: the engine died while playing this song; the next PLAY of it uses the old engine (until the engine is rebuilt)
   var toasted = null, warned = null, resumeNote = false, errN = 0;   // once per song (the S object): the fallback message, the fit warnings
@@ -73,7 +77,7 @@
     /** Decided once per PLAY, before anything sounds (4.6). true = the native engine takes this PLAY (start() follows); false = the old engine plays it. */
     can: function (mode, o) {
       if (!NC.on || !tc) return false;
-      if (o && (o.page || o._nf || o.rz)) return false;   // the page asked for its own engine (hand-over, the fallback itself): not ours, no message
+      if (o && (o.page || o._nf || o.rz || o._warm)) return false;   // the page asked for its own engine (hand-over, the fallback itself): not ours, no message
       if (!wanted()) return false;
       var why = refusal(mode, o);
       if (why) { fallbackNote(why); return false; }
@@ -138,7 +142,7 @@
     /** Settings > Audio > Reset audio engine (branch 17): the shell stops, rebuilds and says {t:'engine', up:true}; the page then sends the song again. */
     reset: function () { if (NC.on && tc) { send({ t: 'engine.reset' }); } },
     /** Test and report hooks. */
-    state: function () { return { engineUp: engineUp, playing: playSent, verdict: verdict, rev: revN, heard: songHeard, failed: !!failed, sendCost: sendCost }; }
+    state: function () { return { engineUp: engineUp && !lost, playing: playSent, verdict: verdict, rev: revN, heard: songHeard, failed: !!failed, sendCost: sendCost }; }
   };
 
   // ---- helpers ----------------------------------------------------------------------------------------------------------------------------
@@ -154,7 +158,7 @@
 
   // The reasons this PLAY cannot be native, in the order of N2-PAGE-CLIENT 4.6. '' = none known (an unknown verdict is not a reason: start() asks).
   function refusal(mode, o) {
-    if (!engineUp) return 'the native engine is not running';
+    if (down()) return 'the native engine is not running';
     if (!lastClock || nowMs() - lastClock > BEAT_PLAY_MS) return 'the native engine is not running';
     if (failed && failed.ref === host.S()) return 'the native engine stopped on this song earlier';
     if (NC.padProblem) return NC.padProblem;   // PC2: a pad could not go to the engine (memory limit, ...)
@@ -164,7 +168,8 @@
     return '';
   }
 
-  function current() { return verdict && !verdict.pending && verdict.sref === host.S() && verdict.ver === host.songVer() && !stale(); }
+  function noVerdict(v) { return !!(v && v.reasons && v.reasons[0] === 'no-verdict'); }   // a timeout, not an answer: never "current"
+  function current() { return verdict && !verdict.pending && !noVerdict(verdict) && verdict.sref === host.S() && verdict.ver === host.songVer() && !stale(); }
   function stale() { return sentRef !== host.S() || sentVer !== host.songVer() || (host.lxp ? host.lxp() | 0 : 0) !== lxpSent; }
 
   var TEXT = { 'no-verdict': 'the native engine did not answer', 'no-kit': 'the kit has not reached the native engine yet' };
@@ -188,7 +193,7 @@
   // The song as the shell is to hold it. `ask`, so the reply is the verdict (G14). Keys in this order: the shell reads `t` and `title` from the head, `rev` and `id` from the tail.
   function publish() {
     if (inflight) return inflight.then(function () { return stale() ? publish() : verdict; });
-    if (!engineUp) return Promise.resolve(verdict);
+    if (down()) return Promise.resolve(verdict);
     var rev = ++revN, ver = host.songVer(), sref = host.S(), mine = { rev: rev, ver: ver, sref: sref, ok: false, pending: true, reasons: [], warn: [] };
     sentRef = sref; sentVer = ver; verdict = mine;
     try { sendLxp(host.lxp ? host.lxp() | 0 : 0); } catch (e) { /* ignore */ }
@@ -211,7 +216,7 @@
   function verdictNow() {
     clearTimeout(publishT); publishT = 0;
     if (current()) return Promise.resolve(verdict);
-    if (stale() || !verdict) return publish();
+    if (stale() || !verdict || (!verdict.pending && noVerdict(verdict))) return publish();
     return awaitVerdict(verdict);
   }
   function awaitVerdict(v) {
@@ -263,18 +268,21 @@
   // While a native PLAY runs the engine's `clock` must keep coming; a fatal `err` or a silent engine stops the transport and says so (4.6, U37 D14: stop and tell).
   function watch(on) {
     clearInterval(watchT); watchT = 0;
+    lastTick = on ? nowMs() : 0;
     if (on) watchT = setInterval(function () {
-      var n = nowMs();
+      var n = nowMs(), late = lastTick && n - lastTick > TICK_LATE_MS; lastTick = n;
+      if (late) { quietUntil = n + 600; return; }   // the page's main thread was busy: the `clock` events are still queued, not missing. Skip this round, wait one more period
       if (typeof document !== 'undefined' && document.hidden) quietUntil = n + 3000;   // the screen off: the page's timers and events run late, not the engine
       if (n < quietUntil) return;
       if (lastClock && n - lastClock > BEAT_LOST_MS) died('the engine stopped answering');
     }, 500);
   }
   function died(why) {
-    engineUp = false;
-    var was = active || playSent;   // (a PLAY waiting for its verdict counts too)
+    lost = true;   // not engineUp=false: a `clock` event proves the engine alive after all
+    var was = active || playSent, sent = playSent;   // (a PLAY waiting for its verdict counts too)
     if (was) failed = { ref: host.S() };
-    playTok++; playSent = false; active = false; watch(false);
+    playTok++; playSent = false; active = false; watch(false); clearTimeout(leadT); leadT = 0;
+    if (sent && tc) send({ t: 'stop' });   // best effort: the engine may only have been late
     if (was) { host.stopped(); host.toast('The native engine stopped: ' + why + '. Press PLAY: the old engine plays this song.', 5000); }
   }
 
@@ -282,7 +290,7 @@
   function subscribe() {
     if (!tc || typeof tc.on !== 'function') return;
     var on = function (t, fn) { tc.on(t, fn); offs.push(function () { if (typeof tc.off === 'function') tc.off(t, fn); }); };
-    on('clock', function (m) { lastClock = nowMs(); if (m && m.sr && m.sr !== NC.sr && m.sr > 0) { /* a rate change arrives with engine / device events: handled there */ } });
+    on('clock', function (m) { lastClock = nowMs(); lost = false; if (m && m.sr && m.sr !== NC.sr && m.sr > 0) { /* a rate change arrives with engine / device events: handled there */ } });
     on('song', function (m) { if (m && m.rev != null) songHeard = m.rev; });
     on('fit', function (m) {   // the shell's verdict again (after kit.load, after lxp): for the song last sent
       if (!m || !verdict || m.rev !== verdict.rev) return;
@@ -302,7 +310,7 @@
         if (was) { host.stopped(); host.toast('The native engine is restarting: the song stopped.', 3000); }
         return; }
       if (m.up === true) {   // rebuilt (engine.reset, a device change): the song goes again (PC2 re-sends the kit and pads itself on this event)
-        engineUp = true; lastClock = nowMs(); lxpSent = 0; verdict = null; sentRef = null; inflight = null; failed = null;
+        engineUp = true; lost = false; lastClock = nowMs(); lxpSent = 0; verdict = null; sentRef = null; inflight = null; failed = null;
         var rate = m.sr && m.sr > 0 && m.sr !== NC.sr; if (rate) NC.sr = m.sr;
         if (rate) { try { host.prerender && host.prerender(); } catch (e) { /* ignore */ } }
         publish();
@@ -348,11 +356,13 @@
     NC.sr = sr; NC.outLat = num(r.outLat, 0, 1e7, 0);
     NC.hostName = String(r.host || (tc && tc.host) || '');
     NC.maxPadBytes = num(r.maxPadBytes, 0, 1e12, 0); NC.maxSongBytes = num(r.maxSongBytes, 0, 1e12, 0);
-    NC.reason = ''; NC.on = true; engineUp = true; lastClock = 0;
+    NC.reason = ''; NC.on = true; engineUp = true; lost = false; lastClock = 0;
     log('native core client: on (' + NC.hostName + ', ' + sr + ' Hz, core ' + NC.core + ')');
     // Pads rendered before the handshake used the page's guess: render them again at the engine's rate, once (design 4.2 step 4).
     try { if (typeof host.prerender === 'function') host.prerender(); } catch (e) { log('native core client: prerender after hello failed', e); }
     try { subscribe(); } catch (e) { log('native core client: subscribe failed', e); }
+    // the kit first (the shell answers a song with `pending` until it has a kit), then the song
+    try { var pa = typeof host.padApi === 'function' ? host.padApi() : null; if (pa && typeof NC.kit === 'function') NC.kit(pa); } catch (e) { log('native core client: kit after hello failed', e); }
     try { if (host.songVer) NC.edit(); } catch (e) { /* ignore */ }   // the song goes once, so the first PLAY already has its verdict
     return true;
   }
@@ -378,7 +388,7 @@
   };
   NC.padProblem = '';         // '' or why a pad could not go to the core ('pad memory ...'): PC3's can() turns it into a fallback reason
 
-  function nowMs() { return typeof host.now === 'function' ? host.now() : Date.now(); }
+  var PADMEM = /limit|memory|too much|budget|\brc -[45]\b/i;   // the shell's text for a refused native call: 'rc -4' E_LIMIT, 'rc -5' E_MEMORY
   function toastOnce(msg) { if (P.toasted) return; P.toasted = true; try { if (P.api && P.api.toast) P.api.toast(msg, 4500); else if (host && host.toast) host.toast(msg, 4500); } catch (e) { /* ignore */ } }
   function problem(why, pad) {
     if (!NC.padProblem) NC.padProblem = why + (pad != null ? ' (pad ' + pad + ')' : '');
@@ -396,21 +406,12 @@
     P.wired = true;
     offs.push(function () { padReset(); P.wired = false; P.api = null; });
     listen('pads', function () { if (!NC.on) return; P.committed++; clearTimeout(P.commitWait); P.commitWait = 0; notify(); });
-    listen('kit', onKitEvent);
     listen('err', function (m) {
       if (!NC.on || !m) return;
       var w = String(m.where || ''), msg = String(m.msg || '');
-      if (/^(buf\.use|put|pad\.chop|pads\.commit|buf\.free)$/.test(w)) { log('native core client: pads: err from ' + w + ': ' + msg); if (/limit|memory|too much|budget/i.test(msg)) problem('pad memory'); }
+      if (/^(buf\.use|put|pad\.chop|pads\.commit|buf\.free)$/.test(w)) { log('native core client: pads: err from ' + w + ': ' + msg); if (PADMEM.test(msg)) problem('pad memory'); }
     });
     listen('engine', function (m) { if (NC.on && m && m.up === true && P.api) { padReset(); NC.kit(P.api); } });   // the shell rebuilt the core (G13): send everything again
-  }
-  function onKitEvent(m) {
-    // After kit.load the core lists the slots it holds no pad for. A pad this client sent BEFORE that kit.load is gone from it: send it again.
-    if (!NC.on || !m || !m.empty || !P.api) return;
-    for (var k = 0; k < m.empty.length; k++) {
-      var i = m.empty[k] | 0, e = P.sent.get(i);
-      if (e && e.kr < P.kitRev) { forget(i); NC.pad(i, P.api); }
-    }
   }
   function forget(i) {
     var e = P.sent.get(i); if (!e) return;
@@ -456,7 +457,7 @@
   function opFailed(op, e) {
     var msg = e && e.message ? e.message : String(e);
     log('native core client: pads: ' + op.k + (op.pad != null ? ' ' + op.pad : '') + ' failed: ' + msg);
-    if (/limit|memory|too much|budget/i.test(msg)) problem('pad memory', op.pad);
+    if (PADMEM.test(msg)) problem('pad memory', op.pad);
   }
   // put the audio (copies), one in flight; the N0 shim's form (one mono Float32Array) only for host 'android-n0' (G2)
   function putCopy(id, sr, chans, frames) {
@@ -568,7 +569,11 @@
     var kv, kit; try { kv = P.api.kitV(); kit = P.api.kitJSON(); } catch (e) { log('native core client: kit list failed', e); return; }
     var sig = JSON.stringify(kv); P.kitT = nowMs();
     // kit.load {kit, rev}: the page's kit (voice definitions, no sample data) is what the shell renders pads from (pad_filler renderPads); it answers `kit {empty:[slots]}`. Sent only when the voice list (kv) changed.
-    if (sig !== P.kitSig) { P.kitSig = sig; P.kitRev++; tc.send({ t: 'kit.load', kit: kit, rev: P.kitRev }); }
+    if (sig !== P.kitSig) {
+      P.kitSig = sig; P.kitRev++; tc.send({ t: 'kit.load', kit: kit, rev: P.kitRev });
+      // the shell now renders every pad it can, replacing the page's: forget what the core holds (bookkeeping only, no rm), so padsAll puts every pad again and the page's render wins
+      P.sent.clear(); P.bytes = 0; P.chopSig.clear(); P.vars.forEach(function (v) { v.sent = 0; });
+    }
     NC.padsAll(P.api);
   };
   // The page's 200 ms look at whether the kit changed while the core plays (coreKitCheck).

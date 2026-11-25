@@ -79,11 +79,20 @@ test('kit.load goes first, then the pads; it is sent again only when the voice l
   r.NC.kitCheck(r.api); await wait(5); assert.equal(kits().length, 3);
 });
 
-test('the core lists empty slots after kit.load: a pad sent before that kit.load is sent again, one sent after it is not', async () => {
-  const r = await on(rig()); r.render(0, 10, 1); r.render(1, 10, 7); r.NC.pad(0, r.api); await wait(20);
-  r.NC.kit(r.api); await wait(30); const puts0 = r.log.filter(l => l[0] === 'put').length;   // pad 1 goes after the kit.load, pad 0 stays
-  r.emit('kit', { empty: [0, 1] }); await wait(30);
-  const puts = r.log.filter(l => l[0] === 'put'); assert.equal(puts.length, puts0 + 1); assert.equal(puts[puts.length - 1][3][0][0], 1, 'pad 0 (value 1) again; pad 1 (value 7) went after the kit.load and stays');
+test('F3: a kit.load that is sent makes the shell re-render every pad: every pad goes again after it, the page\'s render wins', async () => {
+  const r = await on(rig()); r.render(0, 10, 1); r.render(1, 10, 7);
+  r.NC.kit(r.api); await wait(40); const puts = () => r.log.filter(l => l[0] === 'put').length; assert.equal(puts(), 2);
+  r.NC.kit(r.api); await wait(30); assert.equal(puts(), 2, 'same voice list: no kit.load, nothing again');
+  r.page.kv = [{ choke: 1 }]; r.NC.kit(r.api); await wait(60);
+  assert.equal(puts(), 4, 'both pads again after the second kit.load'); const t = r.types(); assert.ok(t.lastIndexOf('kit.load') < t.lastIndexOf('put') - 0 && !t.includes('rm'), 'after it, no rm');
+  assert.equal(r.log.filter(l => l[0] === 'send' && l[1].t === 'buf.use' && l[1].id === -1).length, 0, 'no removal messages');
+  assert.equal(r.NC.padStats().sent, 2); assert.equal(r.NC.padStats().bytes, 80);
+  r.emit('kit', { empty: [0] }); await wait(20); assert.equal(puts(), 4, 'the kit event is not acted on any more');
+});
+test('F4: an err rc -4 / rc -5 from buf.use is the pad-memory problem; rc -45 and unrelated text are not', async () => {
+  for (const msg of ['rc -4 buf.use', 'rc -5 out of memory?']) { const r = await on(rig()); r.render(0, 10, 1); r.NC.pad(0, r.api); await wait(20); r.emit('err', { where: 'buf.use', msg }); assert.match(r.NC.padProblem, /pad memory/, msg); }
+  const q = await on(rig()); q.render(0, 10, 1); q.NC.pad(0, q.api); await wait(20); q.emit('err', { where: 'buf.use', msg: 'rc -45 x' }); q.emit('err', { where: 'buf.use', msg: 'rc -3 bad' }); assert.equal(q.NC.padProblem, '');
+  const f = await on(rig({ putFail: new Error('rc -5 put') })); f.render(0, 10, 1); f.NC.pad(0, f.api); await wait(30); assert.match(f.NC.padProblem, /pad memory/, 'a failed put with rc -5 too');
 });
 
 test('budget: over 90 % of maxPadBytes no new pad is sent, one toast, padProblem says why; a smaller pad does not clear it', async () => {

@@ -164,7 +164,9 @@ test('no verdict within 5 s is NOT ok (reason no-verdict): the old engine plays,
   const st = r.NC.state().verdict; assert.equal(JSON.stringify(st.reasons), '["no-verdict"]'); assert.equal(st.ok, false);
   // the bridge's own timeout rejecting the ask is the same thing
   const q = rig({ verdictFor: () => new Error('ask timeout') }); await q.NC.attach(q.host); q.beat(); await q.ck.advance(300);
-  assert.equal(q.NC.can('song', { row: 0 }), false); assert.match(q.toasts[0], /did not answer/);
+  // a no-verdict is not "current": can() does not refuse on it, start() asks again, and that answer (none again) hands the PLAY back
+  assert.equal(q.NC.can('song', { row: 0 }), true); q.NC.start('song', { row: 0 }); await q.ck.advance(50); assert.equal(q.songLoads().length, 2, 'asked again at PLAY');
+  assert.equal(q.state.fallbacks.length, 1); assert.match(q.toasts[0], /did not answer/);
 });
 test('pending (no kit yet): not a verdict; the shell\'s fit event after kit.load decides', async () => {
   let n = 0; const r = rig({ verdictFor: () => (++n === 1 ? { ok: false, pending: true, reasons: ['no-kit'], warn: [] } : { ok: true, reasons: [], warn: [] }) });
@@ -207,7 +209,7 @@ test('a fatal err during play stops the transport, says so, and the next PLAY of
   r.emit('err', { where: 'REANCHOR', msg: 'x', fatal: false }); assert.equal(r.state.stopped, 0); assert.ok(r.pb.some(x => /REANCHOR/.test(x)));
   r.emit('err', { where: 'FATAL', msg: 'dead', fatal: true }); await r.ck.advance(5);
   assert.equal(r.state.stopped, 1); assert.equal(r.tp.on, false); assert.match(r.toasts.pop(), /^The native engine stopped: FATAL\. Press PLAY/);
-  assert.equal(r.msgs('stop').length, 0, 'no stop to a dead engine');
+  assert.equal(r.msgs('stop').length, 1, 'best effort: one stop, in case the engine was only late');
   r.emit('engine', { up: true, sr: 48000 }); await r.ck.advance(300);
   assert.equal(r.NC.can('song', {}), true, 'a rebuilt engine is tried again');
   r.emit('err', { where: 'x', fatal: true }); r.NC.start('song', {}); r.NC.stop(); r.emit('engine', { up: true }); // (a fatal err with nothing playing marks the engine down, not the song)
@@ -260,6 +262,45 @@ test('the resume note comes once per session', async () => {
   r.NC.start('song', { row: 1 }); await r.ck.advance(5); r.NC.stop(); r.NC.start('song', { row: 1 }); await r.ck.advance(5);
   assert.equal(r.toasts.filter(t => /Resume/.test(t)).length, 1);
 });
+// ---- the lead's read of 25 Nov: F1, F2 ----
+test('F1: a watchdog tick that comes more than 1500 ms late skips its round; the same silence on time kills', async () => {
+  const r = await up(); r.NC.start('song', { row: 0 }); await r.ck.advance(5); r.beat();
+  r.ck.tick(2800);   // the page's main thread was busy: the interval runs now, before the queued clock events
+  await r.ck.advance(500); assert.equal(r.state.stopped, 0, 'a late tick does not kill');
+  r.beat(); await r.ck.advance(500); assert.equal(r.state.stopped, 0);
+  await r.ck.advance(3200); assert.equal(r.state.stopped, 1, 'a real silence still does');
+});
+test('F1: died() sends stop when a play had been sent; a watchdog loss is cleared by the next clock, the failed song stays failed', async () => {
+  const r = await up(); r.NC.start('song', { row: 0 }); await r.ck.advance(5); assert.equal(r.msgs('play').length, 1);
+  await r.ck.advance(3200); assert.equal(r.state.stopped, 1); assert.equal(r.msgs('stop').length, 1, 'stop to an engine that may only have been late');
+  assert.equal(r.NC.can('song', {}), false, 'lost: the old engine');
+  r.beat(); r.S = { name: 'Other', song: [] }; r.bump(); assert.equal(r.NC.can('song', {}), true, 'a clock after the loss: the engine is alive after all, for another song');
+});
+test('F1: engine {up:false} stays down through clock events until {up:true}', async () => {
+  const r = await up(); r.emit('engine', { up: false }); r.beat(); r.beat(); assert.equal(r.NC.can('song', {}), false); assert.equal(r.NC.state().engineUp, false);
+  r.emit('engine', { up: true }); await r.ck.advance(300); assert.equal(r.NC.can('song', {}), true);
+});
+test('F1: after a watchdog loss the song that was playing stays failed even when the clock returns', async () => {
+  const r = await up(); const S0 = r.S; r.NC.start('song', { row: 0 }); await r.ck.advance(3300); r.beat(); assert.equal(r.NC.state().failed, true); assert.equal(r.NC.can('song', {}), false); assert.equal(r.S, S0);
+});
+test('F2: hello sends kit.load before song.load when the page has a pad api', async () => {
+  const r = rig(); let kits = 0;
+  r.host.padApi = () => ({ cache: () => null, nslots: () => 0, kitV: () => [{}], kitJSON: () => ({ voices: [] }), insts: () => [], toast: () => {} });
+  r.sb.thunderCore.send = (m) => { r.sent.push(m); r.log.push(m.t); if (m.t === 'kit.load') kits++; };
+  await r.NC.attach(r.host); r.beat(); await r.ck.advance(300);
+  assert.equal(kits, 1); assert.ok(r.log.indexOf('kit.load') >= 0 && r.log.indexOf('kit.load') < r.log.indexOf('song.load?'), r.log.join());
+});
+test('F2: a settled no-verdict is asked again at PLAY, and a late fit event settles it for the same rev', async () => {
+  let n = 0; const r = rig({ verdictFor: () => (++n === 1 ? { ok: false, pending: true, reasons: ['no-kit'], warn: [] } : { ok: true, reasons: [], warn: [] }) });
+  await r.NC.attach(r.host); r.beat(); await r.ck.advance(300); await run(r, 5200);
+  assert.equal(JSON.stringify(r.NC.state().verdict.reasons), '["no-verdict"]'); assert.equal(r.NC.can('song', {}), true, 'not a refusal');
+  r.emit('fit', { rev: 1, ok: true, reasons: [], reasonTexts: [], warn: [] }); assert.equal(r.NC.state().verdict.ok, true, 'a late fit replaces it');
+  let c = 0; const q = rig({ verdictFor: () => (++c === 2 ? { ok: true, reasons: [], warn: [] } : { ok: false, pending: true, reasons: ['no-kit'], warn: [] }) });
+  await q.NC.attach(q.host); q.beat(); await q.ck.advance(300); await run(q, 5200); assert.equal(q.songLoads().length, 1);
+  q.NC.can('song', {}); q.NC.start('song', {}); await q.ck.advance(50); assert.equal(q.songLoads().length, 2, 'asked again'); assert.equal(q.msgs('play').length, 1);
+});
+test('F6: can() is false for a warm-up play', async () => { const r = await up(); assert.equal(r.NC.can('song', { _warm: true }), false); assert.deepEqual(r.toasts, []); });
+
 test('detach() clears the timers', async () => {
   const r = await up(); r.NC.start('song', { row: 0 }); await r.ck.advance(5); r.bump(); r.NC.edit(); r.NC.detach(); assert.equal(r.ck.count(), 0); assert.equal(r.NC.on, false);
 });
