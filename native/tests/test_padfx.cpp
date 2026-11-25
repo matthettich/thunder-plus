@@ -82,7 +82,7 @@ static int trackBeads() {
     const double p[12] = {(double)media, 0, 1, 0.2, size, 0.5, 0.5, 0.85, 0.2, 1, 0.25, 0};   // the page's TFX map order (media, 0, freeze, time, size, pitch, shape, density, feedback, blend, reverb)
     for (int k = 0; k < 12; k++) e.p[k] = p[k];
     FxPlan* pl = H.plan(&e, 1); if (!pl) { std::printf("trackBeads: no plan (no effects library)\n"); return 0; }
-    H.commit(pl);
+    H.commit(pl); delete pl;
     std::vector<float> L(128), R(128); unsigned s = 1; bool fin = true;
     for (int b = 0; b < 750; b++) { for (int i = 0; i < 128; i++) { s = s * 1664525u + 1013904223u; L[i] = R[i] = ((float)(s >> 8) / 8388608.0f - 1.0f) * 0.3f; }
       H.process(L.data(), R.data(), 128, b * 128 / 48000.0); for (int i = 0; i < 128; i++) if (!std::isfinite(L[i]) || !std::isfinite(R[i])) fin = false; }
