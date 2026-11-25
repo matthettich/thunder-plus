@@ -410,6 +410,13 @@ int LiveHost::play(const thunder_live_play_opts& o) {
   if (mchain_) { plan->master = master_chain_from_song(songCur_->mst, songCur_->limiter); plan->hasMaster = true; }   // the song's own master chain (SongRenderer's caller: master_chain_from_song(song.mst, song.limiter))
   plan->cfgOrd = ++cfgOrd_;
   auto unwindFx = [&]() { for (int t = 0; t <= kSongNT; t++) if (plan->fx[t]) { LiveCmd fc; fc.type = LiveCmdType::FxCommit; fc.i0 = t; fc.p = plan->fx[t]; if (cmds_.push(fc)) { plan->fx[t] = nullptr; fxOut_++; } } };   // plans already made must reach their hosts (FxHost::plan's rule): sent as plain commits
+  // C2 R3 / R6 / L2: THE CHAINS DECISION comes BEFORE the effects plans: a refusal here (E_BUSY: a plan in flight or no room in the edit ring; E_MEMORY) returns with nothing sent and nothing changed, while the effects plans, once made, MUST reach
+  // their hosts (FxHost::plan's rule: unwindFx). A chains plan CAN be abandoned, so a failure of the effects planning below abandons it (chainsAbandon) beside unwindFx.
+  ChainsWork cw;
+  if (chains_) {
+    const int cr = chainsDecide(songCur_, cw);
+    if (cr != THUNDER_LIVE_OK) { sess->rollback(); delete plan; delete bm; refreshCtl(); return cr; }
+  }
   // THE SONG'S EFFECTS, planned LAST (every plan made must be committed, in order: FxHost::plan's rule), master first and then the tracks 0..31 (FxBank::load's order: the MODFX modules draw their seeds from ONE counter).
   // A failure part way sends the plans already made as plain commits (they must reach their hosts), then the play is given up.
   if (fx) {
@@ -419,21 +426,15 @@ int LiveHost::play(const thunder_live_play_opts& o) {
       plan->fx[kSongNT] = fxBank_->host(kSongNT).planFromSong(songCur_->mfx, songCur_->bpm, 0, &seeds);
       for (int t = 0; t < kSongNT && !bad; t++) { plan->fx[t] = fxBank_->host(t).planFromSong(songCur_->tfx.at((size_t)t), songCur_->bpm, 0, &seeds); noteFxPlanned(t, plan->fx[t]); }
     } catch (...) { bad = true; }
-    if (bad) { unwindFx(); sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }
+    if (bad) { unwindFx(); chainsAbandon(cw); sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }
     try {   // PDC: from the plans just made (FxPlan::entry), not from the audio thread's chains
       PdcSlot all[kSongNT * kFxSlots]; int n = 0;
       for (int t = 0; t < kSongNT; t++) for (int i = 0; i < ctlPdcN_[t]; i++) all[n++] = ctlPdc_[t][i];
       plan->pdc = pdc_plan(bm->plan, all, n, sr_, plan->pdcMode);
-    } catch (...) { unwindFx(); sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }   // (the plans are made: they go as commits, as above)
+    } catch (...) { unwindFx(); chainsAbandon(cw); sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }   // (the plans are made: they go as commits, as above)
   }
-  // C2 R3 / R6: THE CHAINS PLAN, after everything above that allocates and before the rings: a play's plan rides in the PlayPlan (committed where busSlot_ was applied, R7). Any failure from here abandons it and gives the effects plans
-  // up the way a failed effects plan does (they must reach their hosts). The edit ring's room was checked with the decision; the Play command's slot was checked at the top.
-  ChainsWork cw;
-  if (chains_) {
-    const int cr = chainsDecide(songCur_, cw);
-    if (cr != THUNDER_LIVE_OK) { unwindFx(); sess->rollback(); delete plan; delete bm; refreshCtl(); return cr; }
-    plan->chains = cw.plan; plan->chainsHost = chains_.get(); cw.plan = nullptr;   // (the PlayPlan owns it now: its destructor settles and deletes it on every path from here)
-  }
+  // C2 L2: the chains plan rides in the PlayPlan, attached only now (right before the Play command is pushed): the PlayPlan owns it from here (its destructor settles and deletes it on every path). The edit ring's room was checked with the decision; the Play command's slot at the top.
+  if (chains_) { plan->chains = cw.plan; plan->chainsHost = chains_.get(); cw.plan = nullptr; }
   // ORDER (verify-283 F9): the Play command goes into the ring FIRST, the snapshot is published SECOND. A quantum that runs between the two finds a Play whose snapshot is not there yet and keeps it stalled
   // (tryStartPlay); the audio side adopts nothing else while a play is stalled (adopt()), so the running runner is never re-pointed at the unstarted Seq of a session whose Play has not been applied.
   // Room in both rings was checked above and only this thread fills them, so neither push can fail.
@@ -571,7 +572,7 @@ int LiveHost::chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w) 
   try {
     const Song& s = *S;
     w.song = S; w.bus = bus_plan(s.chainPatch, s.chainOn); w.feed = chains_feed(s.chainPatch, s.chainOn);
-    bool onSame = true; for (int t = 0; t < kSongNT; t++) if ((chainsSong_ ? chainsSong_->chainOn[t] : false) != s.chainOn[t]) { onSame = false; break; }
+    bool onSame = true; if (chainsPlanned_) for (int t = 0; t < kSongNT; t++) if ((chainsSong_ ? chainsSong_->chainOn[t] : false) != s.chainOn[t]) { onSame = false; break; }   // (no node was ever planned: the CHN flags matter only through chains_feed / the bus plan, compared below; so a song with no chains never makes a plan, L4b)
     const bool busSame = onSame && w.feed == chainsFeed_ && bus_plan_equal(w.bus, chainsBus_);
     ChainsDiff d = chains_diff(chainsSong_ ? chainsSong_->chainPatch : Json(), s.chainPatch);
     std::vector<LiveChainParam> recs;
@@ -784,11 +785,13 @@ void LiveHost::quantum() {
   const int64_t qStart = qFrame_;
   const double t0 = (double)qStart / sr_;
   // 1. APPLY COMMANDS
+  const uint32_t nChainParams = chainParams_.avail();   // C2 L1: the snapshot of the edit ring BEFORE the command loop
   retryStalledPlay(qStart);
   if (clearPend_) { clearPend_ = false; clearWaiting(qStart); }   // (a stalled play that started now)
   applyCommands(qStart, qStart + kLiveQuantum);
   applyFxParams(qStart);
-  if (!stalledPlay_) applyChainParams();   // after the commands: a param sent after a commit meets the new patch. NOT while a play waits for its snapshot: its plan is not committed yet (a param applied now would be lost under the swap)
+  if (testCmdSeam_) testCmdSeam_(testCmdSeamUser_);   // TEST ONLY (null in a product)
+  if (!stalledPlay_) applyChainParams(nChainParams);   // after the commands: a param sent after a commit meets the new patch. NOT while a play waits for its snapshot: its plan is not committed yet (a param applied now would be lost under the swap)
   // 2. ADOPT: seq_adopt, then seqGone() if the Seq was dropped, then PadsHost::beginQuantum(players, runner's Seq) every quantum
   adopt(qStart);
   // 3. CLOCKS
@@ -970,9 +973,11 @@ void LiveHost::applyPdc(int64_t qStart, bool glide) {
   PdcApply a; a.mode = pdcMode_; a.live = glide; a.playing = stateA_ != THUNDER_LIVE_STATE_IDLE; a.now = glide && stateA_ == THUNDER_LIVE_STATE_PLAYING && qStart == playQ_;
   pdc_apply(*mix_, pdcCur_, a);
 }
-void LiveHost::applyChainParams() {
+// At most `n` records: the ones that were in the ring BEFORE this quantum's command loop began (C2 L1). The producer pushes a ChainsCommit (or a Play with a plan) BEFORE the records that follow it, so every record seen by the snapshot
+// has its commit already visible to the command loop that runs after the snapshot; a record pushed later (with a commit the loop did not see) waits for the next quantum, where it meets the new patch.
+void LiveHost::applyChainParams(uint32_t n) {
   LiveChainParam r;
-  while (chainParams_.pop(r)) if (chains_) chains_->param(r.id, r.name, r.v);   // (NUL-terminated by the control side; every node gets it: ChainsHost::param)
+  while (n-- && chainParams_.pop(r)) if (chains_) chains_->param(r.id, r.name, r.v);   // (NUL-terminated by the control side; every node gets it: ChainsHost::param)
 }
 void LiveHost::applyFxParams(int64_t qStart) {
   LiveFxParam fp;

@@ -184,6 +184,7 @@ class LiveHost {
   int play(const thunder_live_play_opts& o);
   void testSetEvSeq(uint32_t v) { evSeq_ = v; }                 // TEST ONLY (no audio thread running): starts the record numbering at `v` (the 2^32 wrap)
   void setTestSeam(void (*f)(void*), void* user) { testSeam_ = f; testSeamUser_ = user; }   // TEST ONLY: `f` runs inside play(), between the push of the Play command and the publish of its snapshot (verify-283 F9)
+  void setTestCommandSeam(void (*f)(void*), void* user) { testCmdSeam_ = f; testCmdSeamUser_ = user; }   // TEST ONLY (single thread): `f` runs on the audio side between a quantum's command loop and its parameter drain (C2 L1: the window where the control side pushes a commit and then records)
   void setTestAudioSeam(void (*f)(void*), void* user) { testAudioSeam_ = f; testAudioSeamUser_ = user; }   // TEST ONLY (single thread): `f` runs on the audio side right after a started play was given back to the control side (R1: the window between giveBack and the state's store)
   void setTestTap(void (*f)(void*, Mixer&, int64_t), void* user) { testTap_ = f; testTapUser_ = user; }   // TEST ONLY (single thread): `f` runs in step 8 right after the voices were rendered into the mixer's inputs, with the ENGINE frame of the quantum (SongRenderer::setInputTap's place): the chains goldens' input signals
   ChainsHost* chainsHostForTest() { return chains_.get(); }   // TEST ONLY: the chains host (events are injected, nodes inspected, only while no audio thread runs)
@@ -283,7 +284,7 @@ class LiveHost {
   int64_t latencyFrames() const;                              // the output's lateness behind the song: master chain + PDC trim + master pump effects (SongRenderer::latencyFrames)
   void postMeters();                                          // step 9: the bank's events as METERS records
   // ---- C2: the chains host (audio) ----
-  void applyChainParams();                                    // step 1, after the commands (and after a stalled play has started): drain chainParams_ into ChainsHost::param
+  void applyChainParams(uint32_t n);                                    // step 1, after the commands (and after a stalled play has started): drain chainParams_ into ChainsHost::param
   // ---- P4: MIDI (audio) ----
   void midiOp(bool start, int spp);                           // step 1: queue a MIDI Start (play) or Stop (stop command) for step 4, in the order the commands were applied
   void midiBegin(double t0, int64_t qStart);                                  // step 4: the ENDED timer's stop, midi_begin, then the queued Starts / Stops DIRECTLY on the scheduler (same `now`, same figures, before the step loop)
@@ -319,6 +320,7 @@ class LiveHost {
   FxPlan* stagedFx_[kSongNT + 1] = {nullptr};        // fxPlan() staged, fxCommit() moved to the ring
   int fxOut_ = 0;                                    // P3: FxCommit commands issued and their plans not yet collected (fxBack_ holds 64)
   PdcSlot ctlPdc_[kSongNT][kFxSlots]; int ctlPdcN_[kSongNT] = {0};   // P3: the pump slots of each track's LAST PLANNED chain (what pdc_plan reads; FxPlan::entry, not the audio thread's chain_)
+  void (*testCmdSeam_)(void*) = nullptr; void* testCmdSeamUser_ = nullptr;
   void (*testAudioSeam_)(void*) = nullptr; void* testAudioSeamUser_ = nullptr;
   void (*testTap_)(void*, Mixer&, int64_t) = nullptr; void* testTapUser_ = nullptr;   // TEST ONLY: setTestTap
   std::unique_ptr<LiveFont> fonts_[THUNDER_LIVE_MAX_FONTS];

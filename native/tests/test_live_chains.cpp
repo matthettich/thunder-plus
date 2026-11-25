@@ -8,10 +8,12 @@
 #include <algorithm>
 #include <thread>
 
+#include "chains/cdiff.h"
 #include "chains/chost.h"
 #include "live_common.h"
 #include "master/chain.h"
 #include "render/render.h"
+#include "rt/spsc.h"
 
 using namespace lt;
 constexpr int Q = THUNDER_LIVE_QUANTUM;
@@ -92,9 +94,18 @@ static void testTransport() {
     thunder_live_opts o = copts(THUNDER_LIVE_F_DUMP_STEPS); Rig a(o); a.H.song(songOf(patchOf(330, 0))); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); po.test_once = 1; a.play(&po);
     bool ended = false, idle = false, playingWhileEnded = true; int k = 0;
     for (; k < 600 && !idle; k++) { a.run(Q * 8); const int s = a.st().state; if (s == THUNDER_LIVE_STATE_ENDED) { ended = true; playingWhileEnded = playingWhileEnded && a.ch()->playing(); } if (s == THUNDER_LIVE_STATE_IDLE && ended) idle = true; }
-    CHECK(ended && idle, "the song ended and the 0.3 s timer ran (%d)", k); CHECK(playingWhileEnded, "ENDED: the chains still play"); CHECK(!a.ch()->playing(), "after the 0.3 s timer (IDLE): stop() as the page's tStop");
+    CHECK(ended && idle, "the song ended and the 0.3 s timer ran (%d)", k);
+ CHECK(playingWhileEnded, "ENDED: the chains still play"); CHECK(!a.ch()->playing(), "after the 0.3 s timer (IDLE): stop() as the page's tStop");
+    { const uint32_t p0 = a.st().chains_plans; CHECK(a.H.song(songOf(patchOf(330, 1)), 2) == 0 && a.st().chains_plans == p0, "(L4a) a publish after ENDED / IDLE makes no plan");
+      thunder_live_play_opts p2 = playOpts(THUNDER_LIVE_NOW); p2.test_once = 1; CHECK(a.play(&p2) == 0 && a.st().chains_plans == p0 + 1, "(L4a) the play makes it (plans %u)", a.st().chains_plans); a.run(Q * 8);
+      CHECK(a.H.song(songOf(patchOf(330, 1)), 3) == 0 && a.st().chains_plans == p0 + 1, "(L4a) and chainsSong_ matches"); }
     Rig b(copts()); b.H.song(songOf(patchOf(330, 0))); b.play(); b.run(Q * 20); b.H->hold(THUNDER_LIVE_NOW); bool held = false; for (int i = 0; i < 400 && !held; i++) { b.run(Q * 8); held = b.st().state == THUNDER_LIVE_STATE_HELD; }
-    CHECK(held, "HELD reached"); b.run(Q * 8); CHECK(b.ch()->playing(), "HELD: the chains keep playing until the stop");
+    CHECK(held, "HELD reached");
+    { const uint32_t p0 = b.st().chains_plans; CHECK(b.H.song(songOf(patchOf(330, 1)), 2) == 0 && b.st().chains_plans == p0, "(L4a) a publish while HELD (the IDLE path) makes no plan yet");
+      b.run(Q * 4); CHECK(b.play() == 0 && b.st().chains_plans == p0 + 1, "(L4a) the play after it makes the plan (plans %u)", b.st().chains_plans); b.run(Q * 8);
+      CHECK(b.ch()->node(1) && b.ch()->node(1)->engine().patchModules() == 5, "(L4a) and the node runs it");
+      CHECK(b.H.song(songOf(patchOf(330, 1)), 3) == 0 && b.st().chains_plans == p0 + 1, "(L4a) chainsSong_ matches the song of the play: the same song makes no plan"); }
+    b.H->hold(THUNDER_LIVE_NOW); held = false; for (int i = 0; i < 400 && !held; i++) { b.run(Q * 8); held = b.st().state == THUNDER_LIVE_STATE_HELD; } b.run(Q * 8); CHECK(b.ch()->playing(), "HELD: the chains keep playing until the stop");
     b.H->stop(THUNDER_LIVE_NOW); b.run(Q * 2); CHECK(!b.ch()->playing(), "the stop after HELD: not playing");
   }
 }
@@ -148,6 +159,39 @@ static void testEdits() {
     CHECK(E.H.song(SX1, 2) == 0 && edit(E, kEditOsc) == 0, "structural publish, then chain_edit freq 441 before the next quantum");
     P.run(Q * 40); E.run(Q * 40);
     CHECK(ndiff(P.l, E.l) == 0 && ndiff(P.r, E.r) == 0, "(R7) the records are applied AFTER the commit: %zu samples differ", ndiff(P.l, E.l));
+  }
+
+  // L1: the records of a quantum are only those in the ring BEFORE its command loop. A TEST seam between the command loop and the param drain publishes a structural change and then chain_edits a value: the commit is not yet
+  // seen by this quantum's loop, so the records must wait for the next quantum (where they meet the new patch). The same sends made BEFORE the next quantum give the same samples.
+  {
+    struct Seam { Rig* R; const std::string* song; bool armed; int rc[2]; };
+    Rig L(copts()), E(copts()); const std::string SXL = SX1; Seam sm{&L, &SXL, false, {0, 0}};
+    L.H.song(S0); L.play(); L.run(kEdit); E.H.song(S0); E.play(); E.run(kEdit + Q);
+    L.H->setTestCommandSeam([](void* u) { Seam* m = (Seam*)u; if (!m->armed) return; m->armed = false; m->rc[0] = m->R->H.song(*m->song, 2); m->rc[1] = edit(*m->R, kEditOsc); }, &sm);
+    sm.armed = true; L.run(Q);   // the seam fires in this quantum
+    CHECK(sm.rc[0] == 0 && sm.rc[1] == 0, "(L1) the seam's publish and chain_edit were accepted (%d %d)", sm.rc[0], sm.rc[1]);
+    L.H->setTestCommandSeam(nullptr, nullptr);
+    CHECK(E.H.song(SX1, 2) == 0 && edit(E, kEditOsc) == 0, "reference: both sent before the next quantum");
+    L.run(Q * 40); E.run(Q * 40);
+    CHECK(ndiff(L.l, E.l) == 0 && ndiff(L.r, E.r) == 0, "(L1) records pushed after the command loop meet the NEW patch (next quantum): %zu samples differ", ndiff(L.l, E.l));
+    CHECK(L.ch()->node(1) && L.ch()->node(1)->engine().patchModules() == 5, "(L1) the swap landed");
+  }
+  {   // Spsc::avail (consumer side snapshot)
+    Spsc<int, 4> q; int v; CHECK(q.avail() == 0, "avail of an empty ring"); q.push(1); q.push(2); CHECK(q.avail() == 2, "avail 2"); q.pop(v); CHECK(q.avail() == 1, "avail 1 after a pop"); q.push(3); q.push(4); q.push(5); CHECK(q.avail() == 4 && !q.push(6), "avail 4 of 4 (full)");
+    for (int i = 0; i < 4; i++) q.pop(v); CHECK(q.avail() == 0 && v == 5, "avail 0 after draining (wrapped indices)");
+  }
+
+  // L2: a play refused by the chains (E_BUSY: the plan of the earlier play is still in flight) sends NOTHING: no effects plans as commits, nothing changed. The run with the refused call equals the run without it.
+  {
+    const uint32_t FXF = THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER; const std::string S2x = songOf(patchOf(330, 2));
+    Rig A(copts(FXF)), B(copts(FXF)); int64_t rr = 0;
+    for (Rig* R : {&A, &B}) { R->H.song(S0); R->play(); R->run(kEdit); R->H->stop(THUNDER_LIVE_NOW); R->run(Q * 4); R->H.song(SX1, 2); CHECK(R->play() == 0, "play with a plan (in flight)"); R->H->stop(THUNDER_LIVE_NOW); R->H.song(S2x, 3); }
+    const thunder_live_stats a0 = A.st(); const int rc = A.play(); const thunder_live_stats a1 = A.st();
+    CHECK(rc == THUNDER_LIVE_E_BUSY, "(L2) a play that needs a plan while one is in flight: E_BUSY (%d)", rc); (void)rr;
+    CHECK(a1.cmd_busy == a0.cmd_busy + 1 && a1.chains_busy == a0.chains_busy + 1 && a1.chains_plans == a0.chains_plans && a1.song_pending == a0.song_pending, "(L2) counted, nothing else moved");
+    A.run(Q * 4); B.run(Q * 4); CHECK(A.st().cmds_applied == B.st().cmds_applied, "(L2) the refused play put no command in the ring (%llu vs %llu applied)", (unsigned long long)A.st().cmds_applied, (unsigned long long)B.st().cmds_applied);
+    CHECK(A.play() == 0 && B.play() == 0, "the retry works"); A.run(Q * 40); B.run(Q * 40);
+    CHECK(ndiff(A.l, B.l) == 0 && ndiff(A.r, B.r) == 0 && A.st().fx_failed_blocks == 0, "(L2) the run with the refused play equals the run without: %zu differ", ndiff(A.l, B.l));
   }
   // the mixer's bus plan is the commit's alone (R7): a refused plan with another bus plan must leave it
   {
@@ -248,6 +292,14 @@ static void testChainEditErrors() {
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // events from the sequencer reach the nodes: BYP (command 38, value 0x11: switch 1 bypassed) and TPO (19, 90) on the chain's track
+static void testNoChains() {
+  std::printf("a song with no chains\n");
+  std::string t = songOf(patchOf(330, 0)); t.resize(t.find(",\"chainPatch\"")); t += "}";
+  Song song; JsonError je; CHECK(song.load(t.data(), t.size(), &je, true), "the song without a chain patch loads");
+  CHECK(bus_plan_equal(BusPlan(), bus_plan(song.chainPatch, song.chainOn)), "(L4b) bus_plan_equal(BusPlan(), bus_plan(no chain patch)): R3 case (a) holds");
+  Rig R(copts()); R.H.song(t); R.play(); R.run(Q * 40); R.H.song(t, 2); R.run(Q * 4); R.H.song(t, 3);
+  const thunder_live_stats st = R.st(); CHECK(st.chains_plans == 0 && st.chains_nodes == 0 && st.chains_refused == 0, "(L4b) no plan is ever made for a song with no chains (plans %u nodes %u)", st.chains_plans, st.chains_nodes);
+}
 static void testSeqEvents() {
   std::printf("events through the sequencer\n");
   const char* row = "[60,-1,-1,-1,-1,0,38,17,19,90,-1,-1]";
@@ -333,6 +385,7 @@ int main() {
   testBusy();
   testRefused();
   testChainEditErrors();
+  testNoChains();
   testSeqEvents();
   testApi();
   testElectro();

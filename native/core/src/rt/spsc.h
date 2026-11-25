@@ -29,6 +29,9 @@ struct Spsc {
   uint32_t space() const {                  // producer: free slots (a lower bound: the consumer may free more meanwhile)
     return N - (head.load(std::memory_order_relaxed) - tail.load(std::memory_order_acquire));
   }
+  uint32_t avail() const {                  // consumer: what can be popped now (a lower bound: the producer may push more meanwhile). Used to take a SNAPSHOT of the ring before other work (C2 L1)
+    return head.load(std::memory_order_acquire) - tail.load(std::memory_order_relaxed);
+  }
   bool empty() const {                      // consumer
     return tail.load(std::memory_order_relaxed) == head.load(std::memory_order_acquire);
   }
