@@ -51,6 +51,8 @@ object BridgeTranslator {
         data class BufUse(val id: Int, val pad: Int, val layer: Int, val kind: String, val ii: Int, val vk: Int, val num: Int) : LiveCall()
         data class BufFree(val id: Int) : LiveCall()
         data class Hello(val id: Int, val live: Boolean) : LiveCall()
+        /** The page's live transpose (the drum module's `lxp`): no live call exists (G11), so it only changes the SongFit verdict (a key-follow song then falls back). st = 0 is off. */
+        data class Lxp(val st: Int) : LiveCall()
     }
 
     sealed class Translation {
@@ -68,7 +70,13 @@ object BridgeTranslator {
         "note.on" to "notes from the host are not in the live API (live.h NOT IN THIS API)", "note.off" to "notes from the host are not in the live API (live.h NOT IN THIS API)",
         "midi.cfg" to "MIDI out on the live host arrives with H2", "dev.list" to "audio devices are the shell's own (H1c)", "dev.open" to "audio devices are the shell's own (H1c)",
         "rec.arm" to "recording is not on the live host", "rec.start" to "recording is not on the live host", "rec.stop" to "recording is not on the live host",
-        "render.start" to "renders do not go through the live host", "render.cancel" to "renders do not go through the live host", "link.set" to "Link is not on the live host", "lxp" to "the drum module command is not on the live host")
+        "render.start" to "renders do not go through the live host", "render.cancel" to "renders do not go through the live host", "link.set" to "Link is not on the live host")
+
+    /** The engines the core's pad renderer has (xeng.h and the layer stack; GUESS: kept by hand, a mismatch costs a fit reason, never a wrong sound) and the effect families (GUESS).
+     *  The optional drum module's engines are listed only when the build has it (LiveNative.nativeHasLxr: thunder_lxr_api() != null), so the page never counts on renders the core cannot make (verify-n2 F13). */
+    private val CORE_ENGINES = listOf("layers", "tone", "modal", "swarm", "drift", "piano", "ep", "organ", "breath", "strings", "fmdrum", "wind", "phase", "partials", "skin", "chip", "table", "vector", "scanned", "resynth", "bytebeat", "acid", "mach", "blip", "bass", "vox")
+    private val LXR_ENGINES = listOf("lxdrum", "lxsnare", "lxcym", "lxhat")
+    fun engineList(hasLxr: Boolean): List<String> = if (hasLxr) CORE_ENGINES + LXR_ENGINES else CORE_ENGINES
 
     /** The message's type without parsing the whole text (a song.load is a megabyte): the "t" member near the front, which JSON.stringify of {t: ..} writes first. */
     fun typeOf(raw: String): String? = Regex("\"t\"\\s*:\\s*\"([^\"]*)\"").find(raw.take(256))?.groupValues?.get(1)
@@ -101,6 +109,7 @@ object BridgeTranslator {
                     if (loop != null) 1 else 0, loop?.optInt("y0", 0) ?: 0, loop?.optInt("y1", 0) ?: 0, at(j),
                     if (j.has("seed") && !j.isNull("seed")) 1 else 0, j.optLong("seed", 0).toInt(), pdc, only, hasOnly))
             }
+            "lxp" -> call(LiveCall.Lxp(j.optInt("st", 0)))
             "stop" -> call(LiveCall.Stop(at(j)))
             "hold" -> call(LiveCall.Hold(at(j)))
             "loop" -> { val y0 = j.optInt("y0", 0); val y1 = j.optInt("y1", 0); call(LiveCall.Loop(if (j.optBoolean("has", j.has("y0"))) 1 else 0, y0, y1, at(j))) }
@@ -170,33 +179,42 @@ object BridgeTranslator {
  * (`sr`, `ch`, `frames` on every header or at least the first; N0's header had only pid, id, o, n, last: the live host needs sr, and `ch` defaults to 1). The store assembles little-endian float32
  * channels; buf.use takes them out. Pure: no Android type.
  */
-class PutStore(private val maxBytes: Long = 256L shl 20) {
+class PutStore(private val maxBytes: Long = 256L shl 20, private val staleMs: Long = 30_000L, private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L }) {
     class Buf(val id: Int, val sr: Double, val ch: Int, val frames: Int, val data: Array<ByteArray>)
-    private class Pending(val pid: Int, val id: Int, val sr: Double, val ch: Int, val frames: Int, val data: Array<ByteArray>)
+    /** One transfer in flight: `got[c]` marks which floats of channel c have arrived (a chunk gap is an error, not silence). */
+    private class Pending(val pid: Int, val id: Int, val sr: Double, val ch: Int, val frames: Int, val data: Array<ByteArray>, val born: Long) {
+        val got = Array(ch) { java.util.BitSet(frames) }
+        val bytes: Long get() = frames.toLong() * 4 * ch
+    }
     private var cur: JSONObject? = null
     private val parts = HashMap<Int, Pending>()   // by pid
     private val done = HashMap<Int, Buf>()        // by id
     var held = 0L; private set
     /** The pid of the chunk just handled (so the shell can answer `put.done {pid}` whether it worked or not). */
     var lastPid = -1; private set
+    /** Transfers still in flight (tests, the status line). */
+    val inFlight: Int get() = parts.size
 
-    /** A header message (JSON text). Returns an error text, or null. */
+    /** A header message (JSON text). Returns an error text, or null. A second header before the bytes of the first REPLACES it (the stale one would take the next ArrayBuffer): the old one is reported. */
     fun header(text: String): String? {
         val j = try { JSONObject(text) } catch (e: JSONException) { return "put.header is not JSON" }
-        if (cur != null) return "put.header while a chunk is still expected"
+        sweep()
+        val stale = cur != null
         cur = j
-        return null
+        return if (stale) "put.header while a chunk is still expected (the earlier header is dropped)" else null
     }
 
-    /** The bytes that follow a header. Returns (error, completedId): an error text; completedId >= 0 when the last chunk finished the buffer. */
+    /** The bytes that follow a header. Returns (error, completedId): an error text; completedId >= 0 when the last chunk finished the buffer. Any error drops the transfer's pid (its memory is released at once). */
     fun chunk(bytes: ByteArray): Pair<String?, Int> {
         val h = cur ?: return Pair("an ArrayBuffer without a put.header", -1)
         cur = null
+        sweep()
         val pid = h.optInt("pid", -1); val id = h.optInt("id", -1)
         lastPid = pid
         val c = h.optInt("c", 0); val o = h.optLong("o", 0); val n = h.optLong("n", 0)
         if (id < 0 || pid < 0) return Pair("put.header without id / pid", -1)
-        if ((bytes.size and 3) != 0) return Pair("put chunk is not whole floats", -1)
+        fun fail(msg: String): Pair<String?, Int> { dropPid(pid); return Pair(msg, -1) }
+        if ((bytes.size and 3) != 0) return fail("put chunk is not whole floats")
         var p = parts[pid]
         if (p == null) {
             val ch = h.optInt("ch", 1); val sr = h.optDouble("sr", Double.NaN)
@@ -207,19 +225,32 @@ class PutStore(private val maxBytes: Long = 256L shl 20) {
             if (frames.toLong() != n) return Pair("put: frames and n disagree", -1)
             val need = n * 4 * ch
             if (held + need > maxBytes) return Pair("put: too much audio held", -1)
-            p = Pending(pid, id, sr, ch, frames, Array(ch) { ByteArray((n * 4).toInt()) })
+            p = Pending(pid, id, sr, ch, frames, Array(ch) { ByteArray((n * 4).toInt()) }, clockMs())
             parts[pid] = p; held += need
-        }
-        if (c !in 0 until p.ch) return Pair("put: channel $c out of range", -1)
-        if (o < 0 || o * 4 + bytes.size > p.data[c].size) return Pair("put: chunk past the end of the buffer", -1)
+        } else if (p.id != id) return fail("put: pid $pid was started for id ${p.id}, not $id")
+        if (c !in 0 until p.ch) return fail("put: channel $c out of range")
+        if (o < 0 || o * 4 + bytes.size > p.data[c].size) return fail("put: chunk past the end of the buffer")
         System.arraycopy(bytes, 0, p.data[c], (o * 4).toInt(), bytes.size)
+        if (bytes.isNotEmpty()) p.got[c].set(o.toInt(), (o + bytes.size / 4).toInt())
         if (h.optBoolean("last", false)) {
+            // every float of every channel must have arrived: a lost chunk, or a stereo put whose right channel never came, is an error, never a silent stretch
+            for (k in 0 until p.ch) if (p.got[k].cardinality() != p.frames) return fail("put: incomplete (channel $k has ${p.got[k].cardinality()} of ${p.frames} floats)")
             parts.remove(pid)
             done.remove(p.id)?.let { held -= it.data.sumOf { d -> d.size.toLong() } }   // a new put under the same id replaces the old
             done[p.id] = Buf(p.id, p.sr, p.ch, p.frames, p.data)
             return Pair(null, p.id)
         }
         return Pair(null, -1)
+    }
+
+    private fun dropPid(pid: Int) { parts.remove(pid)?.let { held -= it.bytes } }
+
+    /** Releases transfers that never completed: older than [staleMs] (called on every header / chunk), or ALL of them (`force`: the page's pads.commit says the puts are over). Returns how many. */
+    fun sweep(force: Boolean = false): Int {
+        val now = clockMs(); var n = 0
+        val it = parts.values.iterator()
+        while (it.hasNext()) { val p = it.next(); if (force || now - p.born > staleMs) { held -= p.bytes; it.remove(); n++ } }
+        return n
     }
 
     fun take(id: Int): Buf? = done[id]

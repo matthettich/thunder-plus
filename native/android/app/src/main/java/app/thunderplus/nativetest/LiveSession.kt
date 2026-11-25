@@ -50,6 +50,7 @@ object LiveSession {
     @Volatile private var ducked = false
     @Volatile private var rememberedRow = 0
     @Volatile private var lastPlayReqMs = 0L
+    private val focusLock = Any()
     @Volatile var lastEvent = ""
         private set
 
@@ -129,20 +130,27 @@ object LiveSession {
     /** The user pressed Stop (anywhere) or a song ended for good: no remembered resume, focus given up, the A5 gate cancelled. */
     fun afterUserStop() { armed = false; LiveEngine.gateAbort("stopped"); abandonFocus(); refresh() }
 
+    /** Main thread (the listener's handler). The DECISION and the new `armed` / `ducked` happen here, at once, in order; only the engine calls go to the worker (verify-n2 F4). */
     private fun onFocusChange(change: Int) {
         val st = LiveEngine.status()
         val playing = st.state == LiveState.PLAYING || st.state == LiveState.HELD
-        val act = FocusPolicy.decide(change, playing, armed, ducked)
+        val act: FocusPolicy.Act
+        synchronized(focusLock) {
+            act = FocusPolicy.decide(change, playing, armed, ducked)
+            val n = FocusPolicy.next(act, FocusPolicy.State(armed, ducked))
+            if (act == FocusPolicy.Act.STOP_AND_REMEMBER) rememberedRow = st.row
+            armed = n.armed; ducked = n.ducked
+        }
         lastEvent = "focus $change -> $act"
         Log.i(TAG, lastEvent)
         exec.execute {
             when (act) {
                 FocusPolicy.Act.NONE -> {}
-                FocusPolicy.Act.STOP_FOR_GOOD -> { LiveNative.nativeTransportStop(-1L); LiveEngine.gateAbort("audio focus lost"); armed = false; abandonFocus() }
-                FocusPolicy.Act.STOP_AND_REMEMBER -> { rememberedRow = st.row; armed = true; LiveNative.nativeTransportStop(-1L); LiveEngine.gateAbort("audio focus lost (transient)") }
-                FocusPolicy.Act.DUCK -> { ducked = true; LiveNative.nativeSetDuck(FocusPolicy.DUCK_GAIN) }
-                FocusPolicy.Act.UNDUCK -> { ducked = false; LiveNative.nativeSetDuck(1f) }
-                FocusPolicy.Act.RESUME -> { armed = false; ducked = false; LiveNative.nativeSetDuck(1f); if (LiveEngine.active) LiveNative.nativePlay(rememberedRow) }
+                FocusPolicy.Act.STOP_FOR_GOOD -> { LiveNative.nativeTransportStop(-1L); LiveEngine.gateAbort("audio focus lost"); abandonFocus(); LiveNative.nativeSetDuck(1f) }
+                FocusPolicy.Act.STOP_AND_REMEMBER -> { LiveNative.nativeTransportStop(-1L); LiveEngine.gateAbort("audio focus lost (transient)") }
+                FocusPolicy.Act.DUCK -> LiveNative.nativeSetDuck(FocusPolicy.DUCK_GAIN)
+                FocusPolicy.Act.UNDUCK -> LiveNative.nativeSetDuck(1f)
+                FocusPolicy.Act.RESUME -> { LiveNative.nativeSetDuck(1f); if (LiveEngine.active) LiveNative.nativePlay(rememberedRow) }
             }
             if (act == FocusPolicy.Act.STOP_FOR_GOOD || act == FocusPolicy.Act.STOP_AND_REMEMBER) LiveBridge.send("{\"t\":\"device\",\"reason\":\"focus\",\"stopped\":true,\"resume\":" + (act == FocusPolicy.Act.STOP_AND_REMEMBER) + "}")
             refresh()

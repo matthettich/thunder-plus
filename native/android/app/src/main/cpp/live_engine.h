@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -22,6 +23,10 @@
 #include "thunder/live.h"
 
 namespace tpa {
+
+// The poller's STATE record carries THUNDER_LIVE_ST_* (1 playing, 2 stopped, 3 ended); everything above the poller (statusJson, LiveState.kt, the MIDI hook) speaks THUNDER_LIVE_STATE_* (0 idle, 1 playing, 2 ended, 3 held).
+// ONE mapping, here (verify-n2 F3): STOPPED -> IDLE (a user Stop shows "stopped"), ENDED -> ENDED (a natural end shows "song ended"). The HELD record sets HELD directly.
+inline int stateOfRecord(int st) { return st == THUNDER_LIVE_ST_PLAYING ? THUNDER_LIVE_STATE_PLAYING : st == THUNDER_LIVE_ST_ENDED ? THUNDER_LIVE_STATE_ENDED : THUNDER_LIVE_STATE_IDLE; }
 
 void setFlushToZero();   // arm64 FPCR.FZ / x86 FTZ+DAZ for the calling thread (the audio thread is the system's: set at the top of every callback; cheap)
 
@@ -50,7 +55,8 @@ class LiveEngine {
   bool created() const { return L_ != nullptr; }
   bool chainsOn() const { return chainsOn_; }   // the host was created with F_CHAINS
   const Config& config() const { return cfg_; }
-  thunder_live* handle() const { return L_; }
+  thunder_live* handle() const { return L_; }   // control-thread use only: the pointer is not protected against destroy()
+  int64_t engineOffset();                       // ANY thread: host frame - engine frame, 0 when destroyed (guarded against destroy(), verify-n2 F10)
 
   // AUDIO. `out` is interleaved stereo, `frames` frames. Never allocates, never blocks. Silence when the engine is not created or the handle is dead.
   void render(float* out, int frames, int64_t wallNs);
@@ -87,6 +93,7 @@ class LiveEngine {
   static int64_t monoNs();
 
   thunder_live* L_ = nullptr;
+  std::shared_mutex lifeM_;                   // destroy() takes it exclusively to free the host; the ANY-thread getters (statsJson) take it shared (verify-n2 F10)
   Config cfg_;
   bool chainsOn_ = false;
   std::vector<float> l_, r_;                  // the audio thread's de-interleave scratch (max_block each), made at create

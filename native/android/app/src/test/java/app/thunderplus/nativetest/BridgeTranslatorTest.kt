@@ -107,9 +107,14 @@ class BridgeTranslatorTest {
         assertEquals(LiveCall.BufFree(5), call("{\"t\":\"buf.free\",\"id\":5}"))
     }
 
+    @Test fun lxpOnlyChangesTheVerdict() {   // verify-n2 F6: the page's live transpose is a SongFit condition (G11), not an error
+        assertEquals(LiveCall.Lxp(5), call("{\"t\":\"lxp\",\"st\":5}"))
+        assertEquals(LiveCall.Lxp(0), call("{\"t\":\"lxp\"}"))
+    }
+
     @Test fun helloAndNotOnTheLiveHost() {
         assertEquals(LiveCall.Hello(3, true), call("{\"t\":\"hello\",\"id\":3,\"v\":1,\"app\":\"thunder\",\"live\":true}"))
-        for (t in listOf("song.patch", "kit.patch", "note.on", "note.off", "midi.cfg", "dev.list", "dev.open", "rec.arm", "render.start", "link.set", "lxp")) {
+        for (t in listOf("song.patch", "kit.patch", "note.on", "note.off", "midi.cfg", "dev.list", "dev.open", "rec.arm", "render.start", "link.set")) {
             val r = refused("{\"t\":\"$t\",\"id\":1}")
             assertEquals(t, r.where); assertEquals(1, r.replyId)
         }
@@ -156,5 +161,57 @@ class BridgeTranslatorTest {
         assertNull(s.header("{\"pid\":1,\"id\":1,\"o\":0,\"n\":2,\"last\":true,\"sr\":48000}")); s.chunk(floats(1f, 2f))
         assertNull(s.header("{\"pid\":2,\"id\":1,\"o\":0,\"n\":2,\"last\":true,\"sr\":48000}")); s.chunk(floats(9f, 9f))
         assertArrayEquals(floats(9f, 9f), s.take(1)!!.data[0]); assertEquals(8L, s.held)
+    }
+
+    // ---- verify-n2 F5: a missing chunk is an error, abandoned transfers are released ----
+    @Test fun aMissingChunkIsAnErrorNotSilence() {
+        val s = PutStore()
+        assertNull(s.header("{\"pid\":1,\"id\":1,\"c\":0,\"o\":0,\"n\":4,\"last\":false,\"sr\":48000,\"ch\":1}")); assertNull(s.chunk(floats(1f, 2f)).first)
+        // the chunk for floats 2..3 never arrives; `last` comes with an empty chunk
+        assertNull(s.header("{\"pid\":1,\"id\":1,\"c\":0,\"o\":4,\"n\":4,\"last\":true}"))
+        val r = s.chunk(ByteArray(0))
+        assertTrue(r.first!!.contains("incomplete")); assertEquals(-1, r.second)
+        assertNull(s.take(1)); assertEquals(0, s.inFlight); assertEquals(0L, s.held)   // dropped at once, memory released
+    }
+
+    @Test fun aStereoPutWithoutItsRightChannelIsAnError() {
+        val s = PutStore()
+        assertNull(s.header("{\"pid\":2,\"id\":2,\"c\":0,\"o\":0,\"n\":2,\"last\":true,\"sr\":48000,\"ch\":2}"))
+        assertTrue(s.chunk(floats(1f, 2f)).first!!.contains("channel 1"))
+        assertNull(s.take(2)); assertEquals(0L, s.held)
+    }
+
+    @Test fun aPidIsNotReusedForAnotherId() {
+        val s = PutStore()
+        assertNull(s.header("{\"pid\":3,\"id\":3,\"o\":0,\"n\":4,\"last\":false,\"sr\":48000}")); s.chunk(floats(1f, 2f))
+        assertNull(s.header("{\"pid\":3,\"id\":9,\"o\":2,\"n\":4,\"last\":true}"))
+        assertTrue(s.chunk(floats(3f, 4f)).first!!.contains("not 9")); assertEquals(0, s.inFlight); assertEquals(0L, s.held)
+    }
+
+    @Test fun aSecondHeaderReplacesTheStaleOne() {
+        val s = PutStore()
+        assertNull(s.header("{\"pid\":4,\"id\":4,\"o\":0,\"n\":1,\"last\":true,\"sr\":48000}"))
+        assertTrue(s.header("{\"pid\":5,\"id\":5,\"o\":0,\"n\":1,\"last\":true,\"sr\":48000}")!!.contains("dropped"))
+        val r = s.chunk(floats(7f)); assertNull(r.first); assertEquals(5, r.second); assertEquals(5, s.lastPid)   // the bytes belong to the NEW header
+    }
+
+    @Test fun abandonedTransfersAreReleasedByTimeoutAndByCommit() {
+        var now = 0L
+        val s = PutStore(staleMs = 1000, clockMs = { now })
+        assertNull(s.header("{\"pid\":6,\"id\":6,\"o\":0,\"n\":100,\"last\":false,\"sr\":48000}")); s.chunk(floats(1f))
+        assertEquals(1, s.inFlight); assertEquals(400L, s.held)
+        now = 500; assertEquals(0, s.sweep()); assertEquals(1, s.inFlight)
+        now = 1500; assertEquals(1, s.sweep()); assertEquals(0, s.inFlight); assertEquals(0L, s.held)
+        // a later header sweeps too
+        now = 2000; assertNull(s.header("{\"pid\":7,\"id\":7,\"o\":0,\"n\":100,\"last\":false,\"sr\":48000}")); s.chunk(floats(1f))
+        now = 4000; assertNull(s.header("{\"pid\":8,\"id\":8,\"o\":0,\"n\":100,\"last\":false,\"sr\":48000}")); assertEquals(0, s.inFlight)
+        s.chunk(floats(1f)); assertEquals(1, s.inFlight)
+        assertEquals(1, s.sweep(force = true)); assertEquals(0L, s.held)   // pads.commit
+    }
+
+    @Test fun theDrumModuleEnginesAreListedOnlyWhenTheBuildHasThem() {   // verify-n2 F13
+        assertTrue(BridgeTranslator.engineList(true).containsAll(listOf("lxdrum", "lxsnare", "lxcym", "lxhat")))
+        assertTrue(BridgeTranslator.engineList(false).none { it.startsWith("lx") })
+        assertTrue(BridgeTranslator.engineList(false).containsAll(listOf("layers", "blip", "bass", "vox")))
     }
 }
