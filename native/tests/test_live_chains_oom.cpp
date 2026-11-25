@@ -10,17 +10,17 @@
 #include <vector>
 #if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__) && !defined(THUNDER_SANITIZE_BUILD)
 #define ALLOC_AUDIT 1
-static long g_live = 0, g_failAt = 0, g_failN = 0;
+static long g_live = 0, g_failAt = 0, g_failN = 0, g_allocs = 0;   // g_allocs: every allocation call (the audio-thread audit)
 extern "C" { void* __libc_malloc(size_t); void* __libc_memalign(size_t, size_t); void* __libc_calloc(size_t, size_t); void* __libc_realloc(void*, size_t); void __libc_free(void*);
-void* malloc(size_t n) { if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; return __libc_malloc(n); }
-void* calloc(size_t a, size_t b) { if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; return __libc_calloc(a, b); }
-void* realloc(void* p, size_t n) { if (!p) { if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; } return __libc_realloc(p, n); }
-int posix_memalign(void** o, size_t al, size_t n) { if (g_failAt && ++g_failN == g_failAt) return 12; void* p = __libc_memalign(al, n); if (!p) return 12; g_live++; *o = p; return 0; }
-void* aligned_alloc(size_t al, size_t n) { if (g_failAt && ++g_failN == g_failAt) return nullptr; void* p = __libc_memalign(al, n); if (p) g_live++; return p; }
-void* memalign(size_t al, size_t n) { if (g_failAt && ++g_failN == g_failAt) return nullptr; void* p = __libc_memalign(al, n); if (p) g_live++; return p; }
+void* malloc(size_t n) { g_allocs++; if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; return __libc_malloc(n); }
+void* calloc(size_t a, size_t b) { g_allocs++; if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; return __libc_calloc(a, b); }
+void* realloc(void* p, size_t n) { g_allocs++; if (!p) { if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; } return __libc_realloc(p, n); }
+int posix_memalign(void** o, size_t al, size_t n) { g_allocs++; if (g_failAt && ++g_failN == g_failAt) return 12; void* p = __libc_memalign(al, n); if (!p) return 12; g_live++; *o = p; return 0; }
+void* aligned_alloc(size_t al, size_t n) { g_allocs++; if (g_failAt && ++g_failN == g_failAt) return nullptr; void* p = __libc_memalign(al, n); if (p) g_live++; return p; }
+void* memalign(size_t al, size_t n) { g_allocs++; if (g_failAt && ++g_failN == g_failAt) return nullptr; void* p = __libc_memalign(al, n); if (p) g_live++; return p; }
 void free(void* p) { if (p) g_live--; __libc_free(p); } }
 #else
-static long g_live = 0, g_failAt = 0, g_failN = 0;
+static long g_live = 0, g_failAt = 0, g_failN = 0, g_allocs = 0;
 #endif
 #include "live_common.h"
 
@@ -120,8 +120,29 @@ static void testDestroy() {
   level("stopped, a plan queued");
 }
 
+// the audio thread's side of the edits: the param records, setParam of every kind the page's chnDiff sends (a value, _byp, _bn which re-derives the bypass numbers, a CHN flip's bus map, a commit) allocate NOTHING in process()
+static void testAudioAlloc() {
+  std::printf("allocation during process()\n");
+#ifdef ALLOC_AUDIT
+  const std::string S0 = songOf(patchOf(330, 2)), S1 = songOf(patchOf(330, 2), false), S2 = songOf(patchOf(330, 3));
+  Host H(copts()); H.song(S0); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); H->play(po); int64_t fr = 0; H.run(Q * 8, Q, fr);
+  long worst = 0; int runs = 0;
+  auto edit = [&](const char* j) { const int rc = H->chainEdit((const uint8_t*)j, std::strlen(j), THUNDER_LIVE_NOW); CHECK(rc == 0, "edit %s: %d", j, rc); };
+  auto audit = [&](int nq) { std::vector<float> a(Q), b(Q); for (int i = 0; i < nq; i++) { const long c0 = g_allocs; H->process(a.data(), b.data(), Q, fr, 0); fr += Q; worst = std::max(worst, g_allocs - c0); runs++; } };
+  edit("[{\"op\":\"param\",\"id\":\"osc1\",\"name\":\"freq\",\"value\":500},{\"op\":\"param\",\"id\":\"mA\",\"name\":\"level\",\"value\":0.5}]"); audit(2);
+  edit("[{\"op\":\"param\",\"id\":\"z1\",\"name\":\"_bn\",\"value\":3},{\"op\":\"param\",\"id\":\"z2\",\"name\":\"_bn\",\"value\":3},{\"op\":\"param\",\"id\":\"osc1\",\"name\":\"_bn\",\"value\":2}]"); audit(2);
+  edit("[{\"op\":\"param\",\"id\":\"z1\",\"name\":\"_byp\",\"value\":1},{\"op\":\"param\",\"id\":\"z1\",\"name\":\"_byp\",\"value\":0}]"); audit(2);
+  edit("[{\"op\":\"param\",\"id\":\"z1\",\"name\":\"nonesuch\",\"value\":1}]"); audit(2);
+  CHECK(H.song(S1, 2) == 0, "keep-patch publish"); audit(3); H->collect();
+  CHECK(H.song(S2, 3) == 0, "structural publish"); audit(3); H->collect();
+  CHECK(H->stop(THUNDER_LIVE_NOW) == 0, "stop"); audit(2); CHECK(H->play(po) == 0, "play"); audit(4);
+  CHECK(worst == 0, "no allocation in %d process() calls around param records, _bn / _byp, a commit, a keep-patch commit, stop and play (worst %ld)", runs, worst);
+#endif
+}
+
 int main() {
   testDestroy();
+  testAudioAlloc();
   const long b0 = g_live; testSweep();
   CHECK(g_live - b0 <= engineLeak, "after the sweep every host is gone and what is left is the engine's own allowance (%+ld vs %ld)", g_live - b0, engineLeak);
   std::printf("live_chains_oom: %d checks, %d failed (engine leak allowance %ld)\n", g_checks, g_fail, engineLeak);
