@@ -272,9 +272,9 @@ int MidiHost::assignImpl(int port, const std::string& id) {
   return applyAssignLocked(port);
 }
 
-void MidiHost::setOutLatencyNs(int64_t ns) {
+int MidiHost::setOutLatencyNs(int64_t ns) {
   const int64_t v = ns < 0 ? 0 : ns > 2000000000LL ? 2000000000LL : ns;
-  viaControl([this, v] { std::lock_guard<std::mutex> g(ctl_); outLatNs_.store(v, std::memory_order_relaxed); if (o_) thunder_midiout_set_out_latency(o_, v); return 0; });
+  return viaControl([this, v] { std::lock_guard<std::mutex> g(ctl_); outLatNs_.store(v, std::memory_order_relaxed); if (o_) thunder_midiout_set_out_latency(o_, v); return 0; });
 }
 
 int MidiHost::debugTest() {

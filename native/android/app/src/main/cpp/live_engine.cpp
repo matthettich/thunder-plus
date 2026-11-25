@@ -55,7 +55,12 @@ void LiveEngine::stopThreads() {
   { std::lock_guard<std::mutex> g(qm_); }
   qcv_.notify_all();
   if (control_.joinable()) control_.join();
+  drainQueue();   // B4: BEFORE the poller join: the poller's state / tick hook may be waiting in call() on a task the control thread never popped
   if (poller_.joinable()) poller_.join();
+  drainQueue();
+}
+
+void LiveEngine::drainQueue() {
   std::lock_guard<std::mutex> g(qm_);
   for (auto& t : q_) { std::lock_guard<std::mutex> g2(t->m); t->done = true; t->rc = -1000; t->cv.notify_all(); }
   q_.clear();
@@ -179,7 +184,7 @@ void LiveEngine::pollLoop() {
       if (hookState >= 0 && stateHook_) stateHook_(hookState);
     }
     const int64_t now = monoNs();
-    if (now - lastHs > 100000000LL) { lastHs = now; thunder_live_host_stats(L_, outLat_.load(std::memory_order_relaxed), under_.load(std::memory_order_relaxed)); }
+    if (now - lastHs > 100000000LL) { lastHs = now; if (tickHook_) tickHook_(); thunder_live_host_stats(L_, outLat_.load(std::memory_order_relaxed), under_.load(std::memory_order_relaxed)); }
     if (!any) std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }

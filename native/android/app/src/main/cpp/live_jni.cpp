@@ -49,7 +49,8 @@ struct Live {
   int32_t (*aaTs)(void*, int32_t, int64_t*, int64_t*) = nullptr;   // H2: the clock map's AAudio pair (read by the audio callback only)
   int64_t (*aaWritten)(void*) = nullptr;
   std::atomic<bool> midiOn{false};     // H2: the MIDI host runs on this engine. Set before the stream starts, cleared after it stopped (the callback reads it plainly)
-  std::atomic<int64_t> lastLatNs{-1};
+  std::atomic<int64_t> lastLatNs{-1};   // the latency floor the MIDI host has accepted (set by the poller's tick hook only on rc 0)
+  std::atomic<int64_t> pendLatNs{-1};   // the floor nativeStatus wants applied: the poller thread does it (B1: no caller thread waits on the control thread), and retries while it answers BUSY (B5)
   int64_t rev = 0;
   std::vector<int> lastSlots;   // pads the previous project filled (to remove the ones a reload does not fill)
   // H1b: what the page last sent (song.load, kit.load): the texts SongFit and the kit entries read. Guarded by g_life.
@@ -156,6 +157,13 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   g.midiOn = false;
   if (thunder_midi* cm = thunder_live_midi(eng->handle())) g.midiOn = tpa::host().engineStartExternal(cm, (double)g.device.sampleRate, &liveTsRead, nullptr);
   if (!g.midiOn) LOGI("MIDI host did not start (MIDI out and in are off)");
+  eng->setTickHook([] {   // the poller thread: the clock map's latency floor (nativeStatus only posts it); a BUSY answer keeps it pending, so it is tried again at the next tick (B5)
+    const int64_t v = g.pendLatNs.load();
+    if (v < 0 || !g.midiOn) return;
+    const int rc = tpa::host().setOutLatencyNs(v);
+    if (rc == 0) g.lastLatNs = v;
+    if (rc != THUNDER_LIVE_E_BUSY) { int64_t exp = v; g.pendLatNs.compare_exchange_strong(exp, -1); }
+  });
   eng->setStateHook([](int st) { if (g.midiOn && st == THUNDER_LIVE_STATE_ENDED) tpa::host().setPlaying(false); });   // a song that ends by itself: the clock box goes quiet (the play and stop calls set it themselves)
   eng->startThreads();
   if (g.midiOn) {
@@ -165,6 +173,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
     });   // a copy of the engine: the runner cannot meet a freed one
     { std::lock_guard<std::mutex> lk(g_inMu); g_inEng = eng; }
     tpa::setMidiInSink(&midiInSink);
+    tpa::midiInStart();
   }
   { std::lock_guard<std::mutex> dl(g_dev);   // resolved before the stream runs: the status call reads the xrun count and buffer size through these (under g_dev)
     g.aaLib = dlopen("libaaudio.so", RTLD_NOW);
@@ -178,7 +187,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   if (started != MA_SUCCESS) {
     g.audioEng.store(nullptr, std::memory_order_release);
     g.eng.take();
-    tpa::setMidiInSink(nullptr); { std::lock_guard<std::mutex> lk(g_inMu); g_inEng.reset(); }
+    tpa::setMidiInSink(nullptr); tpa::midiInStop(); { std::lock_guard<std::mutex> lk(g_inMu); g_inEng.reset(); }
     eng->stopThreads(); if (g.midiOn) { g.midiOn = false; tpa::host().engineStop(); }
     eng->destroy();
     { std::lock_guard<std::mutex> dl(g_dev); ma_device_uninit(&g.device); g.deviceInit = false;
@@ -203,13 +212,14 @@ void teardownLocked() {
   { std::lock_guard<std::mutex> dl(g_dev); if (g.deviceInit) { ma_device_uninit(&g.device); g.deviceInit = false; } }   // stops the callback
   g.audioEng.store(nullptr, std::memory_order_release);
   tpa::setMidiInSink(nullptr);
+  tpa::midiInStop();   // B3: the reader leaves with the engine (joined, 200 ms bound); the next start restarts it
   { std::lock_guard<std::mutex> lk(g_inMu); g_inEng.reset(); }
   if (eng) eng->stopThreads();   // the control thread is the live handle's ONE control thread: it ends before this thread makes the MIDI control calls below
   if (g.midiOn) { g.midiOn = false; tpa::host().engineStop(); }   // the sender delivers the Stop (<= about 0.5 s), then thunder_midiout_free: BEFORE destroy (live.h thunder_live_midi)
   if (eng) eng->destroy();       // joins what is left, then thunder_live_destroy
   eng.reset();
   g.lastSlots.clear();
-  g.lastLatNs = -1;
+  g.lastLatNs = -1; g.pendLatNs = -1;
   g.songText.reset(); g.kitText.reset(); g.kitDoc.reset();   // the page re-sends song and kit after an engine reset: a verdict must never be judged with the old kit
   { std::lock_guard<std::mutex> dl(g_dev); if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; g.aaTs = nullptr; g.aaWritten = nullptr; }
 }
@@ -366,13 +376,13 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStatu
           rtlog_host_underruns(&g_lrt, g_xrun.onStream(x));
           if (g.midiOn && b > 0 && g.device.sampleRate > 0) {   // the clock map's floor: one output buffer (an upper bound, as the host stats use it); only when it changed
             const int64_t ns = (int64_t)b * 1000000000LL / (int64_t)g.device.sampleRate;
-            if (ns != g.lastLatNs) { g.lastLatNs = ns; newLatNs = ns; }   // applied below, after the locks are released: setOutLatencyNs goes through the control thread (up to 1.5 s) and must not hold rerouteLock
+            if (ns != g.lastLatNs.load()) newLatNs = ns; else g.pendLatNs.store(-1);   // back at the accepted value: drop a stale pending one;   // handed to the poller below: setOutLatencyNs goes through the control thread (up to 1.5 s): never on this (maybe main) thread
           }
         }
         ma_mutex_unlock(&g.device.aaudio.rerouteLock);
       }
     } }
-  if (newLatNs >= 0) tpa::host().setOutLatencyNs(newLatNs);
+  if (newLatNs >= 0) g.pendLatNs.store(newLatNs);   // B1: posted, not called
   return env->NewStringUTF(eng->statusJson().c_str());
 }
 JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStats(JNIEnv* env, jobject) {
