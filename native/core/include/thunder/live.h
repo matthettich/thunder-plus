@@ -72,7 +72,8 @@
                 have fixed sizes, the same on wasm32 and 64-bit (no pointer, no size_t, no long): see EVENTS. A function a build does not have is not exported; the
                 caps word says which optional parts the build has.
 
-   NOT IN THIS API  chains and bus modules (the chains host: ruling D1; a song that uses them falls back to the JS core); the stretch (sync 2 / 3, sx: D10); the U04 drum module (U04's
+   NOT IN THIS API  the chains host's sidechain taps and sends, the 20 ms CHN switch ramp, Resample takes and the pump service() driver (C3 / C4: a song that uses them is not yet played by this host; a pump module in a live chain has no spare instance
+                until then); the stretch (sync 2 / 3, sx: D10); the U04 drum module (U04's
                 seam is not wired; `lxp` has no function); a live swap of pump effects (D1; psetPump exists in C++, but one command would be 1.1 KB); note.on / note.off from
                 the host (keys, previews and MIDI thru stay with the page: D16); MIDI in, MIDI clock in, Link, recording, input metering; pad renders, song renders and
                 stems (render.h); the live engines other than bass / vox / acid / mach (D8: a pad of another kind stays on the SAMPLER route and plays its rendered twin);
@@ -129,6 +130,7 @@ extern "C" {
 #define THUNDER_LIVE_F_METERS 8u          /* the host makes a MeterBank (meters events only while thunder_live_meters_want has switched them on) */
 #define THUNDER_LIVE_F_DUMP_STEPS 16u     /* TEST ONLY: thunder_live_dump_step is available (see there); costs a ring of opts.dump_steps steps and a copy of every step's events on the audio thread */
 #define THUNDER_LIVE_F_PAGE_TIMING 32u    /* TEST ONLY: voices timed as the web page's player (VoicePool::setPageTiming, "never on in an app"), for the A/B against the JS engine */
+#define THUNDER_LIVE_F_CHAINS 64u         /* the host makes a chains host (ChainsHost, live; opts.chains_bytes is its memory budget): the song's chains play (see CHAINS below). create fails ("out of memory") when it cannot be made. Without it the host is as it was: no chain, no bus, thunder_live_chain_edit is E_STATE */
 
 /* caps (thunder_live_caps) */
 #define THUNDER_LIVE_CAP_EFFECTS 1u       /* tfx effects can be made (the effects library is linked); fx_plan does not answer E_UNSUPPORTED. Set by P5 when the core is built with THUNDER_HAVE_TFX */
@@ -136,6 +138,7 @@ extern "C" {
 #define THUNDER_LIVE_CAP_LIVE_SWAP 4u     /* thunder_live_pad_live may be called while a song plays (the live pool is swapped with the pads snapshot). NOT BUILT, and not set (P5): the live host has no live-engine pads at all yet, see CAP_ENGINES */
 #define THUNDER_LIVE_CAP_SF 8u            /* font_add / pad_sf work. NOT SET by P5: LiveHost does not wire SoundFonts yet, font_add / font_remove / pad_sf answer E_UNSUPPORTED whatever their arguments (pad_sf_clear: 0 for a pad in range) */
 #define THUNDER_LIVE_CAP_TAKE 16u         /* thunder_live_pad_take is available (PadsHost::setPadTake, built in P2; set by P5 in every build) */
+#define THUNDER_LIVE_CAP_CHAINS 0x200u    /* F_CHAINS exists and thunder_live_chain_edit works (bit 9: set by P5 / C2 in every build; bits 5..8 are CAP_ENGINES) */
 #define THUNDER_LIVE_CAP_ENGINES 0x1E0u   /* bits 5..8: live engines built: bass 1<<5, vox 1<<6, acid 1<<7, mach 1<<8 (THUNDER_RENDER_LIVE_x kind k: bit 4 + k). NONE is set by P5: pad_live answers E_UNSUPPORTED (pad_live_clear: 0 for a pad in range); a live pad stays on the SAMPLER route (ruling D8) */
 
 typedef struct thunder_live thunder_live;
@@ -155,6 +158,8 @@ typedef struct thunder_live_opts {
   int32_t max_voices;           /* sampler voices (the SoundFont pool has its own 32); 0: 64; 1 .. 256 */
   int32_t dump_steps;           /* F_DUMP_STEPS: steps the dump ring holds; 0: 256 */
   uint32_t reserved1, reserved2;/* must be 0 */
+  uint64_t chains_bytes;        /* APPENDED by C2 (the `size` rule: an older caller's struct ends before it and gets 0): F_CHAINS: the chains host's TOTAL memory budget in bytes (the patches of every node, the swap's second set included: chost.h MEMORY).
+                                   0: 1.5 GiB (kChainsHostDefaultBudget); a phone host passes less. A plan that would pass it is refused whole (the song plays with the chains it had, counted: stats.chains_over_budget). Ignored without F_CHAINS */
 } thunder_live_opts;
 
 /* ANY. The ABI number this header is (THUNDER_LIVE_ABI) and the optional parts this BUILD has (THUNDER_LIVE_CAP_*): the page's hello / caps. They do not depend on a handle. */
@@ -236,12 +241,27 @@ typedef struct thunder_live_stats {
   uint32_t evt_crit_dropped;    /* critical records (STATE, HELD, ERROR, SONG, PADS) the critical ring refused: see EVENTS; also counted in evt_dropped */
   uint32_t cmds_cleared;        /* waiting timed commands dropped by a stop or a play (see TIME) */
   uint32_t cmds_no_seq;         /* bpm / loop / perf commands applied with no sequencer running: dropped and counted here (they are also in cmds_applied) */
+  /* APPENDED by C2 (the `size` rule; all zero without F_CHAINS). The audio side's, published once a quantum like the rest: */
+  uint64_t chains_blocks;       /* node blocks run (one per node per quantum) */
+  uint64_t chains_failed_blocks;/* blocks in which the engine failed: that track's output is silence for the block (the buses are cleared, as the worklet's catch does) */
+  uint64_t chains_events;       /* chc / tempo events applied to the nodes */
+  uint64_t chains_events_dropped;/* events that found the host's 4096-event queue full (the newest is dropped) */
+  uint64_t chains_events_bad;   /* events with a track / switch / time / value that cannot be applied */
+  uint64_t chains_chc_no_node;  /* chc events for a track that has no node (the page: nothing) */
+  uint64_t chains_feed_mismatch;/* a feed the mixer handed a node whose track is not the node's bus map's j-th: cannot happen with a plan from the song; the tests assert 0 */
+  /* The control side's (relaxed atomics of the host: any thread reads them): */
+  uint32_t chains_nodes;        /* nodes the audio side has now (as of the last quantum) */
+  uint32_t chains_plans;        /* plans handed to the audio side (a play's or a publish's) */
+  uint32_t chains_refused;      /* plans the host refused whole (the engine refused the patch, or it was over budget): the call SUCCEEDED, the song plays with the chains it had (none: dry) */
+  uint32_t chains_over_budget;  /* of those, refused for the memory budget */
+  uint32_t chains_busy;         /* plan calls answered E_BUSY because a plan was still in flight */
+  uint32_t chains_params_stale; /* parameter records the audio side DROPPED because a whole-patch plan (a swap) was committed after they were pushed: the swap carries every value of the song (C2 V3a) */
 } thunder_live_stats;
 int thunder_live_stats_get(const thunder_live* L, thunder_live_stats* out);
 
 /* ANY thread, wait-free. THE ENGINE OFFSET: *out = (host frame) - (engine frame), the one number that maps the engine's own timeline to the host's (see TIME and MIDI). It is ONE 64-bit atomic that the audio side stores in
    thunder_live_process when it changes (the first call: that call's frame0; every re-anchor, in the call that makes it, even one that completes no quantum), so a read is never torn and never stale for a call that has returned.
-   0 before the first process call with frames > 0. May be negative (a backward re-anchor). Returns 0, or E_ARG (NULL handle or out). Works on a dead handle. (stats_get has no room for it: its 240 bytes are full.) */
+   0 before the first process call with frames > 0. May be negative (a backward re-anchor). Returns 0, or E_ARG (NULL handle or out). Works on a dead handle. (it is its own call: two relaxed counters in stats_get could tear it by one quantum.) */
 int thunder_live_engine_offset(const thunder_live* L, int64_t* out);
 
 /* ANY. A block of `nfloats` floats (> 0, <= 2^30) from the host's own allocator (`new float[]`: aligned as operator new[] is for float, which is at least alignof(float) and 16 bytes on the 64-bit targets; nothing in the core needs more than alignof(float)), uninitialised, for thunder_live_pad_take (the worklet writes a pad into it and hands it over,
@@ -261,7 +281,7 @@ void thunder_live_free(float* block);   /* ANY. NULL is fine. Only for a block f
        The SONG record is still posted, at the next quantum.
      PLAYING (a play was issued and no stop): the new Song goes to the PLAY's SeqSession as a SUCCESSOR snapshot (SeqSession::publish, session.h:51) and the audio side adopts it at
        the top of the next quantum (step 2; the Seq that was running hands its state to it: Seq::takeOver). A note already booked is not re-timed (the web has the same limit).
-       The bus plan built from the song's chains patch is published beside it and adopted at the same quantum boundary or the next (never earlier than the song).
+       The bus plan built from the song's chains patch is published beside it and adopted at the same quantum boundary or the next (never earlier than the song); WITH F_CHAINS the mixer's bus plan is set by the chains host's commit alone (see CHAINS) and this one is only freed.
      A PUBLISH WHILE THE PREVIOUS ONE IS NOT ADOPTED YET is queued: up to THUNDER_LIVE_SONG_RING (16) snapshots may wait; at the next quantum top the audio side adopts only the NEWEST;
        the older ones are retired unrun and freed by thunder_live_collect; ONE SONG record, for the newest rev, covers every lower rev adopted in that quantum (core.h's rule). The 17th
        waiting publish is E_BUSY and nothing changed (the registry growth it staged is rolled back).
@@ -425,7 +445,7 @@ int thunder_live_mix_set(thunder_live* L, int track, int key, double value, doub
    staged and not yet committed, as planned), with `mode` (0 off, 1 auto, 2 on), and publishes it; the audio side adopts it at the top of the next quantum and applies it with a 50 ms glide (10 ms when a play starts
    the same quantum); Auto is in force only while PLAYING. It is NOT recomputed by any other call: the page calls it after an fx_commit that changes a pump slot, after a song_publish that changes the chains patch,
    and when the mode changes (play builds it itself). The BUS PLAN has no call of its own: song_publish builds it (bus_plan(song.chainPatch, song.chainOn)) and publishes it beside the song snapshot (a bus EXISTS only
-   with a chains host: ruling D1; the plan today only gives solo its chains-aware audible mask). Errors: E_ARG, E_MEMORY, E_BUSY (a plan is waiting; retry), E_STATE (no song published). */
+   with a chains host: ruling D1, F_CHAINS; without one the plan only gives solo its chains-aware audible mask). Errors: E_ARG, E_MEMORY, E_BUSY (a plan is waiting; retry), E_STATE (no song published). */
 int thunder_live_pdc_set(thunder_live* L, int mode);
 
 /* ---- 6. EFFECTS AND MASTER -------------------------------------------------------------------------------------------------------------------------------- */
@@ -451,6 +471,31 @@ int thunder_live_fx_param(thunder_live* L, int track, int slot, const double* p1
    states). BUILT IN C++ by U37 P3 (LiveHost::masterConfig: MasterChain::configure at the top of a quantum; a changed latency shows in stats.latency_frames; no PDC path is needed, the PDC plan never reads the master chain): P5 sets THUNDER_LIVE_CAP_MASTER_SWAP. (The sentence below about E_UNSUPPORTED is for a build without it.) Without the cap: E_UNSUPPORTED,
    nothing changes (the page then republishes the song and the chain follows at the next play). Needs F_MASTER (else E_STATE). n above 4 MiB is E_LIMIT; mst_json NULL with n > 0, or `safety` not 0 / 1, is E_ARG. Errors: E_ARG, E_LIMIT, E_MEMORY, E_STATE, E_BUSY (E_UNSUPPORTED never in a P5 build). */
 int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t n, int safety);
+
+/* ---- 6b. CHAINS (F_CHAINS; THUNDER_LIVE_CAP_CHAINS) ---------------------------------------------------------------------------------------------------------- */
+/* CHAINS. The song's chains (index.html chainsNode / routeTrack / busSync: one ChainsNode per track that has CHN on and a Chain Out in the patch, every such track heard; mute and solo are the mixer's) play through the
+   host exactly as through SongRenderer::setChains (bit for bit for a song played from its start). WHAT THE CONTROL SIDE DOES (in `play` and in a PLAYING `song_publish`; an IDLE publish builds nothing: the next play does): it
+   compares the new song's chain patch and CHN flags with those the audio side has (or will have once what is in flight lands) and acts by what differs:
+     nothing differs ............................ nothing is made or sent;
+     only parameter values (same modules, cables, text) ... the new values go to every node through a fixed ring (no reset, no click: the page's `param` op); a value that does not fit the record is a structural change;
+     only the bus plan / the CHN flags ........... a plan that leaves every existing node's patch alone (module state survives) and gives the nodes their new bus maps; plus the parameter values;
+     the patch differs otherwise ................. a WHOLE-PATCH SWAP (ruling D4 (a)): every node gets the new patch, its module state is RESET, a click is accepted.
+   The plan is committed at the top of the quantum that applies it, BEFORE the song's adoption (step 1 against step 2; or a few quanta before it when the adoption waits for a full return ring: accepted), and the mixer's bus plan
+   is set by that commit ONLY. ONE PLAN IS IN FLIGHT at a time: a play or a publish that needs a plan while the previous one has not come back (thunder_live_collect settles it) is E_BUSY with NOTHING changed (retry after the
+   next callback, as every edit). A plan the engine refuses (the patch) or that would pass opts.chains_bytes is NOT an error: the call succeeds, the song plays with the chains it had (none: dry), stats.chains_refused counts it
+   and the next publish or play tries again. TRANSPORT (the page's chainsTempo): a play sends {tempo = the Seq's, playing true} to every node (startN + 1; a host that was already playing goes through not playing first,
+   as the page's tStart does), a stop (and the 0.3 s timer after ENDED, as the page's tStop) {playing false}; HELD keeps playing until the stop; a tempo change reaches the nodes as the sequencer's tempo event. A play and a stop
+   clear the events waiting for their quantum. The host starts not playing. EVENTS: the tracker's BYP (chc) and tempo events reach the nodes at the quantum the page's rules give (chost.h EVENTS). NOT IN THIS VERSION: sidechain taps
+   and sends (a patch's Sidechain In / Out are silent), the 20 ms CHN switch ramp, Resample takes, and the pump spare service (nobody makes a pump module's spare: a bad pump block is silent for good). */
+
+/* CONTROL. Moves parameters of the playing chains NOW, before the shell's next song_publish (the page's `chnDiff` ops `param`: {"op":"param","id":"vcf1","name":"cutoff","value":0.4}): `ops_json` is a JSON ARRAY of
+   such ops (the page's own shape: id, name, value; other fields are ignored), ALL OR NOTHING. Every node gets every op (each holds the whole patch). The shell still publishes the song afterwards: that publish then finds
+   the same values (a parameter change; the same values go to the nodes again, harmless). THE HOST REMEMBERS WHAT chain_edit SENT (since its record of the playing song last moved: up to 256 distinct (module id, param name) pairs) and puts each back to the value of the NEXT published song unless that publish's own diff already carries it: a shell that cancels a gesture and publishes the original values gets the original values on the nodes; a publish that carries the edited value changes nothing more; more than 256 distinct pairs make the next publish a whole-patch plan. A record that was pushed before a whole-patch plan (a swap) was committed is DROPPED by the audio side (stats.chains_params_stale): the swap carries every value of its song. A `param` whose name is `_bn` or `track` is allowed for the module types not refused below, and runs on the audio thread through the engine's allocation-free prepareDerived. `at` must be THUNDER_LIVE_NOW in this version (the parameter is kept for the ABI). Errors: E_STATE (no F_CHAINS, or no chains
+   were ever planned for a song: nothing to edit), E_ARG (NULL with n > 0, `at` not NOW, malformed JSON or not an array, an op that is not `param`, an id that is not a module of the playing patch,
+   a value that is not a finite number, a module of type trackIn, chainOut, scin or scout: their parameters move the bus plan or the sources and go through a publish), E_LIMIT (n above 1 MiB; an id or a name that does not fit a record, 47 / 31 bytes;
+   more ops than the ring can ever hold, THUNDER_LIVE_CHAIN_RING), E_MEMORY, E_BUSY (more ops than the ring has room for right now: retry after the next callback). */
+#define THUNDER_LIVE_CHAIN_RING 256
+int thunder_live_chain_edit(thunder_live* L, const uint8_t* ops_json, size_t n, int64_t at);
 
 /* ---- 7. MIDI ---------------------------------------------------------------------------------------------------------------------------------------------- */
 /* THE HOST OWNS ITS thunder_midi (F_MIDI): made at create, freed at destroy, NEVER given to the page (a raw pointer the audio side reads is not safe to swap: PICKUP duty D-8 (e)). What the host does itself, in this order:
