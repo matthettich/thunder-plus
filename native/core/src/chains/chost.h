@@ -21,6 +21,14 @@
 //   THREADED HOST (C2): the plan must come BACK from the audio side through a ring (release on push, acquire on pop) before the control side reads committed_ / the nodes in settle() or deletes the plan;
 //      until then the audio thread owns it.
 //
+// LIVE (C2b, docs/port/C2-DESIGN.md R4, R10, R12): a host made with `live` = true makes its nodes with inlineService off (a spare pump instance is never built on the audio thread; until C4 nobody services them: a pump module in a live
+// chain has no spare). plan(..., keepPatch = true) leaves the nodes that already exist with the patch they run (no preparePatch, no swap: commit only sets their bus map): for a song whose chain differs from the playing one in the bus plan
+// alone. param() is the page's `param` op, posted to every node. play() / stop() are the page's chainsTempo with `playing` true / false (index.html:23075; the page calls it at the end of tStart, in tStop and on a tempo edit):
+// the host's transport carries `playing_` (default TRUE: an offline render is playing from sample 0, so its goldens are untouched), applyTransport sends it, and both calls clear the event queue (look-ahead events of a Seq that is
+// gone must not be applied). A tempo edit needs no call of its own: the Seq's SEV_TEMPO reaches event().
+// THE TWO THREADS' COUNTERS are two sets of fields of one struct: audioStats() copies the fields only the audio thread writes (blocks, failedBlocks, droppedEvents, badEvents, eventsApplied, feedMismatch, chcNoNode), ctlStats()
+// the ones only the control thread writes (refused, overBudget, busyRefused). stats() copies all of them and is for ONE-thread hosts (the offline renderer, tests): a threaded host must never call it.
+//
 // EVENTS (SongRenderer::dispatch -> event()): `chc` (the tracker's BYP b1..b15) and `tempo`. A tempo event moves the host's transport at once when no node exists; otherwise it and every chc wait in a fixed time-sorted
 // array (kChainsHostEvents, sized for the worst real tracker row; a full array drops the newest and counts it). Each event stores the FRAME it is due at, and beginBlock(frame) (called once per block BEFORE the
 // mixer renders it, by whoever owns the block clock: SongRenderer passes its own frame counter, a live host its own) applies every event due at or before that frame to the nodes, before any node of the block runs.
@@ -37,6 +45,7 @@
 #define THUNDER_CHAINS_CHOST_H
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include "chains/chains.h"
@@ -95,7 +104,7 @@ class ChainsPlan {
 
 class ChainsHost {
  public:
-  explicit ChainsHost(double sampleRate, size_t budgetBytes = kChainsHostDefaultBudget);   // control thread
+  explicit ChainsHost(double sampleRate, size_t budgetBytes = kChainsHostDefaultBudget, bool live = false);   // control thread. live: the nodes are made with inlineService off (see LIVE)
   ~ChainsHost();                             // deletes the nodes it adopted (nothing may be running)
   bool valid() const { return ev_ != nullptr; }   // false: the event array could not be allocated; plan() then returns null (counted refused) and event() drops (counted)
   ChainsHost(const ChainsHost&) = delete; ChainsHost& operator=(const ChainsHost&) = delete;
@@ -106,7 +115,9 @@ class ChainsHost {
 
   // CONTROL THREAD. chainOn: kSongNT flags; heard: bit t = the track is heard (keepMask(), or a stem's heardMask(): pass() makes chains for `keep` only). A track gets a node when it is heard, its CHN flag is on
   // and the patch has a Chain Out for it (chains_feed). A track that has a node keeps it and gets the new patch prepared for a swap. Null: a plan is in flight (busyRefused), or memory ran out.
-  ChainsPlan* plan(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song);
+  // keepPatch (R4): a track that has a node keeps it AND the patch it runs: nothing is prepared for it (its Trk.patch stays null, so commit only sets its bus map and its module state survives), and the memory budget counts one
+  // patch for it, not two (no second set exists). A node made fresh by the same plan loads `chainPatch` as ever. The caller promises that the patch the nodes run is the one it would have prepared (a diff that is Same or Params only).
+  ChainsPlan* plan(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song, bool keepPatch = false);
   void settle(ChainsPlan* p);                // CONTROL THREAD: the plan's fate is known (see the protocol)
 
   // AUDIO THREAD (or the control thread before the first block). Nodes and maps first, the mixer's hooks, the bus plan last. The plan keeps what was replaced. A second commit of a plan does nothing.
@@ -116,11 +127,21 @@ class ChainsHost {
   bool event(const SeqEvent& e);
   // AUDIO THREAD: the block that starts at `frame` is about to render: apply every event due at or before it (see EVENTS).
   void beginBlock(int64_t frame);
+  // AUDIO THREAD (R10, R8; see LIVE). play: the song starts: the transport's tempo is `tempo`, the event queue is cleared, playing, applied to every node (startN + 1 as it starts playing; a host that was already playing goes
+  // through not playing first, as the page's tStart does with tStop(true)). stop: the queue is cleared, not playing, applied to every node. param: the page's `param` op to every node (every node holds the whole patch).
+  // None of them allocates, locks or frees (ChainsEngine::setParam / setTransport allocate nothing: chains.h).
+  void play(double tempo);
+  void stop();
+  void param(std::string_view id, std::string_view name, double v);
 
   // The mixer's hook (Mixer::setChain): the bus's feeds -> NodeIn.feeds in bus-map order, ChainsNode::process in place on the track's pair.
   static void hook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
 
-  ChainsHostStats stats() const { return st_; }
+  ChainsHostStats stats() const { return st_; }              // ONE-thread hosts only (a copy of fields both threads write): see LIVE
+  ChainsHostStats audioStats() const;                         // AUDIO THREAD: the audio side's fields (the control side's are zero)
+  ChainsHostStats ctlStats() const;                           // CONTROL THREAD: the control side's fields (the audio side's are zero)
+  int audioNodes() const { return nNodes_; }                  // AUDIO THREAD: nodes the audio side has now
+  bool playing() const { return playing_; }                   // AUDIO THREAD (tests)
   const ChainsSongTransport& transport() const { return tp_; }
   chains::ChainsNode* node(int t) { return t >= 0 && t < kSongNT ? node_[t] : nullptr; }   // (tests)
   int pendingEvents() const { return nEv_; }
@@ -131,14 +152,17 @@ class ChainsHost {
 
  private:
   struct Ev { int64_t due; uint8_t type; int8_t track; int8_t p; double v, tks; };
-  ChainsPlan* planImpl(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song);
+  ChainsPlan* planImpl(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song, bool keepPatch);
   bool put(const Ev& e);
   void applyTransport(chains::ChainsNode& n);
+  void applyAll();                                 // applyTransport to every node (audio side)
   double sr_, q_;                                  // q_ = 128.0 / sr in double, as the page's `q`
   size_t budget_;
   chains::ChainsNode* node_[kSongNT] = {};         // audio side's view
   chains::ChainsNode* ctlNode_[kSongNT] = {};      // control side's view: the nodes of the last settled plan
   ChainsSongTransport tp_; bool tpSet_ = false;    // the song's transport as it is now (tempo events move it)
+  bool playing_ = true;                            // audio side: the `playing` the nodes are sent (true: an offline render plays from sample 0; a live host calls stop() once when it is made)
+  bool live_ = false;                              // constants: made with `live` (see LIVE)
   ChainsSongTransport lastSong_; bool haveLast_ = false;   // control side: the song transport of the last settled plan
   int nNodes_ = 0;                                 // audio side: nodes now
   bool inFlight_ = false;                          // control side
