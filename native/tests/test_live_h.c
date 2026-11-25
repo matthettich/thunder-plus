@@ -13,13 +13,13 @@
 #define LIVE_SA(name, cond) typedef char live_sa_##name[(cond) ? 1 : -1]
 #endif
 
-LIVE_SA(opts_size, sizeof(thunder_live_opts) == 56);
+LIVE_SA(opts_size, sizeof(thunder_live_opts) == 64);
 LIVE_SA(opts_rate_at8, offsetof(thunder_live_opts, sample_rate) == 8);
 LIVE_SA(opts_max_pad_at16, offsetof(thunder_live_opts, max_pad_bytes) == 16);
 LIVE_SA(play_opts_size, sizeof(thunder_live_play_opts) == 88);
 LIVE_SA(play_opts_t0_at8, offsetof(thunder_live_play_opts, t0) == 8);
 LIVE_SA(play_opts_only_at16, offsetof(thunder_live_play_opts, only) == 16);
-LIVE_SA(stats_size, sizeof(thunder_live_stats) == 240);
+LIVE_SA(stats_size, sizeof(thunder_live_stats) == 320);
 LIVE_SA(stats_frames_at8, offsetof(thunder_live_stats, frames) == 8);
 LIVE_SA(ev_head_size, sizeof(thunder_live_ev_head) == 16);
 LIVE_SA(ev_head_f_at8, offsetof(thunder_live_ev_head, f) == 8);
