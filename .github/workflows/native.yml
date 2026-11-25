@@ -75,7 +75,7 @@ jobs:
         if: ${{ matrix.pass == 'san' }}
         run: |
           cmake -S native -B build-san -DCMAKE_BUILD_TYPE=Release -DTHUNDER_SANITIZE=ON
-          cmake --build build-san -j
+          cmake --build build-san -j4   # bounded: an unbounded -j made the runner lose communication / shut down mid-build three times on PR #311 (memory)
           ctest --test-dir build-san --output-on-failure
       - if: ${{ matrix.pass == 'gcc' }}
         uses: actions/upload-artifact@v4
@@ -181,7 +181,7 @@ jobs:
         with: { node-version: 22 }
       - run: npm i --no-save --no-audit --no-fund acorn@8
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
-      - run: cmake --build build -j
+      - run: cmake --build build -j3   # bounded: the runner has 3 cores; an unbounded -j of a two-architecture build thrashed and hit the 90-minute limit inside the build on PR #311
       - run: ctest --test-dir build --output-on-failure
       - run: lipo -info build/core/libthunder_core.a
       - uses: actions/upload-artifact@v4

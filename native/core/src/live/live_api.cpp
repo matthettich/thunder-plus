@@ -70,7 +70,7 @@ uint32_t thunder_live_abi(void) { return THUNDER_LIVE_ABI; }
 
 uint32_t thunder_live_caps(void) {
   // What THIS build has. The live host does not build SoundFonts, live-engine pads or a live-engine swap yet (LiveHost::fontAdd / padSf / padLive answer E_UNSUPPORTED): CAP_SF, CAP_LIVE_SWAP and CAP_ENGINES stay 0.
-  uint32_t c = THUNDER_LIVE_CAP_MASTER_SWAP | THUNDER_LIVE_CAP_TAKE;   // LiveHost::masterConfig (P3) and PadsHost::setPadTake (P2)
+  uint32_t c = THUNDER_LIVE_CAP_MASTER_SWAP | THUNDER_LIVE_CAP_TAKE | THUNDER_LIVE_CAP_CHAINS;   // LiveHost::masterConfig (P3), PadsHost::setPadTake (P2), ChainsHost live (C2: F_CHAINS, chain_edit)
 #ifdef THUNDER_HAVE_TFX
   c |= THUNDER_LIVE_CAP_EFFECTS;
 #endif
@@ -197,6 +197,12 @@ int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t 
     if (safety != 0 && safety != 1) return (int)THUNDER_LIVE_E_ARG;
     return h.masterConfig(mst_json, n, safety == 1);
   });
+}
+
+// ---- 6b. CHAINS (C2) ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+int thunder_live_chain_edit(thunder_live* L, const uint8_t* ops_json, size_t n, int64_t at) {
+  return ctl(L, [&](LiveHost& h) { return h.chainEdit(ops_json, n, at); });   // (LiveHost judges, in the header's order: E_STATE, `at`, the size, NULL, the ops)
 }
 
 // ---- 7. MIDI -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

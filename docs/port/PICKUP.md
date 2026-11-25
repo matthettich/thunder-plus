@@ -30,8 +30,26 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (24 Nov, 17:35): the state for a new chat. Everything below this section is history, newest first.
-**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (24 Nov, 17:35)."
+## START HERE (25 Nov, 00:50): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at the newest START HERE."
+
+**The owner's rules:** as the 21 Nov 18:18 and 24 Nov 13:05 sections; plus: use Fable (the top model) for audio-thread reads, Opus otherwise, and say when to switch; work goes on overnight; a summary at his morning check-in.
+
+**MERGED overnight:** C2a #310 (squash 980a5e4: `chains_diff`, `bus_plan_equal`), **C2b #311 (squash fad450f: the chains host LIVE through `LiveHost`, `thunder_live_chain_edit`, F_CHAINS / CAP_CHAINS)**. Design and amendments: `docs/port/C2-DESIGN.md`. About **81%** of the whole port.
+
+**OPEN, in order of merge (all drafts into `native`, stacked: each contains the ones before it):**
+- **PFX #314** `n1/pfx-pad-effects`: every pad effect the page offers, in the core's pad render (`EngFx::Kind::Lib`; 134 page-made goldens). Verifier: MERGE AFTER FIXES (`review/verify-pfx`: Beads freeze+size crash, -fexceptions not in effect, missing cases, absent segment keys); the builder is fixing them. Independent of the N2 stack.
+- **N2 H1a #312** `n1/n2-live-shell`: the Android app on the live engine (JNI over `thunder_live_*`, audio callback, control / poller threads, the core's own pad renders, "Play bundled song natively" test path). Plan: `docs/port/N2-PLAN.md`; notes: `docs/port/N2-NOTES.md`.
+- **N2 H1b #313** `n1/n2-h1b`: the shell side of CORE-BRIDGE (incl. section 7), `SongFit` (fallback reasons; the page's `engFx` rule), events to the page.
+- **N2 H1c #315** `n1/n2-h1c`: audio focus, ducking, headphones, stream rebuild, MediaSession with the real song name, the A5 10-minute gate button.
+- **N2 H2** `n1/n2-h2` (in progress): MIDI through AMidi for the live engine.
+- **NEEDS THE TOP MODEL (Fable) before merge:** H1a's audio callback / threads (`live_engine.cpp` render / controlLoop / pollLoop; `live_jni.cpp` dataCallback / start / shutdown), H1b's event hand-off and `engineReset`, H1c's stream rebuild; `docs/port/CORE-BRIDGE.md` section 7 (draft additions G1..G14 + H1c's) to freeze; each of these PRs also gets an independent Sonnet verifier.
+- **The page side:** `docs/port/N2-PAGE-CLIENT.md` (design: one root `thunder-core-client.js` behind a switch, ~22 guarded sites in index.html, PRs PC0..PC7, ~56 builder-hours). **PC1 was NOT started: it changes the owner's daily web app (`index.html` on `beta`) and waits for his OK.** Its five questions for him are in its section 8.
+- After #311: merge `origin/native` into `n1/n2-live-shell`, then `n1/n2-h1b`, `n1/n2-h1c`, `n1/n2-h2` (merges, never rebase), so F_CHAINS turns on in the app.
+
+**Estimate to the Android beta (WORKPLAN N2 exit):** about 1.5 to 2 weeks including the owner's device tests (shell ~76 builder-hours by N2-PLAN, page client ~56, lead review ~14 hours).
+
+## START HERE of 24 Nov, 17:35 (now history: C2 built and merged)
 
 **The owner's rules:** as the 13:05 section below. Lead: Fable (new chat, 17:07).
 
