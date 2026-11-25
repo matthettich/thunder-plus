@@ -62,7 +62,7 @@ object LiveBridge {
                 val r = LiveNative.nativeSongLoad(c.raw)
                 val ok = FlatJson.bool(r, "ok") ?: false
                 if (!ok) { err("song.load", FlatJson.str(r, "err").orEmpty().ifEmpty { "rc " + FlatJson.num(r, "rc") }); return }
-                lastRev = revOf(c.raw)
+                lastRev = revOf(String(c.raw, Charsets.UTF_8))
                 emit(LiveNative.nativeFit(lastRev))
             }
             is BridgeTranslator.LiveCall.KitLoad -> {
