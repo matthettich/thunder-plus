@@ -17,7 +17,7 @@ const CALL = cut(/\nif \(window\.thunderCore \|\| aset\.core === 'native'\) load
 // A page-like sandbox: `window` is the sandbox itself, so window.thunderCore / window.__thunderClient are plain properties of it.
 function rig({ core = 'core', thunderCore = null, rate = 0, withCtx = null } = {}) {
   const log = { ac: 0, scripts: [], appended: [], fetches: 0, creates: [], tp: [] };
-  const sb = { aset: { core, rate }, BUILD: 677, tpLog: (...a) => log.tp.push(a.join(' ')), latOf: () => 'interactive', ctx: withCtx,
+  const sb = { aset: { core, rate }, BUILD: 678, tpLog: (...a) => log.tp.push(a.join(' ')), latOf: () => 'interactive', ctx: withCtx,
     fetch: () => { log.fetches++; return Promise.reject(new Error('no network in tests')); },
     XMLHttpRequest: function () { log.fetches++; },
     AudioContext: function () { log.ac++; this.sampleRate = 44100; this.close = () => Promise.resolve(); },
@@ -71,20 +71,31 @@ test('(a) the Settings value "Native core (test)" is listed only where window.th
 });
 
 // ---- (b) source guards -----------------------------------------------------------------------------------------------------------
-test('(b) branch count: PC1 owns exactly the branches 1, 2, 3 and 18 of N2-PAGE-CLIENT 4.3; a new NCON() use needs a row there and a change here', () => {
-  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 1, 'NCON() occurrences (padSR is the only one in PC1)');
-  assert.equal((src.match(/\bNC\(\)/g) || []).length, 1, 'NC() occurrences (padSR)');
+test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 of N2-PAGE-CLIENT 4.3 (and the two media-session guards), PC2 adds 7, 8 (two), 9, 10 (two); a new NCON() / tp.nc use needs a row there and a change here', () => {
+  const at = re => (src.split('\n').map((l, i) => re.test(l) ? i + 1 : 0).filter(Boolean));
+  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 10, 'NCON() occurrences: padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2)');
+  assert.equal((src.match(/\bNC\(\)/g) || []).length, 13, 'NC() occurrences: padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16); coreBuf, coreKit, coreKitCheck, setSong, setKit, newKit (PC2)');
+  assert.equal((src.match(/\btp\.nc\b/g) || []).length, 9, 'tp.nc: perfPush, perfFill (15), corePost (16), tStop x2 (5), msMeta x2 (code and comment) and bgPlay (the one media session), the ncSongHost comment');
+  for (const [re, fn] of [[/^function perfPush\(\)/, 'perfPush'], [/^function perfFill\(/, 'perfFill'], [/^const corePost = /, 'corePost'], [/^\s*if \(tp\.nc\)\{ tp\.nc = false;/, 'tStop'], [/const ms = navigator\.mediaSession; if \(!ms \|\| !bgOn/, 'msMeta'], [/^\s*if \(on && tp\.nc\) return;/, 'bgPlay']]) assert.equal(at(re).length, 1, fn);
+  assert.equal(at(/\btp\.nc\b/).length, 7, 'tp.nc on seven lines (the tp literal and begin() say nc: without the tp. prefix)');
+  for (const fn of ['coreBuf', 'coreKit', 'coreKitCheck', 'coreVar']) assert.ok(new RegExp('NCON\\(\\)[^\\n]*', 'm').test(cut(new RegExp('function ' + fn + '\\([^\\n]*(\\n[^\\n]*)?', 'm'), fn)), fn + ' has its branch');
+  assert.equal((src.match(/\bncPadApi\b/g) || []).length, 8, 'ncPadApi: its definition, the five PC2 calls (coreVar does not need it), and PC3\'s padApi line (typeof test and call)');
   assert.equal((src.match(/\bloadClient\b/g) || []).length, 2, 'loadClient: its declaration and its one call site');
   assert.equal((src.match(/window\.thunderCore/g) || []).length, 6, 'window.thunderCore: the loader comment, srGuess, updCore (options, get, comment), the call site');
   assert.equal((src.match(/aset\.core === 'native'/g) || []).length, 3, "aset.core === 'native': srGuess, updCore's getter, the call site");
   assert.ok(/else if \(!\(window\.thunderCore \|\| aset\.core === 'native'\)\)\{ const AC = /.test(SRGUESS), 'branch 2');
+  // the PC3 branches say what they are: tStart's is the first thing after the render prep and before the first PLAY's audio warm-up (rtInit)
+  const ts = src.slice(src.indexOf('function tStart(mode, o){'), src.indexOf('function tStart(mode, o){') + 6000);
+  assert.ok(ts.indexOf("if (NCON() && NC().can(mode, o)){ NC().start(mode, o); return; }") > 0 && ts.indexOf("if (NCON() && NC().can(mode, o))") < ts.indexOf('rtInit()'), 'the native branch comes before rtInit() (no AudioContext for a native PLAY)');
+  assert.ok(/function saveS\(\)\{[^\n]*try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'saveS publishes through the client, after coreSong');
+  assert.ok(/const corePost = \(m, tr\) => \{ if \(tp\.nc\) return NC\(\)\.legacy\(m\); try \{ core\.node\.port/.test(src), 'corePost: the JS core body is unchanged behind the tp.nc line');
 });
 test('(b) __thunderClient appears only inside the loader block; thunder-core-client.js only in comments and loadClient\'s one src line', () => {
   const lines = src.split('\n'), start = lines.findIndex(l => l.startsWith('/* NATIVE CORE CLIENT (PC1')), endIdx = lines.findIndex((l, i) => i > start && l.includes('document.head.appendChild(s); };'));
   assert.ok(start > 0 && endIdx > start);
   lines.forEach((l, i) => {
     if (l.includes('__thunderClient')) assert.ok(i >= start && i <= endIdx, 'line ' + (i + 1) + ' mentions __thunderClient outside the loader: ' + l.slice(0, 80));
-    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=1';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
+    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=2';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
   });
   assert.equal(lines.filter(l => /^\s*s\.src = /.test(l) && l.includes('thunder-core-client.js')).length, 1);
 });
@@ -109,7 +120,7 @@ test('(c) switch off, no thunderCore: the call site does not call loadClient; no
 test('(c) with the shell or the native pick the loader makes one script for the client file, and not a second time', () => {
   for (const o of [{ thunderCore: {} }, { core: 'native' }]) {
     const sb = rig(o); run(sb, LOADER + CALL + ';'); assert.equal(sb.__log.creates.join(), 'script');
-    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=1'); assert.equal(sb.__log.appended.length, 1);
+    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=2'); assert.equal(sb.__log.appended.length, 1);
     sb.__thunderClient = {}; run(sb, 'loadClient()'); assert.equal(sb.__log.creates.length, 1, 'already loaded: nothing more');
   }
 });
@@ -120,16 +131,16 @@ test('(c) a load error leaves the page as it was: onerror only logs', () => {
 
 // ---- the client file and sw.js --------------------------------------------------------------------------------------------------
 function clientRig(thunderCore, hostExtra = {}) {
-  const sb = { window: null, Promise, Error, JSON, Object, Array, isFinite, setTimeout, clearTimeout }; sb.window = sb; if (thunderCore) sb.thunderCore = thunderCore;
+  const sb = { window: null, Promise, Error, JSON, Object, Array, isFinite, setTimeout, clearTimeout, setInterval, clearInterval }; sb.window = sb; if (thunderCore) sb.thunderCore = thunderCore;
   vm.createContext(sb); vm.runInContext(H.read('thunder-core-client.js'), sb, { filename: 'thunder-core-client.js' });
-  const host = Object.assign({ tpLog: (...a) => (sb.__tp = sb.__tp || []).push(a.join(' ')), build: () => 677, prerender: () => { sb.__pre = (sb.__pre || 0) + 1; } }, hostExtra);
+  const host = Object.assign({ tpLog: (...a) => (sb.__tp = sb.__tp || []).push(a.join(' ')), build: () => 678, prerender: () => { sb.__pre = (sb.__pre || 0) + 1; } }, hostExtra);
   return { sb, host };
 }
 const fakeCore = reply => { const sent = []; return { sent, ask: (m) => { sent.push(m); return reply instanceof Error ? Promise.reject(reply) : Promise.resolve(reply); } }; };
 test('client: hello handshake turns it on only for v 1 + caps.nativeAudio + a sample rate, then re-renders pads once', async () => {
   const tc = fakeCore({ t: 'reply', v: 1, core: 'r1', caps: { nativeAudio: true }, sr: 44100, outLat: 256, host: 'android' }); const { sb, host } = clientRig(tc);
   assert.equal(sb.__thunderClient.on, false); assert.equal(await sb.__thunderClient.attach(host), true);
-  assert.equal(JSON.stringify(tc.sent), JSON.stringify([{ t: 'hello', v: 1, app: 677 }])); assert.equal(sb.__thunderClient.on, true); assert.equal(sb.__thunderClient.sr, 44100); assert.equal(sb.__pre, 1);
+  assert.equal(JSON.stringify(tc.sent), JSON.stringify([{ t: 'hello', v: 1, live: true, app: 678 }])); assert.equal(sb.__thunderClient.on, true); assert.equal(sb.__thunderClient.sr, 44100); assert.equal(sb.__pre, 1);
   sb.__thunderClient.detach(); assert.equal(sb.__thunderClient.on, false);
 });
 test('client: every failure leaves it off and the page untouched', async () => {
@@ -139,13 +150,13 @@ test('client: every failure leaves it off and the page untouched', async () => {
 });
 test('client: defines only window.__thunderClient, and loading it twice keeps the first', () => {
   const { sb } = clientRig(null); const first = sb.__thunderClient; vm.runInContext(H.read('thunder-core-client.js'), sb); assert.equal(sb.__thunderClient, first);
-  assert.deepEqual(Object.keys(sb).filter(k => !['window', 'Promise', 'Error', 'JSON', 'Object', 'Array', 'isFinite', 'setTimeout', 'clearTimeout'].includes(k)), ['__thunderClient']);
+  assert.deepEqual(Object.keys(sb).filter(k => !['window', 'Promise', 'Error', 'JSON', 'Object', 'Array', 'isFinite', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'].includes(k)), ['__thunderClient']);
 });
 test('sw.js: the client is an OPTIONAL entry (a missing file cannot fail the install), the file exists, and BUILD matches the cache', () => {
   const fs = require('fs'), path = require('path');
   const opt = (sw.match(/const OPTIONAL = \[([^\]]*)\]/) || [])[1] || '', files = (sw.match(/const FILES = \[[\s\S]*?\];/) || [])[0] || '';
-  assert.ok(opt.includes("'./thunder-core-client.js?v=1'")); assert.ok(!files.includes('thunder-core-client.js'));
+  assert.ok(opt.includes("'./thunder-core-client.js?v=2'")); assert.ok(!files.includes('thunder-core-client.js'));
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'thunder-core-client.js')));
-  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=1'"), 'the page and the service worker name the same URL');
+  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=2'"), 'the page and the service worker name the same URL');
   const b = src.match(/const BUILD = (\d+);/)[1]; assert.ok(sw.includes("'thunderplus-v" + b + "'"));
 });
