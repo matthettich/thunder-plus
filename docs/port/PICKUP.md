@@ -30,7 +30,28 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (25 Nov, 00:50): the state for a new chat. Everything below this section is history, newest first.
+## START HERE (25 Nov, 09:40): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at the newest START HERE."
+
+**The owner's rules:** as the 00:50 section below (Fable for audio-thread reads, Opus otherwise, say when to switch; delegate to Sonnet; decide and tell him).
+
+**DONE this morning by the lead on Fable: the top-model read of H1a / H1b / H1c** (`live_engine.{h,cpp}`, `live_jni.cpp` render / controlLoop / pollLoop / dataCallback / start / teardown / reopen, `live_events.cpp`, the duck ramp, `engineReset` in LiveBridge.kt, CORE-BRIDGE section 7). **Verdict: the audio thread itself is clean** (no lock, no allocation, no JNI; hand-over of `frame0_` / `duckCur_` between stream threads is ordered by miniaudio's join). Findings, all off the audio thread:
+- **A (HIGH)** miniaudio 0.11.26 re-routes an AAudio stream by itself (job thread, `aaudio.rerouteLock`); `nativeStatus` calls AAudio functions on `pStreamPlayback` under `g_dev` only: use-after-close on a headphone / Bluetooth change. Fix: also hold `rerouteLock`; a `rerouted` notification resets `g_xrun`.
+- **B (MED)** `LiveEngine::call` timeout while the task runs: -1001 "may still apply" (was -1000 for both). **C / D / E / F (LOW)** `lastSlots` union after a failed load; retry safety of `pad_kit` / `pad_take` in the load lambdas (theoretical: only `pads_publish` returns E_BUSY today); record-size guards in `pollLoop`; `dlsym` pointers under `g_dev`.
+- **G** CORE-BRIDGE section 7 is FROZEN with one change: **G14: no verdict within 5 s = NOT ok (old engine plays), not ok.** PC3 must follow this (N2-PAGE-CLIENT.md still says "treated as ok").
+- **Open question (report asked of the fixer):** the load calls hold `g_life` through `renderPads` + a 20 s `call`; can `nativeShutdown` / `nativeReopenStream` on the main thread ANR behind them?
+- **#318 / #319 "no Native CI":** not a fault. `native.yml` runs only for PRs INTO `native`; their bases are `n1/n2-h3` / `n1/n2-h4`. CI runs when each is retargeted to `native` after the one below merges (or by `workflow_dispatch`).
+
+**RUNNING (two Sonnet workers; a new chat has neither: re-brief from here):**
+- **Fixer** for A..G on the N2 stack: merges `origin/native` into `n1/n2-live-shell` first (F_CHAINS), fixes on the lowest branch, merges forward through `n1/n2-h1b`, `-h1c`, `-h2`, `-h3`, `-h4`, `-h5`; notes under "Lead's read of 25 Nov: fixes" in `docs/port/N2-NOTES.md` on those branches.
+- **PC1 builder** on `pc1/core-client-loader` (from `beta` 524948d): loader, `NCON`, branches 1, 2, 3, 18, empty `thunder-core-client.js` with `hello`, `tests/native-client-inert.test.js`; draft PR into `beta`; notes `docs/plans/PC1-NOTES.md` on that branch. Lead's choice for owner question 5: "Native core (test)" stays hidden on the web copy until core.wasm exists there.
+
+**NEXT, in order:**
+1. **Fable:** read the fixer's diff for A and B (small), then squash-merge #312, #313, #315 in order when CI is green (REST, pin the sha; after each: merge `origin/native` into the next branch, never rebase). Then #316 (H2, needs its verifier), #317, #318 (retarget to `native` to get CI; it changes `native.yml`), #319, #320 (P3b).
+2. **Fable:** read every line of PC1's `index.html` / `sw.js` diff before it merges into `beta` (CodeRabbit first).
+3. **Opus is enough from here:** PC0 (doc), PC2 / PC3 builders on the fake core, the recovery copy on swipe-away (`onTaskRemoved` + "Restore unsaved changes": shell + page client), H2's verifier, the owner's four signing secrets, ANDROID-CHECKLIST. Come back to Fable for: PC2's `put` / budget code, PC3's PLAY / STOP / fallback, PC5's `meterRt` stub, C3 / C4.
+
+## START HERE of 25 Nov, 00:50 (now history: the morning read is done, see above)
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at the newest START HERE."
 
 **The owner's rules:** as the 21 Nov 18:18 and 24 Nov 13:05 sections; plus: use Fable (the top model) for audio-thread reads, Opus otherwise, and say when to switch; work goes on overnight; a summary at his morning check-in.
