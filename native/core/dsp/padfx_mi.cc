@@ -7,9 +7,15 @@
 #include "rings/dsp/performance_state.h"
 #include "clouds/dsp/granular_processor.h"
 
+#include <new>
 namespace thunder_padfx {
 namespace {
-struct RingsImpl : Rings {
+// the page's statics start as zeroed wasm memory: these objects do too (the tfx Fx objects have the same operator new)
+struct Zeroed {
+  static void* operator new(size_t n) { void* q = ::operator new(n); memset(q, 0, n); return q; }
+  static void operator delete(void* q) { ::operator delete(q); }
+};
+struct RingsImpl : Rings, Zeroed {
   uint16_t reverb_buffer[32768];
   rings::Part part; rings::Patch patch; rings::PerformanceState ps;
   float raux[4096];
@@ -33,7 +39,7 @@ struct RingsImpl : Rings {
     memcpy(io, out, sizeof(float) * (size_t)n);
   }
 };
-struct CloudsImpl : Clouds {
+struct CloudsImpl : Clouds, Zeroed {
   uint8_t block_mem[118784];
   uint8_t block_ccm[65536 - 128];
   clouds::GranularProcessor proc;
