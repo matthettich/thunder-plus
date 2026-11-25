@@ -52,6 +52,11 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - **NEW, to build (Sonnet, on top of the stack): ANR.** `ThunderService.onDestroy` (ThunderService.kt:78) and `ThunderHost.startRun` (ThunderHost.kt:65) call `LiveEngine.shutdown()` on the MAIN thread; it waits on `g_life` behind a load (renderPads + a `call` of up to 20 s). Fix: run the shutdown on a worker (the service keeps a wake until it returns), or split `g_life` so a load releases it around `renderPads` / the wait. Also small: the N0 `jni.cpp` has the same unlocked `pStreamPlayback` reads (lines 99, 123); a miniaudio self-reroute should call `tpa::host().remap()` (one atomic store) from the notification callback; a reroute zeroes the A5 xrun base.
 - **Now:** when CI is green on a head, squash-merge #312, then merge `origin/native` into the next branch, wait for its CI, squash-merge it; and so on up the stack (#313, #315, #316 after its verifier, #317, #318 retargeted to `native`, #319, #320).
 
+**UPDATE 10:25 (the lead, now on Opus; Matt OK'd merging without asking once CI and the lead's review pass):**
+- **PC1 #321 MERGED into `beta`** (47c99c1, build 677); punch-list checks added to HANDOVER.md on `beta` (ac4dc49). Not on `main` yet.
+- **ANR fix = #322** `n1/n2-anr` (draft, into `n1/n2-h5`). Independent verifier (`review/verify-h2-anr`): #316 and #322 MERGE AFTER FIXES, nothing HIGH, audio thread clean. **All MED items fixed** (B1..B4, B7 on h2; A1..A5, A8 on anr) and merged forward. Heads: h2 8b6369b, h3 a4527e1, h4 852fc49, h5 c01304d, anr b7d274a. Known and left: A6, A7, A9, B6, B8, and the service starting after `lifeLock` (N2-NOTES "Verifier fixes (25 Nov)"). Kotlin compiles only in CI: #316 and #322 merge when their CI is green.
+- **#312 / #313 / #315:** all green except the slow Linux clang / sanitizer jobs at 17:01 UTC; a scheduled check merges them in order.
+
 **NEXT, in order:**
 1. **Fable:** read the fixer's diff for A and B (small), then squash-merge #312, #313, #315 in order when CI is green (REST, pin the sha; after each: merge `origin/native` into the next branch, never rebase). Then #316 (H2, needs its verifier), #317, #318 (retarget to `native` to get CI; it changes `native.yml`), #319, #320 (P3b).
 2. **Fable:** read every line of PC1's `index.html` / `sw.js` diff before it merges into `beta` (CodeRabbit first).
