@@ -85,6 +85,12 @@ const char* const kModKeys[] = {"spring", "plate", "lverb", "ensemble", "dimensi
   "gdelay", "reverse", "sdelay", "filter", "cut", "compressor", "buscomp", "glue", "ngate", "limiter", "ringmod", "envfilt"};
 constexpr int kNMod = (int)(sizeof kModKeys / sizeof kModKeys[0]);
 constexpr int kMaxVals = 24;
+#include "engine/padfx_ranges.inc"
+// The page's own row range of a control (the hardening clamp: a saved value outside it would run the wasm out of range; the page's UI cannot make one). A control without a row: no clamp.
+bool rangeOf(const char* type, const char* key, double* mn, double* mx) {
+  for (const PadRange& r : kPadRanges) if (!std::strcmp(r.type, type) && !std::strcmp(r.key, key)) { *mn = r.mn; *mx = r.mx; return true; }
+  return false;
+}
 
 bool haveTfx() {
 #ifdef THUNDER_HAVE_TFX
@@ -123,7 +129,14 @@ void pad_fx_parse(EngFx& f, Json j) {
   if (i < kNTx && !haveTfx()) return;
   f.lib = i; f.kind = EngFx::Kind::Lib;
   for (double& x : f.lv) x = kNaN;
-  if (i < kNTx) { for (int k = 0; k < kDefs[i].n; k++) f.lv[k] = valueOf(j.get(kDefs[i].keys[k])); return; }
+  if (i < kNTx) {
+    for (int k = 0; k < kDefs[i].n; k++) {
+      double v = valueOf(j.get(kDefs[i].keys[k])), mn, mx;
+      if (v == v && rangeOf(kDefs[i].key, kDefs[i].keys[k], &mn, &mx)) v = v < mn ? mn : v > mx ? mx : v;   // (+-infinity too)
+      f.lv[k] = v;
+    }
+    return;
+  }
   const modfx::Def* d = modfx::find(kModKeys[i - kNTx]);
   if (!d || d->np > kMaxVals) { f.kind = EngFx::Kind::Other; f.lib = -1; return; }
   for (int k = 0; k < d->np; k++) { Json v = j.get(modKey(d->params[k].name)); f.lv[k] = v.isNum() ? v.asNum() : kNaN; }   // io.p: a finite number, else the module's default
@@ -226,6 +239,7 @@ bool pad_fx_lib(const EngFx& f, const float* a, size_t n, double sr, double bpm,
   if (f.kind != EngFx::Kind::Lib || f.lib < 0 || f.lib >= kNTx + kNMod) return false;
   if (n == 0) { out.clear(); return true; }
   if (f.lib >= kNTx) return runMod(f.lib - kNTx, f, a, n, sr, bpm, out);
+  for (int k = 0; k < kDefs[f.lib].n; k++) if (!(f.lv[k] == f.lv[k])) return false;   // a control the saved effect lacks (undefined on the page: NaN into the wasm, which can run off its tables): the sound passes, as for an effect that is not ready
 #ifdef THUNDER_HAVE_TFX
   const Def& d = kDefs[f.lib];
   if (d.cls == kCrush || d.cls == kChorus) return runCrushChorus(d, f.lv, a, n, sr, bpm, out);

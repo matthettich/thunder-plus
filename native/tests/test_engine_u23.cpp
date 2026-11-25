@@ -50,7 +50,7 @@ static int renderOne(Json c, EngSampleBank& bank, double sr, double hold, double
   EngVoice V; if (!eng_voice_from_json(V, c.obj("v"), c.arr("L"), c.arr("fx"))) return -100;
   Json L = c.arr("L"); *nLayers = (int)L.size();
   for (size_t i = 0; i < L.size(); i++) { Json s = L.at(i).get("sample"); if (s.isObj()) bank.attach(V.layers[i], s); }
-  EngRenderOpts o; o.sr = sr; o.hold = hold; o.bpm = bpm;
+  EngRenderOpts o; o.libFx = false; o.sr = sr; o.hold = hold; o.bpm = bpm;
   const size_t bound = eng_render_bound(V, o); buf.assign(bound + 8, 12345.0f);
   *n = 0; const int st = eng_render_voice(V, o, buf.data(), bound, n);
   if (st != kEngOk) return st;

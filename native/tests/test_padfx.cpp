@@ -47,7 +47,12 @@ int main(int argc, char** argv) {
     Json c = doc.root(); const double sr = c.num("sr", 48000), bpm = c.num("bpm", 120);
     const std::vector<float> a = floats(in), want = floats(ref);
     std::vector<float> got; bool ok = true;
-    if (std::string(c.str("kind")) == "fx") {
+    if (std::string(c.str("kind")) == "voice") {   // renderVoice: layers, pad effects, trim, fade
+      Json vj = c.get("voice"); EngVoice* V = new EngVoice; EngRenderOpts o; o.sr = sr; o.hold = 0; o.bpm = bpm;
+      ok = eng_voice_from_json(*V, vj, vj.arr("layers"), vj.arr("fx"));
+      if (ok) { const size_t bound = eng_render_bound(*V, o); got.assign(bound, 0.0f); size_t n = 0; ok = bound && eng_render_voice(*V, o, got.data(), bound, &n) == kEngOk; got.resize(n); }
+      delete V;
+    } else if (std::string(c.str("kind")) == "fx") {
       EngFx f; eng_fx_from_json(f, c.get("fx"));
       if (f.kind != EngFx::Kind::Lib) { std::printf("%-26s not hosted (kind %d)\n", G.name, (int)f.kind); fails++; continue; }
       ok = pad_fx_lib(f, a.data(), a.size(), sr, bpm, got);

@@ -33,7 +33,7 @@ struct Row { std::string sha; long len; };
 // renders one voice / case and compares: the committed hash (gate), the local Node's (x86-64 Linux only). Returns true if it is bit-exact with the committed hash.
 static bool runOne(const std::string& name, Json v, Json L, Json fx, double sr, double hold, double bpm, const Row* gold, const Row* local, bool localMustMatch, const std::string& f32path, int* localDiff) {
   EngVoice V; if (!eng_voice_from_json(V, v, L, fx)) { std::printf("%s: loader refused\n", name.c_str()); fails++; return false; }
-  EngRenderOpts o; o.sr = sr; o.hold = hold; o.bpm = bpm;
+  EngRenderOpts o; o.libFx = false; o.sr = sr; o.hold = hold; o.bpm = bpm;
   const size_t bound = eng_render_bound(V, o); std::vector<float> buf(bound + 8, 12345.0f);
   size_t n = 0; const int st = eng_render_voice(V, o, buf.data(), bound, &n);
   if (st != kEngOk || !gold || !local) { std::printf("%s: status %d, golden %s, reference %s  FAIL\n", name.c_str(), st, gold ? "there" : "missing", local ? "there" : "missing"); fails++; return false; }
