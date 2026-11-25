@@ -923,6 +923,7 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 - [ ] **Computer: update to build 677 (Settings → App) and play a song as usual.** Pass: opens and plays exactly as on 676; no new toast or message.
 - [ ] **Phone (Fold, Chrome) and computer: build 678 (PC2 + PC3, PR #325) opens and plays as before.** Pass: no new toast; PLAY, STOP, loop play, a kit change and opening another song behave as on 677.
 - [ ] **Phone and computer: build 679 (PC4, live edits; draft PR) opens and plays as before.** Pass: no new toast; dragging a track fader, the master OUT bar, a …chains slider and Settings → Audio → Latency compensation behave as on 678 (the new code runs only with the native engine on).
+- [ ] **Phone and computer: build 680 (M5, effect meters on the page client; draft PR) opens and plays as before.** Pass: nothing new on 679; the FX bar's slot meters and dynamics bars are unchanged with the web engine (the new code runs only with the native engine on and a core that says `meters2`).
 - [ ] **Computer: Settings → Audio → Sequencer.** Pass: only the two old choices (Audio thread, Page (old)); no "Native core (test)".
 
 **Resizing the window while a song plays (24 Nov; build 676, branch `fix/resize-during-playback`)** (details: the 24 Nov entry "resize during playback" below)
@@ -1817,6 +1818,9 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 25 Nov (native page client M5 first half: effect meters; build 680, branch `m5/fx-meters`, draft PR into `beta`)
+- The client sends ONE debounced `meters.want {rate, fx:[tr], dyn:[tr], chains:false, master:false}` (one track at a time; everything off under `meterHold()` or with no native PLAY; sent again on `engine {up:true}`) and keeps `fx.lvl` / `fx.dyn` in a node-like view per track that the page's own FX bar / FX screen code reads (one guarded line in `fxDynNodeOf`). Only with `hello` `caps.meters2`. Notes, the exact message and the lines to review: `docs/plans/M5-NOTES.md`. `npm test`: 1972 -> 1982 tests (1915 -> 1925 pass, 0 fail, 57 skipped).
 
 ## 25 Nov (native page client PC4: live edits; build 679, branch `pc4/live-edits`, draft PR into `beta`)
 - With the native engine playing, `NC.edit()` (from `saveS`) now sends one small message per changed thing: `mix.set` (fader, trim, pan, mute, solo, master, OUT), `fx.set` (an effect knob) or `fx.plan` (a slot added, removed, retyped, on / off), `master.config`, `pdc.set`, `chain.edit` (a …chains slider). The whole song still follows 250 ms later. Notes and line ranges for the lead's review: `docs/plans/PC4-NOTES.md`. Nothing changes with the native engine off (`tests/native-client-inert.test.js` counts the four new one-line branches: `mfSet`, `moApply`, `pdcSet`, `thunderChains.param`).
