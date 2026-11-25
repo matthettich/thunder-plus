@@ -137,13 +137,14 @@ int main() {
     }
   });
   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-  std::atomic<bool> stop{false}; std::atomic<int> nonfinite{0}; std::atomic<int64_t> frames{0}; std::atomic<float> peak{0};
+  std::atomic<bool> stop{false}; std::atomic<int> nonfinite{0}; std::atomic<int64_t> frames{0}; std::atomic<float> peak{0}; std::atomic<double> sq{0};
   std::thread audio([&] {   // the fake device callback: 480-frame blocks, a little faster than real time
     std::vector<float> o(2 * 480); int64_t wall = 1000000000LL;
     while (!stop.load()) {
       E.render(o.data(), 480, wall); wall += 10000000LL;
       float pk = 0; for (float v : o) { if (!std::isfinite(v)) nonfinite++; else pk = std::fmax(pk, std::fabs(v)); }
       float cur = peak.load(); if (pk > cur) peak.store(pk);
+      { double s = 0; for (float v : o) if (std::isfinite(v)) s += (double)v * v; sq.store(sq.load() + s); }
       frames += 480;
       std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
@@ -174,6 +175,16 @@ int main() {
   { const std::string ev = E.drainEvents(); std::printf("events: %zu bytes, dropped %zu\n", ev.size(), E.eventsDropped());
     for (const char* t : {"clock", "pos", "meters", "state", "song"}) CHECK(ev.find(std::string("\"t\":\"") + t + "\"") != std::string::npos, "no %s event in the drained queue", t);
     CHECK(ev.size() > 2 && ev[0] == '{' && ev.back() == '}' && ev.find("}\n{") != std::string::npos, "events are JSON objects, one per line"); }
+  { // H1c: the shell's ducking gain (audio focus): energy over two seconds at unity, then at 0.25 (after its 150 ms ramp), then back
+    auto window = [&] { const double a = sq.load(); const int64_t f0 = frames.load(); while (frames.load() < f0 + 96000) std::this_thread::sleep_for(std::chrono::milliseconds(20)); return std::sqrt((sq.load() - a) / (double)(frames.load() - f0)); };
+    const double unity = window();
+    E.setDuck(0.25f); std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    const double ducked = window();
+    E.setDuck(1.f); std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    const double back = window();
+    std::printf("duck: rms unity %.4f, ducked %.4f (x%.3f), back %.4f\n", unity, ducked, unity > 0 ? ducked / unity : 0.0, back);
+    CHECK(unity > 1e-4 && ducked < unity * 0.5 && ducked > unity * 0.08 && back > unity * 0.5, "ducking gain: %.4f -> %.4f -> %.4f", unity, ducked, back);
+    CHECK(E.duck() == 1.f, "duck target back at unity"); }
   rc = E.call([&](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); });
   CHECK(rc == 0, "stop: %d", rc);
   std::this_thread::sleep_for(std::chrono::milliseconds(200));

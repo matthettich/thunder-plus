@@ -26,6 +26,8 @@ object LiveBridge {
 
     /** Events and replies go to every listener (ThunderHost.listeners: the bridge's forward). */
     private fun emit(json: String) { for (l in ThunderHost.listeners) l(json) }
+    /** H1c: the shell's own events (device change, focus) to the page. */
+    fun send(json: String) = emit(json)
     private fun err(where: String, msg: String) = emit(JSONObject().put("t", "err").put("where", where).put("msg", msg).put("fatal", false).toString())
     private fun reply(id: Int, body: JSONObject) { if (id >= 0) emit(body.put("t", "reply").put("id", id).toString()) }
 
@@ -61,6 +63,7 @@ object LiveBridge {
                 val id = idOf(text); lastRev = revOf(text)
                 val r = LiveNative.nativeSongLoad(c.raw)
                 val published = FlatJson.bool(r, "ok") ?: false
+                if (published) { LiveEngine.songTitle = SongTitle.fromMessage(text, LiveEngine.projectFile); LiveSession.refresh() }   // H1c: the notification and the media session say this name
                 val fit = if (published) LiveNative.nativeFit(lastRev) else ""
                 val fitOk = published && (FlatJson.bool(fit, "ok") ?: false)
                 val reasons = if (published) FlatJson.stringArray(fit, "reasonTexts") else listOf(FlatJson.str(r, "err").orEmpty().ifEmpty { "the native engine refused the song (rc " + FlatJson.num(r, "rc") + ")" })
@@ -79,8 +82,8 @@ object LiveBridge {
                 emit("{\"t\":\"kit\"," + r.substring(1))   // {ok, rc, err, pads, skipped, dry, renderMs, empty:[the slots the page must put]}
                 emit(LiveNative.nativeFit(lastRev))
             }
-            is BridgeTranslator.LiveCall.Play -> check(type, LiveNative.nativePlayEx(c.mode, c.row, c.track, c.sect, c.phrase, c.hasLoop, c.y0, c.y1, c.t0, c.hasSeed, c.seed, c.pdc, c.onlyBits, c.hasOnly))
-            is BridgeTranslator.LiveCall.Stop -> check(type, LiveNative.nativeTransportStop(c.at))
+            is BridgeTranslator.LiveCall.Play -> if (!LiveSession.beforePlay()) err(type, "audio focus refused (a call or another app holds the audio)") else check(type, LiveNative.nativePlayEx(c.mode, c.row, c.track, c.sect, c.phrase, c.hasLoop, c.y0, c.y1, c.t0, c.hasSeed, c.seed, c.pdc, c.onlyBits, c.hasOnly))
+            is BridgeTranslator.LiveCall.Stop -> { check(type, LiveNative.nativeTransportStop(c.at)); LiveSession.afterUserStop() }
             is BridgeTranslator.LiveCall.Hold -> check(type, LiveNative.nativeHold(c.at))
             is BridgeTranslator.LiveCall.Bpm -> check(type, LiveNative.nativeBpm(c.bpm, c.at))
             is BridgeTranslator.LiveCall.Loop -> check(type, LiveNative.nativeLoop(c.has, c.y0, c.y1, c.at))

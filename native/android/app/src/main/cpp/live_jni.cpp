@@ -47,6 +47,7 @@ struct Live {
   double bpm = 120, lpb = 4;
 };
 Live g;
+std::atomic<bool> g_reopening{false};   // H1c: the stream is being rebuilt: the status call leaves the stream pointer alone
 std::mutex g_life;   // start / shutdown / load: one at a time (the JNI threads are Kotlin's; the audio thread never takes it)
 rtlog g_lrt;         // A5's clock-drift logger on the live callback
 std::atomic<double> g_load{0.0};   // CORE-BRIDGE 7 G9: the callback's time over its period, peak-held with decay (written by the audio thread, read by Kotlin)
@@ -108,9 +109,8 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   return (jint)g.device.sampleRate;
 }
 
-// The destroy order (live.h destroy, N0's nativeStop): stop the transport, let two callbacks run it, stop the stream (no more process), join the threads, destroy.
-JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown(JNIEnv*, jobject) {
-  std::lock_guard<std::mutex> lk(g_life);
+// The destroy order (live.h destroy, N0's nativeStop): stop the transport, let two callbacks run it, stop the stream (no more process), join the threads, destroy. g_life held.
+void teardownLocked() {
   if (!g.deviceInit) return;
   g.eng->call([](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); }, 500);
   const int64_t c0 = g.eng->audioCalls();
@@ -122,6 +122,51 @@ JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown
   g.lastSlots.clear();
   if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; g.aaXrun = nullptr; g.aaBuf = nullptr; }
 }
+
+JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown(JNIEnv*, jobject) {
+  std::lock_guard<std::mutex> lk(g_life);
+  teardownLocked();
+}
+
+// H1c: the output changed under the host (a device was unplugged, a Bluetooth sink came or went, the stream died). The HOST stays: its sample rate, song and pads are kept. Only the stream is rebuilt, and at the
+// ENGINE's rate (the new device may run at another rate: Android's mixer converts, miniaudio converts if it does not; no new create, no pad re-render, no song re-publish). The transport is stopped first
+// and is NOT restarted (a defined state: stopped; the owner presses Play). process() takes the new frame0 count as a re-anchor (live.h TIME), so no seam is possible.
+// Returns the stream's rate (the engine's), or -1 when no stream could be opened (the host is then ended too: the shell reports "engine down" and the page re-sends everything).
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeReopenStream(JNIEnv*, jobject) {
+  std::lock_guard<std::mutex> lk(g_life);
+  if (!g.deviceInit || !g.eng) return -2;
+  g_reopening.store(true);
+  g.eng->call([](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); }, 500);
+  const int64_t c0 = g.eng->audioCalls();
+  for (int i = 0; i < 40 && g.eng->audioCalls() < c0 + 2; i++) std::this_thread::sleep_for(std::chrono::milliseconds(5));   // a dead stream makes no calls: the wait is 200 ms at most
+  ma_device_uninit(&g.device);
+  g.deviceInit = false;
+  ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
+  cfg.playback.format = ma_format_f32;
+  cfg.playback.channels = 2;
+  cfg.sampleRate = (ma_uint32)g.eng->config().sampleRate;
+  cfg.dataCallback = dataCallback;
+  cfg.pUserData = &g;
+  cfg.performanceProfile = ma_performance_profile_low_latency;
+  cfg.aaudio.usage = ma_aaudio_usage_media;
+  if (ma_device_init(nullptr, &cfg, &g.device) != MA_SUCCESS) { g_reopening.store(false); LOGI("reopen: ma_device_init failed: the host ends"); teardownLocked(); return -1; }
+  g.deviceInit = true;
+  if (ma_device_start(&g.device) != MA_SUCCESS) { g_reopening.store(false); LOGI("reopen: ma_device_start failed: the host ends"); teardownLocked(); return -1; }
+  g_reopening.store(false);
+  LOGI("stream reopened at the engine's %u Hz", g.device.sampleRate);
+  return (jint)g.device.sampleRate;
+}
+
+// The stream as the watchdog sees it: {"calls": audio callbacks since create, "state": ma_device state (3 = started), "sr", "duck"}. "{}" when no host.
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStreamState(JNIEnv* env, jobject) {
+  if (!g.deviceInit || !g.eng || g_reopening.load()) return env->NewStringUTF("{}");
+  char b[160];
+  std::snprintf(b, sizeof b, "{\"calls\":%lld,\"state\":%d,\"sr\":%u,\"duck\":%.3f}", (long long)g.eng->audioCalls(), (int)ma_device_get_state(&g.device), g.device.sampleRate, (double)g.eng->duck());
+  return env->NewStringUTF(b);
+}
+
+// The shell's output gain (audio-focus ducking): 0..1, ramped by the audio thread.
+JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeSetDuck(JNIEnv*, jobject, jfloat gain) { if (g.eng) g.eng->setDuck(gain); }
 
 // A .thunder project's bytes (UTF-8): the song and the kit. The pads are rendered HERE (the caller's thread, not the control thread, not the audio thread), then ONE control call publishes the
 // song and the pads. Returns a JSON object {ok, rc, err, pads, skipped, dry, renderMs, notes[]}.
@@ -202,7 +247,9 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMixSet(J
 // The poller's latest state as JSON. Also hands AAudio's xrun count and buffer size to the host (the poller thread passes them to thunder_live_host_stats every 100 ms).
 JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStatus(JNIEnv* env, jobject) {
   if (!g.deviceInit || !g.eng) return env->NewStringUTF("{}");
-  void* stream = (void*)g.device.aaudio.pStreamPlayback;
+  // the stream pointer is read only while no start / reopen / shutdown runs (g_life is held by them): a busy lock skips this round of host stats
+  std::unique_lock<std::mutex> lk(g_life, std::try_to_lock);
+  void* stream = (lk.owns_lock() && g.deviceInit && !g_reopening.load()) ? (void*)g.device.aaudio.pStreamPlayback : nullptr;
   if (stream) {
     const int x = g.aaXrun ? g.aaXrun(stream) : 0, b = g.aaBuf ? g.aaBuf(stream) : 0;
     g.eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)

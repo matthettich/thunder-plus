@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- N2 H1c: the status-bar icon of the playback notification (a lightning bolt, white on transparent as Android wants). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFF" android:pathData="M13,2 L5,13.5 H10.5 L9.5,22 L19,9.5 H13.5 Z" />
+</vector>

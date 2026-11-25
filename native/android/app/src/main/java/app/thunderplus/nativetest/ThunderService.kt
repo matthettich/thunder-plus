@@ -42,34 +42,40 @@ class ThunderService : Service() {
     private fun onLiveCommand(action: String?): Int {
         val ctx = applicationContext
         postLive(ctx)   // startForegroundService needs startForeground soon: post first, update after the work
+        LiveSession.attach(this)   // H1c: audio focus, headphones, device changes, media session, the 500 ms ticker (idempotent)
+        LiveSession.refresh()
         when (action) {
-            ACTION_PLAY -> LiveEngine.async { if (LiveButtons.canPlay(LiveEngine.status(), LiveEngine.loaded != null)) LiveEngine.play(); postLive(ctx) }
-            ACTION_STOP -> LiveEngine.async { LiveEngine.stop(); postLive(ctx) }
+            ACTION_PLAY -> LiveEngine.async { if (LiveButtons.canPlay(LiveEngine.status(), LiveEngine.loaded != null)) LiveEngine.play(); LiveSession.refresh() }
+            ACTION_STOP -> LiveEngine.async { LiveEngine.stop(); LiveSession.refresh() }
             else -> {}
         }
         return START_NOT_STICKY
     }
 
-    private fun postLive(ctx: Context) {
+    /** The live engine's notification (H1c): the song's name as the title, the app icon, Play and Stop, in the media style tied to the media session (lock screen and Android 13+ media controls). Main thread or any: it only posts. */
+    fun postLive(ctx: Context) {
         val text = LiveButtons.notificationText(LiveEngine.status(), LiveEngine.loaded != null)
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "Playback", NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val play = PendingIntent.getService(this, 2, Intent(this, ThunderService::class.java).setAction(ACTION_PLAY), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, ThunderService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
-        val n = Notification.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("Thunder Plus (native live engine)")
-            .setContentText(if (LiveEngine.projectName.isEmpty()) text else LiveEngine.projectName + ": " + text)
+        val b = Notification.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_thunder)
+            .setContentTitle(LiveEngine.songTitle)
+            .setContentText(text)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(android.R.drawable.ic_media_play, "Play", play).build())
             .addAction(Notification.Action.Builder(android.R.drawable.ic_media_pause, "Stop", stop).build())
             .setOngoing(true)
-            .build()
-        startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+        LiveSession.largeIcon()?.let { b.setLargeIcon(it) }
+        LiveSession.session?.let { b.setStyle(Notification.MediaStyle().setMediaSession(it.sessionToken).setShowActionsInCompactView(0, 1)) }
+        startForeground(NOTIF_ID, b.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     }
 
     override fun onDestroy() {
+        LiveSession.detach()
         LiveEngine.shutdown()
         ThunderHost.shutdown()
         super.onDestroy()
