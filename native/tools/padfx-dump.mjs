@@ -17,7 +17,7 @@ const require = createRequire(import.meta.url);
 const SR = 48000;
 const rd = f => fs.readFileSync(path.join(ROOT, f));
 
-const SKIP = new Set(['degrade', 'reson', 'pdelay', 'preverb', 'rings', 'clouds']);   // the four JS cores have their own unit (U17); rings / clouds are not hosted (PFX-NOTES.md)
+const SKIP = new Set(['degrade', 'reson', 'pdelay', 'preverb']);   // the four JS cores have their own unit (U17)
 
 function loadEngine() {
   const html = rd('index.html').toString('utf8').replace(/\r\n/g, '\n');

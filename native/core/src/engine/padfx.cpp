@@ -14,6 +14,7 @@
 #include "song/song.h"
 #ifdef THUNDER_HAVE_TFX
 #include "tfx.h"
+#include "padfx_mi.h"
 #endif
 
 namespace thunder {
@@ -28,7 +29,7 @@ inline double sgn(double v) { return v != v ? kNaN : v > 0 ? 1 : v < 0 ? -1 : v;
 constexpr double kSpaceSizeMax = 0.99;                                                           // SPACE_SIZE_MAX
 inline double truthy(double v) { return (v == v && v != 0) ? 1 : 0; }                            // `v ? 1 : 0`
 
-enum Cls : uint8_t { kTx, kTxRaw, kCrush, kChorus, kMod };
+enum Cls : uint8_t { kTx, kTxRaw, kCrush, kChorus, kRings, kClouds, kMod };
 typedef void (*MapFn)(const double* f, double sr, double bpm, double* p);
 struct Def {
   const char* key; Cls cls; int id; int n; const char* keys[12]; MapFn map; int blend;   // blend: index of the REVERB MIX value, -1 none
@@ -75,6 +76,8 @@ const Def kDefs[] = {
   {"density", kTxRaw, 2, 4, {"drive", "highpass", "output", "mix"}, M(p[0] = 0.2 + f[0] * 0.8; p[1] = f[1]; p[2] = f[2]; p[3] = f[3];), -1},
   {"tape", kTxRaw, 3, 6, {"input", "soften", "bump", "flutter", "output", "mix"}, M(for (int i = 0; i < 6; i++) p[i] = f[i];), -1},
   {"chorus", kChorus, 4, 5, {"depth", "rate", "delay", "feedback", "mix"}, M(p[0] = f[0]; p[1] = f[1]; p[2] = f[2]; p[3] = f[3]; p[4] = 1;), -1},
+  {"rings", kRings, -1, 9, {"model", "poly", "note", "structure", "brightness", "damping", "position", "input", "mix"}, nullptr, -1},
+  {"clouds", kClouds, -1, 11, {"mode", "lofi", "freeze", "position", "size", "pitch", "density", "texture", "blend", "feedback", "reverb"}, nullptr, -1},
   {"crush", kCrush, 5, 4, {"down", "bits", "mix", "smooth"}, M(p[0] = f[0]; p[1] = f[1]; p[2] = truthy(f[3]); p[3] = 1;), -1},
 };
 #undef M
@@ -122,7 +125,7 @@ int pad_fx_count() { return kNTx + kNMod; }
 const char* pad_fx_key(int i) { return i < 0 ? nullptr : i < kNTx ? kDefs[i].key : i < kNTx + kNMod ? kModKeys[i - kNTx] : nullptr; }
 int pad_fx_nvals(int i) { if (i < 0) return 0; if (i < kNTx) return kDefs[i].n; if (i >= kNTx + kNMod) return 0; const modfx::Def* d = modfx::find(kModKeys[i - kNTx]); return d ? d->np : 0; }
 const char* pad_fx_valkey(int i, int k) { if (i >= 0 && i < kNTx && k >= 0 && k < kDefs[i].n) return kDefs[i].keys[k]; return nullptr; }
-bool pad_fx_map(int i, const double* v, double sr, double bpm, double* p12) { if (i < 0 || i >= kNTx) return false; for (int k = 0; k < 12; k++) p12[k] = 0; kDefs[i].map(v, sr, bpm, p12); return true; }
+bool pad_fx_map(int i, const double* v, double sr, double bpm, double* p12) { if (i < 0 || i >= kNTx || !kDefs[i].map) return false; for (int k = 0; k < 12; k++) p12[k] = 0; kDefs[i].map(v, sr, bpm, p12); return true; }
 
 void pad_fx_parse(EngFx& f, Json j) {
   const int i = findIndex(j.str("type")); if (i < 0) return;
@@ -200,6 +203,55 @@ bool runCrushChorus(const Def& d, const double* v, const float* a, size_t n, dou
   }
   return true;
 }
+
+// index.html resample(a, from, to)
+std::vector<float> resampleJs(const float* a, size_t len, double from, double to) {
+  if (from == to) return std::vector<float>(a, a + len);
+  const double nn = js_round((double)len * to / from); const size_t n = nn < 1 ? 1 : (size_t)nn;
+  std::vector<float> out(n); const double k = from / to;
+  for (size_t i = 0; i < n; i++) {
+    const double p = (double)i * k; const size_t j = (size_t)p; const double fr = p - (double)j;
+    double x0 = j < len ? (double)a[j] : 0; if (x0 != x0) x0 = 0;   // `a[j] || 0`
+    const double x1 = j + 1 < len ? (double)a[j + 1] : 0;
+    out[i] = fl(x0 + (x1 - x0) * fr);
+  }
+  return out;
+}
+bool runRings(const EngFx& f, const float* a, size_t n, double sr, std::vector<float>& out) {
+  const double* v = f.lv;   // model poly note structure brightness damping position input mix
+  std::vector<float> src = resampleJs(a, n, sr, 48000);
+  for (float& x : src) x = fl((double)x * v[7]);
+  std::unique_ptr<thunder_padfx::Rings> R(thunder_padfx::Rings::make()); if (!R) return false;
+  R->set(js_to_int32(v[0]), js_to_int32(v[1]), fl(v[2]), fl(v[3]), fl(v[4]), fl(v[5]), fl(v[6]));
+  std::vector<float> wet48(src.size()), io(4096);
+  for (size_t off = 0; off < src.size(); off += 4032) {   // chunked(src, 4032, ...): the last call rounded up to 96 with zeros
+    const int k = (int)(src.size() - off < 4032 ? src.size() - off : 4032), m = std::min(4032, (k + 95) / 96 * 96);
+    std::fill(io.begin(), io.end(), 0.0f); std::memcpy(io.data(), src.data() + off, sizeof(float) * (size_t)k);
+    R->process(io.data(), m, off == 0 ? 1 : 0);
+    std::memcpy(wet48.data() + off, io.data(), sizeof(float) * (size_t)k);
+  }
+  const std::vector<float> wet = resampleJs(wet48.data(), wet48.size(), 48000, sr);
+  out.assign(n, 0.0f);
+  for (size_t i = 0; i < n; i++) { double w = i < wet.size() ? (double)wet[i] : 0; if (w != w) w = 0; out[i] = fl((double)a[i] * (1 - v[8]) + w * v[8]); }
+  return true;
+}
+bool runClouds(const EngFx& f, const float* a, size_t n, double sr, std::vector<float>& out) {
+  const double* v = f.lv;   // mode lofi freeze position size pitch density texture blend feedback reverb
+  StateScope ss;   // Clouds draws from stmlib's generator
+  const std::vector<float> src = resampleJs(a, n, sr, 32000);
+  size_t end = src.size(); while (end > 1 && std::fabs((double)src[end - 1]) < 1e-4) end--;
+  std::unique_ptr<thunder_padfx::Clouds> C(thunder_padfx::Clouds::make(js_to_int32(v[0]), truthy(v[1]) ? 3 : 1)); if (!C) return false;
+  std::vector<float> wet(src.size(), 0.0f); float in[96], L[96], R[96];
+  for (size_t off = 0; off < src.size(); off += 96) {
+    std::memset(in, 0, sizeof in); const size_t k = std::min<size_t>(96, src.size() - off); std::memcpy(in, src.data() + off, sizeof(float) * k);
+    C->set(fl(v[3]), fl(v[4]), fl(v[5]), fl(v[6]), fl(v[7]), fl(v[8]), 0.5f, fl(v[9]), fl(v[10]), (truthy(v[2]) && off >= end) ? 1 : 0);
+    C->process(in, L, R, 96);
+    for (size_t i = 0; i < 96 && off + i < wet.size(); i++) wet[off + i] = fl(((double)L[i] + (double)R[i]) * 0.5);
+  }
+  const std::vector<float> back = resampleJs(wet.data(), wet.size(), 32000, sr);
+  out.assign(n, 0.0f); std::memcpy(out.data(), back.data(), sizeof(float) * std::min(n, back.size()));
+  return true;
+}
 #endif
 
 // modFxRun
@@ -242,6 +294,8 @@ bool pad_fx_lib(const EngFx& f, const float* a, size_t n, double sr, double bpm,
   for (int k = 0; k < kDefs[f.lib].n; k++) if (!(f.lv[k] == f.lv[k])) return false;   // a control the saved effect lacks (undefined on the page: NaN into the wasm, which can run off its tables): the sound passes, as for an effect that is not ready
 #ifdef THUNDER_HAVE_TFX
   const Def& d = kDefs[f.lib];
+  if (d.cls == kRings) return runRings(f, a, n, sr, out);
+  if (d.cls == kClouds) return runClouds(f, a, n, sr, out);
   if (d.cls == kCrush || d.cls == kChorus) return runCrushChorus(d, f.lv, a, n, sr, bpm, out);
   if (!runFx(d, f.lv, a, n, sr, bpm, out, d.cls == kTx)) return false;
   if (d.blend >= 0) {   // REVERB MIX: the wasm runs fully wet, the pad blends it with rvMix

@@ -49,7 +49,7 @@ endif()
 # U14: the track-effect host links the tfx effects directly (make_* of dsp/tfx/tfx.h), no wasm
 if(TARGET thunder_dsp_tfx)
   target_link_libraries(thunder_core PUBLIC thunder_dsp_tfx)
-  target_include_directories(thunder_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../dsp/tfx)
+  target_include_directories(thunder_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../dsp/tfx ${CMAKE_CURRENT_SOURCE_DIR}/dsp)
   target_compile_definitions(thunder_core PUBLIC THUNDER_HAVE_TFX=1)
 endif()
 # U25: the Plaits / Elements layer types host the strict upstream build (thunder_dsp_pe, dsp/pe_host.h) directly. layer_pe.cpp is always built (without the library the two types are simply not supported).

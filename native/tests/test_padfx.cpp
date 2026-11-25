@@ -78,12 +78,16 @@ int main(int argc, char** argv) {
     const double db = same ? -999 : 10 * std::log10(e2 / std::max(r2, 1e-30));
     const bool hashOk = fnv(want.data(), want.size()) == G.hash && (int)want.size() == G.floats;
     const double gate = std::strstr(G.name, "pshift") ? -80.0 : -100.0;   // the pitch shifter's two crossfaded taps: tfx.wasm is built with -ffast-math, the host without (test_fx.cpp: e_pshift_def -68.5 dB there); -85.2 / -96.7 measured here
-    const bool pass = db <= gate && hashOk;
+    double maxe = 0; for (size_t i = 0; i < got.size(); i++) maxe = std::max(maxe, std::fabs((double)got[i] - (double)want[i]));
+    // Clouds hands its output over as int16 (the page's own wasm is built with -ffast-math, this host strict): a sample may land on the neighbouring step, on either channel, and the page's
+    // mean of the two and its resample from 32 kHz leave at most 1.5 steps (test_fx.cpp's e_clouds_alt rule, one step per channel). Rings: fast-math rounding in a resonator bank, -88 dB measured.
+    const bool clouds = std::strstr(G.name, "clouds") != nullptr;
+    const bool pass = (clouds ? maxe <= 1.6 / 32768.0 : db <= (std::strstr(G.name, "rings") ? -80.0 : gate)) && hashOk;
     if (same) exact++; else if (db > worst) { worst = db; worstName = G.name; }
     char b[24]; if (same) std::snprintf(b, sizeof b, "exact"); else std::snprintf(b, sizeof b, "%.1f dB", db);
     std::printf("%-26s %-10s%s%s\n", G.name, b, hashOk ? "" : "  [committed hash disagrees with the reference run]", pass ? "" : "  FAIL");
     if (!pass) fails++;
   }
-  std::printf("padfx: %d cases run, %d bit-exact, worst %s (%s), %d failed (gate -100 dB RMS, pshift -80)\n", ran, exact, worst < -900 ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName.c_str(), fails);
+  std::printf("padfx: %d cases run, %d bit-exact, worst %s (%s), %d failed (gate -100 dB RMS; pshift and rings -80; clouds 1.6 int16 steps)\n", ran, exact, worst < -900 ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName.c_str(), fails);
   return fails ? 1 : 0;
 }
