@@ -84,13 +84,13 @@ test('publish: one song.load at a time; an edit while one is out goes after its 
 // ---- PLAY ---------------------------------------------------------------------------------------------------------------------------------
 test('PLAY order: kit, pads, then song.load and its verdict, and only then play; the run is lit at once', async () => {
   const r = await up(); r.bump();
-  r.NC.kit = () => r.log.push('kit.load'); r.NC.settle = ms => { r.log.push('pads?' + ms); return Promise.resolve(); };
+  r.host.padApi = () => ({ api: 1 }); r.NC.kit = a => r.log.push('kit.load' + (a && a.api)); r.NC.chopAll = () => r.log.push('chop'); r.NC.whenPads = ms => { r.log.push('pads?' + ms); return Promise.resolve(); };
   r.log.length = 0; assert.equal(r.NC.can('song', { row: 3 }), true);
   r.NC.start('song', { row: 3, loop: { v: 'song', y0: 3, y1: 5 }, only: [1, 2] });
   assert.equal(r.tp.on && r.tp.nc, true, 'tp says playing before the verdict');
   await r.ck.advance(1);
-  const order = r.log.filter(x => ['kit.load', 'pads?1500', 'song.load?', 'play'].includes(x));
-  assert.deepEqual(order, ['kit.load', 'pads?1500', 'song.load?', 'play']);
+  const order = r.log.filter(x => ['kit.load1', 'chop', 'pads?1500', 'song.load?', 'play'].includes(x));
+  assert.deepEqual(order, ['kit.load1', 'chop', 'pads?1500', 'song.load?', 'play']);
   assert.ok(r.log.indexOf('prep') >= 0 && r.log.indexOf('prep') < r.log.indexOf('play'));
   const p = r.msgs('play')[0]; assert.equal(p.mode, 'song'); assert.equal(p.row, 3); assert.deepEqual(p.loop, { y0: 3, y1: 5 }); assert.deepEqual(p.only, [1, 2]); assert.ok(Number.isInteger(p.seed));
   assert.ok(r.msgs('lead').length >= 1, 'the look-ahead goes with PLAY');
@@ -193,6 +193,9 @@ test('can(): what only the page knows (recording take, count-in, Link, MIDI cloc
   const r = await up(); r.blocked = 'Ableton Link needs the old engine'; assert.equal(r.NC.can('song', {}), false); assert.deepEqual(r.toasts, ['Playing with the old engine: Ableton Link needs the old engine']);
   r.blocked = ''; assert.equal(r.NC.can('song', {}), true);
 });
+test('can(): a pad problem from the pad side (memory limit) is a fallback reason', async () => {
+  const r = await up(); r.NC.padProblem = 'pad memory is full (pad 3)'; assert.equal(r.NC.can('song', {}), false); assert.deepEqual(r.toasts, ['Playing with the old engine: pad memory is full (pad 3)']);
+});
 test('can(): no heartbeat (a clock event within 2 s) means the engine is not running', async () => {
   const r = await up(); await r.ck.advance(2500); assert.equal(r.NC.can('song', {}), false); assert.match(r.toasts[0], /not running/);
   const n = rig(); await n.NC.attach(n.host); assert.equal(n.NC.can('song', {}), false, 'no clock yet');
@@ -262,6 +265,6 @@ test('detach() clears the timers', async () => {
 });
 test('the page hands the client what it needs: the host object of index.html has every function the client calls', () => {
   const src = H.read('index.html'), host = (src.match(/const ncSongHost = \(\) => \(\{[\s\S]*?\n\}\);\n/) || [])[0] || '';
-  for (const k of ['songVer', 'vars', 'title', 'lxp', 'pbLog', 'perf', 'blocked', 'prep', 'begin', 'fallback', 'stopped']) assert.match(host, new RegExp('\\b' + k + ':'), k);
+  for (const k of ['padApi', 'songVer', 'vars', 'title', 'lxp', 'pbLog', 'perf', 'blocked', 'prep', 'begin', 'fallback', 'stopped']) assert.match(host, new RegExp('\\b' + k + ':'), k);
   for (const k of ['S', 'songVer', 'aset', 'toast', 'now', 'vars', 'title', 'lxp', 'perf', 'blocked', 'prep', 'begin', 'fallback', 'stopped', 'pbLog']) assert.ok(CLIENT.includes('host.' + k), 'the client reads host.' + k + ' (' + k + ')');
 });

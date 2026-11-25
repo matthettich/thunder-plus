@@ -24955,6 +24955,7 @@ let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP cl
 /* NATIVE CORE, PC3 (docs/port/N2-PAGE-CLIENT.md 4.3 rows 4-6, 15-17): the page's side of a PLAY that the engine in the shell plays. tp.nc is true from that PLAY to its STOP; the page's own sequencer,
    AudioContext and the JS core are not used then. The client file is handed these through attach(); nothing here runs unless tStart let the native engine in. */
 const ncSongHost = () => ({
+  padApi:() => typeof ncPadApi === 'function' ? ncPadApi() : undefined,   // (PC2's pad side reads the page through this)
   songVer:() => songVer, vars:() => coreVars(), title:() => msTitle(), lxp:() => lxp.st | 0, pbLog:s => pbLog(s),
   perf:() => perfLive.init ? {xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill} : null,
   // What only the page knows and the shell's verdict cannot (4.6, last row); '' = none. (Live transpose and MIDI-clock follow are in the shell's verdict too.)

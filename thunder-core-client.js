@@ -89,8 +89,10 @@
       if (!resumeNote && o && o._resumed) { resumeNote = true; host.toast('Resume plays from the start of the row on the native engine.', 3000); }
       watch(true);
       var tasks = [];
-      try { if (typeof NC.kit === 'function') NC.kit(); } catch (e) { log('native core client: kit hook failed', e); }
-      try { if (typeof NC.settle === 'function') tasks.push(NC.settle(1500)); } catch (e) { log('native core client: pads hook failed', e); }
+      // PC2's pad side (when it is there): every pad and the kit go first, the chop data after an instrument edit, then PLAY waits (at most 1.5 s) for the pads to be audible
+      try { if (typeof NC.kit === 'function') NC.kit(host.padApi ? host.padApi() : undefined); } catch (e) { log('native core client: kit hook failed', e); }
+      try { if (typeof NC.chopAll === 'function') NC.chopAll(host.padApi ? host.padApi() : undefined); } catch (e) { log('native core client: chop hook failed', e); }
+      try { if (typeof NC.whenPads === 'function') tasks.push(NC.whenPads(1500)); } catch (e) { log('native core client: pads hook failed', e); }
       try { host.prep && host.prep(); } catch (e) { log('native core client: prep failed', e); }
       tasks.push(verdictNow());
       Promise.all(tasks).then(function (r) {
@@ -155,6 +157,7 @@
     if (!engineUp) return 'the native engine is not running';
     if (!lastClock || nowMs() - lastClock > BEAT_PLAY_MS) return 'the native engine is not running';
     if (failed && failed.ref === host.S()) return 'the native engine stopped on this song earlier';
+    if (NC.padProblem) return NC.padProblem;   // PC2: a pad could not go to the engine (memory limit, ...)
     var why = host.blocked ? host.blocked() : '';
     if (why) return why;
     if (current() && !verdict.ok) return reasonText(verdict);

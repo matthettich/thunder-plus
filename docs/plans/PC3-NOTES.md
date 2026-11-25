@@ -24,7 +24,7 @@ tStart 24946 -> 24982; tStop 25725 -> ~25780; saveS 22290 -> 22298; resetAudio 2
 
 ## For the lead (merge with PC2)
 - `loadClient`'s `attach(...)` line is the one line both PRs touch: PC3 wraps it as `attach(Object.assign({...PC1 keys}, ncSongHost()))`. The inert test's counts (NCON() 4, NC() 7, tp.nc 9) will need PC2's numbers added.
-- Hooks PC3 calls if they exist, and PC2 should provide: `NC.kit()` (send `kit.load`; also PC2's branch 8), `NC.settle(maxMs)` (a Promise: pads sent and committed, first PLAY waits at most 1500 ms), `NC.resend()` (kit + all pads again after `{t:'engine', up:true}`). PLAY order in the test: kit, pads, song.load verdict, play.
+- PC2's hooks (from the lead's note), called at PLAY if present: `NC.kit(api)`, `NC.chopAll(api)`, then `await NC.whenPads(1500)`; `NC.padProblem` is read in `can()`. `api` comes from `host.padApi()` (-> `ncPadApi()` once PC2 is merged). PC2 re-sends kit and pads itself on `engine up`; PC3's own `NC.resend` hook is optional and can be dropped. PLAY order in the test: kit, chop, pads, song.load verdict, play. `hello {live:true}` is PC2's.
 - `draw()`'s playhead block is guarded by `ctx`, so with `ctx === null` a native PLAY shows no playhead until PC5; PC5's `ctx === null` audit still applies (`tp.on` is true now).
 - Metronome, count-in (fallback), `moStart` (the shell's MIDI scheduler plays MIDI), pad flashes: not in PC3.
 
