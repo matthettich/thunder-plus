@@ -21,7 +21,7 @@ While a native PLAY runs, `saveS()` -> `NC.edit()` starts ONE diff task per 16 m
 The whole song still goes 250 ms after the last edit (the song text must carry every change). The small messages go first (same port, ordered).
 
 ## The page side (`index.html`, 4 one-line branches and 3 host functions)
-- `mfSet` (the track fader drag) and `moApply` (the master OUT drag) call `NC().edit()`: **both change `S` without `saveS()` until the pointer is let go**, so without these two lines a drag is silent in native mode until release. (This is the answer to "list the applyMix sites": see below.)
+- `mfSet` (the track fader drag) and the master OUT bar's pointer-move handler (32022, next to its `moApply()` call; `moApply` itself is untouched, `tests/gain-staging.test.js` pins its text) call `NC().edit()`: **both change `S` without `saveS()` until the pointer is let go**, so without these two lines a drag is silent in native mode until release. (This is the answer to "list the applyMix sites": see below.)
 - `pdcSet` calls `NC().edit()` (an `aset` change: no `saveS`).
 - `thunderChains.param` (branch 13): `if (NCON()) return NC().chainParam(id, name, value);` after the patch update and before the `rt` guard. `param()` does **not** `saveS` (the editor's autosave follows about a second later), so the client makes the song stale itself.
 - `ncSongHost`: `fxSlot(f, sr, bpm)` (tfxChain's mapping for one slot without `pumpSync`'s side effect), `chainMods()` (module id -> type), `pdc()` (0 off, 1 auto, 2 on).
@@ -38,7 +38,7 @@ The whole song still goes 250 ms after the last edit (the song text must carry e
 7. 33031 part load (PRT): `saveS()` just before. OK.
 8. 26272 offline render's own `pl.applyMix(keep)`: not the live mixer. n/a.
 (Inside the player, 23298 `planChanged` and 23850 TVL / TPN reset call it on the page's own graph; no `rt` in native mode.)
-Also without `saveS` during the gesture: the master OUT bar (`moApply` on pointer-move; `saveS` on pointer-up, the pointer-up handler `moDragEnd`) — fixed the same way — and `thunderChains.param` (above). The other `rtRoute()` / `moApply()` callers (tracker keys, MASTER rows) end in `saveS()`.
+Also without `saveS` during the gesture: the master OUT bar (pointer-move; `saveS` on pointer-up, the pointer-up handler `moDragEnd`) — fixed the same way — and `thunderChains.param` (above). The other `rtRoute()` / `moApply()` callers (tracker keys, MASTER rows) end in `saveS()`.
 
 ## The signature (`L.sent`): why it is never stale
 `L.sent` is a snapshot object `{ref: S, mix[32][5], master, mout, fx[33], mst, safety, mods}`.
@@ -61,4 +61,4 @@ Also without `saveS` during the gesture: the master OUT bar (`moApply` on pointe
 - `liveFlush` (the diff and every message): 667-708.
 - `NC.chainParam`: 710-720.
 - Hooks outside the block: `edit` 70-75; `publish` snapshot 203; `settleV` 244; `sendPlay` pdc 258-259; `engine` handlers `liveReset` 316 and 320; `NC.newSong` 601; `detach` 66; `schedPublish` 153.
-- `index.html`: `fxSlot` / `chainMods` / `pdc` 24979-24982; `mfSet` 31950; `moApply` 24830; `pdcSet` 15940; `thunderChains.param` 19019.
+- `index.html`: `fxSlot` / `chainMods` / `pdc` 24979-24982; `mfSet` 31950; the OUT bar drag (`S.mout = v; moApply(); ...`) 32022; `pdcSet` 15940; `thunderChains.param` 19019.

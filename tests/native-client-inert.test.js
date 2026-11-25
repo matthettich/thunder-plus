@@ -73,8 +73,8 @@ test('(a) the Settings value "Native core (test)" is listed only where window.th
 // ---- (b) source guards -----------------------------------------------------------------------------------------------------------
 test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 of N2-PAGE-CLIENT 4.3 (and the two media-session guards), PC2 adds 7, 8 (two), 9, 10 (two); a new NCON() / tp.nc use needs a row there and a change here', () => {
   const at = re => (src.split('\n').map((l, i) => re.test(l) ? i + 1 : 0).filter(Boolean));
-  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 14, 'NCON() occurrences: padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2); mfSet, moApply, pdcSet, thunderChains.param (PC4)');
-  assert.equal((src.match(/\bNC\(\)/g) || []).length, 17, 'NC() occurrences: padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16); coreBuf, coreKit, coreKitCheck, setSong, setKit, newKit (PC2); mfSet, moApply, pdcSet, param (PC4)');
+  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 14, 'NCON() occurrences: padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2); mfSet, the OUT bar drag, pdcSet, thunderChains.param (PC4)');
+  assert.equal((src.match(/\bNC\(\)/g) || []).length, 17, 'NC() occurrences: padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16); coreBuf, coreKit, coreKitCheck, setSong, setKit, newKit (PC2); mfSet, the OUT bar drag, pdcSet, param (PC4)');
   assert.equal((src.match(/\btp\.nc\b/g) || []).length, 9, 'tp.nc: perfPush, perfFill (15), corePost (16), tStop x2 (5), msMeta x2 (code and comment) and bgPlay (the one media session), the ncSongHost comment');
   for (const [re, fn] of [[/^function perfPush\(\)/, 'perfPush'], [/^function perfFill\(/, 'perfFill'], [/^const corePost = /, 'corePost'], [/^\s*if \(tp\.nc\)\{ tp\.nc = false;/, 'tStop'], [/const ms = navigator\.mediaSession; if \(!ms \|\| !bgOn/, 'msMeta'], [/^\s*if \(on && tp\.nc\) return;/, 'bgPlay']]) assert.equal(at(re).length, 1, fn);
   assert.equal(at(/\btp\.nc\b/).length, 7, 'tp.nc on seven lines (the tp literal and begin() say nc: without the tp. prefix)');
@@ -90,9 +90,9 @@ test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 o
   assert.ok(/function saveS\(\)\{[^\n]*try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'saveS publishes through the client, after coreSong');
   assert.ok(/const corePost = \(m, tr\) => \{ if \(tp\.nc\) return NC\(\)\.legacy\(m\); try \{ core\.node\.port/.test(src), 'corePost: the JS core body is unchanged behind the tp.nc line');
 });
-test('(b) PC4: the four live-edit branches are one guarded line each, and the host gives the client its three hooks', () => {
+test('(b) PC4: the four live-edit branches (mfSet, the OUT bar drag, pdcSet, param) are one guarded line each, and the host gives the client its three hooks', () => {
   assert.ok(/function mfSet\(t, v\)\{[^\n]*if \(rt\) rt\.pl\.applyMix\(\); try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'mfSet: after the old line, in a try');
-  assert.ok(/function moApply\(\)\{ try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\} if \(rt && rt\.mo && ctx\)/.test(src), 'moApply: the old body is behind it');
+  assert.ok(/  S\.mout = v; moApply\(\); try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\} draw\(\); moToast\(\);/.test(src), 'the master OUT bar drag (moApply itself is untouched)');
   assert.ok(/function pdcSet\(v\)\{[^\n]*asetSave\(\); moFxAt = -1e9; try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}\n/.test(src), 'pdcSet');
   assert.ok(/\n    if \(NCON\(\)\) return NC\(\)\.chainParam\(id, name, value\);[^\n]*\n    if \(!rt \|\| !rt\.pl\) return;/.test(src), 'thunderChains.param: after the patch update, before the rt guard (branch 13)');
   assert.equal((src.match(/\.chainParam\(/g) || []).length, 1); assert.equal((src.match(/NC\(\)\.edit\(\)/g) || []).length, 4, 'saveS, mfSet, moApply, pdcSet');

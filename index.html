@@ -24827,7 +24827,7 @@ function rtRoute(){
 }
 // The master OUT fader's level to the live graph (GAIN STAGING, 27 Oct). Gliding, and without rtRoute's rewire, so a drag
 // neither zips nor clicks.
-function moApply(){ try { if (NCON()) NC().edit(); } catch(e){} if (rt && rt.mo && ctx) rt.mo.gain.setTargetAtTime(curve(S.mout == null ? 255 : S.mout), ctx.currentTime, 0.012); }
+function moApply(){ if (rt && rt.mo && ctx) rt.mo.gain.setTargetAtTime(curve(S.mout == null ? 255 : S.mout), ctx.currentTime, 0.012); }
 // Sends a track's (or with t = NT, the master's) effect list to the live worklets.
 function rtFx(t){
   if (!rt) return;
@@ -32019,7 +32019,7 @@ grid.addEventListener('pointermove', e => {
   const D = moDrag; D.vx = clamp(D.vx + (e.clientX - D.lx) * dragMul(e), D.x0 - 12, D.x0 + D.w + 2); D.lx = e.clientX;
   const v = moVal(D.vx, D.x0, D.w);
   if (v === (S.mout == null ? 255 : S.mout)) return;
-  S.mout = v; moApply(); draw(); moToast();
+  S.mout = v; moApply(); try { if (NCON()) NC().edit(); } catch(e){} draw(); moToast();   // (the bar saves only when let go: the native engine hears each step)
 }, true);
 const moDragEnd = e => { if (!moDrag || e.pointerId !== moDrag.id) return; moDrag = null; try { grid.releasePointerCapture(e.pointerId); } catch(err){} saveS(); draw(); };
 grid.addEventListener('pointerup', moDragEnd, true); grid.addEventListener('pointercancel', moDragEnd, true);
