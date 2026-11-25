@@ -1,8 +1,8 @@
 # verify-c2b: PR #311 "C2: the chains host live" (branch n1/c2-live, head 84e8a9e54291ffa34e773d498786f33726e23b48)
 
-STATUS: PARTIAL (first push). Verifier: independent; the PR's own notes were not trusted. Not yet run: TSan / ASan matrix, mutation table, full ctest (see "What was not checked yet" at the end; this file is updated as they finish).
+STATUS: FINAL. Verifier: independent; the PR's own notes were not trusted. Everything in the task list was run except what "WHAT I COULD NOT CHECK" lists.
 
-## VERDICT (provisional): MERGE AFTER FIXES
+## VERDICT: MERGE AFTER FIXES
 
 No real-time-safety, ownership or leak defect found so far: the plan lifecycle (play / publish / chain_edit -> PlayPlan or ChainsCommit -> commit -> playBack_ / chBack_ -> settle + delete after the pop) holds on every path I traced, `inFlight_` cannot stick, `~LiveHost` / `~PlayPlan` order is right, and a 35 s two-thread stress (below) saw 0 audio-thread allocations, 0 bad returns, live allocations back to baseline after destroy.
 But four behavioural defects are reproduced by my own tests (not caught by the PR's): findings 1 to 4. None can crash; 1 breaks the "E_BUSY changes nothing" contract (R5), 2 and 3 make the audio side diverge from the song the shell believes it published, 4 leaves the chains' transport stale. All four have small fixes.
@@ -10,7 +10,7 @@ But four behavioural defects are reproduced by my own tests (not caught by the P
 ## FINDINGS (by severity)
 
 ### 1. MEDIUM. A play() that answers E_BUSY because a chains plan is in flight still commits the song's 33 effects plans (R5 / R6 violated)
-`LiveHost::play` plans the effects first (live_host.cpp ~419) and the chains plan after (~429). When `chainsDecide` returns E_BUSY, `unwindFx()` pushes every effects plan as a plain `FxCommit` ("plans already made must reach their hosts"): the failed play changes the effects of the host (also while another song is playing), `fxOut_` grows by 33 per attempt (so the NEXT play hits the `fxOut_ + 33 > 64` E_BUSY too), and `cfgOrd_` is consumed. Design R5: "E_BUSY, NOTHING changed".
+`LiveHost::play` plans the effects first (live_host.cpp ~419) and the chains plan after (~429). When `chainsDecide` returns E_BUSY, `unwindFx()` pushes every effects plan as a plain `FxCommit` ("plans already made must reach their hosts"): the failed play changes the effects of the host (also while another song is playing), `fxOut_` grows by 33 per attempt (two failed attempts without a collect exceed the `fxOut_ + 33 > 64` limit, so the next play is E_BUSY for that reason too), and `cfgOrd_` is consumed. Design R5: "E_BUSY, NOTHING changed".
 Reproduction (test_vadv `det`, D6, F_CHAINS|F_EFFECTS|F_MASTER): song, play (its plan is in flight, no quantum ran), stop, idle publish with a different patch, play -> rc E_BUSY; after 4 quanta the audio side has applied 37 commands (2 expected: play1 + stop; 35 leaked FxCommits).
 Fix: make the decision before anything irreversible: at the top of `play()` (beside the other cheap E_BUSY checks) refuse when a plan is in flight and the song would need one, or call `chainsDecide` BEFORE the effects planning and `chainsAbandon` it if the effects planning fails (abandon is clean; `unwindFx` is not).
 
@@ -66,5 +66,21 @@ All eight are caught, all by `live_chains` alone (the other four binaries do not
 | test_vadv thr (mine, 30-40 s) | 0 reports, 0 audio-thread allocations, baseline restored | same, 0 reports |
 | test_vadv det (mine) | not run | 0 sanitizer reports (its 4 behavioural FAILs are findings 1 to 4) |
 
-## STILL NOT CHECKED
-Full Release ctest of ALL targets (see the last section for what ran), MSVC safety by compiler (read only), the C++ `live_capi` beyond its own checks.
+## FULL RELEASE CTEST
+`cmake --build build-v -j2` (all targets, Release, head 84e8a9e5; my test_vadv is not registered with ctest): `ctest -j2`: 240 tests, 239 passed, 0 failed, 1 skipped (`pumpsynth_refused`, skipped by its own condition), 2410 s.
+
+## SUGGESTED FIXES, in order
+1. Finding 1: move the chains decision before the effects planning (or pre-check `inFlight_` at the top of `play()`); add to `live_chains`: "E_BUSY play commits nothing" (cmds_applied delta).
+2. Finding 2: overlay of chain_edit values re-sent by the next `chainsDecide`; test = my D2.
+3. Finding 3: sequence numbers on the param records against the plan count; test = my D1 (deterministic) and, for the race, a seam between `applyCommands` and `applyChainParams`.
+4. Finding 4: transport lpb / ticks (and bpm) carried by play() and by a Same / Params publish; test = my D3.
+Findings 1 to 4 each have a deterministic reproduction in docs/port/reviews/verify-c2b-tests/test_vadv.cpp (`test_vadv det` prints D1, D2, D3, D6 and fails exactly those four checks on the head; D4 and D5 pass). None of them needs a design change; none is a crash, a leak or a real-time violation.
+
+## WHAT I COULD NOT CHECK
+- Finding 3(b) (the cmds_ / chainParams_ interleaving) is analysis only: I have no seam between `applyCommands` and `applyChainParams` and the engine has no param getter to observe a lost record from outside.
+- MSVC: nothing compiled with MSVC (no toolchain here); read only (no unistd, VLA or large stack arrays in the added code; `std::string_view`, `<cmath>` included).
+- The page side (`index.html`) was read for `chainsTempo` / `tStop` only; whether the shell actually calls `chain_edit` with the same values as its next publish (the premise of live.h) was not checked; findings 2 and 3(a) are real only when it does not (a cancelled gesture, an edit overtaken by a publish).
+- The allocation counts of my stress cover `operator new` only (a direct `malloc` on the audio thread is covered by the PR's `rt_harness` pass, which I ran: 0 allocations, but I did not audit the harness's hook coverage); free() on the audio thread was reviewed by reading only (no counter).
+- The PR's mutation notes were not re-run; my 8 mutations are my own (M1..M8 above); only M1's failing assertions were read in detail.
+- Bit-equality against SongRenderer (design "done when" 1) was taken from `live_chains` / `chains_song` passing (300 exact LiveHost runs), not re-derived.
+- CI on the PR itself.
