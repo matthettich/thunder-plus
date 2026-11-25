@@ -552,7 +552,9 @@ void LiveHost::ppNote(int track, const FxPlan* p) {
   for (int i = 0; i < kFxSlots; i++) ppKind_[track][i] = PpSlot();
   if (p) for (int i = 0; i < p->size(); i++) {
     const FxEntry& e = p->entry(i); if (e.slot < 0 || e.slot >= kFxSlots) continue;
-    if (fx_is_pump(e.t)) { ppKind_[track][e.slot].kind = THUNDER_LIVE_FXV_PUMP; ppKind_[track][e.slot].n = (int16_t)e.npv; }
+    if (fx_is_pump(e.t)) { ppKind_[track][e.slot].kind = THUNDER_LIVE_FXV_PUMP; ppKind_[track][e.slot].n = (int16_t)e.npv;
+      PpSlot& s = ppKind_[track][e.slot]; s.locked = fx_pump_live_locked(e.t - kPumpT0, e.pv, e.npv);
+      for (int j = 0; j < e.npv && s.nfix < 4; j++) if (fx_pump_live_fixed(e.t - kPumpT0, j)) { s.fixI[s.nfix] = (int16_t)j; s.fixV[s.nfix] = e.pv[j]; s.nfix++; } }
     else if (fx_is_mod(e.t)) { ppKind_[track][e.slot].kind = THUNDER_LIVE_FXV_MOD; ppKind_[track][e.slot].n = (int16_t)e.nmp; }
   }
 }
@@ -562,6 +564,8 @@ int LiveHost::fxValues(int track, int slot, int kind, const double* v, int n, in
   if (kind != THUNDER_LIVE_FXV_PUMP && kind != THUNDER_LIVE_FXV_MOD) return THUNDER_LIVE_E_ARG;
   const PpSlot& k = ppKind_[track][slot];
   if (k.kind != kind || n <= 0 || n != k.n) return THUNDER_LIVE_E_ARG;   // not a hosted slot of that kind in the last planned chain, or not the planned count
+  if (k.locked) return THUNDER_LIVE_E_ARG;   // rides in the song (fx_pump_live_locked)
+  for (int j = 0; j < k.nfix; j++) if ((float)v[k.fixI[j]] != k.fixV[j]) return THUNDER_LIVE_E_ARG;   // a value that rides in the song, changed (fx_pump_live_fixed)
   LiveFxValues r; r.track = track; r.slot = slot; r.kind = kind; r.n = n; r.at = at;
   for (int i = 0; i < n; i++) {
     if (!finite(v[i])) return THUNDER_LIVE_E_ARG;

@@ -332,7 +332,7 @@ class LiveHost {
   FxPlan* stagedFx_[kSongNT + 1] = {nullptr};        // fxPlan() staged, fxCommit() moved to the ring
   int fxOut_ = 0;                                    // P3: FxCommit commands issued and their plans not yet collected (fxBack_ holds 64)
   /* PP CONTROL: the kind and value count of each slot of each track's (and the master's) LAST PLANNED chain, by the slot number: 0 none / tfx / core, THUNDER_LIVE_FXV_PUMP, THUNDER_LIVE_FXV_MOD. Written by ppNote (fxPlan, play), read by fxValues. */
-  struct PpSlot { int16_t kind = 0, n = 0; };
+  struct PpSlot { int16_t kind = 0, n = 0; bool locked = false; uint8_t nfix = 0; int16_t fixI[4] = {0}; float fixV[4] = {0}; };   // locked: the slot rides in the song (fx_pump_live_locked); fix*: the planned values of the indices that do (fx_pump_live_fixed)
   PpSlot ppKind_[kSongNT + 1][kFxSlots];
   void ppNote(int track, const FxPlan* p);
   LiveFxValues fxvScratch_;                          // PP AUDIO: the record being applied (a member: 1.2 KB stays off the audio stack)

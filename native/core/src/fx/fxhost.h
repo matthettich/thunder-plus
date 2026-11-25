@@ -71,6 +71,10 @@ int fx_mod_param_count(int id);
 bool fx_mod_bounds(int id, int pi, int* bmin, int* bmax);   // control pi's byte range (FXV's q.min / q.max)
 void fx_mod_map(int id, const double* bytes, double* mp);   // TFX[k].map(f): the controls' bytes into the module's values, in the table's order
 const char* fx_pump_param_name(int pt, int i);       // FX1: pump parameter i's symbol (fx/pumpparams.inc), nullptr past the end
+/* PP: the pump parameters thunder_live_fx_values does NOT change live (a change at that index is E_ARG; the planned value is accepted): they ride in the song (fx_plan + fx_commit). Today: EQ `phase` and `lin_quality` (and, locked: the whole EQ slot while it is planned in linear phase)
+   (switching to / re-sizing the linear-phase engine allocates in pump_commit: measured by live_fxvalues_alloc). THE ONE TABLE: fxsong.cpp. */
+bool fx_pump_live_fixed(int pt, int i);
+bool fx_pump_live_locked(int pt, const float* pv, int n);   // PP: the whole slot rides in the song: EQ planned in LINEAR PHASE (`phase` != 0): every change there re-makes the filter's impulse response (allocates, measured for every lin_quality)
 // Why a slot of the song was left out of a host (counted, never silent): FxHost::refused(why).
 enum FxRefusal { kRefSidechain = 0, kRefNotesFrom, kRefNoEngine, kRefUnknown, kRefN };
 // pump state texts of one slot (MASTER's learned analysis, TUNE's notes): made by the song reader, read by plan() (control thread) and then not needed

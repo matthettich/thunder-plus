@@ -142,6 +142,20 @@ int main() {
     CHECK(ok == THUNDER_LIVE_FXVALUES_RING && rc == THUNDER_LIVE_E_BUSY && stats(H.h).cmd_busy == 1, "the ring holds %d records, then E_BUSY (ok %d, rc %d, busy %u)", THUNDER_LIVE_FXVALUES_RING, ok, rc, stats(H.h).cmd_busy);
     H.run(l, r, 128, 128, fr);
     CHECK(H->fxValues(0, 0, THUNDER_LIVE_FXV_PUMP, pv9.data(), (int)pv9.size(), -1) == 0, "after a block the retry lands");
+    // what rides in the song (measured by live_fxvalues_alloc): EQ `phase` / `lin_quality` may not change; an EQ planned in linear phase takes nothing
+    {
+      FxEntry eq, lin; entryOf("{\"type\":\"peq\",\"on\":true}", &eq); entryOf("{\"type\":\"peq\",\"on\":true,\"pump\":{\"phase\":1,\"lin_quality\":1}}", &lin);
+      std::vector<double> e0, l0; for (int i = 0; i < eq.npv; i++) e0.push_back(eq.pv[i]); for (int i = 0; i < lin.npv; i++) l0.push_back(lin.pv[i]);
+      const std::string c2 = "[" + std::string("{\"type\":\"peq\",\"on\":true}") + "]", c3 = "[{\"type\":\"peq\",\"on\":true,\"pump\":{\"phase\":1,\"lin_quality\":1}}]";
+      CHECK(H->fxPlan(1, (const uint8_t*)c2.data(), c2.size(), 120) == 0 && H->fxCommit(1, -1) == 0 && H->fxPlan(2, (const uint8_t*)c3.data(), c3.size(), 120) == 0 && H->fxCommit(2, -1) == 0, "plan the two EQ chains");
+      H.run(l, r, 128 * 4, 128, fr);
+      std::vector<double> v = e0; v[0] = 6;
+      CHECK(H->fxValues(1, 0, THUNDER_LIVE_FXV_PUMP, e0.data(), (int)e0.size(), -1) == 0 && H->fxValues(1, 0, THUNDER_LIVE_FXV_PUMP, v.data(), (int)v.size(), -1) == 0, "EQ: the planned list and a changed out_gain are accepted");
+      H.run(l, r, 128 * 4, 128, fr);
+      v = e0; v[3] = 1; CHECK(H->fxValues(1, 0, THUNDER_LIVE_FXV_PUMP, v.data(), (int)v.size(), -1) == THUNDER_LIVE_E_ARG, "EQ: a changed `phase` rides in the song (E_ARG)");
+      v = e0; v[4] = 2; CHECK(H->fxValues(1, 0, THUNDER_LIVE_FXV_PUMP, v.data(), (int)v.size(), -1) == THUNDER_LIVE_E_ARG, "EQ: a changed `lin_quality` rides in the song (E_ARG)");
+      v = l0; v[0] = 6; CHECK(H->fxValues(2, 0, THUNDER_LIVE_FXV_PUMP, v.data(), (int)v.size(), -1) == THUNDER_LIVE_E_ARG && H->fxValues(2, 0, THUNDER_LIVE_FXV_PUMP, l0.data(), (int)l0.size(), -1) == THUNDER_LIVE_E_ARG, "an EQ planned in linear phase takes no values (E_ARG)");
+    }
     // a host without F_EFFECTS
     Host N(opts(0, 4096)); CHECK(N->fxValues(0, 0, THUNDER_LIVE_FXV_PUMP, pv0.data(), (int)pv0.size(), -1) == THUNDER_LIVE_E_STATE, "without F_EFFECTS: E_STATE");
   }
