@@ -24,7 +24,7 @@ void MidiInParser::feed(const uint8_t* bytes, int n, Fn fn, void* user) {
       continue;
     }
     if (c >= 0x80) {       // a status byte
-      inSysex_ = false; skipping_ = false; have_ = 0;
+      inSysex_ = false; skipping_ = false; have_ = 0; need_ = 0;   // ANY status byte ends the open message (verify-n2 F8: a truncated message followed by F7 / F0 must not turn the next data bytes into a phantom one)
       if (c == 0xF0) { inSysex_ = true; status_ = 0; sysexSkipped++; continue; }
       if (c == 0xF7) { status_ = 0; continue; }    // end of a SysEx (or stray)
       const int d = dataBytes(c);

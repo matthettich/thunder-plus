@@ -2,6 +2,7 @@ package app.thunderplus.nativetest
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,5 +71,43 @@ class LivePolicyTest {
         assertTrue(GateState.Running(75.0, true).line().contains("1:15 / 10:00 (so far OK)"))
         assertTrue(GateState.Finished(false, "ratio 1.0020").line().startsWith("A5 gate FAIL"))
         assertTrue(GateState.Aborted("audio focus lost", 30.0).line().contains("not a pass"))
+    }
+
+    // ---- verify-n2 F4: two focus callbacks in quick succession leave nothing ducked or armed ----
+    /** Runs the callbacks the way LiveSession does on the main thread: decide, take the new state at once; the gain the worker would end on is the LAST gain set. */
+    private fun run(vararg changes: Int, playing: Boolean = true): Triple<FocusPolicy.State, Float, List<A>> {
+        var st = FocusPolicy.State(); var gain = 1f; var pl = playing; val acts = ArrayList<A>()
+        for (c in changes) {
+            val act = FocusPolicy.decide(c, pl, st.armed, st.ducked); acts.add(act)
+            st = FocusPolicy.next(act, st)
+            FocusPolicy.gainAfter(act)?.let { gain = it }
+            if (act == A.STOP_AND_REMEMBER || act == A.STOP_FOR_GOOD) pl = false   // the stop lands later in reality; the NEXT decision must not depend on it, see below
+            if (act == A.RESUME) pl = true
+        }
+        return Triple(st, gain, acts)
+    }
+
+    @Test fun duckThenGainInQuickSuccessionRestoresTheGain() {
+        val (st, gain, acts) = run(FocusPolicy.LOSS_TRANSIENT_CAN_DUCK, FocusPolicy.GAIN)
+        assertEquals(listOf(A.DUCK, A.UNDUCK), acts); assertEquals(1f, gain, 0f); assertEquals(FocusPolicy.State(false, false), st)
+    }
+
+    @Test fun transientLossThenGainInQuickSuccessionResumes() {
+        // the second callback arrives BEFORE the worker ran the first stop: `playing` is still true, the flags already say armed
+        var st = FocusPolicy.State()
+        val a1 = FocusPolicy.decide(FocusPolicy.LOSS_TRANSIENT, true, st.armed, st.ducked); st = FocusPolicy.next(a1, st)
+        val a2 = FocusPolicy.decide(FocusPolicy.GAIN, true, st.armed, st.ducked); st = FocusPolicy.next(a2, st)
+        assertEquals(A.STOP_AND_REMEMBER, a1); assertEquals(A.RESUME, a2); assertEquals(FocusPolicy.State(false, false), st)
+    }
+
+    @Test fun duckThenTransientLossThenGainEndsClean() {
+        val (st, gain, acts) = run(FocusPolicy.LOSS_TRANSIENT_CAN_DUCK, FocusPolicy.LOSS_TRANSIENT, FocusPolicy.GAIN)
+        assertEquals(listOf(A.DUCK, A.STOP_AND_REMEMBER, A.RESUME), acts); assertEquals(1f, gain, 0f); assertEquals(FocusPolicy.State(false, false), st)
+    }
+
+    @Test fun lossForGoodClearsArmedAndDucked() {
+        val (st, gain, _) = run(FocusPolicy.LOSS_TRANSIENT_CAN_DUCK, FocusPolicy.LOSS)
+        assertEquals(FocusPolicy.State(false, false), st); assertEquals(1f, gain, 0f)
+        assertNull(FocusPolicy.gainAfter(A.STOP_AND_REMEMBER)); assertNull(FocusPolicy.gainAfter(A.NONE))
     }
 }

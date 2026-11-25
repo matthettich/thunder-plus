@@ -222,7 +222,9 @@ int MidiHost::viaControl(std::function<int()> fn) {
   { std::lock_guard<std::mutex> g(runMu_); r = runner_; }
   if (!r) return fn();
   const int rc = r(fn);
-  return rc == -1000 ? fn() : rc;   // the control thread is not running (no engine): nothing to race with
+  // -1000: the runner says there is NO control thread (the engine is gone): nothing to race with, so fn runs here. A TIMEOUT or a busy control thread is the runner's own code (the shell's runner answers
+  // THUNDER_LIVE_E_BUSY): fn is NOT run on the caller's thread beside a thunder_live_* control call, which is exactly what the runner exists to prevent (verify-n2 F11).
+  return rc == -1000 ? fn() : rc;
 }
 
 int MidiHost::setDevices(const std::vector<DevInfo>& devs) { return viaControl([this, devs] { return setDevicesImpl(devs); }); }

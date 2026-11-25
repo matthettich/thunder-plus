@@ -31,7 +31,8 @@ object LiveNative {
     /** kit.load: the core renders the pads it can and publishes them. {ok, rc, err, pads, skipped, dry, renderMs, empty:[slots the page must put]}. */
     external fun nativeKitLoad(msg: ByteArray): String
     /** SongFit over the last song and kit: the `fit` event JSON. */
-    external fun nativeFit(rev: Long): String
+    external fun nativeFit(rev: Long, flags: Int): String
+    external fun nativeHasLxr(): Boolean
     /** put + buf.use 'pad': little-endian float32 channels; r is null for a mono pad. */
     external fun nativePadTake(pad: Int, l: ByteArray, r: ByteArray?, frames: Int, rate: Double): Int
     external fun nativePadsPublish(): Int

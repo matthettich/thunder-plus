@@ -29,6 +29,23 @@ object FocusPolicy {
         RESUME
     }
 
+    /** The two flags a decision reads. They change AS SOON AS the act is decided, on the deciding thread, before any engine call is queued (verify-n2 F4): a second focus callback that arrives while the first act is still
+     *  waiting for the worker must see the state the first one left, or a quick DUCK then GAIN / transient loss then GAIN leaves the output ducked or the transport armed for good. */
+    data class State(val armed: Boolean = false, val ducked: Boolean = false)
+
+    /** The state after [act]. STOP_FOR_GOOD also ends any ducking (the focus is given up and the gain returns to 1). */
+    fun next(act: Act, s: State): State = when (act) {
+        Act.NONE -> s
+        Act.STOP_FOR_GOOD -> State(armed = false, ducked = false)
+        Act.STOP_AND_REMEMBER -> s.copy(armed = true)
+        Act.DUCK -> s.copy(ducked = true)
+        Act.UNDUCK -> s.copy(ducked = false)
+        Act.RESUME -> State(armed = false, ducked = false)
+    }
+
+    /** What the output gain must be after [act] (the worker sets it; DUCK_GAIN while ducked, else 1): null when the act leaves it alone. */
+    fun gainAfter(act: Act): Float? = when (act) { Act.DUCK -> DUCK_GAIN; Act.UNDUCK, Act.RESUME, Act.STOP_FOR_GOOD -> 1f; else -> null }
+
     /** [playing]: the transport is running (or held). [armed]: a STOP_AND_REMEMBER is waiting for its GAIN. [ducked]: the gain is below 1 because of a DUCK. */
     fun decide(change: Int, playing: Boolean, armed: Boolean, ducked: Boolean): Act = when (change) {
         LOSS -> if (playing || armed) Act.STOP_FOR_GOOD else Act.NONE
