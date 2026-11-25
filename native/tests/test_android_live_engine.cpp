@@ -124,7 +124,10 @@ int main() {
   CHECK(st.find("\"fatal\":0") != std::string::npos, "a fatal error record");
   rc = E.call([&](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); });
   CHECK(rc == 0, "stop: %d", rc);
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  { bool idle = false;   // verify-n2 F3: a user Stop shows as IDLE (0), not as "ended" (2)
+    for (int i = 0; i < 200 && !idle; i++) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); idle = E.statusJson().find("\"state\":0") != std::string::npos; }
+    CHECK(idle, "after Stop the state must read 0 (IDLE): %s", E.statusJson().c_str()); }
+  CHECK(stateOfRecord(THUNDER_LIVE_ST_PLAYING) == 1 && stateOfRecord(THUNDER_LIVE_ST_STOPPED) == 0 && stateOfRecord(THUNDER_LIVE_ST_ENDED) == 2, "stateOfRecord");
   stop = true; audio.join();
   E.destroy();
   CHECK(!E.created(), "destroyed");
