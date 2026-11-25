@@ -141,6 +141,13 @@ FxHost::~FxHost() {
 }
 uint32_t FxHost::laneDropped() const { uint32_t n = 0; for (int i = 0; i < 11; i++) n += lanes_[i]->dropped; return n; }
 
+// P3b: the random state of a plan that makes its first effect with statics: the first such plan of a host starts from the values a fresh wasm instance has (a render's own plan is
+// as before); the k-th later one from a hash of k (splitmix64), so that nothing the audio thread owns is read.
+void FxHost::seedPlan(FxPlan* pl) {
+  const uint32_t k = planSeq_++; if (!k) return;
+  uint64_t z = (uint64_t)k * 0x9E3779B97F4A7C15ull; z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull; z = (z ^ (z >> 27)) * 0x94D049BB133111EBull; z ^= z >> 31;
+  pl->rs_.rand = z; pl->rs_.stm = (uint32_t)(z >> 32); pl->rs_.daisy = (uint32_t)z;
+}
 // ---- control thread --------------------------------------------------------------------------------------------------------------------
 FxPlan* FxHost::plan(const FxEntry* e, int n, modfx::Seeds* seeds) {
   std::unique_ptr<FxPlan> plp(new FxPlan); FxPlan* pl = plp.get();   // (U34a: an allocation failure part way frees the plan and the effects it has made)
@@ -152,7 +159,7 @@ FxPlan* FxHost::plan(const FxEntry* e, int n, modfx::Seeds* seeds) {
     int j = -1; for (int k = 0; k < nCtl_; k++) if (!used[k] && std::strcmp(ctl_[k].key, e[i].key) == 0) { j = k; break; }
     const int w = pl->n_;
     if (j >= 0) { used[j] = true; pl->reuse_[w] = true; nf[w] = ctlFx_[j]; }
-    else { Fx* f; if (pmp) f = make_pump(e[i], sr_); else if (mdf) f = fx_make_mod(e[i], sr_, sd); else if (fx_is_core(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) { refused_[kRefNoEngine]++; continue; } pl->fx_[w] = f; nf[w] = f; }
+    else { Fx* f; if (pmp) f = make_pump(e[i], sr_); else if (mdf) f = fx_make_mod(e[i], sr_, sd); else if (fx_is_core(e[i].t)) f = make_clk(e[i].t, sr_); else { if (!pl->rsUsed_) { pl->rsUsed_ = true; seedPlan(pl); } ModuleState ms(&pl->rs_.rand, &pl->rs_.stm, &pl->rs_.daisy); f = make_fx(e[i].t, (float)sr_); } if (!f) { refused_[kRefNoEngine]++; continue; } pl->fx_[w] = f; nf[w] = f; }
     pl->e_[w] = e[i]; pl->e_[w].pst = nullptr; pl->n_++;
     if (pmp) {   // LATENCY COMP counts pumpLatencyOf(slot): a temporary instance with the slot's values; the one measured for the same values before is kept
       FxEntry& c = pl->e_[w]; const int jj = j;
@@ -228,6 +235,7 @@ void FxHost::commit(FxPlan* pl) {
   pl->nRetired_ = 0; for (int k = 0; k < nSlots_; k++) if (!used[k]) pl->retired_[pl->nRetired_++] = slots_[k].fx;
   for (int i = 0; i < nn; i++) { slots_[i] = next[i]; chain_[i] = nc[i]; }
   nSlots_ = nn; nChain_ = nn; idle_ = 0; pl->committed_ = true;
+  if (pl->rsUsed_) { rand_ = pl->rs_.rand; stmRng_ = pl->rs_.stm; daisySeed_ = pl->rs_.daisy; }   // P3b: the audio side continues from the plan's state (a plan that made no such effect leaves its own)
   nPump_ = 0; for (int i = 0; i < nn; i++) if (slots_[i].pu) nPump_++;
   if (nPump_) { pumpSeen_ = true; PumpGate g(true); pumpOk_ = g.ok; pumpUp(); pumpOk_ = false; }   // set(): s.up of every pump slot at once
 }
