@@ -206,6 +206,7 @@ class FxHost {
   int idleFrames() const { return idle_; }
   bool slotNapping(int i) const { return slots_[i].zz; }
   double sampleRate() const { return sr_; }
+  void audioRandState(uint64_t* r, uint32_t* stm, uint32_t* daisy) const { *r = rand_; *stm = stmRng_; *daisy = daisySeed_; }   // P3b, tests: the audio side's copy of the effect sources' statics (read from the thread that owns it, or while none runs)
   const FxEntry* chainEntry(int i) const { return i >= 0 && i < nChain_ ? &chain_[i] : nullptr; }
   int chainSize() const { return nChain_; }
 

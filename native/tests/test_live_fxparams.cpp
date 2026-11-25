@@ -85,7 +85,11 @@ int main() {
   {   // ---- (2a) plans leave the audio side alone ----
     FxHost A(48000.0), B(48000.0); int64_t nA = 0, nB = 0;
     { FxPlan* p = planOf(A, kChainX); CHECK(p != nullptr, "plan X"); A.commit(p); delete p; } { FxPlan* p = planOf(B, kChainX); B.commit(p); delete p; }
-    std::vector<FxPlan*> dropped;
+    std::vector<FxPlan*> dropped; uint64_t r0 = 0, r1 = 0; uint32_t s0 = 0, s1 = 0, d0 = 0, d1 = 0;
+    A.audioRandState(&r0, &s0, &d0);
+    { FxPlan* p = planOf(A, kChainY); CHECK(p != nullptr, "plan Y"); dropped.push_back(p); }   // constructors that draw (Cloud Seed / Airwindows rand(), Beads, Clouds, the pitch shifter): on the PLAN's state
+    A.audioRandState(&r1, &s1, &d1);
+    CHECK(r0 == r1 && s0 == s1 && d0 == d1, "(P3b) plan() leaves the audio side's random state alone (rand %llu -> %llu, stmlib %u -> %u, daisy %u -> %u)", (unsigned long long)r0, (unsigned long long)r1, s0, s1, d0, d1);
     const std::vector<float> a = blocks(A, &nA, 60, [&](int b) { if (b == 10 || b == 25 || b == 40) { FxPlan* p = planOf(A, b == 25 ? kChainX : kChainY); if (p) dropped.push_back(p); } });
     const std::vector<float> bb = blocks(B, &nB, 60);
     CHECK(peakOf(a) > 0.001, "the chain sounds (peak %g)", peakOf(a));
@@ -111,6 +115,7 @@ int main() {
       int64_t n0 = 0; float L[128], R[128];
       while (!stop.load(std::memory_order_acquire)) {
         if (FxPlan* p = in.exchange(nullptr, std::memory_order_acquire)) { H.commit(p); back.store(p, std::memory_order_release); }
+        { double q[12]; for (int i = 0; i < 12; i++) q[i] = 0.5 + 0.45 * std::sin(0.37 * (double)n0 / 128.0 * (i + 1)); H.psetAt((double)n0 / 48000.0, 3, q); }   // new values for slot 3 every block: Cloud Seed (Space) re-draws its random taps in process()
         feed(L, R, n0, 128); H.process(L, R, 128, (double)n0 / 48000.0); n0 += 128; blocksRun.fetch_add(1, std::memory_order_relaxed);
         for (int i = 0; i < 128; i++) if (!std::isfinite(L[i]) || !std::isfinite(R[i])) nonFinite.fetch_add(1, std::memory_order_relaxed);
       }
