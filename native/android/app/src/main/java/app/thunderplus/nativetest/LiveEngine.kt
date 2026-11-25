@@ -70,6 +70,7 @@ object LiveEngine {
     @Synchronized fun shutdown() {
         if (!active) return
         active = false
+        LiveBridge.reset()
         LiveNative.nativeShutdown()
         loaded = null; projectName = ""
     }

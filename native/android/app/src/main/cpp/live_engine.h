@@ -48,6 +48,8 @@ class LiveEngine {
   // After the audio callback has stopped and the threads are joined.
   void destroy();
   bool created() const { return L_ != nullptr; }
+  bool chainsOn() const { return chainsOn_; }   // the host was created with F_CHAINS
+  const Config& config() const { return cfg_; }
   thunder_live* handle() const { return L_; }
 
   // AUDIO. `out` is interleaved stereo, `frames` frames. Never allocates, never blocks. Silence when the engine is not created or the handle is dead.
@@ -64,7 +66,7 @@ class LiveEngine {
   std::string statusJson();
   // thunder_live_stats as JSON (control side may call: stats_get is ANY).
   std::string statsJson();
-  // The records the poller saw since the last call, as the bridge's JSON events in one array text ("" when none): live_events.h. Any thread.
+  // The records the poller saw since the last call, as the bridge's JSON events, one per line ("" when none): live_events.h. Any thread.
   std::string drainEvents() { return events_.drain(); }
   size_t eventsDropped() const { return events_.dropped(); }
   int64_t audioCalls() const { return calls_.load(std::memory_order_relaxed); }
@@ -81,6 +83,7 @@ class LiveEngine {
 
   thunder_live* L_ = nullptr;
   Config cfg_;
+  bool chainsOn_ = false;
   std::vector<float> l_, r_;                  // the audio thread's de-interleave scratch (max_block each), made at create
   int64_t frame0_ = 0;                        // the running host frame: the audio thread's alone
   std::atomic<int64_t> calls_{0};

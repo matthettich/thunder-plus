@@ -18,9 +18,11 @@
 #include "live_engine.h"
 #include "miniaudio.h"
 #include "pad_filler.h"
+#include "songfit.h"
 #include "rt/json.h"
 #include "thunder/rtlog.h"
 #ifdef THUNDER_HAVE_LXR
+#include "thunder/lxr_seam.h"
 #include "thunder/lxr_module.h"   // the optional drum module (native/lxr): registered once at start
 #endif
 
@@ -38,6 +40,10 @@ struct Live {
   int32_t (*aaBuf)(void*) = nullptr;
   int64_t rev = 0;
   std::vector<int> lastSlots;   // pads the previous project filled (to remove the ones a reload does not fill)
+  // H1b: what the page last sent (song.load, kit.load): the texts SongFit and the kit entries read. Guarded by g_life.
+  std::shared_ptr<std::string> songText, kitText;
+  std::shared_ptr<thunder::JsonDoc> kitDoc;   // parses kitText (its Json refers into it: both live as long as this)
+  double bpm = 120, lpb = 4;
 };
 Live g;
 std::mutex g_life;   // start / shutdown / load: one at a time (the JNI threads are Kotlin's; the audio thread never takes it)
@@ -170,21 +176,21 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePlay(JNI
   });
 }
 
-JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeTransportStop(JNIEnv*, jobject) {
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeTransportStop(JNIEnv*, jobject, jlong at) {
   if (!g.deviceInit || !g.eng) return -2;
-  return g.eng->call([](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); });
+  return g.eng->call([=](thunder_live* L) { return thunder_live_stop(L, at); });
 }
-JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeBpm(JNIEnv*, jobject, jdouble bpm) {
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeBpm(JNIEnv*, jobject, jdouble bpm, jlong at) {
   if (!g.deviceInit || !g.eng) return -2;
-  return g.eng->call([=](thunder_live* L) { return thunder_live_bpm(L, bpm, THUNDER_LIVE_NOW); });
+  return g.eng->call([=](thunder_live* L) { return thunder_live_bpm(L, bpm, at); });
 }
-JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeLoop(JNIEnv*, jobject, jint has, jint y0, jint y1) {
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeLoop(JNIEnv*, jobject, jint has, jint y0, jint y1, jlong at) {
   if (!g.deviceInit || !g.eng) return -2;
-  return g.eng->call([=](thunder_live* L) { return thunder_live_loop(L, has, y0, y1, THUNDER_LIVE_NOW); });
+  return g.eng->call([=](thunder_live* L) { return thunder_live_loop(L, has, y0, y1, at); });
 }
-JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMixSet(JNIEnv*, jobject, jint track, jint key, jdouble value, jdouble ramp) {
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMixSet(JNIEnv*, jobject, jint track, jint key, jdouble value, jdouble ramp, jlong at) {
   if (!g.deviceInit || !g.eng) return -2;
-  return g.eng->call([=](thunder_live* L) { return thunder_live_mix_set(L, track, key, value, ramp, THUNDER_LIVE_NOW); });
+  return g.eng->call([=](thunder_live* L) { return thunder_live_mix_set(L, track, key, value, ramp, at); });
 }
 
 // The poller's latest state as JSON. Also hands AAudio's xrun count and buffer size to the host (the poller thread passes them to thunder_live_host_stats every 100 ms).
@@ -212,5 +218,182 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeRtSna
     sr, (long long)sn.frames, (long long)sn.calls, (long long)sn.late, (long long)sn.underruns, sn.audio_s, sn.wall_s, sn.ratio_ppm, sn.max_gap_ms, sn.max_work_ms, sn.pass);
   return env->NewStringUTF(b);
 }
+
+
+// ============================== H1b: the CORE-BRIDGE v1 messages (docs/port/N2-PLAN.md section 2) ================================================================================
+// Every call below runs on the caller's thread and hands its CONTROL work to the control thread (LiveEngine::call). Big messages arrive as the page's raw JSON text (UTF-8 bytes) and the members are cut
+// out with extractMember, so the song is parsed once, by the core.
+namespace {
+inline bool ready() { return g.deviceInit && g.eng; }
+std::shared_ptr<std::vector<uint8_t>> bytesOf(JNIEnv* env, jbyteArray a) {
+  auto v = std::make_shared<std::vector<uint8_t>>();
+  if (!a) return v;
+  const jsize n = env->GetArrayLength(a);
+  if (n <= 0) return v;
+  v->resize((size_t)n);
+  env->GetByteArrayRegion(a, 0, n, reinterpret_cast<jbyte*>(v->data()));
+  if (env->ExceptionCheck()) { env->ExceptionClear(); v->clear(); }
+  return v;
+}
+long long numOf(std::string_view s, long long def) { if (s.empty()) return def; return std::strtoll(std::string(s).c_str(), nullptr, 10); }
+jstring jstr(JNIEnv* env, const std::string& s) { return env->NewStringUTF(s.c_str()); }
+std::string loadJson(bool ok, int rc, const std::string& err, const char* extra = "") {
+  char b[400]; std::snprintf(b, sizeof b, "{\"ok\":%s,\"rc\":%d,\"err\":\"%s\"%s}", ok ? "true" : "false", rc, jsonEscape(err).c_str(), extra); return b;
+}
+}  // namespace
+
+// song.load {S, vars, rev}: the whole song text to thunder_live_song_publish (ruling D3: no patches). Remembers the song's bpm and lpb for the pad render of the next kit.load.
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeSongLoad(JNIEnv* env, jobject, jbyteArray msg) {
+  std::lock_guard<std::mutex> lk(g_life);
+  if (!ready()) return jstr(env, loadJson(false, -2, "engine not started"));
+  auto m = bytesOf(env, msg);
+  const std::string_view mv((const char*)m->data(), m->size());
+  std::string_view S = tpa::extractMember(mv, "S"), V = tpa::extractMember(mv, "vars");
+  if (S.empty()) return jstr(env, loadJson(false, -3, "song.load without S"));
+  if (V == "null") V = std::string_view();
+  const long long rev = numOf(tpa::extractMember(mv, "rev"), ++g.rev);
+  auto text = std::make_shared<std::string>(S);
+  auto vars = std::make_shared<std::string>(V);
+  auto serr = std::make_shared<std::array<char, 256>>(); serr->fill(0);
+  const int rc = g.eng->call([=](thunder_live* L) { return thunder_live_song_publish(L, (const uint8_t*)text->data(), text->size(), vars->empty() ? nullptr : (const uint8_t*)vars->data(), vars->size(), rev, serr->data(), serr->size()); }, 20000);
+  if (rc == 0) {
+    g.songText = text;
+    thunder::JsonDoc sd; if (sd.parse(*text)) { g.bpm = sd.root().num("bpm", 120); g.lpb = sd.root().num("lpb", 4); }
+  }
+  return jstr(env, loadJson(rc == 0, rc, serr->data()));
+}
+
+// kit.load {kit, rev}: the core renders every pad it can (PadFiller) and publishes them with the kit entries; a pad it cannot render stays empty for the page to `put`. The answer says which.
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeKitLoad(JNIEnv* env, jobject, jbyteArray msg) {
+  std::lock_guard<std::mutex> lk(g_life);
+  if (!ready()) return jstr(env, loadJson(false, -2, "engine not started"));
+  auto m = bytesOf(env, msg);
+  const std::string_view kitT = tpa::extractMember(std::string_view((const char*)m->data(), m->size()), "kit");
+  if (kitT.empty()) return jstr(env, loadJson(false, -3, "kit.load without kit"));
+  g.kitText = std::make_shared<std::string>(kitT);
+  g.kitDoc = std::make_shared<thunder::JsonDoc>();
+  if (!g.kitDoc->parse(*g.kitText)) { g.kitDoc.reset(); g.kitText.reset(); return jstr(env, loadJson(false, -3, "the kit is unreadable")); }
+  auto psP = std::make_shared<tpa::PadSet>();
+  tpa::renderPads(*g.kitText, g.bpm, g.lpb, (double)g.device.sampleRate, psP.get());
+  std::vector<int> slots; for (auto& p : psP->pads) slots.push_back(p.slot);
+  auto goneP = std::make_shared<std::vector<int>>(); for (int s : g.lastSlots) { bool keep = false; for (int t : slots) if (t == s) keep = true; if (!keep) goneP->push_back(s); }
+  const double sr = (double)g.device.sampleRate;
+  const int rc = g.eng->call([=](thunder_live* L) -> int {
+    int r;
+    for (int s : *goneP) { r = thunder_live_pad_set(L, s, nullptr, nullptr, 0, sr); if (r) return r; }
+    for (auto& p : psP->pads) {
+      if (!p.block) continue;
+      r = thunder_live_pad_take(L, p.slot, p.block, 0, p.frames, sr); if (r) return r;
+      p.block = nullptr;
+      r = thunder_live_pad_kit(L, p.slot, p.choke, p.syn ? 1 : 0, p.rel); if (r) return r;
+    }
+    return thunder_live_pads_publish(L);
+  }, 20000);
+  if (rc == 0) g.lastSlots = slots;
+  std::string empty; for (size_t i = 0; i < g.kitDoc->root().arr("voices").size() && i < 256; i++) { bool have = false; for (int s : slots) if (s == (int)i) have = true; if (!have && g.kitDoc->root().arr("voices").at(i).isObj()) { if (!empty.empty()) empty += ","; empty += std::to_string(i); } }
+  char extra[200]; std::snprintf(extra, sizeof extra, ",\"pads\":%zu,\"skipped\":%d,\"dry\":%d,\"renderMs\":%.0f,\"empty\":[%s]", psP->pads.size(), psP->skipped, psP->dry, psP->ms, empty.c_str());
+  return jstr(env, loadJson(rc == 0, rc, "", extra));
+}
+
+// SongFit over the last song and kit: the bridge's `fit` event (songfit.h). Chains count as available only when the host was made with F_CHAINS.
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFit(JNIEnv* env, jobject, jlong rev) {
+  std::lock_guard<std::mutex> lk(g_life);
+  if (!ready() || !g.songText) return jstr(env, "{\"t\":\"fit\",\"ok\":false,\"reasons\":[{\"code\":\"none\",\"text\":\"no song loaded\"}]}");
+  uint32_t caps = thunder_live_caps();
+#ifdef THUNDER_LIVE_F_CHAINS
+  if (!g.eng->chainsOn()) caps &= ~(uint32_t)THUNDER_LIVE_CAP_CHAINS;
+#endif
+  bool lxr = false;
+#ifdef THUNDER_HAVE_LXR
+  lxr = thunder_lxr_api() != nullptr;
+#endif
+  return jstr(env, tpa::songFit(*g.songText, g.kitText ? std::string_view(*g.kitText) : std::string_view(), caps, 0, lxr).json(rev));
+}
+
+// put + buf.use kind 'pad': `l` (and `r` for a stereo pad) are little-endian float32 as the page sent them. The block comes from thunder_live_alloc, all of L then all of R (pad_take's layout).
+// The kit entry (choke, syn, rel) is the one of the last kit.load for that slot (0, 0, 0 without one). The caller publishes with nativePadsPublish.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadTake(JNIEnv* env, jobject, jint pad, jbyteArray l, jbyteArray r, jint frames, jdouble rate) {
+  std::lock_guard<std::mutex> lk(g_life);
+  if (!ready()) return -2;
+  if (frames <= 0 || pad < 0 || pad >= THUNDER_LIVE_PADS || !l) return -1;
+  const jsize nl = env->GetArrayLength(l), nr = r ? env->GetArrayLength(r) : 0;
+  const int ch = r ? 2 : 1;
+  if ((jlong)nl < (jlong)frames * 4 || (r && (jlong)nr < (jlong)frames * 4)) return -1;
+  float* b = thunder_live_alloc((int64_t)frames * ch);
+  if (!b) return THUNDER_LIVE_E_MEMORY;
+  env->GetByteArrayRegion(l, 0, (jsize)frames * 4, reinterpret_cast<jbyte*>(b));
+  if (r) env->GetByteArrayRegion(r, 0, (jsize)frames * 4, reinterpret_cast<jbyte*>(b + frames));
+  if (env->ExceptionCheck()) { env->ExceptionClear(); thunder_live_free(b); return -1; }
+  int choke = 0; bool syn = false; double rel = 0;
+  if (g.kitDoc) tpa::kitEntryOf(g.kitDoc->root(), (size_t)pad, &choke, &syn, &rel);
+  const int rc = g.eng->call([=](thunder_live* L) {
+    int x = thunder_live_pad_take(L, pad, b, r ? 1 : 0, frames, rate);
+    if (x) { thunder_live_free(b); return x; }
+    return thunder_live_pad_kit(L, pad, choke, syn ? 1 : 0, rel);
+  }, 10000);
+  if (rc == -1000) return rc;   // the task may still run and owns `b` then (it frees it on a refusal)
+  return rc;
+}
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadsPublish(JNIEnv*, jobject) {
+  if (!ready()) return -2;
+  return g.eng->call([](thunder_live* L) { return thunder_live_pads_publish(L); }, 10000);
+}
+// A MUT / GEN variation (buf.use kind 'var'): mono float32 in `l`.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeVarSet(JNIEnv* env, jobject, jint ii, jint kind, jint num, jint pad, jbyteArray l, jint frames, jdouble rate) {
+  if (!ready() || !l || frames <= 0) return -2;
+  if ((jlong)env->GetArrayLength(l) < (jlong)frames * 4) return -1;
+  auto v = std::make_shared<std::vector<float>>((size_t)frames);
+  env->GetByteArrayRegion(l, 0, (jsize)frames * 4, reinterpret_cast<jbyte*>(v->data()));
+  return g.eng->call([=](thunder_live* L) { return thunder_live_var_set(L, ii, kind, num, pad, v->data(), frames, rate); }, 10000);
+}
+
+// play {mode,row,at?,...}: every field of thunder_live_play_opts the page can send. t0 < 0: the next quantum + 0.08 s.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePlayEx(JNIEnv*, jobject, jint mode, jint row, jint track, jint sect, jint phrase, jint hasLoop, jint y0, jint y1, jlong t0, jint hasSeed, jint seed, jint pdc, jlong onlyBits, jint hasOnly) {
+  if (!ready()) return -2;
+  const uint32_t rs = (uint32_t)(monoNs() & 0x7fffffff) | 1u;
+  return g.eng->call([=](thunder_live* L) {
+    thunder_live_play_opts po; std::memset(&po, 0, sizeof po);
+    po.size = (uint32_t)sizeof po; po.t0 = t0 < 0 ? THUNDER_LIVE_NOW : t0; po.mode = mode; po.row = row; po.track = track; po.sect = sect; po.phrase = phrase;
+    po.has_loop = hasLoop; po.loop_y0 = y0; po.loop_y1 = y1; po.has_seed = hasSeed; po.seed = (uint32_t)seed; po.random_seed = rs; po.spp = -1; po.pdc_mode = pdc;
+    po.only = (uint64_t)onlyBits; po.has_only = hasOnly;
+    return thunder_live_play(L, &po);
+  });
+}
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeHold(JNIEnv*, jobject, jlong at) { if (!ready()) return -2; return g.eng->call([=](thunder_live* L) { return thunder_live_hold(L, at); }); }
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeLead(JNIEnv*, jobject, jdouble s, jlong at) { if (!ready()) return -2; return g.eng->call([=](thunder_live* L) { return thunder_live_lead(L, s, at); }); }
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePerf(JNIEnv*, jobject, jint what, jint index, jdouble v, jlong at) { if (!ready()) return -2; return g.eng->call([=](thunder_live* L) { return thunder_live_perf(L, what, index, v, at); }); }
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMetersWant(JNIEnv*, jobject, jdouble hz) { if (!ready()) return -2; return g.eng->call([=](thunder_live* L) { return thunder_live_meters_want(L, hz); }); }
+
+// fx.plan / fx.commit / fx.param / master.config (live.h section 5): the page's own JSON as bytes, passed through.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFxPlan(JNIEnv* env, jobject, jint track, jbyteArray slots, jdouble bpm) {
+  if (!ready()) return -2;
+  auto b = bytesOf(env, slots);
+  return g.eng->call([=](thunder_live* L) { return thunder_live_fx_plan(L, track, b->empty() ? nullptr : b->data(), b->size(), bpm); }, 10000);
+}
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFxCommit(JNIEnv*, jobject, jint track, jlong at) { if (!ready()) return -2; return g.eng->call([=](thunder_live* L) { return thunder_live_fx_commit(L, track, at); }); }
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFxParam(JNIEnv* env, jobject, jint track, jint slot, jdoubleArray p, jlong at) {
+  if (!ready() || !p || env->GetArrayLength(p) < 12) return -1;
+  auto v = std::make_shared<std::array<double, 12>>(); env->GetDoubleArrayRegion(p, 0, 12, v->data());
+  return g.eng->call([=](thunder_live* L) { return thunder_live_fx_param(L, track, slot, v->data(), at); });
+}
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMasterConfig(JNIEnv* env, jobject, jbyteArray mst, jint safety) {
+  if (!ready()) return -2;
+  auto b = bytesOf(env, mst);
+  return g.eng->call([=](thunder_live* L) { return thunder_live_master_config(L, b->empty() ? nullptr : b->data(), b->size(), safety); }, 10000);
+}
+// chain.edit {ops, at?}: needs the chains host (n1/c2-live, #311); without it E_UNSUPPORTED (-9).
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeChainEdit(JNIEnv* env, jobject, jbyteArray ops, jlong at) {
+  if (!ready()) return -2;
+#ifdef THUNDER_LIVE_F_CHAINS
+  auto b = bytesOf(env, ops);
+  return g.eng->call([=](thunder_live* L) { return thunder_live_chain_edit(L, b->empty() ? nullptr : b->data(), b->size(), at); });
+#else
+  (void)env; (void)ops; (void)at; return THUNDER_LIVE_E_UNSUPPORTED;
+#endif
+}
+JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeChainsOn(JNIEnv*, jobject) { return ready() && g.eng->chainsOn() ? JNI_TRUE : JNI_FALSE; }
+// The poller's events since the last call, one JSON object per line ("" when none).
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeDrainEvents(JNIEnv* env, jobject) { if (!ready()) return jstr(env, ""); return jstr(env, g.eng->drainEvents()); }
+JNIEXPORT jlong JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeEngineOffset(JNIEnv*, jobject) { int64_t o = 0; if (ready() && g.eng->handle()) thunder_live_engine_offset(g.eng->handle(), &o); return (jlong)o; }
 
 }  // extern "C"

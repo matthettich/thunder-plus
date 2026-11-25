@@ -1,0 +1,144 @@
+package app.thunderplus.nativetest
+
+import app.thunderplus.nativetest.BridgeTranslator.LiveCall
+import app.thunderplus.nativetest.BridgeTranslator.Translation
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
+// N2 H1b: the translation of CORE-BRIDGE v1 messages into live calls (BridgeTranslator.kt) and the put assembly (PutStore).
+class BridgeTranslatorTest {
+    private fun call(raw: String): LiveCall { val t = BridgeTranslator.translate(raw); assertTrue("not a call: $t", t is Translation.Call); return (t as Translation.Call).call }
+    private fun refused(raw: String): Translation.Refused { val t = BridgeTranslator.translate(raw); assertTrue("not refused: $t", t is Translation.Refused); return t as Translation.Refused }
+
+    @Test fun typeIsReadFromTheFront() {
+        assertEquals("play", BridgeTranslator.typeOf("{\"t\":\"play\",\"row\":0}"))
+        assertEquals("song.load", BridgeTranslator.typeOf("{ \"t\" : \"song.load\", \"S\": {\"t\":\"x\"}}"))
+        assertNull(BridgeTranslator.typeOf("{\"row\":0}"))
+    }
+
+    @Test fun bigMessagesPassThroughUnparsed() {
+        val msg = "{\"t\":\"song.load\",\"S\":{\"name\":\"x\",\"bpm\":131},\"vars\":null,\"rev\":4}"
+        val c = call(msg) as LiveCall.SongLoad
+        assertEquals(msg, String(c.raw, Charsets.UTF_8))
+        assertTrue(call("{\"t\":\"kit.load\",\"kit\":{\"voices\":[]},\"rev\":1}") is LiveCall.KitLoad)
+    }
+
+    @Test fun playFields() {
+        assertEquals(LiveCall.Play(0, 0, 0, -1, -1, 0, 0, 0, -1, 0, 0, 1, 0, 0), call("{\"t\":\"play\"}"))
+        val p = call("{\"t\":\"play\",\"mode\":\"sect\",\"row\":5,\"track\":2,\"sect\":3,\"loop\":{\"y0\":4,\"y1\":8},\"seed\":99,\"pdc\":2,\"only\":[0,3],\"at\":48000}") as LiveCall.Play
+        assertEquals(LiveCall.Play(1, 5, 2, 3, -1, 1, 4, 8, 48000, 1, 99, 2, 0b1001, 1), p)
+        assertEquals(2, (call("{\"t\":\"play\",\"mode\":2}") as LiveCall.Play).mode)
+        assertTrue(refused("{\"t\":\"play\",\"mode\":\"weird\"}").msg.contains("unknown play mode"))
+        assertTrue(refused("{\"t\":\"play\",\"pdc\":5}").msg.contains("pdc"))
+    }
+
+    @Test fun transportCommands() {
+        assertEquals(LiveCall.Stop(-1), call("{\"t\":\"stop\"}"))
+        assertEquals(LiveCall.Stop(960), call("{\"t\":\"stop\",\"at\":960}"))
+        assertEquals(LiveCall.Hold(-1), call("{\"t\":\"hold\",\"at\":null}"))
+        assertEquals(LiveCall.Bpm(140.5, -1), call("{\"t\":\"bpm\",\"bpm\":140.5}"))
+        assertEquals(LiveCall.Bpm(90.0, 7), call("{\"t\":\"bpm\",\"v\":90,\"at\":7}"))
+        assertEquals(LiveCall.Loop(1, 2, 6, -1), call("{\"t\":\"loop\",\"y0\":2,\"y1\":6}"))
+        assertEquals(LiveCall.Loop(0, 0, 0, -1), call("{\"t\":\"loop\",\"has\":false}"))
+        assertEquals(LiveCall.Lead(0.25, -1), call("{\"t\":\"lead\",\"s\":0.25}"))
+        assertEquals(LiveCall.Perf(3, 1, 0.5, -1), call("{\"t\":\"perf\",\"what\":3,\"i\":1,\"v\":0.5}"))
+        assertTrue(refused("{\"t\":\"bpm\"}").msg.contains("bpm"))
+    }
+
+    @Test fun mixSet() {
+        assertEquals(LiveCall.MixSet(3, 0, 200.0, -1.0, -1), call("{\"t\":\"mix.set\",\"tr\":3,\"k\":\"vol\",\"v\":200}"))
+        assertEquals(LiveCall.MixSet(32, 6, 255.0, 0.0, 10), call("{\"t\":\"mix.set\",\"tr\":\"m\",\"k\":\"out\",\"v\":255,\"ramp\":0,\"at\":10}"))
+        assertEquals(LiveCall.MixSet(5, 3, 1.0, 512.0, -1), call("{\"t\":\"mix.set\",\"tr\":5,\"k\":\"mute\",\"v\":1,\"ramp\":512}"))
+        assertTrue(refused("{\"t\":\"mix.set\",\"tr\":1,\"k\":\"send\",\"i\":0,\"v\":3}").msg.contains("send"))
+        assertTrue(refused("{\"t\":\"mix.set\",\"tr\":99,\"k\":\"vol\",\"v\":1}").msg.contains("tr"))
+        assertTrue(refused("{\"t\":\"mix.set\",\"tr\":1,\"k\":\"zzz\",\"v\":1}").msg.contains("zzz"))
+    }
+
+    @Test fun effectsAndMaster() {
+        val plan = call("{\"t\":\"fx.plan\",\"tr\":2,\"slots\":[{\"type\":\"glue\"},null],\"bpm\":131}") as LiveCall.FxPlan
+        assertEquals(2, plan.track); assertEquals(131.0, plan.bpm, 0.0); assertTrue(String(plan.slotsJson).startsWith("[{\"type\":\"glue\"}"))
+        assertEquals(LiveCall.FxCommit(2, 100), call("{\"t\":\"fx.commit\",\"tr\":2,\"at\":100}"))
+        val fp = call("{\"t\":\"fx.param\",\"tr\":\"m\",\"slot\":1,\"p\":[1,2,3,4,5,6,7,8,9,10,11,12.5]}") as LiveCall.FxParam
+        assertEquals(32, fp.track); assertEquals(1, fp.slot); assertEquals(12.5, fp.p[11], 0.0)
+        assertTrue(refused("{\"t\":\"fx.param\",\"tr\":1,\"slot\":0,\"p\":[1,2]}").msg.contains("12"))
+        val mc = call("{\"t\":\"master.config\",\"mst\":{\"limiter\":true},\"safety\":false}") as LiveCall.MasterConfig
+        assertEquals(0, mc.safety); assertEquals("{\"limiter\":true}", String(mc.mstJson))
+        val ce = call("{\"t\":\"chain.edit\",\"ops\":[{\"op\":\"param\",\"id\":\"a\",\"name\":\"b\",\"value\":1}]}") as LiveCall.ChainEdit
+        assertTrue(String(ce.opsJson).contains("\"op\":\"param\""))
+    }
+
+    @Test fun fxSetCannotBeAnswered() {
+        val r = refused("{\"t\":\"fx.set\",\"tr\":1,\"slot\":0,\"p\":2,\"v\":0.5,\"id\":9}")
+        assertEquals("fx.set", r.where); assertTrue(r.msg.contains("fx.param")); assertEquals(9, r.replyId)
+    }
+
+    @Test fun metersClamp() {
+        assertEquals(LiveCall.MetersWant(30.0), call("{\"t\":\"meters.want\",\"rate\":60}"))
+        assertEquals(LiveCall.MetersWant(0.0), call("{\"t\":\"meters.want\",\"rate\":-1}"))
+        assertEquals(LiveCall.MetersWant(10.0), call("{\"t\":\"meters.want\",\"rate\":10,\"tracks\":[0]}"))
+    }
+
+    @Test fun bufUse() {
+        assertEquals(LiveCall.BufUse(4, 9, 0, "pad", 0, 'g'.code, 0), call("{\"t\":\"buf.use\",\"id\":4,\"pad\":9,\"kind\":\"pad\"}"))
+        assertEquals(LiveCall.BufUse(5, 9, 0, "var", 3, 'm'.code, 7), call("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\",\"ii\":3,\"vk\":\"m\",\"num\":7}"))
+        assertTrue(refused("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"ir\"}").msg.contains("ir"))
+        assertTrue(refused("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\"}").msg.contains("ii"))
+        assertEquals(LiveCall.BufFree(5), call("{\"t\":\"buf.free\",\"id\":5}"))
+    }
+
+    @Test fun helloAndNotOnTheLiveHost() {
+        assertEquals(LiveCall.Hello(3, true), call("{\"t\":\"hello\",\"id\":3,\"v\":1,\"app\":\"thunder\",\"live\":true}"))
+        for (t in listOf("song.patch", "kit.patch", "note.on", "note.off", "midi.cfg", "dev.list", "dev.open", "rec.arm", "render.start", "link.set", "lxp")) {
+            val r = refused("{\"t\":\"$t\",\"id\":1}")
+            assertEquals(t, r.where); assertEquals(1, r.replyId)
+        }
+        assertTrue(BridgeTranslator.translate("{\"t\":\"something.new\"}") is Translation.Ignored)
+        assertTrue(BridgeTranslator.translate("{\"t\":\"play\",") is Translation.Refused)
+        assertTrue(BridgeTranslator.translate("garbage") is Translation.Ignored)
+    }
+
+    // ---- PutStore ----
+    private fun floats(vararg f: Float): ByteArray { val b = ByteBuffer.allocate(f.size * 4).order(ByteOrder.LITTLE_ENDIAN); f.forEach { b.putFloat(it) }; return b.array() }
+
+    @Test fun putAssemblesChunksInTwoChannels() {
+        val s = PutStore()
+        fun send(h: String, bytes: ByteArray) = run { assertNull(s.header(h)); s.chunk(bytes) }
+        var r = send("{\"pid\":7,\"id\":11,\"c\":0,\"o\":0,\"n\":4,\"last\":false,\"sr\":44100,\"ch\":2,\"frames\":4}", floats(1f, 2f))
+        assertNull(r.first); assertEquals(-1, r.second)
+        r = send("{\"pid\":7,\"id\":11,\"c\":0,\"o\":2,\"n\":4,\"last\":false}", floats(3f, 4f)); assertEquals(-1, r.second)
+        r = send("{\"pid\":7,\"id\":11,\"c\":1,\"o\":0,\"n\":4,\"last\":true}", floats(5f, 6f, 7f, 8f))
+        assertNull(r.first); assertEquals(11, r.second); assertEquals(7, s.lastPid)
+        val b = s.take(11)!!
+        assertEquals(2, b.ch); assertEquals(4, b.frames); assertEquals(44100.0, b.sr, 0.0)
+        assertArrayEquals(floats(1f, 2f, 3f, 4f), b.data[0]); assertArrayEquals(floats(5f, 6f, 7f, 8f), b.data[1])
+        assertEquals(32L, s.held); s.free(11); assertEquals(0L, s.held); assertNull(s.take(11))
+    }
+
+    @Test fun putRefusals() {
+        val s = PutStore(maxBytes = 64)
+        assertNull(s.header("{\"pid\":1,\"id\":1,\"o\":0,\"n\":4,\"last\":true}"))
+        assertTrue(s.chunk(floats(1f, 2f, 3f, 4f)).first!!.contains("sample rate"))
+        assertNull(s.header("{\"pid\":2,\"id\":2,\"o\":0,\"n\":4,\"last\":true,\"sr\":48000}"))
+        assertTrue(s.chunk(ByteArray(7)).first!!.contains("whole floats"))
+        assertNull(s.header("{\"pid\":3,\"id\":3,\"o\":2,\"n\":4,\"last\":true,\"sr\":48000}"))
+        assertTrue(s.chunk(floats(1f, 2f, 3f)).first!!.contains("past the end"))
+        assertTrue(s.chunk(floats(1f)).first!!.contains("without a put.header"))
+        assertNull(s.header("{\"pid\":4,\"id\":4,\"o\":0,\"n\":100,\"last\":false,\"sr\":48000}"))
+        assertTrue(s.chunk(floats(1f)).first!!.contains("too much"))
+        assertNull(s.header("{\"pid\":5,\"id\":5,\"o\":0,\"n\":1,\"sr\":48000}"))
+        assertTrue(s.header("{\"pid\":5}")!!.contains("still expected"))
+        assertTrue(PutStore().header("not json")!!.contains("not JSON"))
+    }
+
+    @Test fun aNewPutUnderTheSameIdReplacesTheOld() {
+        val s = PutStore()
+        assertNull(s.header("{\"pid\":1,\"id\":1,\"o\":0,\"n\":2,\"last\":true,\"sr\":48000}")); s.chunk(floats(1f, 2f))
+        assertNull(s.header("{\"pid\":2,\"id\":1,\"o\":0,\"n\":2,\"last\":true,\"sr\":48000}")); s.chunk(floats(9f, 9f))
+        assertArrayEquals(floats(9f, 9f), s.take(1)!!.data[0]); assertEquals(8L, s.held)
+    }
+}

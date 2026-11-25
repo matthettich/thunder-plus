@@ -79,8 +79,11 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
     }
 
     private fun onPageMessage(m: WebMessageCompat) {
-        if (m.type == WebMessageCompat.TYPE_ARRAY_BUFFER) { onBytes(m.arrayBuffer); return }
+        if (m.type == WebMessageCompat.TYPE_ARRAY_BUFFER) { if (LiveBridge.liveMode) LiveBridge.onBytes(m.arrayBuffer) else onBytes(m.arrayBuffer); return }
         val s = m.data ?: return
+        // N2 H1b: a page that said hello {live:true} talks to the LIVE host (LiveBridge, BridgeTranslator.kt); the N0 test core's messages below are unchanged for every other page.
+        if (BridgeTranslator.typeOf(s) == "hello" && s.length < 1024 && (try { JSONObject(s).optBoolean("live", false) } catch (e: Exception) { false })) { LiveBridge.handle(activity, s); return }
+        if (LiveBridge.liveMode) { LiveBridge.handle(activity, s); return }
         val j = try { JSONObject(s) } catch (e: Exception) { return }
         when (j.optString("t")) {
             "hello" -> sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("v", 1).put("core", "n0-test")

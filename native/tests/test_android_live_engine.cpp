@@ -112,9 +112,9 @@ int main() {
     CHECK(!eventToJson((const unsigned char*)&p, 8, &o), "a short record is refused");
     EventQueue q(3);
     q.push("1", false); q.push("2", true); q.push("3", false); q.push("4", true);   // full: the oldest non-critical (1) goes
-    CHECK(q.drain() == "[2,3,4]" && q.dropped() == 1 && q.drain().empty(), "queue drop rule");
+    CHECK(q.drain() == "2\n3\n4" && q.dropped() == 1 && q.drain().empty(), "queue drop rule");
     EventQueue q2(2); q2.push("a", true); q2.push("b", true); q2.push("c", true);
-    CHECK(q2.drain() == "[a,b]" && q2.dropped() == 1, "a queue of critical records refuses the newest");
+    CHECK(q2.drain() == "a\nb" && q2.dropped() == 1, "a queue of critical records refuses the newest");
   }
   // 3. the engine
   LiveEngine E; LiveEngine::Config cfg; cfg.sampleRate = 48000; cfg.maxBlock = 1024;
@@ -168,7 +168,7 @@ int main() {
   CHECK(st.find("\"fatal\":0") != std::string::npos, "a fatal error record");
   { const std::string ev = E.drainEvents(); std::printf("events: %zu bytes, dropped %zu\n", ev.size(), E.eventsDropped());
     for (const char* t : {"clock", "pos", "meters", "state", "song"}) CHECK(ev.find(std::string("\"t\":\"") + t + "\"") != std::string::npos, "no %s event in the drained queue", t);
-    CHECK(ev.size() > 2 && ev[0] == '[' && ev.back() == ']', "events are one JSON array"); }
+    CHECK(ev.size() > 2 && ev[0] == '{' && ev.back() == '}' && ev.find("}\n{") != std::string::npos, "events are JSON objects, one per line"); }
   rc = E.call([&](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); });
   CHECK(rc == 0, "stop: %d", rc);
   std::this_thread::sleep_for(std::chrono::milliseconds(200));

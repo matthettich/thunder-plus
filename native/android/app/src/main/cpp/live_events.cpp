@@ -77,9 +77,9 @@ void EventQueue::push(std::string json, bool critical) {
 std::string EventQueue::drain() {
   std::lock_guard<std::mutex> g(m_);
   if (q_.empty()) return std::string();
-  std::string o = "[";
-  for (size_t i = 0; i < q_.size(); i++) { if (i) o += ','; o += q_[i].s; }
-  o += ']'; q_.clear();
+  std::string o;   // one event per line: a JSON object never contains a raw newline (strings are escaped), so the shell splits on '\n' without parsing
+  for (size_t i = 0; i < q_.size(); i++) { if (i) o += '\n'; o += q_[i].s; }
+  q_.clear();
   return o;
 }
 

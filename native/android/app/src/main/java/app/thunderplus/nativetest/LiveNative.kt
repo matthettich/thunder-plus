@@ -13,14 +13,41 @@ object LiveNative {
     /** A .thunder project's bytes: renders the pads with the core, publishes the song and the pads. Blocks (seconds): call it from a worker thread. A JSON object, see [LoadResult.parse]. */
     external fun nativeLoadProject(bytes: ByteArray): String
     external fun nativePlay(row: Int): Int
-    external fun nativeTransportStop(): Int
-    external fun nativeBpm(bpm: Double): Int
-    external fun nativeLoop(has: Int, y0: Int, y1: Int): Int
-    external fun nativeMixSet(track: Int, key: Int, value: Double, ramp: Double): Int
+    /** `at` in these calls is a HOST frame, or -1 (THUNDER_LIVE_NOW). */
+    external fun nativeTransportStop(at: Long): Int
+    external fun nativeBpm(bpm: Double, at: Long): Int
+    external fun nativeLoop(has: Int, y0: Int, y1: Int, at: Long): Int
+    external fun nativeMixSet(track: Int, key: Int, value: Double, ramp: Double, at: Long): Int
     /** The poller's latest state (JSON, see [LiveStatus.parse]). */
     external fun nativeStatus(): String
     external fun nativeStats(): String
     /** A5's clock-drift logger on the live callback (same JSON as [NativeEngine.nativeRtSnapshot]). */
     external fun nativeRtReset()
     external fun nativeRtSnapshot(): String
+
+    // ---- H1b: the CORE-BRIDGE v1 messages (see BridgeTranslator.kt for what each page message becomes) ----
+    /** song.load: the page's whole message as UTF-8 bytes. A JSON object {ok, rc, err}. */
+    external fun nativeSongLoad(msg: ByteArray): String
+    /** kit.load: the core renders the pads it can and publishes them. {ok, rc, err, pads, skipped, dry, renderMs, empty:[slots the page must put]}. */
+    external fun nativeKitLoad(msg: ByteArray): String
+    /** SongFit over the last song and kit: the `fit` event JSON. */
+    external fun nativeFit(rev: Long): String
+    /** put + buf.use 'pad': little-endian float32 channels; r is null for a mono pad. */
+    external fun nativePadTake(pad: Int, l: ByteArray, r: ByteArray?, frames: Int, rate: Double): Int
+    external fun nativePadsPublish(): Int
+    external fun nativeVarSet(ii: Int, kind: Int, num: Int, pad: Int, l: ByteArray, frames: Int, rate: Double): Int
+    external fun nativePlayEx(mode: Int, row: Int, track: Int, sect: Int, phrase: Int, hasLoop: Int, y0: Int, y1: Int, t0: Long, hasSeed: Int, seed: Int, pdc: Int, onlyBits: Long, hasOnly: Int): Int
+    external fun nativeHold(at: Long): Int
+    external fun nativeLead(seconds: Double, at: Long): Int
+    external fun nativePerf(what: Int, index: Int, v: Double, at: Long): Int
+    external fun nativeMetersWant(hz: Double): Int
+    external fun nativeFxPlan(track: Int, slotsJson: ByteArray, bpm: Double): Int
+    external fun nativeFxCommit(track: Int, at: Long): Int
+    external fun nativeFxParam(track: Int, slot: Int, p: DoubleArray, at: Long): Int
+    external fun nativeMasterConfig(mstJson: ByteArray, safety: Int): Int
+    external fun nativeChainEdit(opsJson: ByteArray, at: Long): Int
+    external fun nativeChainsOn(): Boolean
+    /** The events the poller saw since the last call, one JSON object per line ("" when none). */
+    external fun nativeDrainEvents(): String
+    external fun nativeEngineOffset(): Long
 }

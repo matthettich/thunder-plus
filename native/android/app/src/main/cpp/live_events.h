@@ -24,7 +24,7 @@ class EventQueue {
   explicit EventQueue(size_t cap = 512) : cap_(cap) {}
   // Pushes one JSON object. A full queue drops the oldest NON-critical entry (clock, pos, rows, meters, late); a critical one (state, held, song, pads, err) is dropped only when the queue holds nothing else.
   void push(std::string json, bool critical);
-  // Everything queued as one JSON array text ("[a,b,...]"), or "" when empty. Counts what was dropped.
+  // Everything queued as JSON objects joined by newlines ("a\nb\nc"), or "" when empty. Counts what was dropped.
   std::string drain();
   size_t dropped() const { std::lock_guard<std::mutex> g(m_); return dropped_; }
  private:

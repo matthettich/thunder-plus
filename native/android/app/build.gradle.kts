@@ -41,6 +41,7 @@ android {
 dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("androidx.core:core-ktx:1.15.0")
+    testImplementation("org.json:json:20240303")   // N2 H1b: the JVM tests of BridgeTranslator.kt use org.json (the Android stub jar only has empty methods)
     testImplementation("junit:junit:4.13.2")   // U36 T9: the JVM unit tests of MidiModel.kt (src/test), run by `gradle :app:testDebugUnitTest`
 }
 

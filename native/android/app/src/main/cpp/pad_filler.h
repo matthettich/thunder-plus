@@ -40,6 +40,10 @@ struct PadSet {
 // Renders every voice of kit `kitJson` (the `kit` member of a .thunder file) at `sr` Hz. bpm / lpb: the song's (songBpm(), songLpb()). Returns false only for an unreadable kit.
 bool renderPads(std::string_view kitJson, double bpm, double lpb, double sr, PadSet* out);
 
+// The kit entry of slot i as the page's coreKitV makes it (index.html:23537): choke, syn (isSyn, index.html:4924: kit.held[i] when the project has no voice-per-track, else i >= 8), rel (relOf, seconds, 0 unless syn).
+// false for a slot with no voice. `kit` is the kit object (voices array, optional held).
+bool kitEntryOf(thunder::Json kit, size_t slot, int* choke, bool* syn, double* rel);
+
 // The page's relOf(V) (index.html:4930), in seconds, for the kit entry's `rel` (an approximation: the engine-specific `rel` of the pump synths is not read).
 // Declared here so the JVM-free test can check it.
 double relOfVoice(thunder::Json voice);

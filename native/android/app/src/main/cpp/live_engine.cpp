@@ -25,7 +25,7 @@ int64_t LiveEngine::monoNs() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); r
 
 bool LiveEngine::create(const Config& c, std::string* err) {
   if (L_) { if (err) *err = "already created"; return false; }
-  cfg_ = c;
+  cfg_ = c; chainsOn_ = false;
   thunder_live_opts o; std::memset(&o, 0, sizeof o);
   o.size = (uint32_t)sizeof o;
   o.sample_rate = c.sampleRate;
@@ -33,7 +33,7 @@ bool LiveEngine::create(const Config& c, std::string* err) {
   o.max_block = c.maxBlock;
   o.flags = THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_MIDI;
 #ifdef THUNDER_LIVE_F_CHAINS
-  if (c.chains) { o.flags |= THUNDER_LIVE_F_CHAINS; o.chains_bytes = c.chainsBytes; }
+  if (c.chains) { o.flags |= THUNDER_LIVE_F_CHAINS; o.chains_bytes = c.chainsBytes; chainsOn_ = true; }
 #endif
   char e[256] = {0};
   L_ = thunder_live_create(&o, e, sizeof e);

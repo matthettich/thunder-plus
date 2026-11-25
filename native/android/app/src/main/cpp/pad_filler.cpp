@@ -82,6 +82,17 @@ double relOfVoice(thunder::Json V) {
   return (r > 0 ? std::fmax(1, r) : 30) / 1000;
 }
 
+bool kitEntryOf(thunder::Json kit, size_t slot, int* choke, bool* syn, double* rel) {
+  const thunder::Json voices = kit.arr("voices");
+  const thunder::Json v = voices.at(slot);
+  if (!v.isObj()) return false;
+  const bool vtrk = voices.size() > 16;   // GUESS, as in renderPads
+  const thunder::Json held = kit.arr("held");
+  const bool s = (!vtrk && held.isArr() && held.at(slot).isBool()) ? held.at(slot).asBool() : slot >= 8;
+  *choke = (int)v.num("choke"); *syn = s; *rel = s ? std::fmin(60.0, relOfVoice(v)) : 0;
+  return true;
+}
+
 namespace {
 
 int dryFx(thunder::Json fx) {   // pad effects the core does not host (Kind::Other) that are switched on
