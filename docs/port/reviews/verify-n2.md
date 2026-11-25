@@ -2,14 +2,16 @@
 
 Source: `n1/n2-h2` @ 1310bdd3 (the four PRs read as one diff against `native`). PARTIAL REPORT (written while the host builds and sanitizer runs were still in progress; see the end for what is still open).
 
-## Verdict per PR (provisional)
+## Verdict per PR
 
-| PR | Verdict |
-|---|---|
-| #312 H1a | MERGE AFTER FIXES (F1, F3) |
-| #313 H1b | MERGE AFTER FIXES (F5, F6, F9) |
-| #315 H1c | MERGE AFTER FIXES (F2, F4, F7) |
-| #316 H2 | MERGE AFTER FIXES (F8) |
+| PR | Verdict | Must fix first |
+|---|---|---|
+| #312 H1a (live engine, JNI, pads) | MERGE AFTER FIXES | F1 + F10 (use-after-free / SEGV against shutdown, reset, reopen), F3 (state enum), F9 (leak, by-reference capture) |
+| #313 H1b (bridge, SongFit) | MERGE AFTER FIXES | F5 (put gaps), F6 (SongFit false OK), F17 (id / rev from a regex on the tail) |
+| #315 H1c (focus, device, gate) | MERGE AFTER FIXES | F2 (the gate cannot fail on an xrun: do not trust a PASS before it is fixed), F4, F7, F16 |
+| #316 H2 (MIDI) | MERGE AFTER FIXES | F8 (one line), F11 |
+
+No finding is on the audio thread itself: render / dataCallback / the clock map / the duck ramp / the load figure are allocation-, lock-, JNI- and log-free and race-free by my read and by the runs below. The defects are in the control side's lifetimes and in decisions around it. Nothing here is DO NOT MERGE; all four are drafts into `native`, not `main`.
 
 ## Findings (by severity; file:line are on n1/n2-h2 @ 1310bdd3)
 
@@ -63,6 +65,12 @@ c. A stale `hasFocus == true` after an unplayed `AUDIOFOCUS_LOSS` (decide return
 
 ### F15 (LOW, #312) event shapes differ from CORE-BRIDGE section 4
 `pos` carries `cr` and no `pat` (spec: `{f,row,pat,step}`); `meters` is `{seq, at, a:[...]}` not `{f, tr, m, fx}`; a `state` record of the ENDED / STOPPED kind maps through ST_* only (no `held`); `clock` adds `voices`, `dropped` (additive, fine). If N2-PAGE-CLIENT.md specifies these shapes the doc and CORE-BRIDGE should say so; I did not find the section 4 shapes anywhere in the shell.
+
+### F16 (LOW-MEDIUM, #313/#315) while the live engine is down (engine.reset, a failed stream reopen) a page `play` / `open` goes to the N0 test core
+`Bridge.kt:86`: `if (LiveBridge.liveMode)` is `flag && LiveEngine.active`; `LiveEngine.shutdown()` clears both (LiveBridge.reset(), active=false) for the ~1 s of an engine.reset and for good after a failed reopen (`reopenStream` -> `shutdown()`). Messages that arrive then fall through to `ThunderHost.command` (ThunderHost.kt:122): `open` / `play` call `ensureRunning`, i.e. the N0 test core opens the output. After a failed reopen the page is told `engine up:false` but a press of Play still starts the N0 test core; during a reset the N0 core can start after `LiveEngine.start` has run `ThunderHost.shutdown()`, giving two engines on the output. Fix: keep a `liveSession` flag that survives reset, and answer `err` instead of routing to N0 until the page says `hello` without `live`.
+
+### F17 (LOW, #313) the ask id and the rev of a song.load are read by regex from the last 200 characters of the message
+`LiveBridge.kt` `idOf` / `revOf`: `Regex("\"id\"...").findAll(raw.takeLast(200)).lastOrNull()`. On a `send` (no id) whose tail contains an `"id":N` of the song or vars, a `reply` with that id is emitted and can resolve an unrelated pending ask (thunder_bridge.js `pending[m.id]`); `rev` missing gives 0 while the core was given `++g.rev`. Fix: take them from the top level the way `extractMember` does in C++.
 
 ## Results of the runs
 
