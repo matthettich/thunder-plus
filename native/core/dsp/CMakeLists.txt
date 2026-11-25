@@ -160,6 +160,9 @@ dsp_group(${T} mi OPTS ${OPT_TFX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E
   ${E}/clouds/dsp/granular_processor.cc ${E}/clouds/dsp/correlator.cc ${E}/clouds/dsp/mu_law.cc ${E}/clouds/resources.cc
   ${E}/clouds/dsp/pvoc/frame_transformation.cc ${E}/clouds/dsp/pvoc/phase_vocoder.cc ${E}/clouds/dsp/pvoc/stft.cc
   ${E}/stmlib/dsp/atan.cc ${E}/stmlib/dsp/units.cc ${E}/stmlib/utils/random.cc)
+if(NOT IS_WASM)   # PFX: the pad Rings / Clouds as objects (padfx_mi.h); a group of their own so that tfx.wasm's link (parity) is not touched
+  dsp_group(${T} padmi OPTS ${OPT_TFX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${CMAKE_CURRENT_SOURCE_DIR}/padfx_mi.cc)
+endif()
 dsp_group(${T} beads OPTS ${OPT_TFX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_beads.cc
   ${E}/beads/dsp/delay_clock.cc ${E}/beads/dsp/delay_controller.cc ${E}/beads/dsp/mu_law.cc
   ${E}/beads/dsp/processor.cc ${E}/beads/dsp/trigger_generator.cc ${E}/beads/resources.cc)
