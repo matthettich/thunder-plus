@@ -1,6 +1,6 @@
 # C2a notes: `chains_diff` and `bus_plan_equal`
 
-**STATUS: done, pushed, PR #310 open (not merged). Lead's rulings applied (decision 5 replaced by deep equality, see "Departures from the page").** `ctest chains_diff` (266 golden pairs), `chains_diff_golden_current`, `busplan`, `busplan_bib`, `busplan_verify266` and `chains_song` pass on the final head; ASan + UBSan clean; 27 of 27 seeded faults die.
+**STATUS: done, pushed, PR #310 open (not merged). Round 3 applied (bad_alloc leak fixed, verifier gaps closed, identity shortcut dropped). Lead's rulings applied (decision 5 replaced by deep equality, see "Departures from the page").** `ctest chains_diff` (266 golden pairs), `chains_diff_golden_current`, `busplan`, `busplan_bib`, `busplan_verify266` and `chains_song` pass on the final head; ASan + UBSan clean; 31 of 31 seeded faults die.
 
 ## What was built
 - `native/core/src/chains/cdiff.{h,cpp}` (in `thunder_core`): `ChainsDiffKind`, `ChainsParamOp`, `ChainsDiff`, `chains_diff(Json prev, Json next)`, `bus_plan_equal(a, b)`, exactly the C2-DESIGN "C2a" interface.
@@ -19,6 +19,11 @@
 8. The class is decided by the first Structural cause: the page's order of evaluation (adds, removes, params, text, cables) is not reproduced because a throw and any non-param op are all Structural. Only the order of the PARAM list is contractual and is tested.
 9. `bus_plan_equal` compares `nFeeds`, `feedLen`, the first `nFeeds[t]` entries of each feed list (the rest is not part of the plan: always zero from `bus_plan`), `feedMask`, `targets`, `loopTo`, `srcAll`, `busAll`, `pure`, `pre`, `loop`.
 10. The file is compiled `-fno-exceptions` like the rest of `thunder_core` (no `try`, no throwing library call: no `at()`, `stoi`...); the only failure is an allocation failure. Control thread only (it allocates). No `lxr` in `native/core`. MSVC: standard C++17 only, no VLAs, no big stack arrays.
+
+## Round 3
+1. **The bad_alloc leak: the real cause was the compile flag, not the code.** `thunder_core` is built `-fno-exceptions`. With that flag GCC emits no cleanup landing pads, so when `operator new` throws `std::bad_alloc` inside `chains_diff`, the exception propagates through cdiff.cpp's frames without running the destructors of the `std::string`s, `std::vector`s and `std::unordered_map`s that are alive in them (the unwind tables exist, the cleanups do not). Every container was RAII and correct; they were just never destroyed. The same reason the other allocating control-side files (chost.cpp, render.cpp, ...) are in the `-fexceptions` list of `native/core/CMakeLists.txt`. Reproduced first: the new sweep failed at `electro/param-one` allocation 2 with +1 block behind. Fix: `src/chains/cdiff.cpp` added to that `-fexceptions` list (no source change); after it the sweep (19 golden pairs, 22821 failing calls, every n until the call succeeds) leaves 0 blocks behind. The sweep counts glibc malloc / calloc / free like `test_chains_host` and skips itself under a sanitizer or without glibc. MSVC has exceptions on already.
+2. **Verifier finding 1** (golden gaps): added `verify/` pairs: `st2` / `ti2` of -1, -5, -0.5, 0 against each other and absent; bool ids `true` vs `false` and `false` same; `null` id vs `false` and vs missing; the same `null` param on both sides (alone and with another change); `null` vs `false` param. The three surviving mutants now die: V-A (`truthy(Number)` as `> 0`), V-G (bool ids keyed the same), V-L (`null === null` false).
+3. **Verifier finding 2**: the identity shortcut for objects and arrays is gone (`strict_eq` never says equal for a container; `deep_eq` decides, so the same handle nested past 64 is Structural like two parses). `test_chains_diff` now pins: same handle shallow Same, same handle and two parses at 70 levels Structural. Mutation V-2 (shortcut back) dies.
 
 ## Departures from the page
 - **Deep equality for object / array params (lead's ruling).** In the page `b[k] !== a[k]` makes two clones of an object- or array-valued param different, so chnDiff sends a harmless repeated `param` op. In LiveHost `prev` and `next` are always two separately parsed songs, so identity would make every such param a structural publish. Rule: a param whose value is an object or array in both documents and DEEP-EQUAL is no op and does not change the kind. Deep equality: same JSON types; arrays of equal length with equal elements; objects with the same set of keys (duplicate keys: the last wins, as JSON.parse) and equal values, in any key order; numbers by value (-0 equals 0; NaN cannot occur in JSON and would never be equal); strings by content. Not deep-equal: Structural, as before (a value that is an object in next and a number / string in prev, or the reverse, is the page's ordinary op: a number in next is a Params op, anything else Structural). Strings and booleans: equal, no op; different, Structural. Containers nested deeper than 64 levels compare as NOT equal (the param value is level 1, so 64 nested containers are equal and 65 are not; pinned by `deep/nest-64-equal-at-limit` and `deep/nest-65-past-limit-not-equal`).
@@ -59,6 +64,10 @@ Almost certainly not. `native/core/src/chains/ctable.inc` has 145 module types (
 | M25 | deep compare: duplicate keys, first wins (next side) | killed, 2: `deep/duplicate-keys-in-next-last-wins-raw` (survived until a pair with duplicates in next was added) |
 | M25b | deep compare: duplicate keys, first wins (prev side) | killed, 2: `deep/duplicate-keys-last-wins-raw` |
 | M26 | deep compare: depth limit off by one | killed, 1: `deep/nest-64-equal-at-limit` |
+| V-A | `truthy(Number)` as `> 0` | killed, 6: `verify/st2-minus-1-vs-absent` |
+| V-G | bool ids all keyed the same | killed, 1: `verify/ids-true-vs-false` |
+| V-L | `null === null` false in the param compare | killed, 2: `verify/param-null-on-both-sides` |
+| V-2 | identity shortcut back for the same handle | killed, 1: same handle nested 70 deep |
 
 ## For the lead to rule on
 - Decision 1 (non-string ids are Structural) is my reading of the contract; say if C2b wants numeric ids to flow through as param ops (then `ChainsParamOp::id` needs another type).
@@ -66,8 +75,7 @@ Almost certainly not. `native/core/src/chains/ctable.inc` has 145 module types (
 - Only the targets this unit touches were built here; the rest of the tree was not rebuilt (the change to `thunder_core` is one added source file, and `native/tests/CMakeLists.txt` one appended block).
 
 ## Results (final head)
-- Build: `cmake -S native -B native/build-c2a -DCMAKE_BUILD_TYPE=Release -DTHUNDER_DEPS_DIR=/home/claude/deps`, `cmake --build native/build-c2a --target test_chains_diff test_busplan test_busplan_verify266 test_chains_song -j2`.
-- `ctest -R "chains_diff|busplan|chains_song"`: 7 of 7 passed (`busplan_ref`, `busplan`, `busplan_bib`, `busplan_verify266`, `chains_song`, `chains_diff`, `chains_diff_golden_current`).
-- `chains_diff: 266 pairs (Same 99, Params 46, Structural 121 of which 19 throw in the page; 20 raw-text), 0 failure(s)`.
-- `node native/tools/chains-diff-dump.mjs --check`: current (266 cases). ASan + UBSan build of the test with cdiff.cpp and json.cpp: same output, no report.
+- `cmake --build native/build-c2a --target test_chains_diff test_busplan test_busplan_verify266 test_chains_song -j2`; `ctest -R "chains_diff|busplan|chains_song"`: 7 of 7 passed (`busplan_ref`, `busplan`, `busplan_bib`, `busplan_verify266`, `chains_song`, `chains_diff`, `chains_diff_golden_current`).
+- `chains_diff: bad_alloc sweep: 19 pairs, 22821 failing calls, live allocations left: +0`; `chains_diff: 281 pairs (Same 102, Params 47, Structural 132 of which 19 throw in the page; 20 raw-text), 0 failure(s)`.
+- `node native/tools/chains-diff-dump.mjs --check`: current (281 cases). ASan + UBSan build of the test (sweep skipped there): same pair results, no report.
 

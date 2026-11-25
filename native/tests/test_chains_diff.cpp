@@ -10,6 +10,17 @@
 #include <string>
 #include <vector>
 
+#include <new>
+#if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__) && !defined(__SANITIZE_THREAD__)
+#define ALLOC_AUDIT 1
+// live = allocations minus frees (a leak check without a sanitizer, as test_chains_host); g_failAt: the n-th allocation after g_failN was zeroed fails (null: operator new throws bad_alloc)
+static long g_live = 0, g_failAt = 0, g_failN = 0;
+extern "C" { void* __libc_malloc(size_t); void* __libc_calloc(size_t, size_t); void* __libc_realloc(void*, size_t); void __libc_free(void*);
+void* malloc(size_t n) { if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; return __libc_malloc(n); }
+void* calloc(size_t a, size_t b) { if (g_failAt && ++g_failN == g_failAt) return nullptr; g_live++; return __libc_calloc(a, b); }
+void* realloc(void* p, size_t n) { if (!p) g_live++; return __libc_realloc(p, n); }
+void free(void* p) { if (p) g_live--; __libc_free(p); } }
+#endif
 #include "chains/cdiff.h"
 #include "mix/mix.h"
 #include "rt/json.h"
@@ -85,6 +96,10 @@ int main(int argc, char** argv) {
   // ---- the same document on both sides: JS identity makes every object equal to itself ----
   { std::string_view t = "{\"format\":\"chains.patch\",\"modules\":[{\"id\":\"a\",\"params\":{\"x\":1,\"o\":{}}}],\"cables\":[{\"from\":[\"a\",\"o\"],\"to\":[\"a\",\"i\"]}]}"; JsonDoc d; CHECK("parse", d.parse(t));
     CHECK("same handle: Same", chains_diff(d.root(), d.root()).kind == ChainsDiffKind::Same);
+    { std::string deep; for (int i = 0; i < 70; i++) deep += '['; deep += '1'; for (int i = 0; i < 70; i++) deep += ']';
+      std::string t2 = "{\"format\":\"chains.patch\",\"modules\":[{\"id\":\"a\",\"params\":{\"d\":" + deep + "}}]}"; JsonDoc x, y; CHECK("parse deep", x.parse(std::string_view(t2)) && y.parse(std::string_view(t2)));
+      CHECK("nested past the limit: Structural for two parses", chains_diff(x.root(), y.root()).kind == ChainsDiffKind::Structural);
+      CHECK("nested past the limit: Structural for the same handle too (no identity shortcut)", chains_diff(x.root(), x.root()).kind == ChainsDiffKind::Structural); }
     JsonDoc e; CHECK("parse2", e.parse(t));
     CHECK("twin documents: an object-valued param is deep-equal, no op (departure from the page)", chains_diff(d.root(), e.root()).kind == ChainsDiffKind::Same); }
   CHECK("missing, missing", chains_diff(Json(), Json()).kind == ChainsDiffKind::Same);
@@ -139,6 +154,37 @@ int main(int argc, char** argv) {
     std::string t = "{\"format\":\"chains.patch\",\"modules\":[{\"id\":" + deep + "}],\"cables\":[{\"from\":" + deep + ",\"to\":[\"a\",\"b\"]}]}";
     JsonDoc d; if (d.parse(std::string_view(t))) { ChainsDiff x = chains_diff(d.root(), d.root()); CHECK("deep nesting classified", x.kind == ChainsDiffKind::Same || x.kind == ChainsDiffKind::Structural); } }
 
+
+#ifdef ALLOC_AUDIT
+  // ---- bad_alloc sweep: the n-th allocation of chains_diff fails (operator new throws std::bad_alloc), for every n until the call succeeds; every failing call must give back everything it made ----
+  { try { throw std::bad_alloc(); } catch (const std::bad_alloc&) {}   // the first exception of a process makes the unwinder's caches (never freed): before the count
+    static const char* names[] = {"electro/param-one", "electro/param-two-modules-order", "electro/identical", "electro/connect", "electro/text-changed", "electro/prev-missing", "syn/dup-ids-order-by-first-position",
+      "syn/param-order-index-keys-first", "syn/cable-key-nested-array-parts", "syn/cable-key-float-formats", "syn/params-string-unicode", "deep/identical-object-and-array-params", "deep/duplicate-keys-in-next-last-wins-raw",
+      "syn/module-null-in-both-throws", "syn/cable-without-from-in-both-throws", "syn/raw-text-split-surrogate-at-200", "syn/many-modules-one-param", "syn/many-params-two-change", "syn/many-cables-one-fb"};
+    const long liveStart = g_live; size_t swept = 0, failedCalls = 0; bool leak = false;
+    for (const char* want : names) {
+      Json c; for (size_t ci = 0; ci < cases.size(); ci++) if (cases.at(ci).str("name") == want) c = cases.at(ci);
+      if (c.missing()) { std::printf("FAIL sweep case %s not in the golden\n", want); g_fail++; continue; }
+      JsonDoc pd, nd; Json prev, next;
+      if (c.get("prevText").isStr() || c.get("nextText").isStr()) { if (c.get("prevText").isStr()) { pd.parse(c.str("prevText")); prev = pd.root(); } if (c.get("nextText").isStr()) { nd.parse(c.str("nextText")); next = nd.root(); } }
+      else { prev = c.get("prev"); next = c.get("next"); }
+      swept++;
+      for (long n = 1; n < 2000000 && !leak; n++) {
+        const long live0 = g_live; bool threw = false; ChainsDiffKind k = ChainsDiffKind::Same;
+        g_failN = 0; g_failAt = n;
+        try { ChainsDiff d = chains_diff(prev, next); k = d.kind; } catch (const std::bad_alloc&) { threw = true; }
+        g_failAt = 0;
+        if (g_live != live0) { std::printf("FAIL %s: allocation %ld failing leaves %+ld block(s) behind\n", want, n, g_live - live0); g_fail++; leak = true; }
+        if (!threw) { CHECK("the sweep's last call gives the page's kind", std::string(kindName(k)) == std::string(c.str("expectKind"))); break; }
+        failedCalls++;
+      }
+    }
+    CHECK("the sweep ran over every case and failed some calls", swept == sizeof names / sizeof names[0] && failedCalls > 100);
+    std::printf("chains_diff: bad_alloc sweep: %zu pairs, %zu failing calls, live allocations left: %+ld\n", swept, failedCalls, g_live - liveStart);
+  }
+#else
+  std::printf("chains_diff: the bad_alloc sweep is skipped (needs glibc without a sanitizer)\n");
+#endif
   std::printf("chains_diff: %zu pairs (Same %zu, Params %zu, Structural %zu of which %zu throw in the page; %zu raw-text), %d failure(s)\n", cases.size(), nSame, nParams, nStruct, nThrow, nRaw, g_fail);
   return g_fail ? 1 : 0;
 }

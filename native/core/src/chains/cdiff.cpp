@@ -11,7 +11,7 @@
 //   - `for (const k in b) if (b[k] !== a[k])` with a = q.params || {}, b = m.params || {}: JS for-in order on an object is the array-index keys ascending (canonical "0".."4294967294"), then the
 //     rest in first-insertion order; a duplicate JSON key keeps its first position and its last value (JSON.parse). b may also be an array (keys "0".."n-1") or a string (a for-in over
 //     its UTF-16 units); a number / boolean has no keys. a[k] reads an object member, an array element or "length", or a string's unit or "length". `!==` is strict: numbers by value (-0 === 0),
-//     strings by content, objects and arrays by identity (the same Json handle), EXCEPT the deep-equal departure below. A name that only exists on Object.prototype (constructor, toString, __proto__ when a has no own member) is
+//     strings by content, objects and arrays: see the deep-equal departure below (no identity shortcut). A name that only exists on Object.prototype (constructor, toString, __proto__ when a has no own member) is
 //     a function there, never equal to a JSON value: absent. A differing value is a `param` op: Params when it is a finite number (Number.isFinite; 1e999 reads as Infinity) and the
 //     module's id is a string, else Structural. (An id that is a number would have to be a string in ChainsParamOp: a decision, see C2A-NOTES.md.)
 //   - DEPARTURE: a param that is an object / array in both documents and deep-equal is no op (deep_eq below); the page would compare by identity and send a harmless repeated op.
@@ -66,7 +66,7 @@ bool strict_eq(const JV& a, const JV& b) {
     case JV::Bool: return a.b == b.b;
     case JV::Num: return a.d == b.d;
     case JV::Str: return a.s == b.s;
-    default: return a.ref == b.ref;
+    default: return false;   // an object / array is never `===` here: the caller decides by deep_eq (also for the same handle, so the depth limit holds)
   }
 }
 
