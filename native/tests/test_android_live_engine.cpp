@@ -71,7 +71,9 @@ int main() {
   for (auto& n : ps.notes) std::printf("  %s\n", n.c_str());
   CHECK(ps.pads.size() >= 36, "ELECTRO has 40 voices, all of engines the core has: %zu rendered", ps.pads.size());
   CHECK(ps.skipped == expectSkipped, "the two lxsnare voices render with the optional drum module and are left empty without it (thunder_lxr_api() is null): %d skipped, expected %d", ps.skipped, expectSkipped);
-  CHECK(ps.dry == 2, "ELECTRO has two voices with a pad effect the core does not host (spring, crush): %d", ps.dry);
+  // ELECTRO's voice 10 (mach + spring) is DRY on the page too (engFx is false for a live engine): never a note or a reason. Voice 17 (layers + crush) is dry here until the pad-effects unit (#314) is in the core, then 0.
+  CHECK(ps.dry <= 1, "at most one pad (crush on a layers voice) lacks its pad effect: %d", ps.dry);
+  for (auto& n : ps.notes) CHECK(n.find("pad 10 ") == std::string::npos, "pad 10 (mach + spring) must not be reported: %s", n.c_str());
   { size_t loud = 0; for (auto& p : ps.pads) { float pk = 0; for (int64_t i = 0; i < p.frames; i++) pk = std::fmax(pk, std::fabs(p.block[i])); if (pk > 0.001f) loud++; } CHECK(loud >= 30, "pads with sound: %zu", loud); }
 
   // 2b. SongFit (songfit.h). ELECTRO: two voices have a pad effect the core does not host, so by the lead's ruling the SONG is not natively playable.
@@ -79,7 +81,8 @@ int main() {
     const uint32_t full = THUNDER_LIVE_CAP_EFFECTS | 0x200u;
     FitResult f = songFit(songT, kitT, full, 0, expectSkipped == 0);
     int pe = 0, other = 0; for (auto& r : f.reasons) { if (r.code == "pad-effect") pe++; else other++; }
-    CHECK(!f.ok && pe == 2 && other == 0, "ELECTRO fit: ok %d, %d pad-effect, %d other", (int)f.ok, pe, other);
+    CHECK(pe <= 1 && other == 0 && f.ok == (pe == 0), "ELECTRO fit: ok %d, %d pad-effect, %d other (one until #314: crush on pad 17; none after)", (int)f.ok, pe, other);
+    for (auto& r : f.reasons) CHECK(r.text.find("pad 10 ") == std::string::npos, "voice 10 (mach + spring) is dry on the page: no reason: %s", r.text.c_str());
     CHECK(f.warns.size() == 1 && f.warns[0].find("4 pads play its rendered twin") != std::string::npos, "ELECTRO warn: %zu entries, first '%s'", f.warns.size(), f.warns.empty() ? "" : f.warns[0].c_str());
     { const std::string fj = f.json(3); CHECK(fj.find("\"reasonTexts\":[\"pad ") != std::string::npos && fj.find("\"warn\":[\"4 pads") != std::string::npos, "fit json lists: %s", fj.c_str()); }
     FitResult g = songFit(songT, kitT, THUNDER_LIVE_CAP_EFFECTS, 0, expectSkipped == 0);   // no chains in the host: ELECTRO has chainOn

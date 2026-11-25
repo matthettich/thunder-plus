@@ -6,6 +6,7 @@
 #include "engine/engine.h"
 #include "engine/engine_json.h"
 #include "engine/xeng.h"
+#include "pad_filler.h"
 #include "rt/json.h"
 #include "thunder/live.h"
 #ifndef THUNDER_LIVE_CAP_CHAINS
@@ -69,7 +70,9 @@ FitResult songFit(std::string_view songJson, std::string_view kitJson, uint32_t 
         else if (xv->kind == XKind::None) { *ev = EngVoice(); renders = eng_voice_from_json(*ev, v, v.arr("layers"), v.arr("fx")) && eng_render_bound(*ev, o) > 0; }
         if (!renders) { add(r, "engine", std::string(tag) + " (" + std::string(eng.empty() ? "layers" : eng) + ") is an instrument the new engine cannot render"); continue; }
         if (eng == "bass" || eng == "vox" || eng == "acid" || eng == "mach") twins++;
-        const Json fx = v.arr("fx");
+        // a pad effect counts only where the page applies it (engFx: padFxApplies) and only when the core build does not host it (Kind::Other: today every type the library does not have; after the pad-effects unit, #314,
+        // its types are Kind::Lib and only a type nobody knows stays Other): the check needs no change when #314 lands.
+        const Json fx = padFxApplies(eng) ? v.arr("fx") : Json();
         for (size_t k = 0; k < fx.size(); k++) { EngFx f; eng_fx_from_json(f, fx.at(k)); if (f.kind == EngFx::Kind::Other && f.on) { dryPads++; if (dryPads <= 8) add(r, "pad-effect", std::string(tag) + " has a pad effect the new engine does not have"); else r.ok = false; break; } }
       }
       if (twins > 0) r.warns.push_back(std::to_string(twins) + (twins == 1 ? " pad plays" : " pads play") + " its rendered twin (the live engines are not in the new engine yet)");

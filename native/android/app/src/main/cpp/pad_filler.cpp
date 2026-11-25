@@ -93,6 +93,8 @@ bool kitEntryOf(thunder::Json kit, size_t slot, int* choke, bool* syn, double* r
   return true;
 }
 
+bool padFxApplies(std::string_view e) { return !(e == "bass" || e == "vox" || e == "acid" || e == "mach" || e == "wavesl"); }
+
 namespace {
 
 int dryFx(thunder::Json fx) {   // pad effects the core does not host (Kind::Other) that are switched on
@@ -143,7 +145,7 @@ bool renderPads(std::string_view kitJson, double bpm, double lpb, double sr, Pad
     std::memcpy(b, buf.data(), sizeof(float) * n);
     RenderedPad p; p.slot = (int)i; p.block = b; p.frames = (int64_t)n; p.choke = (int)v.num("choke"); p.syn = syn; p.rel = syn ? std::fmin(60.0, relOfVoice(v)) : 0;
     out->pads.push_back(p);
-    if (dryFx(v.arr("fx")) > 0) { out->dry++; out->notes.push_back(std::string(tag) + ": rendered without a pad effect the core does not have"); }
+    if (padFxApplies(v.str("engine")) && dryFx(v.arr("fx")) > 0) { out->dry++; out->notes.push_back(std::string(tag) + ": rendered without a pad effect the core does not have"); }
   }
   out->ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
   return true;

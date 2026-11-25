@@ -44,6 +44,10 @@ bool renderPads(std::string_view kitJson, double bpm, double lpb, double sr, Pad
 // false for a slot with no voice. `kit` is the kit object (voices array, optional held).
 bool kitEntryOf(thunder::Json kit, size_t slot, int* choke, bool* syn, double* rel);
 
+// The page's engFx rule (index.html:4967, applied in renderVoice index.html:4981-4983): pad effects run on Layers, Blip and every X engine that is not `live`; Bass, Voice, Acid, Machine (and the waves live
+// engine) play live in the song, so their pads are DRY on the page too. `engine` is the voice's `engine` string ("" = layers). The core's own twin is anyFxOn in xeng_voice.cpp.
+bool padFxApplies(std::string_view engine);
+
 // The page's relOf(V) (index.html:4930), in seconds, for the kit entry's `rel` (an approximation: the engine-specific `rel` of the pump synths is not read).
 // Declared here so the JVM-free test can check it.
 double relOfVoice(thunder::Json voice);
