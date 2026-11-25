@@ -123,9 +123,10 @@ class MainActivity : Activity() {
     private fun runUpdateCheck(verbose: Boolean) {
         UpdateCheck.check { v, text ->
             ui.post {
+                if (isFinishing || isDestroyed) return@post   // H4-7: no dialog or toast on a finished activity (BadTokenException)
                 if (v is ReleaseTags.Verdict.NewBuild) {
                     android.app.AlertDialog.Builder(this).setTitle("New build").setMessage(text + "\nSongs and settings stay when you install it over this one.")
-                        .setPositiveButton("Open download page") { _, _ -> try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(v.release.pageUrl))) } catch (e: Exception) { Toast.makeText(this, "No browser found", Toast.LENGTH_LONG).show() } }
+                        .setPositiveButton("Open download page") { _, _ -> try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(ReleaseTags.safePage(v.release.pageUrl)))) } catch (e: Exception) { Toast.makeText(this, "No browser found", Toast.LENGTH_LONG).show() } }
                         .setNegativeButton("Later", null).show()
                 } else if (verbose) Toast.makeText(this, text, Toast.LENGTH_LONG).show()
             }

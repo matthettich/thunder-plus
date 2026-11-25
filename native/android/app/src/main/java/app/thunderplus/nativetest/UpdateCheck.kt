@@ -19,7 +19,13 @@ import java.net.URL
  */
 object ReleaseTags {
     const val REPO = "matthettich/thunder-plus"
-    const val API_URL = "https://api.github.com/repos/$REPO/releases?per_page=50"
+    /** H4-8: 100 per page, newest first across the WHOLE repository (desktop, N0 and both Android channels): [check] reads up to [MAX_PAGES] pages until one holds a release of this channel. */
+    fun apiUrl(page: Int) = "https://api.github.com/repos/$REPO/releases?per_page=100&page=$page"
+    const val MAX_PAGES = 5
+    const val RELEASES_PAGE = "https://github.com/$REPO/releases"
+
+    /** H4-9: the release page to open; anything that is not a page of this repository's releases becomes the repository's releases list. */
+    fun safePage(url: String): String = if (url.startsWith("$RELEASES_PAGE/") || url == RELEASES_PAGE) url else RELEASES_PAGE
     private val TAG = Regex("^native-android-(stable|beta|test)-([0-9]{1,9})$")
 
     data class Tag(val channel: String, val number: Int)
@@ -59,7 +65,7 @@ object ReleaseTags {
 
     fun describe(v: Verdict, channel: String, currentNumber: Int): String = when (v) {
         is Verdict.UpToDate -> "This is the newest $channel build (#$currentNumber)."
-        is Verdict.NoneFound -> "No $channel build is published yet."
+        is Verdict.NoneFound -> "No $channel build found in the newest ${MAX_PAGES * 100} releases (none published yet, or it is older than that)."
         is Verdict.NewBuild -> "New $channel build #${v.release.tag.number} (this one is #$currentNumber)."
     }
 }
@@ -72,17 +78,23 @@ object UpdateCheck {
     fun checkOnStart(ctx: Context): Boolean = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ON_START, false)
     fun setCheckOnStart(ctx: Context, on: Boolean) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ON_START, on).apply() }
 
-    /** One GET on a worker thread; [done] is called on that thread with the verdict, or with the error text. */
+    /** Up to [ReleaseTags.MAX_PAGES] GETs on a worker thread (stops at the first page that has a build of this channel); [done] is called on that thread with the verdict, or with the error text. */
     fun check(done: (ReleaseTags.Verdict?, String) -> Unit) {
         Thread({
             try {
-                val c = URL(ReleaseTags.API_URL).openConnection() as HttpURLConnection
-                c.connectTimeout = 8000; c.readTimeout = 8000
-                c.setRequestProperty("Accept", "application/vnd.github+json"); c.setRequestProperty("User-Agent", "thunder-plus-android")
-                val code = c.responseCode
-                if (code != 200) { done(null, "GitHub answered $code"); return@Thread }
-                val body = c.inputStream.use { String(it.readBytes(), Charsets.UTF_8) }
-                val v = ReleaseTags.verdict(body, BuildConfig.CHANNEL, BuildConfig.BUILD_NUMBER)
+                var v: ReleaseTags.Verdict = ReleaseTags.Verdict.NoneFound
+                for (page in 1..ReleaseTags.MAX_PAGES) {
+                    val c = URL(ReleaseTags.apiUrl(page)).openConnection() as HttpURLConnection
+                    try {
+                        c.connectTimeout = 8000; c.readTimeout = 8000
+                        c.setRequestProperty("Accept", "application/vnd.github+json"); c.setRequestProperty("User-Agent", "thunder-plus-android")
+                        val code = c.responseCode
+                        if (code != 200) { done(null, "GitHub answered $code"); return@Thread }
+                        val body = c.inputStream.use { String(it.readBytes(), Charsets.UTF_8) }
+                        v = ReleaseTags.verdict(body, BuildConfig.CHANNEL, BuildConfig.BUILD_NUMBER)
+                        if (v !is ReleaseTags.Verdict.NoneFound || body.trim() == "[]") break   // found, or the list ended
+                    } finally { c.disconnect() }
+                }
                 done(v, ReleaseTags.describe(v, BuildConfig.CHANNEL, BuildConfig.BUILD_NUMBER))
             } catch (e: Exception) { done(null, "Could not check: ${e.javaClass.simpleName}") }
         }, "thunder-update-check").start()

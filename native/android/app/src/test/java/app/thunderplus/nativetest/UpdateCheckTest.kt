@@ -48,4 +48,17 @@ class UpdateCheckTest {
         val v = ReleaseTags.verdict(list(rel("native-android-test-8", apk = false)), "test", 3) as Verdict.NewBuild
         assertNull(v.release.apkUrl); assertTrue(v.release.pageUrl.isNotEmpty())
     }
+
+    @Test fun paging() {
+        assertTrue(ReleaseTags.apiUrl(2).contains("per_page=100&page=2"))
+        assertEquals("No beta build found in the newest 500 releases (none published yet, or it is older than that).", ReleaseTags.describe(Verdict.NoneFound, "beta", 1))
+    }
+
+    @Test fun releasePageIsChecked() {
+        val ok = "https://github.com/matthettich/thunder-plus/releases/tag/native-android-beta-5"
+        assertEquals(ok, ReleaseTags.safePage(ok))
+        assertEquals(ReleaseTags.RELEASES_PAGE, ReleaseTags.safePage("https://evil.example/releases/tag/x"))
+        assertEquals(ReleaseTags.RELEASES_PAGE, ReleaseTags.safePage("https://github.com/matthettich/thunder-plus/releases.evil"))
+        assertEquals(ReleaseTags.RELEASES_PAGE, ReleaseTags.safePage(""))
+    }
 }
