@@ -34,7 +34,7 @@ namespace {
 // stats.* of the audio side, in pub_[]: the audio thread stores each once a quantum (relaxed), any thread loads (relaxed)
 enum Pub { P_FRAMES, P_ORIGIN, P_QUANTA, P_CALLS, P_STEPS, P_EVENTS, P_SEQDROP, P_SKIPS, P_CMDS, P_DUMPDROP, P_VOICES, P_PEAKV, P_NOTES, P_NPLAYED, P_NLATE, P_NNOPAD, P_NLIVE, P_NSF, P_NVARMISS,
   P_NSTRETCH, P_EVIGN, P_CMDLATE, P_EVTDROP, P_EVTCRIT, P_REANCH, P_PREP, P_LIVEFAIL, P_LIVELATE, P_SONGADOPT, P_CLEARED, P_NOSEQ, P_LATENCY, P_FXREMAKE, P_FXFAIL, P_MIDIFAIL, P_MIDIHANG,
-  P_CHBLOCKS, P_CHFAILED, P_CHEVENTS, P_CHDROPPED, P_CHBAD, P_CHNONODE, P_CHMISMATCH, P_CHNODES, P_COUNT };   // C2: the chains host's audio-side counters
+  P_CHBLOCKS, P_CHFAILED, P_CHEVENTS, P_CHDROPPED, P_CHBAD, P_CHNONODE, P_CHMISMATCH, P_CHNODES, P_CHSTALE, P_COUNT };   // C2: the chains host's audio-side counters
 constexpr double kEndStopSec = 0.3;          // the web's frame() rule: the MIDI stop 0.3 s after the song's end (live.h, THE STATE MACHINE)
 constexpr int64_t kMaxHostFrame = (int64_t)1 << 62;   // frame0, t0 and `at` above this are E_ARG: engine + offset arithmetic cannot overflow
 constexpr double kPlayDelaySec = 0.08;       // t0 < 0: the next quantum's start + 0.08 s (live.h, thunder_live_play_opts::t0)
@@ -430,7 +430,7 @@ int LiveHost::play(const thunder_live_play_opts& o) {
     try {   // PDC: from the plans just made (FxPlan::entry), not from the audio thread's chains
       PdcSlot all[kSongNT * kFxSlots]; int n = 0;
       for (int t = 0; t < kSongNT; t++) for (int i = 0; i < ctlPdcN_[t]; i++) all[n++] = ctlPdc_[t][i];
-      plan->pdc = pdc_plan(bm->plan, all, n, sr_, plan->pdcMode);
+      plan->pdc = pdc_plan(chains_ && !cw.move ? chainsBus_ : bm->plan, all, n, sr_, plan->pdcMode);   // V-PDC: the bus plan the mixer WILL have: with a chains host it is the last commit's; a refused / over-budget plan (nothing moves) leaves it, so the PDC plan is made from that one
     } catch (...) { unwindFx(); chainsAbandon(cw); sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }   // (the plans are made: they go as commits, as above)
   }
   // C2 L2: the chains plan rides in the PlayPlan, attached only now (right before the Play command is pushed): the PlayPlan owns it from here (its destructor settles and deletes it on every path). The edit ring's room was checked with the decision; the Play command's slot at the top.
@@ -573,14 +573,34 @@ int LiveHost::chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w) 
     const Song& s = *S;
     w.song = S; w.bus = bus_plan(s.chainPatch, s.chainOn); w.feed = chains_feed(s.chainPatch, s.chainOn);
     bool onSame = true; if (chainsPlanned_) for (int t = 0; t < kSongNT; t++) if ((chainsSong_ ? chainsSong_->chainOn[t] : false) != s.chainOn[t]) { onSame = false; break; }   // (no node was ever planned: the CHN flags matter only through chains_feed / the bus plan, compared below; so a song with no chains never makes a plan, L4b)
-    const bool busSame = onSame && w.feed == chainsFeed_ && bus_plan_equal(w.bus, chainsBus_);
+    // V4: a song whose bpm / lpb / ticks differ from the one the nodes were planned for is NOT "same" while nodes exist: a (keep-patch) plan carries the transport (newSong_), as the page's chainsTempo does on a tempo / TICKS / LPB edit
+    const bool trSame = !chainsPlanned_ || (chainsSong_ && chainsSong_->bpm == s.bpm && chainsSong_->lpb == s.lpb && chainsSong_->ticks == s.ticks);
+    const bool busSame = onSame && trSame && w.feed == chainsFeed_ && bus_plan_equal(w.bus, chainsBus_);
     ChainsDiff d = chains_diff(chainsSong_ ? chainsSong_->chainPatch : Json(), s.chainPatch);
+    if (d.kind != ChainsDiffKind::Structural && chEditAll_) d.kind = ChainsDiffKind::Structural;   // V2: more than 256 distinct edited params since the last move: a full plan carries every value
     std::vector<LiveChainParam> recs;
-    if (d.kind == ChainsDiffKind::Params) {
-      if (d.params.size() > kLiveChainRing) d.kind = ChainsDiffKind::Structural;
-      else for (const ChainsParamOp& op : d.params) {
-        if (op.id.size() >= sizeof(LiveChainParam::id) || op.name.size() >= sizeof(LiveChainParam::name) || !std::isfinite(op.v)) { d.kind = ChainsDiffKind::Structural; break; }
-        LiveChainParam r; std::memset(&r, 0, sizeof r); std::memcpy(r.id, op.id.data(), op.id.size()); std::memcpy(r.name, op.name.data(), op.name.size()); r.v = op.v; recs.push_back(r);
+    if (d.kind != ChainsDiffKind::Structural) {
+      // V2: every (id, name) chain_edit sent since chainsSong_ last moved is put back to the NEW song's value unless the diff already holds it (the shell may publish a song that does not carry the edit: the audio side must end up with the song's values)
+      if (!chEdited_.empty()) {
+        const Json mods = s.chainPatch.arr("modules");
+        for (const auto& pr : chEdited_) {
+          bool have = false; for (const ChainsParamOp& op : d.params) if (op.id == pr.first && op.name == pr.second) { have = true; break; }
+          if (have) continue;
+          for (size_t k = 0; k < mods.size(); k++) {
+            const Json m = mods.at(k); if (!m.isObj() || m.str("id") != pr.first) continue;
+            const Json v = m.get("params").get(pr.second);
+            if (v.isNum() && std::isfinite(v.asNum())) { ChainsParamOp op; op.id = pr.first; op.name = pr.second; op.v = v.asNum(); d.params.push_back(std::move(op)); }
+            break;
+          }
+        }
+        if (!d.params.empty()) d.kind = ChainsDiffKind::Params;
+      }
+      if (d.kind == ChainsDiffKind::Params) {
+        if (d.params.size() > kLiveChainRing) d.kind = ChainsDiffKind::Structural;
+        else for (const ChainsParamOp& op : d.params) {
+          if (op.id.size() >= sizeof(LiveChainParam::id) || op.name.size() >= sizeof(LiveChainParam::name) || !std::isfinite(op.v)) { d.kind = ChainsDiffKind::Structural; break; }
+          LiveChainParam r; std::memset(&r, 0, sizeof r); std::memcpy(r.id, op.id.data(), op.id.size()); std::memcpy(r.name, op.name.data(), op.name.size()); r.v = op.v; recs.push_back(r);
+        }
       }
     }
     if (d.kind == ChainsDiffKind::Structural) recs.clear();
@@ -597,7 +617,7 @@ int LiveHost::chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w) 
       return THUNDER_LIVE_E_MEMORY;
     }
     if (p->noop()) { delete p; return THUNDER_LIVE_OK; }   // refused whole (counted by the host): the call succeeds, nothing moves; a noop plan needs no settle
-    w.plan = p; w.hasPlan = true; w.nodeMask = p->nodeMask(); w.params = std::move(recs); w.move = true;
+    w.plan = p; w.hasPlan = true; w.full = p->full(); w.nodeMask = p->nodeMask(); w.params = std::move(recs); w.move = true;
     return THUNDER_LIVE_OK;
   } catch (...) { chainsAbandon(w); return THUNDER_LIVE_E_MEMORY; }
 }
@@ -608,9 +628,9 @@ void LiveHost::chainsAbandon(ChainsWork& w) {
 // Cannot fail: the command ring's slot and the edit ring's room were checked, and this thread is the only producer of both.
 void LiveHost::chainsFinish(ChainsWork& w, bool asCommand) {
   if (w.plan && asCommand) { LiveCmd c; c.type = LiveCmdType::ChainsCommit; c.at = THUNDER_LIVE_NOW; c.p = w.plan; const bool ok = cmds_.push(c); assert(ok); (void)ok; w.plan = nullptr; }
-  if (w.hasPlan) { chPlans_.fetch_add(1, std::memory_order_relaxed); if (w.nodeMask) chainsPlanned_ = true; }
-  for (const LiveChainParam& r : w.params) { const bool ok = chainParams_.push(r); assert(ok); (void)ok; }
-  if (w.move) { chainsSong_ = w.song; chainsBus_ = w.bus; chainsFeed_ = w.feed; }
+  if (w.hasPlan) { chPlans_.fetch_add(1, std::memory_order_relaxed); if (w.nodeMask) chainsPlanned_ = true; if (w.full) chFullSeq_++; }   // V3a: counted BEFORE the records below are stamped
+  for (LiveChainParam r : w.params) { r.gen = chFullSeq_; const bool ok = chainParams_.push(r); assert(ok); (void)ok; }
+  if (w.move) { chainsSong_ = w.song; chainsBus_ = w.bus; chainsFeed_ = w.feed; chEdited_.clear(); chEditAll_ = false; }   // V2: the edits are now part of what the song says (resent by the decision that moved)
   w.params.clear(); refreshCtl();
 }
 
@@ -642,7 +662,17 @@ int LiveHost::chainEdit(const uint8_t* ops, size_t n, int64_t at) {
   } catch (...) { return THUNDER_LIVE_E_MEMORY; }
   if (recs.size() > kLiveChainRing) return THUNDER_LIVE_E_LIMIT;   // more than the ring can ever hold
   if (recs.size() > chainParams_.space()) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }
-  for (const LiveChainParam& r : recs) { const bool ok = chainParams_.push(r); assert(ok); (void)ok; }
+  try {   // V2: remembered (the room for the vector is made BEFORE anything is pushed: a failure here changes nothing)
+    std::vector<std::pair<std::string, std::string>> add;
+    for (const LiveChainParam& r : recs) {
+      bool have = false; for (const auto& pr : chEdited_) if (pr.first == r.id && pr.second == r.name) { have = true; break; }
+      for (const auto& pr : add) if (pr.first == r.id && pr.second == r.name) { have = true; break; }
+      if (!have) add.emplace_back(std::string(r.id), std::string(r.name));
+    }
+    if (!chEditAll_ && chEdited_.size() + add.size() > 256) chEditAll_ = true;
+    else if (!chEditAll_) { chEdited_.reserve(chEdited_.size() + add.size()); for (auto& pr : add) chEdited_.push_back(std::move(pr)); }
+  } catch (...) { return THUNDER_LIVE_E_MEMORY; }
+  for (LiveChainParam r : recs) { r.gen = chFullSeq_; const bool ok = chainParams_.push(r); assert(ok); (void)ok; }
   return THUNDER_LIVE_OK;
 }
 int LiveHost::midiLead(double seconds) {
@@ -737,7 +767,7 @@ bool LiveHost::statsGet(thunder_live_stats* out) const {
   s.session_full = sessionFullFlag_.load(std::memory_order_relaxed);
   s.live_failed = (uint32_t)P(P_LIVEFAIL); s.live_late = (uint32_t)P(P_LIVELATE); s.thread_prepares = (uint32_t)P(P_PREP); s.evt_crit_dropped = (uint32_t)P(P_EVTCRIT); s.cmds_cleared = (uint32_t)P(P_CLEARED); s.cmds_no_seq = (uint32_t)P(P_NOSEQ);
   s.chains_blocks = P(P_CHBLOCKS); s.chains_failed_blocks = P(P_CHFAILED); s.chains_events = P(P_CHEVENTS); s.chains_events_dropped = P(P_CHDROPPED); s.chains_events_bad = P(P_CHBAD); s.chains_chc_no_node = P(P_CHNONODE); s.chains_feed_mismatch = P(P_CHMISMATCH);
-  s.chains_nodes = (uint32_t)P(P_CHNODES); s.chains_plans = chPlans_.load(std::memory_order_relaxed); s.chains_refused = chRefused_.load(std::memory_order_relaxed); s.chains_over_budget = chOver_.load(std::memory_order_relaxed); s.chains_busy = chBusy_.load(std::memory_order_relaxed);
+  s.chains_nodes = (uint32_t)P(P_CHNODES); s.chains_plans = chPlans_.load(std::memory_order_relaxed); s.chains_refused = chRefused_.load(std::memory_order_relaxed); s.chains_over_budget = chOver_.load(std::memory_order_relaxed); s.chains_busy = chBusy_.load(std::memory_order_relaxed); s.chains_params_stale = (uint32_t)P(P_CHSTALE);
   const uint32_t n = std::min<uint32_t>(out->size, (uint32_t)sizeof s);
   const uint32_t keep = out->size; std::memcpy(out, &s, n); out->size = keep;
   return true;
@@ -890,7 +920,7 @@ void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
       break; }
     case LiveCmdType::ChainsCommit: {   // R7: commit at the top of the quantum; the plan comes back through chBack_ (ONE plan is in flight: room is guaranteed)
       ChainsPlan* cp = static_cast<ChainsPlan*>(c.p);
-      if (chains_) chains_->commit(cp, *mix_);
+      commitChains(cp);
       const bool ok = chBack_.push(cp); assert(ok); (void)ok;
       break; }
     case LiveCmdType::Meters:
@@ -916,10 +946,10 @@ bool LiveHost::tryStartPlay(PlayPlan* p, int64_t qStart) {
   const double t0 = p->t0 >= 0 ? (double)(p->t0 - off_) / sr_ : (double)(qStart + (int64_t)std::llround(kPlayDelaySec * sr_)) / sr_;
   runner_.seq()->setTime(t0);
   if (busSlot_.adopt() && !chains_) mix_->setPlan(busSlot_.get()->plan);   // WITH a chains host the bus plan is set by ChainsHost::commit alone (R7: a plan newer than the nodes' bus maps would hand a node the wrong feeds); the message is adopted so that it is freed
-  if (chains_) chains_->commit(p->chains, *mix_);                          // R7: the play's chains plan (null: none needed), BEFORE mix_->load (load's audible mask reads the plan)
+  commitChains(p->chains);                                                 // R7: the play's chains plan (null: none needed), BEFORE mix_->load (load's audible mask reads the plan)
   mix_->load(*sn->song); mix_->songLanesReset(); mix_->clockStop((double)qStart / sr_);
   players_->live().tempo((double)qStart / sr_, runner_.seq()->bpm());   // the tempo consumers are seeded: SEV_TEMPO is emitted only on a change (seq.cpp:995)
-  if (chains_) chains_->play(runner_.seq()->bpm());                     // the page's chainsTempo at the end of tStart: {tempo, playing true}; the queue of the Seq that is gone is cleared
+  if (chains_) chains_->play(runner_.seq()->bpm(), p->song->lpb ? p->song->lpb : 4, p->song->ticks ? p->song->ticks : 6);                     // the page's chainsTempo at the end of tStart: {tempo, playing true}; the queue of the Seq that is gone is cleared
   const bool fromIdle = stateA_ == THUNDER_LIVE_STATE_IDLE;
   playQ_ = qStart;
   midiOp(true, p->spp);                                 // the MIDI Start: done right after midi_begin of this quantum, before the first step (D-1)
@@ -955,7 +985,7 @@ void LiveHost::commitPlayFx(PlayPlan* p, int64_t qStart) {
   if (p->fx[kSongNT]) commitFxLive(kSongNT, p->fx[kSongNT], qStart);   // the master first, then the tracks 0..31 (FxBank::load)
   for (int t = 0; t < kSongNT; t++) if (p->fx[t]) commitFxLive(t, p->fx[t], qStart);
 }
-void LiveHost::dropPlay(PlayPlan* p, int64_t qStart) { commitWaitingFx(qStart); commitPlayFx(p, qStart); if (chains_) chains_->commit(p->chains, *mix_); giveBack(p); }   // C2 R7: every plan handed to the audio side is committed (the control side's chainsSong_ is what the audio side ends with)
+void LiveHost::dropPlay(PlayPlan* p, int64_t qStart) { commitWaitingFx(qStart); commitPlayFx(p, qStart); commitChains(p->chains); giveBack(p); }   // C2 R7: every plan handed to the audio side is committed (the control side's chainsSong_ is what the audio side ends with)
 // Commits, in list order, the FxCommits that wait in pend_ (all tracks, or only `track`) and returns their plans through fxBack_. COMMITTED IN PLANNING ORDER: FxHost::plan (control) reuses the objects of the previous plan of the track,
 // so a later plan must never be committed before an earlier one. Entries are marked done (p = nullptr, type kept) and NOT removed: applyCommands iterates pend_ by index while calling applyOne (which may land here), and a
 // compaction here would corrupt its `w` / `i` loop; that loop and clearWaiting skip an FxCommit with a null p, and the loop drops it at its next compaction.
@@ -975,9 +1005,14 @@ void LiveHost::applyPdc(int64_t qStart, bool glide) {
 }
 // At most `n` records: the ones that were in the ring BEFORE this quantum's command loop began (C2 L1). The producer pushes a ChainsCommit (or a Play with a plan) BEFORE the records that follow it, so every record seen by the snapshot
 // has its commit already visible to the command loop that runs after the snapshot; a record pushed later (with a commit the loop did not see) waits for the next quantum, where it meets the new patch.
+void LiveHost::commitChains(ChainsPlan* p) { if (!chains_) return; if (p && !p->noop() && p->full()) chFullApplied_++; chains_->commit(p, *mix_); }
 void LiveHost::applyChainParams(uint32_t n) {
   LiveChainParam r;
-  while (n-- && chainParams_.pop(r)) if (chains_) chains_->param(r.id, r.name, r.v);   // (NUL-terminated by the control side; every node gets it: ChainsHost::param)
+  while (n-- && chainParams_.pop(r)) {
+    if (r.gen < chFullApplied_) { chStale_++; continue; }   // V3a: pushed before a whole-patch plan that has been committed since: the swap carries every value of the song, an older record would override the newer patch
+    assert(r.gen == chFullApplied_ || stalledPlay_);        // (a record of a plan not yet committed cannot be here outside a stalled play: L1's snapshot; in a release build it is applied)
+    if (chains_) chains_->param(r.id, r.name, r.v);
+  }   // (NUL-terminated by the control side; every node gets it: ChainsHost::param)
 }
 void LiveHost::applyFxParams(int64_t qStart) {
   LiveFxParam fp;
@@ -1223,7 +1258,7 @@ void LiveHost::publish() {
   S(P_LATENCY, (uint64_t)(int64_t)latencyFrames());
   S(P_MIDIFAIL, midiBeginFailed_); S(P_MIDIHANG, midi_ ? midi_sched(midi_).stats().mayHang : 0);
   if (fxBank_) { uint64_t rm = 0, fb = 0; for (int t = 0; t <= kSongNT; t++) { rm += fxBank_->host(t).audioRemakes(); fb += fxBank_->host(t).failedBlock(); } S(P_FXREMAKE, rm); S(P_FXFAIL, fb); }
-  if (chains_) { const ChainsHostStats cs = chains_->audioStats(); S(P_CHBLOCKS, cs.blocks); S(P_CHFAILED, cs.failedBlocks); S(P_CHEVENTS, cs.eventsApplied); S(P_CHDROPPED, cs.droppedEvents); S(P_CHBAD, cs.badEvents); S(P_CHNONODE, cs.chcNoNode); S(P_CHMISMATCH, cs.feedMismatch); S(P_CHNODES, (uint64_t)chains_->audioNodes()); }   // (the audio side's own fields: stats() is never called here)
+  if (chains_) { const ChainsHostStats cs = chains_->audioStats(); S(P_CHSTALE, chStale_); S(P_CHBLOCKS, cs.blocks); S(P_CHFAILED, cs.failedBlocks); S(P_CHEVENTS, cs.eventsApplied); S(P_CHDROPPED, cs.droppedEvents); S(P_CHBAD, cs.badEvents); S(P_CHNONODE, cs.chcNoNode); S(P_CHMISMATCH, cs.feedMismatch); S(P_CHNODES, (uint64_t)chains_->audioNodes()); }   // (the audio side's own fields: stats() is never called here)
   const LiveStats ls = players_->live().stats(); S(P_LIVEFAIL, players_->live().failedNodes()); S(P_LIVELATE, ls.late);
 }
 

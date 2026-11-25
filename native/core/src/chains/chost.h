@@ -89,6 +89,7 @@ class ChainsPlan {
   size_t bytes() const { return bytes_; }                // what the nodes of the plan need in all (during a swap: the second patch included)
   size_t patchBytes() const { return patchBytes_; }      // what one node's patch needs (cmem.inc)
   const BusPlan& bus() const { return bus_; }
+  bool full() const { return full_; }                    // a WHOLE-PATCH plan (not keep-patch): the nodes' patches are swapped / replaced (the audio side counts them: records older than the latest one are stale)
   int retiredPatches() const { return nOldPatch_; }      // after commit(): the patches it swapped out (the control thread frees them with the plan)
   int retiredNodes() const { return nOldNode_; }         // after commit(): the nodes it replaced or removed
   int nodes() const { int n = 0; for (uint32_t m = nodeMask_; m; m &= m - 1) n++; return n; }
@@ -97,7 +98,7 @@ class ChainsPlan {
   friend class ChainsHost;
   struct Trk { int track = 0; chains::ChainsNode* node = nullptr; /* the node after this plan (not owned) */ chains::ChainsNode* fresh = nullptr; /* owned until commit */ waves::PatchImpl* patch = nullptr; bool remove = false; int nBus = 0; uint8_t busMap[kMixFeedMax] = {}; };
   Trk trk_[kSongNT]; int nTrk_ = 0;
-  BusPlan bus_; uint32_t nodeMask_ = 0; int refused_ = 0; bool overBudget_ = false, noop_ = false, committed_ = false, settled_ = false, newSong_ = false; size_t bytes_ = 0, patchBytes_ = 0; ChainsSongTransport song_;
+  BusPlan bus_; uint32_t nodeMask_ = 0; int refused_ = 0; bool overBudget_ = false, noop_ = false, committed_ = false, settled_ = false, newSong_ = false, full_ = true; size_t bytes_ = 0, patchBytes_ = 0; ChainsSongTransport song_;
   chains::ChainsNode* oldNode_[kSongNT] = {}; int nOldNode_ = 0;       // filled by commit()
   waves::PatchImpl* oldPatch_[kSongNT] = {}; int nOldPatch_ = 0;
 };
@@ -130,7 +131,7 @@ class ChainsHost {
   // AUDIO THREAD (R10, R8; see LIVE). play: the song starts: the transport's tempo is `tempo`, the event queue is cleared, playing, applied to every node (startN + 1 as it starts playing; a host that was already playing goes
   // through not playing first, as the page's tStart does with tStop(true)). stop: the queue is cleared, not playing, applied to every node. param: the page's `param` op to every node (every node holds the whole patch).
   // None of them allocates, locks or frees (ChainsEngine::setParam / setTransport allocate nothing: chains.h).
-  void play(double tempo);
+  void play(double tempo, double lpb, double ticks);   // the page's chainsTempo at the end of tStart: the WHOLE song transport {tempo, lpb, ticks} (V4), playing true
   void stop();
   void param(std::string_view id, std::string_view name, double v);
 

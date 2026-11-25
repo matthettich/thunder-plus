@@ -77,7 +77,7 @@ struct LiveFxParam { int32_t track = 0, slot = 0; int64_t at = -1; double p[12] 
 
 // The chains host's parameter edits (C2 R8): one record per `param` op, in its own ring, drained at step 1 AFTER the commands (a param sent after a commit meets the new patch). id / name are NUL-terminated and fit
 // (the control side judges: an id or a name that does not fit is not representable). Every node gets every record (ChainsHost::param).
-struct LiveChainParam { char id[48]; char name[32]; double v; };
+struct LiveChainParam { char id[48]; char name[32]; double v; uint32_t gen; };   // gen: the control side's count of WHOLE-PATCH plans handed over when the record was pushed (V3a)
 constexpr uint32_t kLiveChainRing = THUNDER_LIVE_CHAIN_RING;   // 256
 
 // Everything a PLAY needs that is made on the control side. Heap object, created by play(), handed to the audio side in LiveCmd::p, returned through playBack_ and deleted by collect().
@@ -187,6 +187,7 @@ class LiveHost {
   void setTestCommandSeam(void (*f)(void*), void* user) { testCmdSeam_ = f; testCmdSeamUser_ = user; }   // TEST ONLY (single thread): `f` runs on the audio side between a quantum's command loop and its parameter drain (C2 L1: the window where the control side pushes a commit and then records)
   void setTestAudioSeam(void (*f)(void*), void* user) { testAudioSeam_ = f; testAudioSeamUser_ = user; }   // TEST ONLY (single thread): `f` runs on the audio side right after a started play was given back to the control side (R1: the window between giveBack and the state's store)
   void setTestTap(void (*f)(void*, Mixer&, int64_t), void* user) { testTap_ = f; testTapUser_ = user; }   // TEST ONLY (single thread): `f` runs in step 8 right after the voices were rendered into the mixer's inputs, with the ENGINE frame of the quantum (SongRenderer::setInputTap's place): the chains goldens' input signals
+  size_t chEditedForTest() const { return chEdited_.size(); }   // TEST ONLY (control thread): the (id, name) pairs chain_edit remembers
   ChainsHost* chainsHostForTest() { return chains_.get(); }   // TEST ONLY: the chains host (events are injected, nodes inspected, only while no audio thread runs)
   const Mixer& mixerForTest() const { return *mix_; }   // TEST ONLY: the mixer (its bus plan is the commit's alone with a chains host; read only while no audio thread runs)
   // stop(): queues LiveCmd::Stop; controlPlaying_ = false (a later songPublish no longer reaches the sequencer).
@@ -284,6 +285,7 @@ class LiveHost {
   int64_t latencyFrames() const;                              // the output's lateness behind the song: master chain + PDC trim + master pump effects (SongRenderer::latencyFrames)
   void postMeters();                                          // step 9: the bank's events as METERS records
   // ---- C2: the chains host (audio) ----
+  void commitChains(ChainsPlan* p);                                    // AUDIO: ChainsHost::commit + the whole-patch count (V3a)
   void applyChainParams(uint32_t n);                                    // step 1, after the commands (and after a stalled play has started): drain chainParams_ into ChainsHost::param
   // ---- P4: MIDI (audio) ----
   void midiOp(bool start, int spp);                           // step 1: queue a MIDI Start (play) or Stop (stop command) for step 4, in the order the commands were applied
@@ -296,7 +298,7 @@ class LiveHost {
   void noteFxPlanned(int track, const FxPlan* p);    // P3: the pump slots of the track's newest plan, for pdc_plan (control side)
   // C2 (control): what a play / a publish has to do for the chains, decided against chainsSong_ (R3) and made (R4..R6). chainsDecide() makes the plan (and the param records), changes NOTHING of the host's own state; chainsFinish()
   // moves chainsSong_ / chainsBus_ / chainsFeed_ forward and pushes the param records, only once the call can no longer fail; chainsAbandon() settles and deletes a plan that was not handed over.
-  struct ChainsWork { ChainsPlan* plan = nullptr; bool hasPlan = false; uint32_t nodeMask = 0; std::vector<LiveChainParam> params; bool move = false; uint32_t feed = 0; BusPlan bus; std::shared_ptr<const Song> song; };
+  struct ChainsWork { ChainsPlan* plan = nullptr; bool hasPlan = false; uint32_t nodeMask = 0; std::vector<LiveChainParam> params; bool move = false; uint32_t feed = 0; BusPlan bus; std::shared_ptr<const Song> song; bool full = false; };
   int chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w);   // 0, E_BUSY (a plan is in flight, or the edit ring has no room: counted), E_MEMORY; on an error `w` owns nothing
   void chainsAbandon(ChainsWork& w);
   void chainsFinish(ChainsWork& w, bool asCommand);   // asCommand: push the plan as a ChainsCommit (a publish); a play's plan rides in its PlayPlan
@@ -316,6 +318,9 @@ class LiveHost {
   bool controlPlaying_ = false;                      // control's view: a play was issued and no stop
   std::shared_ptr<const Song> chainsSong_;           // C2 CONTROL: the song whose chain patch and CHN flags the audio side has, or will have once what is in flight lands (moves forward only when a call returns OK)
   BusPlan chainsBus_; uint32_t chainsFeed_ = 0;      // C2 CONTROL: bus_plan(chainsSong_) and chains_feed(chainsSong_); a host that never planned: the default plan, 0
+  uint32_t chFullSeq_ = 0;                           // C2 CONTROL (V3a): whole-patch plans handed over so far; every record is stamped with it AFTER a plan of the same call counted
+  std::vector<std::pair<std::string, std::string>> chEdited_;   // C2 CONTROL (V2): the (module id, param name) pairs chain_edit sent since chainsSong_ last moved (at most 256; a 257th sets chEditAll_)
+  bool chEditAll_ = false;
   bool chainsPlanned_ = false;                       // C2 CONTROL: a plan that makes nodes was ever handed over (R3 (a))
   FxPlan* stagedFx_[kSongNT + 1] = {nullptr};        // fxPlan() staged, fxCommit() moved to the ring
   int fxOut_ = 0;                                    // P3: FxCommit commands issued and their plans not yet collected (fxBack_ holds 64)
@@ -354,6 +359,8 @@ class LiveHost {
   SnapSlot<LivePdcMsg> pdcSlot_;
   SnapSlot<LiveMasterMsg> masterSlot_;
   Spsc<LiveChainParam, kLiveChainRing> chainParams_; // control pushes, audio pops (applyChainParams)
+  uint32_t chFullApplied_ = 0;                       // C2 AUDIO (V3a): whole-patch plans committed so far (ChainsCommit, tryStartPlay, dropPlay); a record with gen below it is stale
+  uint64_t chStale_ = 0;                             // C2 AUDIO: stale records dropped
   PlayPlan* stalledPlay_ = nullptr;                  // AUDIO ONLY: a play whose snapshot could not be adopted yet (return ring full): retried at every quantum top
   PadsHost* padsHost_ = nullptr;                     // PadsHost::publish / collect: control; beginQuantum: audio (pads_snap.h): its own atomics (board_) and SnapSlot
   // ---- AUDIO -> CONTROL ----

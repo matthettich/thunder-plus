@@ -50,7 +50,7 @@ ChainsPlan* ChainsHost::planImpl(Json chainPatch, const bool* chainOn, uint32_t 
   // the first call of the module tables makes static data (cdef / cinfo / the registry): do it here, so the audio thread never meets a first call
   (void)chains::cinfo_count(); (void)chains::chainsTable(); (void)chains::cdef("trackIn"); (void)chains::cdef("chainOut"); (void)chains::cdef("smixer");
   std::unique_ptr<ChainsPlan> pl(new (std::nothrow) ChainsPlan); if (!pl) return nullptr;
-  ChainsPlan& P = *pl; P.song_ = song; P.newSong_ = haveLast_ && !(song == lastSong_);
+  ChainsPlan& P = *pl; P.song_ = song; P.full_ = !keepPatch; P.newSong_ = haveLast_ && !(song == lastSong_);
   P.bus_ = bus_plan(chainPatch, chainOn);
   const uint32_t feedMask = chains_feed(chainPatch, chainOn);
   const bool okPatch = chainPatch.isObj() && chainPatch.str("format") == "chains.patch";   // routeTrack: wantChn = chainsFeed(t) && patch format
@@ -123,9 +123,9 @@ void ChainsHost::commit(ChainsPlan* p, Mixer& mix) {
 }
 
 void ChainsHost::applyAll() { for (int t = 0; t < kSongNT; t++) if (node_[t]) applyTransport(*node_[t]); }
-void ChainsHost::play(double tempo) {
+void ChainsHost::play(double tempo, double lpb, double ticks) {
   if (playing_) { playing_ = false; applyAll(); }   // the page's tStart runs tStop(true) first (chainsTempo, playing false): the nodes see the transport stop and start again (startN + 1 once more)
-  tp_.tempo = tempo; nEv_ = 0; playing_ = true; applyAll();   // (the queue: look-ahead events of a Seq that is gone are not applied)
+  tp_.tempo = tempo; tp_.lpb = lpb; tp_.ticks = ticks; nEv_ = 0; playing_ = true; applyAll();   // (the queue: look-ahead events of a Seq that is gone are not applied)
 }
 void ChainsHost::stop() { nEv_ = 0; playing_ = false; applyAll(); }
 void ChainsHost::param(std::string_view id, std::string_view name, double v) { for (int t = 0; t < kSongNT; t++) if (node_[t]) node_[t]->engine().setParam(id, name, v); }

@@ -34,8 +34,8 @@ static std::string patchOf(double freq, int extra, bool hostile = false) {
   return "{\"format\":\"chains.patch\",\"version\":1,\"modules\":[" + m + "],\"cables\":[" + c + "]}";
 }
 // row0: the phrase's first row on track 1 (a note, optionally BYP / TPO commands); on0: the CHN flag of track 0
-static std::string songOf(const std::string& patch, bool on0 = true, int bpm = 120, const char* row0 = "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]") {
-  std::string s = "{\"v\":6,\"bpm\":" + std::to_string(bpm) + ",\"lpb\":4,\"ticks\":6,\"master\":255,\"mout\":255,\"ntr\":8,\"song\":[[-1,0";
+static std::string songOf(const std::string& patch, bool on0 = true, int bpm = 120, const char* row0 = "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]", int lpb = 4, int ticks = 6) {
+  std::string s = "{\"v\":6,\"bpm\":" + std::to_string(bpm) + ",\"lpb\":" + std::to_string(lpb) + ",\"ticks\":" + std::to_string(ticks) + ",\"master\":255,\"mout\":255,\"ntr\":8,\"song\":[[-1,0";
   for (int t = 2; t < kSongNT; t++) s += ",-1";
   s += "]],\"chains\":[[[0,0]]],\"plen\":[8],\"phrases\":[[" + std::string(row0);
   for (int i = 1; i < 8; i++) s += ",[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]";
@@ -192,6 +192,53 @@ static void testEdits() {
     A.run(Q * 4); B.run(Q * 4); CHECK(A.st().cmds_applied == B.st().cmds_applied, "(L2) the refused play put no command in the ring (%llu vs %llu applied)", (unsigned long long)A.st().cmds_applied, (unsigned long long)B.st().cmds_applied);
     CHECK(A.play() == 0 && B.play() == 0, "the retry works"); A.run(Q * 40); B.run(Q * 40);
     CHECK(ndiff(A.l, B.l) == 0 && ndiff(A.r, B.r) == 0 && A.st().fx_failed_blocks == 0, "(L2) the run with the refused play equals the run without: %zu differ", ndiff(A.l, B.l));
+  }
+
+  // V3a (verifier D1): a record still in the ring when a WHOLE-PATCH plan is committed is older than the new patch: it is dropped (counted), the output equals a host that only got the publish
+  {
+    Rig A(copts()), B(copts()); const std::string SXF = songOf(patchOf(523, 1));
+    A.H.song(S0); A.play(); A.run(kEdit); B.H.song(S0); B.play(); B.run(kEdit);
+    CHECK(edit(A, "[{\"op\":\"param\",\"id\":\"osc1\",\"name\":\"freq\",\"value\":200}]") == 0 && A.H.song(SXF, 2) == 0 && B.H.song(SXF, 2) == 0, "D1: chain_edit(200), then a structural publish (523), no quantum between");
+    A.run(Q * 40); B.run(Q * 40);
+    CHECK(ndiff(A.l, B.l) == 0 && ndiff(A.r, B.r) == 0, "(V3a) the stale record did not override the new patch: %zu samples differ", ndiff(A.l, B.l));
+    CHECK(A.st().chains_params_stale == 1 && B.st().chains_params_stale == 0, "(V3a) the stale record was counted (%u)", A.st().chains_params_stale);
+    // a record pushed AFTER the plan of the same publish (a param publish after a keep-patch) is NOT stale
+    CHECK(edit(A, kEditOsc) == 0, "an edit after the swap"); A.run(Q * 4); CHECK(A.st().chains_params_stale == 1, "(V3a) a record newer than the last whole-patch plan is applied");
+  }
+  // V2 (verifier D2): chain_edit, then a publish of the ORIGINAL values (the shell cancelled the gesture): the host puts the song's values back
+  {
+    Rig A(copts()), B(copts()); A.H.song(S0); A.play(); A.run(kEdit); B.H.song(S0); B.play(); B.run(kEdit);
+    CHECK(edit(A, "[{\"op\":\"param\",\"id\":\"osc1\",\"name\":\"freq\",\"value\":900}]") == 0 && A.H.song(S0, 2) == 0 && B.H.song(S0, 2) == 0, "D2: edit to 900, publish the original");
+    A.run(Q * 40); B.run(Q * 40);
+    CHECK(ndiff(A.l, B.l) == 0 && ndiff(A.r, B.r) == 0, "(V2) the audio follows the song: %zu samples differ from a host that never saw the edit", ndiff(A.l, B.l));
+    // no double effect: the edit and a publish that carries the edited value = the edit alone
+    Rig C(copts()), D(copts()); C.H.song(S0); C.play(); C.run(kEdit); D.H.song(S0); D.play(); D.run(kEdit);
+    CHECK(edit(C, kEditOsc) == 0 && C.H.song(SF, 2) == 0 && edit(D, kEditOsc) == 0, "edit 441 + a publish with 441 / edit alone"); C.run(Q * 40); D.run(Q * 40);
+    CHECK(ndiff(C.l, D.l) == 0 && C.st().chains_plans == 1, "(V2) the edited value carried by the publish: same samples, no plan (%zu differ)", ndiff(C.l, D.l));
+  }
+  {   // 256 distinct pairs are remembered (no plan on a Same publish of values the song holds); the 257th makes the next publish a FULL plan
+    Rig R(copts()); R.H.song(S0); R.play(); R.run(kEdit); int n = 0;
+    auto batch = [&](int count) { std::string j = "["; for (int i = 0; i < count; i++, n++) j += std::string(i ? "," : "") + "{\"op\":\"param\",\"id\":\"osc1\",\"name\":\"zz" + std::to_string(n) + "\",\"value\":1}"; j += "]"; const int rc = edit(R, j.c_str()); R.run(Q * 2); return rc; };
+    CHECK(batch(100) == 0 && batch(100) == 0 && batch(56) == 0 && n == 256, "256 distinct pairs sent");
+    CHECK(R.H.song(S0, 2) == 0 && R.st().chains_plans == 1, "(V2) 256 pairs: the publish (values not in the patch: skipped) makes no plan (plans %u)", R.st().chains_plans);
+    CHECK(batch(100) == 0 && batch(100) == 0 && batch(57) == 0 && n == 513, "257 more pairs");
+    R.run(Q * 4); CHECK(R.H.song(S0, 3) == 0 && R.st().chains_plans == 2, "(V2) more than 256 pairs: a FULL plan carries every value (plans %u)", R.st().chains_plans);
+  }
+  {   // a failed (E_BUSY) publish keeps the pairs
+    Rig R(copts()); R.H.song(S0); R.play(); R.run(kEdit);
+    CHECK(R.H.song(SX1, 2) == 0, "a structural publish (plan in flight)"); CHECK(edit(R, kEditOsc) == 0, "edit after it"); const size_t k0 = R.H->chEditedForTest();
+    CHECK(R.H.song(SX2, 3) == THUNDER_LIVE_E_BUSY, "the next structural publish: E_BUSY"); CHECK(R.H->chEditedForTest() == k0 && k0 == 1, "(V2) the pairs survive a failed call (%zu)", R.H->chEditedForTest());
+    R.run(Q * 4); CHECK(R.H.song(SX1, 4) == 0 && R.H->chEditedForTest() == 0, "the decision that moves clears them");
+  }
+  // V4 (verifier D3): the transport of a play is the song's whole {tempo, lpb, ticks}; a publish while playing that changes TICKS / LPB / tempo reaches the nodes (keep-patch plan carrying it)
+  {
+    Rig R(copts()); R.H.song(S0); R.play(); R.run(kEdit); R.H->stop(THUNDER_LIVE_NOW); R.run(Q * 4);
+    CHECK(R.H.song(songOf(patchOf(330, 0), true, 120, "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]", 3, 8), 2) == 0, "idle publish: ticks 8, lpb 3, same patch"); CHECK(R.play() == 0, "play"); R.run(Q * 8);
+    chains::ChainsNode* n = R.ch()->node(1); const waves::Transport t = n->engine().transport(); CHECK(t.ticks == 8 && t.lpb == 3, "(V4/D3) the play sends lpb / ticks (ticks %g lpb %g)", (double)t.ticks, (double)t.lpb);
+    const uint32_t p0 = R.st().chains_plans;
+    CHECK(R.H.song(songOf(patchOf(330, 0), true, 120, "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]", 4, 5), 3) == 0 && R.st().chains_plans == p0 + 1, "(V4) a publish while playing with ticks 5 / lpb 4: a plan carries the transport (plans %u)", R.st().chains_plans); R.run(Q * 8);
+    const waves::Transport t2 = n->engine().transport(); CHECK(R.ch()->node(1) == n && t2.ticks == 5 && t2.lpb == 4, "(V4) the node has them, and is the same node (keep-patch; ticks %g lpb %g)", (double)t2.ticks, (double)t2.lpb);
+    CHECK(R.H.song(songOf(patchOf(330, 0), true, 90, "[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]", 4, 5), 4) == 0 && R.st().chains_plans == p0 + 2, "(V4) a tempo edit alone: a plan"); R.run(Q * 8); CHECK(n->engine().transport().tempo == 90, "(V4) the node's tempo is 90");
   }
   // the mixer's bus plan is the commit's alone (R7): a refused plan with another bus plan must leave it
   {
