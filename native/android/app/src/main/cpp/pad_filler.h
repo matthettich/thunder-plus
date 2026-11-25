@@ -23,6 +23,7 @@ struct RenderedPad {
   float* block = nullptr;     // from thunder_live_alloc, `frames` mono floats; ownership moves to the host by thunder_live_pad_take, else PadSet frees it
   int64_t frames = 0;
   int choke = 0; bool syn = false; double rel = 0;   // the kit entry (coreKitV)
+  bool kitDone = false;       // thunder_live_pad_kit succeeded (set by the publishing lambda: an E_BUSY retry repeats the lambda, and a pad whose take worked but whose kit did not still needs its kit)
 };
 
 struct PadSet {
