@@ -126,3 +126,17 @@ loaded in the Android web view, and commands and events crossed through the core
 Exactness (decided in U05, recorded here because every later unit depends on it): the core is built without fused
 multiply-add and uses its own `exp` (fdlibm's, as V8), so values the sequencer and the automation compute are the same
 bits as the web copy's on every platform. `pow` and `sin` join `js_exp` in the first unit whose golden needs them exact.
+
+
+## 7. BRIDGE_V 1 additions for N2 (24 Nov 2026, the lead on Opus; DRAFT until the lead's top-model read, then frozen)
+
+All ADDITIVE (unknown types are ignored and logged once; reply fields are only added), so BRIDGE_V stays 1. Source: `docs/port/N2-PAGE-CLIENT.md` section 3 (gaps G1..G14), which has the page side and file:line for each.
+Adopted as proposed there:
+- **G1** `hello` reply adds `sr`, `outLat` (frames), `host` (`'android'`, `'web'`, `'android-n0'`), `maxPadBytes`, `maxSongBytes`.
+- **G2** `put` is the contract's form only (`put(id, {sr, ch, frames}, Float32Array[])`); the client carries a small adapter for the N0 shim (`host === 'android-n0'`).
+- **G3** new `pads.commit {n}` (shell: `thunder_live_pads_publish`); the existing `pads` event says the batch is audible.
+- **G4** `buf.use` with `kind:'var'` adds `ii`, `vk`; new `pad.chop {pad, loopSecs, slices:[frames...]}` (shell: `var_set`, `pad_chop`, `pad_hits`).
+- **G5a** new `fx.plan {tr, slots, bpm}` (shell: `fx_plan` then `fx_commit` at NOW); `fx.set {tr, slot, p:[12]}` as section 3. **G5b** new `master.config {mst, safety}`. **G5c** new `chain.edit {ops}` (shell: `thunder_live_chain_edit`; all or nothing; an `err` event on refusal).
+- **G8** new `pdc.set {mode: 0|1|2}`. **G9** `clock` adds `load` (callback time over period, measured by the shell). **G13** new `engine.reset {}` (shell: stop, panic, destroy, create; the page re-sends song, kit and pads on `{t:'engine', up:true}`).
+- **G14** `song.load` may be sent with `ask`; reply `{ok, rev, reasons:[...], warn:[...]}`; `ok:false` is the fallback verdict (the shell's `SongFit`). No reply within 5 s: treated as ok.
+Deferred (not in N2; the page shows nothing or falls back): **G6** FX / chains / master / TRIM meters, **G7** spectrum, **G10** `note.on` / `note.off` (hand-played sound stays on the page's own AudioContext in N2), **G11** `lxp` (a song using it falls back), **G12** `play` from a step (RESUME restarts the row).
