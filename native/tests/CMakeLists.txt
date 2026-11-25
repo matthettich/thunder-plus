@@ -118,7 +118,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 # N2 H1a: the Android shell's side of the live host (live_engine.cpp, pad_filler.cpp: no Android header), against the real thunder_live_* and the bundled ELECTRO (about 15 s).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  add_executable(test_android_live_engine test_android_live_engine.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/live_engine.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/pad_filler.cpp)
+  add_executable(test_android_live_engine test_android_live_engine.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/live_engine.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/live_events.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/pad_filler.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/songfit.cpp)
   target_link_libraries(test_android_live_engine PRIVATE thunder_core Threads::Threads)
   target_include_directories(test_android_live_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp)
   target_compile_definitions(test_android_live_engine PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")

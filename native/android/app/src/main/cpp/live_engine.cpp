@@ -141,6 +141,7 @@ void LiveEngine::pollLoop() {
         if (st_.lastSeq && h.seq != st_.lastSeq + 1) st_.gaps++;
         st_.lastSeq = h.seq;
         const unsigned char* p = buf + off;
+        { std::string js; if (eventToJson(p, h.bytes, &js)) events_.push(std::move(js), eventIsCritical(h.type)); }
         switch (h.type) {
           case THUNDER_LIVE_EV_CLOCK: { thunder_live_ev_clock c; std::memcpy(&c, p, sizeof c); st_.clockF = c.h.f; st_.voices = c.voices; st_.under = c.under; st_.outLat = c.out_lat; break; }
           case THUNDER_LIVE_EV_POS: { thunder_live_ev_pos q; std::memcpy(&q, p, sizeof q); st_.row = q.row; st_.step = q.step; st_.bpm = q.bpm10 / 10.0; break; }

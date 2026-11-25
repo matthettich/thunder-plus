@@ -15,7 +15,9 @@
 #include <vector>
 
 #include "live_engine.h"
+#include "live_events.h"
 #include "pad_filler.h"
+#include "songfit.h"
 #include "rt/json.h"
 #ifdef THUNDER_HAVE_LXR
 #include "thunder/lxr_module.h"
@@ -72,6 +74,48 @@ int main() {
   CHECK(ps.dry == 2, "ELECTRO has two voices with a pad effect the core does not host (spring, crush): %d", ps.dry);
   { size_t loud = 0; for (auto& p : ps.pads) { float pk = 0; for (int64_t i = 0; i < p.frames; i++) pk = std::fmax(pk, std::fabs(p.block[i])); if (pk > 0.001f) loud++; } CHECK(loud >= 30, "pads with sound: %zu", loud); }
 
+  // 2b. SongFit (songfit.h). ELECTRO: two voices have a pad effect the core does not host, so by the lead's ruling the SONG is not natively playable.
+  {
+    const uint32_t full = THUNDER_LIVE_CAP_EFFECTS | 0x200u;
+    FitResult f = songFit(songT, kitT, full, 0, expectSkipped == 0);
+    int pe = 0, other = 0; for (auto& r : f.reasons) { if (r.code == "pad-effect") pe++; else other++; }
+    CHECK(!f.ok && pe == 2 && other == 0, "ELECTRO fit: ok %d, %d pad-effect, %d other", (int)f.ok, pe, other);
+    FitResult g = songFit(songT, kitT, THUNDER_LIVE_CAP_EFFECTS, 0, expectSkipped == 0);   // no chains in the host: ELECTRO has chainOn
+    bool nc = false; for (auto& r : g.reasons) if (r.code == "no-chains") nc = true;
+    CHECK(nc, "ELECTRO without CAP_CHAINS must say no-chains");
+    FitResult n = songFit(songT, kitT, 0, 0, true);
+    bool ne = false; for (auto& r : n.reasons) if (r.code == "no-effects") ne = true; CHECK(ne, "no-effects");
+    const std::string synthSong = R"({"insts":[{"sync":0},{"sync":2}],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"scin"}]}})";
+    const std::string synthKit = R"({"voices":[{"engine":"sf"},{"name":"lx","engine":"lxsnare"},{"layers":[{"type":"sine","on":true,"level":1}]}]})";
+    FitResult h = songFit(synthSong, synthKit, THUNDER_LIVE_CAP_EFFECTS | 0x200u, 0, false);
+    std::string codes; for (auto& r : h.reasons) codes += r.code + " ";
+    CHECK(codes.find("stretch") != std::string::npos && codes.find("sidechain") != std::string::npos && codes.find("font") != std::string::npos && codes.find("no-lxr") != std::string::npos && codes.find("no-chains") == std::string::npos, "synthetic fit codes: %s", codes.c_str());
+    CHECK(songFit(R"({"insts":[],"chainOn":[]})", "", THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "an empty song fits");
+    CHECK(!songFit("not json", "", THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "garbage does not fit");
+    CHECK(!songFit(R"({"insts":[]})", "", THUNDER_LIVE_CAP_EFFECTS, 10, true).ok, "too big");
+    const std::string js = h.json(7);
+    CHECK(js.find("\"t\":\"fit\"") != std::string::npos && js.find("\"rev\":7") != std::string::npos && js.find("\"ok\":false") != std::string::npos, "fit json: %s", js.c_str());
+  }
+  // 2c. the event formatter on synthetic records
+  {
+    std::string o;
+    thunder_live_ev_pos p; std::memset(&p, 0, sizeof p); p.h.type = THUNDER_LIVE_EV_POS; p.h.bytes = sizeof p; p.h.f = 12345; p.row = 7; p.step = 3; p.cr = 2; p.bpm10 = 1310;
+    CHECK(eventToJson((const unsigned char*)&p, sizeof p, &o) && o == "{\"t\":\"pos\",\"f\":12345,\"row\":7,\"step\":3,\"cr\":2,\"bpm\":131.0}", "pos json: %s", o.c_str());
+    unsigned char rb[sizeof(thunder_live_ev_rows) + 16]; std::memset(rb, 0, sizeof rb);
+    thunder_live_ev_rows w; std::memset(&w, 0, sizeof w); w.h.type = THUNDER_LIVE_EV_ROWS; w.h.bytes = sizeof rb; w.h.f = 9; w.valid = (1ull << 1) | (1ull << 32);
+    std::memcpy(rb, &w, sizeof w); thunder_live_ev_rowent e1 = {4, 5, 6, 7}, e2 = {-1, 0, 0, -1}; std::memcpy(rb + sizeof w, &e1, 8); std::memcpy(rb + sizeof w + 8, &e2, 8);
+    CHECK(eventToJson(rb, sizeof rb, &o) && o.find("{\"tr\":1,\"row\":4,\"cr\":5,\"step\":6,\"phrase\":7}") != std::string::npos && o.find("\"tr\":32") != std::string::npos, "rows json: %s", o.c_str());
+    thunder_live_ev_state st; std::memset(&st, 0, sizeof st); st.h.type = THUNDER_LIVE_EV_STATE; st.h.bytes = sizeof st; st.state = THUNDER_LIVE_ST_STOPPED; st.arg = 1;
+    CHECK(eventToJson((const unsigned char*)&st, sizeof st, &o) && o.find("\"state\":\"stopped\"") != std::string::npos, "state json");
+    thunder_live_ev_head bad; std::memset(&bad, 0, sizeof bad); bad.type = 99; bad.bytes = sizeof bad;
+    CHECK(!eventToJson((const unsigned char*)&bad, sizeof bad, &o), "an unknown type is not forwarded");
+    CHECK(!eventToJson((const unsigned char*)&p, 8, &o), "a short record is refused");
+    EventQueue q(3);
+    q.push("1", false); q.push("2", true); q.push("3", false); q.push("4", true);   // full: the oldest non-critical (1) goes
+    CHECK(q.drain() == "[2,3,4]" && q.dropped() == 1 && q.drain().empty(), "queue drop rule");
+    EventQueue q2(2); q2.push("a", true); q2.push("b", true); q2.push("c", true);
+    CHECK(q2.drain() == "[a,b]" && q2.dropped() == 1, "a queue of critical records refuses the newest");
+  }
   // 3. the engine
   LiveEngine E; LiveEngine::Config cfg; cfg.sampleRate = 48000; cfg.maxBlock = 1024;
   std::string err;
@@ -122,6 +166,9 @@ int main() {
   CHECK(peak.load() > 0.02f, "the song is silent: peak %.4f", (double)peak.load());
   CHECK(ss.find("\"seqDropped\":0") != std::string::npos, "sequencer dropped events");
   CHECK(st.find("\"fatal\":0") != std::string::npos, "a fatal error record");
+  { const std::string ev = E.drainEvents(); std::printf("events: %zu bytes, dropped %zu\n", ev.size(), E.eventsDropped());
+    for (const char* t : {"clock", "pos", "meters", "state", "song"}) CHECK(ev.find(std::string("\"t\":\"") + t + "\"") != std::string::npos, "no %s event in the drained queue", t);
+    CHECK(ev.size() > 2 && ev[0] == '[' && ev.back() == ']', "events are one JSON array"); }
   rc = E.call([&](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); });
   CHECK(rc == 0, "stop: %d", rc);
   std::this_thread::sleep_for(std::chrono::milliseconds(200));

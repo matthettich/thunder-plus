@@ -18,6 +18,7 @@
 #include <thread>
 #include <vector>
 
+#include "live_events.h"
 #include "thunder/live.h"
 
 namespace tpa {
@@ -63,6 +64,9 @@ class LiveEngine {
   std::string statusJson();
   // thunder_live_stats as JSON (control side may call: stats_get is ANY).
   std::string statsJson();
+  // The records the poller saw since the last call, as the bridge's JSON events in one array text ("" when none): live_events.h. Any thread.
+  std::string drainEvents() { return events_.drain(); }
+  size_t eventsDropped() const { return events_.dropped(); }
   int64_t audioCalls() const { return calls_.load(std::memory_order_relaxed); }
 
  private:
@@ -88,6 +92,7 @@ class LiveEngine {
   std::atomic<bool> run_{false};
   std::thread control_, poller_;
 
+  EventQueue events_;
   std::mutex sm_;                             // the status (poller writes, anyone reads)
   struct Status {
     int state = 0; int row = 0, step = 0; double bpm = 0; int64_t clockF = 0; int voices = 0; uint32_t under = 0; int outLat = 0;
