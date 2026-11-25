@@ -95,9 +95,6 @@ size_t ndiff(const std::vector<float>& a, const std::vector<float>& b) {
 
 int main() {
   CHECK((thunder_live_caps() & THUNDER_LIVE_CAP_METERS2) != 0, "CAP_METERS2 is set");
-#ifndef THUNDER_HAVE_TFX
-  std::printf("live_meters2: skipped (no effects library)\n"); return 77;
-#endif
   const uint64_t T0 = 1ull << 0, T1 = 1ull << 1, TM = 1ull << 32;
 
   {   // ---- (2) the call ----
@@ -137,6 +134,7 @@ int main() {
     int64_t fr = 0; std::vector<float> l, r; B.run(l, r, 128 * 4, 128, fr); CHECK(B->metersSet(s) == 0, "room again after a quantum");
   }
 
+#ifdef THUNDER_HAVE_TFX   // (3) to (7) need the effects library (the closed build and MSVC have none: the plans cannot be made there; (1), (2) and (8) still run)
   Run base;   // no watching, no METERS: the audio of reference
   { Cfg c; go(c, base); }
   CHECK(base.rc[0] == 0 && base.rc[1] == 0, "plans accepted (%d %d)", base.rc[0], base.rc[1]);
@@ -252,6 +250,10 @@ int main() {
     Run g; { Cfg c; c.masterPlan = true; c.poll = false; c.quanta = 3000; go(c, g); }
     CHECK(ndiff(f.l, g.l) == 0 && ndiff(f.r, g.r) == 0, "a full ring changes no sample");
   }
+
+#else
+  std::printf("live_meters2: parts (3) to (7) SKIPPED: this build has no effects library\n");
+#endif
 
   {   // (8) the names
     CHECK(thunder_fx_type_name(7) && !std::strcmp(thunder_fx_type_name(7), "comp"), "7 is comp");
