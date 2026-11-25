@@ -910,7 +910,7 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
    - Base64 it: Mac `base64 -i thunderplus.p12 | pbcopy`; Windows PowerShell `[Convert]::ToBase64String([IO.File]::ReadAllBytes("thunderplus.p12")) | Set-Clipboard`.
    - GitHub, repo `matthettich/thunder-plus` → Settings → Secrets and variables → Actions → New repository secret, four times: `ANDROID_KEYSTORE_B64` (the pasted base64), `ANDROID_KEYSTORE_PASS` (the password), `ANDROID_KEY_ALIAS` (`thunderplus`), `ANDROID_KEY_PASS` (the same password: a PKCS12 keystore has one).
    - Then tell Claude "the secrets are set": it runs the Native workflow with `release` ticked and checks the APK name ends `-signed.apk`.
-2. **Build 677 / 678 on the web app (2 minutes, phone and computer):** the app opens and plays as before; Settings → Audio → Sequencer shows only the two old choices. (Items in the punch list below.)
+2. **Build 677 / 678 on the web app (2 minutes; the phone passed 677 on 25 Nov, the computer is left):** the app opens and plays as before; Settings → Audio → Sequencer shows only the two old choices. (Items in the punch list below.)
 3. **Later, not yet: sideload the Android test APK on the Fold** and run `native/tests/ANDROID-CHECKLIST.md`. Claude says when there is an APK (after the N2 stack and the page client are merged).
 4. **Open, no hurry:** an Apple Developer membership (only if a signed Mac / iOS build is wanted); whether the page client's fallback message, the 2.5 s "engine stopped" wait and "a refused edit keeps playing" are as wanted once he has used the Android beta.
 
@@ -919,7 +919,8 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 **Native-core client loader, switch off (25 Nov; build 677, PR #321)** (nothing should change; the file is fetched only by the Android app)
-- [ ] **Phone (Fold, Chrome) and computer: update to build 677 (Settings → App) and play a song as usual.** Pass: opens and plays exactly as on 676; no new toast or message.
+- [x] **Phone (Fold, Chrome): build 677 plays as before** (owner, 25 Nov 12:40).
+- [ ] **Computer: update to build 677 (Settings → App) and play a song as usual.** Pass: opens and plays exactly as on 676; no new toast or message.
 - [ ] **Computer: Settings → Audio → Sequencer.** Pass: only the two old choices (Audio thread, Page (old)); no "Native core (test)".
 
 **Resizing the window while a song plays (24 Nov; build 676, branch `fix/resize-during-playback`)** (details: the 24 Nov entry "resize during playback" below)
