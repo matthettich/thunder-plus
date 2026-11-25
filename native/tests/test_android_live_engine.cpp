@@ -112,7 +112,7 @@ int main() {
     CHECK(pe <= 1 && other == 0 && f.ok == (pe == 0), "ELECTRO fit: ok %d, %d pad-effect, %d other (one until #314: crush on pad 17; none after)", (int)f.ok, pe, other);
     for (auto& r : f.reasons) CHECK(r.text.find("pad 10 ") == std::string::npos, "voice 10 (mach + spring) is dry on the page: no reason: %s", r.text.c_str());
     CHECK(f.warns.size() == 1 && f.warns[0].find("4 pads play its rendered twin") != std::string::npos, "ELECTRO warn: %zu entries, first '%s'", f.warns.size(), f.warns.empty() ? "" : f.warns[0].c_str());
-    { const std::string fj = f.json(3); CHECK(fj.find("\"reasonTexts\":[\"pad ") != std::string::npos && fj.find("\"warn\":[\"4 pads") != std::string::npos, "fit json lists: %s", fj.c_str()); }
+    { const std::string fj = f.json(3); CHECK(fj.find("\"ok\":true,\"reasons\":[],\"reasonTexts\":[]") != std::string::npos && fj.find("\"warn\":[\"4 pads") != std::string::npos, "fit json (C2b ported spring / crush: no reason left, the four twins stay a warning): %s", fj.c_str()); }
     FitResult g = songFit(songT, kitT, THUNDER_LIVE_CAP_EFFECTS, 0, expectSkipped == 0);   // no chains in the host: ELECTRO has chainOn
     bool nc = false; for (auto& r : g.reasons) if (r.code == "no-chains") nc = true;
     CHECK(nc, "ELECTRO without CAP_CHAINS must say no-chains");
