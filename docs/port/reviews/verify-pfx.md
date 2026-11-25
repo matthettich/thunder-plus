@@ -56,3 +56,44 @@ The port is faithful where it is tested: the golden tool really is the page's co
 - Page behaviour beyond Node 22 / x86-64 Linux (the goldens are pinned to it, as every other golden).
 - The songfit fallback branch (n1/n2-h1b) that PFX-NOTES says must stop counting non-live-engine fx as unhosted; not looked at.
 - Memory pressure on a real phone for a 312 s pad through rings / clouds (290 / 250 MB measured here on top of the pad's own buffers).
+
+## Re-check of 14388c1
+
+Verifier: Claude Opus 5.5, independent. Head 14388c163eeb09b942b7ded4276616970edcab34 of n1/pfx-pad-effects (builds in Release and ASan+UBSan, own harnesses). Reported, not fixed.
+
+### VERDICT: MERGE
+
+Findings 1 to 5 of the first report are really fixed; each was re-tested with a control (the fix removed, or the mutation re-seeded) so the new tests are shown to bite. Nothing blocks merge. Two small follow-ups are listed at the end (neither is a regression).
+
+### Per finding
+
+1. Beads divide by zero (F1): FIXED, pad path and track host.
+   - `prepare.sh` patches `delay_controller.cc` so `slice_duration` is at least 1, inside `#ifndef __wasm__`; the patched file in build-r/upstream shows exactly that. dsp/tfx/build.sh compiles the unpatched upstream for the wasm; no file outside native/ and docs/ is in the diff, so tfx.wasm is untouched.
+   - My own pad harness (216 cases: media 0..3 x size .98 .. 1, 1.5, 1e9 x freeze on/off x time 0 / .2 / 1, 5 s pad via eng_render_voice): 0 bad. My own track-host harness (FxHost, Beads slot, size .98 .. 1, media 0..3, freeze on/off, 2 s): 0 bad.
+   - Control: with the guard line deleted from the generated source, test_padfx, my pad harness and my track harness all die with SIGFPE (exit 136). So both the PR's `trackBeads` test and the new rv_beads_hold_size* cases do exercise the divide.
+   - Caveat: the page's reference for those four cases is SILENCE (rms 0.0 over the whole 30000 samples; all four share one hash), so they pin "no crash and same silence", not a sound. That is the page's real behaviour (a held Beads that never recorded), fine for a crash regression.
+2. -fexceptions (F2): FIXED.
+   - `make VERBOSE=1` compile lines of padfx.cpp, engine.cpp, xeng_voice.cpp: `... -fno-exceptions ... -fexceptions -c .../engine/padfx.cpp` (and the same for the other two; the later flag wins).
+   - test_padfx_oom: 30 allocation points, 29 failing renders, `live left +0`; the per-allocation check `g_live != l0` is made after EVERY failing call, so "back to the start" is real (it counts malloc / calloc / free through glibc hooks; it SKIPs under ASan and off glibc). Only the layers path (eng_render_voice) is swept; xeng_voice.cpp has the same try / catch but no sweep.
+   - Callers of the new status -4 (kEngNoMemory): the only production caller on origin/n1/n2-live-shell is android `pad_filler.cpp` (renderPads, lines 118 / 124 / 127): `if (st != kEngOk || n == 0 ...) { out->skipped++; notes.push_back("... not rendered by the core (status -4)"); continue; }`. Any non-zero status is skipped and noted; nothing special-cases -1 / -2 / -3, so -4 is handled the same. No other caller outside tests (render_api and the desktop / iOS code do not call the voice render). Unchanged and pre-existing: pad_filler's own `buf.assign(bound, 0.f)` is outside any try (not new).
+3. Unpinned behaviours (F3): FIXED. Re-seeded myself:
+   - M3 (spectral latency 2048 -> 0): rv_spectral_wet +4.7 dB FAIL, rv_spectral_nomix +4.8 dB FAIL (rv_spectral_wet_def stays exact; so it is the wet / null-mix cases that bite, as intended).
+   - M6 (tgate bpm hard-coded 120): rv_tgate_bpm93 -12.6, rv_tgate_bpm93_div -22.2, rv_tgate_bpm175 -5.0 dB, all FAIL.
+   - Bonus M6b (MODFX tempo hard-coded 120, line 282): rv_sgate_bpm93 -15.8, rv_retrig_bpm93 +1.4, rv_flex_bpm93 -0.6, rv_sdelay_bpm93 -5.6 dB, all FAIL. Sources restored with `git checkout` after each.
+4. Absent segment keys (F4): FIXED. `isSeg` lists beads media / freeze, tremolo shape, ladder mode, xmod carrier, tgate div / pat, cab model, crush smooth, rings model, clouds mode / lofi / freeze, which is every FX[type].segs key of the page's tfx and thunder-dsp types (read from index.html; reson / pdelay / preverb / degrade are the JS cores of another unit; rings `poly` is left refused because the page itself traps). Checked three against the page's code: tgate map `[f.div | 0]` and `[f.pat | 0]` (index.html 4480), tremolo `f.shape | 0` (4437), cab `(f.model | 0)` (4495): undefined | 0 is 0, as native. The 14 rv_noseg_* cases are made by the page's own applyFx with the keys deleted and match (exact, or -108 .. -170 dB; beads media -57 dB, see below). A missing ROW key still refuses.
+5. Clamp and fuzz (F6): FIXED. The clamp is inside `pad_fx_lib`. My hand-built EngFx harness (62 types x 13 hostile values {NaN, 0, +-1, +-1e300, +-inf, 2^32, -0, +-7, .5}, all controls / one at a time / all NaN except one, plus a default-built EngFx with no values): 10332 runs, 7896 applied, 2436 refused, 0 non-finite, 0 length change, 0 crash. Galactic (reverb) and room with no values: refused (the pad stays dry), no crash. test_padfx SKIPs (exit 77) without a reference dir and the CMake test has SKIP_RETURN_CODE 77.
+
+### Sanitizers and tests
+- ASan + UBSan (RelWithDebInfo, THUNDER_SANITIZE=ON): test_padfx exit 0, 165 cases, fuzz 7234 runs, track Beads held: 0 bad, 0 sanitizer reports. My three harnesses (pad Beads, track Beads, hand-built hostile) also clean under the sanitizers.
+- Release: ctest -R padfx: padfx, padfx_golden_current, padfx_oom pass (4 of 4 with the oom one); test_padfx 165 cases, 130 bit-exact. (I did not rerun the full 241-test ctest.)
+
+### The open item: Beads media 0 (Dirty tape) at about -58 dB
+Verdict: ACCEPTABLE, not a mapping bug; the gate and the evidence need a small tightening.
+- The mapping is identical to the page: page map `[f.media | 0, 0, f.freeze ? 1 : 0, time, min(size, .995), pitch, shape, density, feedback, blend, reverb, 0]` (index.html 4427); C++ `p[0] = i32(media); p[2] = truthy(freeze); p[3..10] = ...; jmn(size, .995)` (padfx.cpp line 49). The effect object itself is the SAME source file (dsp/tfx/fx_beads.cc) the wasm is built from; `media` goes through the same `(int)(p[0] + 0.5)`.
+- The only difference is the build: host effect libs are compiled `-fno-fast-math -ffp-contract=off` on purpose (core/dsp/CMakeLists.txt, U14), tfx.wasm keeps `-ffast-math`. The error measured here: starts at the first audible sample (20294), peak 1.3e-3 on a 0.1 peak signal, relative 0.1 to 0.3 % in both audible segments, no growth: a rounding-class difference, not a swapped or mis-scaled control (which would be tens of percent). Media 2 (alt) is -131.8 dB and media 3 (def) -113 dB, so the other media are fine.
+- Two honest caveats: (a) rv_beads_media1 (Clean tape) is VACUOUS: the page's reference for it is all zeros in the 30000 samples (the tape delay is longer than the case), so its "exact" compares silence with silence; media 1 has no real coverage. (b) the -50 gate leaves only 8 dB over the measured -58, so a small Dirty-tape mapping error would pass. Suggested follow-up (not blocking): give media 0 and 1 a longer pad / earlier hit so media 1 produces sound, and note that a tfx.wasm built without -ffast-math would show whether media 0 goes exact.
+
+### Not checked
+- The wasm CI job itself (statically: dsp/tfx/build.sh uses its own upstream copy and no wasm file is in the diff).
+- The full 241-test ctest and MSVC.
+- The oom sweep covers the layers path only, not xeng_voice_render.
