@@ -644,9 +644,14 @@ static int run_live_host() {
   const std::string textPump = text; std::string textNoPump = text; for (size_t at; (at = textNoPump.find("\"type\":\"pverb\"")) != std::string::npos;) textNoPump.replace(at, std::strlen("\"type\":\"pverb\""), "\"type\":\"reverb\"");
   // pass 3 (U37 P4): pass 2 plus the MIDI scheduler (F_MIDI): every instrument's OUTPUT 2 (pad + MIDI) on port A with the clock on, the records drained by the consumer after every call, the outbox lead changed between blocks
   std::string textMidi = textNoPump; for (size_t at = 0; (at = textMidi.find("\"mo\":0", at)) != std::string::npos; at += 6) textMidi.replace(at, 6, "\"mo\":2");
-  for (int pass = 0; pass < 4; pass++) {
-    const std::string& text = pass == 3 ? textMidi : pass == 2 ? textNoPump : textPump;
-    thunder_live_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.sample_rate = 48000; o.max_block = 1024; o.flags = pass == 1 ? THUNDER_LIVE_F_DUMP_STEPS : pass == 2 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS) : pass == 3 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_MIDI) : 0;
+  // pass 4 (C2b): pass 2 plus F_CHAINS (the chains host live: the plan at play, ChainsCommit, param records, chain_edit, keep-patch): the control side publishes variants of ELECTRO's chain patch (a parameter, a CHN flag, a module added) and edits parameters between blocks
+  std::string textP = textNoPump, textOn = textNoPump, textS = textNoPump;
+  { size_t at = textP.find("\"l1\":0.8"); if (at != std::string::npos) textP.replace(at, 8, "\"l1\":0.5"); at = textOn.find("\"chainOn\":[true,true,true,true,false,false,true"); if (at != std::string::npos) textOn.replace(at, 52, "\"chainOn\":[true,true,true,false,false,false,true");
+    at = textS.find("\"modules\":["); if (at != std::string::npos) textS.insert(at + 11, "{\"id\":\"zzvca\",\"type\":\"vca\",\"params\":{\"gain\":1}},"); }
+  const std::string* variants[4] = {&textNoPump, &textP, &textOn, &textS};
+  for (int pass = 0; pass < 5; pass++) {
+    const std::string& text = pass == 3 ? textMidi : (pass == 2 || pass == 4) ? textNoPump : textPump;
+    thunder_live_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.sample_rate = 48000; o.max_block = 1024; o.flags = pass == 1 ? THUNDER_LIVE_F_DUMP_STEPS : pass == 2 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS) : pass == 3 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_MIDI) : pass == 4 ? (THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_CHAINS) : 0;
     char err[256] = {0}; LiveHost* H = LiveHost::create(o, err, sizeof err); if (!H) return fail("LiveHost::create");
     if (pass == 3 && (!H->midi() || thunder_midi_set_port(H->midi(), 0, 1, 1, 0, 0))) return fail("LiveHost midi port");
     char e2[128]; if (H->songPublish((const uint8_t*)text.data(), text.size(), nullptr, 0, 1, e2, sizeof e2)) return fail("LiveHost song publish");
@@ -670,6 +675,8 @@ static int run_live_host() {
       else if (k == 23) H->perf((int)(rnd() * 3), 0, (double)(int)(rnd() * 2), THUNDER_LIVE_NOW);
       else if (k == 29) H->mixSet((int)(rnd() * 8), THUNDER_LIVE_MIX_MUTE, (double)(int)(rnd() * 2), -1, THUNDER_LIVE_NOW);
       else if (k == 31) H->mixSet(32, THUNDER_LIVE_MIX_VOL, 200, 480, THUNDER_LIVE_NOW);
+      else if (pass == 4 && k == 3) { static int vi = 0; vi = (vi + 1) % 4; const std::string& v = *variants[vi]; H->songPublish((const uint8_t*)v.data(), v.size(), nullptr, 0, 1000 + calls, e2, sizeof e2); }   // E_BUSY while a plan is in flight is fine
+      else if (pass == 4 && k == 2) { char eb[160]; const int n2 = std::snprintf(eb, sizeof eb, "[{\"op\":\"param\",\"id\":\"mmvohebij95\",\"name\":\"l1\",\"value\":%.3f}]", 0.2 + 0.7 * rnd()); H->chainEdit((const uint8_t*)eb, (size_t)n2, THUNDER_LIVE_NOW); }
       else if (k == 41) { H->songPublish((const uint8_t*)text.data(), text.size(), nullptr, 0, 10 + calls, e2, sizeof e2); }
       else if (k == 47) { setp((int)(rnd() * PN), calls); H->padsPublish(); }
       else if (k == 53) H->collect();
@@ -700,8 +707,10 @@ static int run_live_host() {
     if (endedSeen < 1 || stoppedSeen < 2 || heldSeen < 1) return fail("LiveHost run never ended a song or never stopped (ENDED / STOPPED / HELD paths not exercised)");
     if (pass == 3 && (midiRecs < 300 || midiNotes < 50 || st.midi_begin_failed != 0)) { std::printf("MIDI pass: %llu records, %llu note-ons, %u begin failures\n", (unsigned long long)midiRecs, (unsigned long long)midiNotes, st.midi_begin_failed); return fail("LiveHost MIDI pass: too few MIDI records / notes, or a midi_begin failed"); }
     if (pass == 1 && dumped < 50) return fail("LiveHost step dump delivered too little");
-    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records (%d ENDED, %d STOPPED, %d HELD), %ld dumped steps, no allocation in process\n", pass == 1 ? " (with the step dump)" : pass == 2 ? " (effects, master chain, PDC, meters)" : pass == 3 ? " (effects, master chain, PDC, meters, MIDI)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, endedSeen, stoppedSeen, heldSeen, dumped);
+    std::printf("rt_harness: LiveHost%s: %d process calls, %llu quanta, %llu steps, %llu commands, %u late commands, %llu records (%d ENDED, %d STOPPED, %d HELD), %ld dumped steps, no allocation in process\n", pass == 1 ? " (with the step dump)" : pass == 2 ? " (effects, master chain, PDC, meters)" : pass == 3 ? " (effects, master chain, PDC, meters, MIDI)" : pass == 4 ? " (effects, master chain, PDC, meters, CHAINS: plans, commits, param records, chain_edit)" : "", calls, (unsigned long long)st.quanta, (unsigned long long)st.steps, (unsigned long long)st.cmds_applied, st.cmd_late, (unsigned long long)recs, endedSeen, stoppedSeen, heldSeen, dumped);
     if (pass == 3) std::printf("rt_harness: LiveHost MIDI: %llu MIDI records drained, %llu note-ons, midi_begin failures %u, may_hang %u\n", (unsigned long long)midiRecs, (unsigned long long)midiNotes, st.midi_begin_failed, st.midi_may_hang);
+    if (pass == 4 && (st.chains_nodes < 1 || st.chains_blocks < 1000 || st.chains_plans < 3 || st.chains_failed_blocks || st.chains_feed_mismatch)) return fail("LiveHost chains pass: no chains ran, or a block failed");
+    if (pass == 4) std::printf("rt_harness: LiveHost CHAINS: nodes %u, plans %u, blocks %llu, events %llu, busy %u, refused %u\n", st.chains_nodes, st.chains_plans, (unsigned long long)st.chains_blocks, (unsigned long long)st.chains_events, st.chains_busy, st.chains_refused);
     delete H;
   }
   return 0;

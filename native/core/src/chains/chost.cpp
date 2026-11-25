@@ -17,7 +17,7 @@ ChainsPlan::~ChainsPlan() {
   for (int i = 0; i < nOldPatch_; i++) if (oldPatch_[i]) chains::chains_free_patch(oldPatch_[i]);
 }
 
-ChainsHost::ChainsHost(double sampleRate, size_t budgetBytes) : sr_(sampleRate), q_(128.0 / sampleRate), budget_(budgetBytes ? budgetBytes : kChainsHostDefaultBudget), ev_(new (std::nothrow) Ev[kChainsHostEvents]) {}   // (on the heap: a 1 MB stack (MSVC) must not hold 160 KB per host)
+ChainsHost::ChainsHost(double sampleRate, size_t budgetBytes, bool live) : sr_(sampleRate), q_(128.0 / sampleRate), budget_(budgetBytes ? budgetBytes : kChainsHostDefaultBudget), live_(live), ev_(new (std::nothrow) Ev[kChainsHostEvents]) {}   // (on the heap: a 1 MB stack (MSVC) must not hold 160 KB per host)
 ChainsHost::~ChainsHost() { for (int t = 0; t < kSongNT; t++) delete node_[t]; }
 
 // pass() (index.html:25909-25913, busStemPlan :25816-25820, busClosure :25823-25827)
@@ -37,28 +37,28 @@ static double docBytes(Json patch, double sr) {
 }
 
 // ---- control thread --------------------------------------------------------------------------------------------------------------------
-ChainsPlan* ChainsHost::plan(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song) {
+ChainsPlan* ChainsHost::plan(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song, bool keepPatch) {
 #if defined(__cpp_exceptions)
-  try { return planImpl(chainPatch, chainOn, heard, song); } catch (const std::bad_alloc&) { return nullptr; }   // everything planImpl made is freed by its unique_ptr; the control view and inFlight_ are touched only at its very end
+  try { return planImpl(chainPatch, chainOn, heard, song, keepPatch); } catch (const std::bad_alloc&) { return nullptr; }   // everything planImpl made is freed by its unique_ptr; the control view and inFlight_ are touched only at its very end
 #else
-  return planImpl(chainPatch, chainOn, heard, song);
+  return planImpl(chainPatch, chainOn, heard, song, keepPatch);
 #endif
 }
-ChainsPlan* ChainsHost::planImpl(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song) {
+ChainsPlan* ChainsHost::planImpl(Json chainPatch, const bool* chainOn, uint32_t heard, const ChainsSongTransport& song, bool keepPatch) {
   if (!ev_) { st_.refused++; return nullptr; }
   if (inFlight_) { st_.busyRefused++; return nullptr; }
   // the first call of the module tables makes static data (cdef / cinfo / the registry): do it here, so the audio thread never meets a first call
   (void)chains::cinfo_count(); (void)chains::chainsTable(); (void)chains::cdef("trackIn"); (void)chains::cdef("chainOut"); (void)chains::cdef("smixer");
   std::unique_ptr<ChainsPlan> pl(new (std::nothrow) ChainsPlan); if (!pl) return nullptr;
-  ChainsPlan& P = *pl; P.song_ = song; P.newSong_ = haveLast_ && !(song == lastSong_);
+  ChainsPlan& P = *pl; P.song_ = song; P.full_ = !keepPatch; P.newSong_ = haveLast_ && !(song == lastSong_);
   P.bus_ = bus_plan(chainPatch, chainOn);
   const uint32_t feedMask = chains_feed(chainPatch, chainOn);
   const bool okPatch = chainPatch.isObj() && chainPatch.str("format") == "chains.patch";   // routeTrack: wantChn = chainsFeed(t) && patch format
   uint32_t want = 0; for (int t = 0; t < kSongNT; t++) if (okPatch && (feedMask >> t & 1u) && (heard >> t & 1u)) want |= 1u << t;
   for (int t = 0; t < kSongNT; t++) if (ctlNode_[t]) P.nodeMask_ |= 1u << t;   // (a no-op plan leaves this)
-  // D7: the memory budget, before anything is built
+  // D7: the memory budget, before anything is built (a node that keeps its patch has no second set: one pb, not two)
   const double pb = docBytes(chainPatch, sr_); P.patchBytes_ = (size_t)pb;
-  { double total = 0; for (int t = 0; t < kSongNT; t++) if (want >> t & 1u) total += (ctlNode_[t] ? 2 * pb : pb) + (double)kChainsNodeOverhead; P.bytes_ = (size_t)total;
+  { double total = 0; for (int t = 0; t < kSongNT; t++) if (want >> t & 1u) total += (ctlNode_[t] ? (keepPatch ? 1 : 2) * pb : pb) + (double)kChainsNodeOverhead; P.bytes_ = (size_t)total;
     if (total > (double)budget_) { P.overBudget_ = P.noop_ = true; st_.overBudget++; st_.refused++; return pl.release(); } }
   bool refused = false;
   {
@@ -67,11 +67,14 @@ ChainsPlan* ChainsHost::planImpl(Json chainPatch, const bool* chainOn, uint32_t 
       if (want >> t & 1u) {
         if (ctlNode_[t]) {
           k = &P.trk_[P.nTrk_++]; k->track = t; k->node = ctlNode_[t];
-          k->patch = ctlNode_[t]->engine().preparePatch(chainPatch);   // refused (null): the whole plan is
-          if (!k->patch) refused = true;
+          if (!keepPatch) {   // (keepPatch: the node runs what it runs; commit sets its bus map and nothing else)
+            k->patch = ctlNode_[t]->engine().preparePatch(chainPatch);   // refused (null): the whole plan is
+            if (!k->patch) refused = true;
+          }
         } else {
           chains::EngineOptions o; o.transport.tempo = song.tempo; o.transport.lpb = song.lpb; o.transport.ticks = song.ticks; o.transport.playing = false;   // processorOptions.transport (index.html:21137)
           std::unique_ptr<ChainsNode> n(new ChainsNode(sr_, t, o));
+          if (live_) n->engine().setInlineService(false);   // a spare pump instance is never built on the audio thread (R12; nobody services them until C4)
           if (!n->engine().valid() || !n->engine().loadPatch(chainPatch)) { refused = true; break; }
           k = &P.trk_[P.nTrk_++]; k->track = t; k->node = n.get(); k->fresh = n.release();
         }
@@ -99,7 +102,7 @@ void ChainsHost::settle(ChainsPlan* p) {
 // ---- audio thread ----------------------------------------------------------------------------------------------------------------------
 void ChainsHost::applyTransport(ChainsNode& n) {   // the page's {tempo, lpb, ticks, playing: true} message: Object.assign over the engine's transport (startN + 1 when it starts playing)
   chains::ChainsEngine& e = n.engine(); waves::Transport t = e.transport();
-  t.tempo = tp_.tempo; t.lpb = tp_.lpb; t.ticks = tp_.ticks; t.playing = true;
+  t.tempo = tp_.tempo; t.lpb = tp_.lpb; t.ticks = tp_.ticks; t.playing = playing_;
   e.setTransport(t);
 }
 void ChainsHost::commit(ChainsPlan* p, Mixer& mix) {
@@ -118,6 +121,19 @@ void ChainsHost::commit(ChainsPlan* p, Mixer& mix) {
   for (int t = 0; t < kSongNT; t++) mix.setChain(t, node_[t] ? &ChainsHost::hook : nullptr, node_[t] ? this : nullptr);
   mix.setPlan(p->bus_);   // last: a bus never exists before its node
 }
+
+void ChainsHost::applyAll() { for (int t = 0; t < kSongNT; t++) if (node_[t]) applyTransport(*node_[t]); }
+void ChainsHost::play(double tempo, double lpb, double ticks) {
+  if (playing_) { playing_ = false; applyAll(); }   // the page's tStart runs tStop(true) first (chainsTempo, playing false): the nodes see the transport stop and start again (startN + 1 once more)
+  tp_.tempo = tempo; tp_.lpb = lpb; tp_.ticks = ticks; nEv_ = 0; playing_ = true; applyAll();   // (the queue: look-ahead events of a Seq that is gone are not applied)
+}
+void ChainsHost::stop() { nEv_ = 0; playing_ = false; applyAll(); }
+void ChainsHost::param(std::string_view id, std::string_view name, double v) { for (int t = 0; t < kSongNT; t++) if (node_[t]) node_[t]->engine().setParam(id, name, v); }
+ChainsHostStats ChainsHost::audioStats() const {
+  ChainsHostStats s; s.blocks = st_.blocks; s.failedBlocks = st_.failedBlocks; s.droppedEvents = st_.droppedEvents; s.badEvents = st_.badEvents; s.eventsApplied = st_.eventsApplied; s.feedMismatch = st_.feedMismatch; s.chcNoNode = st_.chcNoNode;
+  return s;
+}
+ChainsHostStats ChainsHost::ctlStats() const { ChainsHostStats s; s.refused = st_.refused; s.overBudget = st_.overBudget; s.busyRefused = st_.busyRefused; return s; }
 
 // the two due-frame rules (chost.h)
 int64_t ChainsHost::tempoDue(double t) const { if (!(t > 0)) return 0; const double k = std::ceil(t / q_) * 128.0; return k >= 9e15 ? (int64_t)9e15 : (int64_t)k; }
