@@ -76,6 +76,8 @@ class LiveEngine {
   // A bridge event made by the shell itself (midi.in, midi.ports ...): goes out with the core's, in the same drained list. Any thread.
   void pushEvent(std::string json, bool critical) { events_.push(std::move(json), critical); }
   // Called by the poller thread for every STATE record (state 0 stopped, 1 playing, 2 ended, 3 held). Set before startThreads.
+  // B1: run by the poller thread about every 100 ms (never by a caller thread): work that waits for the control thread, such as the MIDI clock map's latency floor, belongs here, not on main.
+  void setTickHook(std::function<void()> f) { tickHook_ = std::move(f); }
   void setStateHook(std::function<void(int)> f) { stateHook_ = std::move(f); }
 
   // H1c: the SHELL's output gain (audio-focus ducking), applied after the core's master and safety limiter, so the page's master volume is never touched. Any thread; the audio thread ramps to it
@@ -109,6 +111,7 @@ class LiveEngine {
   };
   void controlLoop();
   void pollLoop();
+  void drainQueue();   // completes every queued task with -1000
   static int64_t monoNs();
 
   thunder_live* L_ = nullptr;
@@ -121,6 +124,7 @@ class LiveEngine {
   std::atomic<float> duckTarget_{1.f};
   std::atomic<int64_t> cbFrame_{0}, cbNs_{0};
   std::function<void(int)> stateHook_;
+  std::function<void()> tickHook_;
   float duckCur_ = 1.f;                       // the audio thread's alone
   std::atomic<int> outLat_{0}, under_{0};
 
