@@ -17,7 +17,7 @@ const CALL = cut(/\nif \(window\.thunderCore \|\| aset\.core === 'native'\) load
 // A page-like sandbox: `window` is the sandbox itself, so window.thunderCore / window.__thunderClient are plain properties of it.
 function rig({ core = 'core', thunderCore = null, rate = 0, withCtx = null } = {}) {
   const log = { ac: 0, scripts: [], appended: [], fetches: 0, creates: [], tp: [] };
-  const sb = { aset: { core, rate }, BUILD: 677, tpLog: (...a) => log.tp.push(a.join(' ')), latOf: () => 'interactive', ctx: withCtx,
+  const sb = { aset: { core, rate }, BUILD: 678, tpLog: (...a) => log.tp.push(a.join(' ')), latOf: () => 'interactive', ctx: withCtx,
     fetch: () => { log.fetches++; return Promise.reject(new Error('no network in tests')); },
     XMLHttpRequest: function () { log.fetches++; },
     AudioContext: function () { log.ac++; this.sampleRate = 44100; this.close = () => Promise.resolve(); },
@@ -71,13 +71,15 @@ test('(a) the Settings value "Native core (test)" is listed only where window.th
 });
 
 // ---- (b) source guards -----------------------------------------------------------------------------------------------------------
-test('(b) branch count: PC1 + PC3 own exactly rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 of N2-PAGE-CLIENT 4.3 (and the two media-session guards); a new NCON() / tp.nc use needs a row there and a change here', () => {
+test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 of N2-PAGE-CLIENT 4.3 (and the two media-session guards), PC2 adds 7, 8 (two), 9, 10 (two); a new NCON() / tp.nc use needs a row there and a change here', () => {
   const at = re => (src.split('\n').map((l, i) => re.test(l) ? i + 1 : 0).filter(Boolean));
-  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 4, 'NCON() occurrences: padSR (PC1), tStart (4), saveS (6), resetAudio (17)');
-  assert.equal((src.match(/\bNC\(\)/g) || []).length, 7, 'NC() occurrences: padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16)');
+  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 10, 'NCON() occurrences: padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2)');
+  assert.equal((src.match(/\bNC\(\)/g) || []).length, 13, 'NC() occurrences: padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16); coreBuf, coreKit, coreKitCheck, setSong, setKit, newKit (PC2)');
   assert.equal((src.match(/\btp\.nc\b/g) || []).length, 9, 'tp.nc: perfPush, perfFill (15), corePost (16), tStop x2 (5), msMeta x2 (code and comment) and bgPlay (the one media session), the ncSongHost comment');
   for (const [re, fn] of [[/^function perfPush\(\)/, 'perfPush'], [/^function perfFill\(/, 'perfFill'], [/^const corePost = /, 'corePost'], [/^\s*if \(tp\.nc\)\{ tp\.nc = false;/, 'tStop'], [/const ms = navigator\.mediaSession; if \(!ms \|\| !bgOn/, 'msMeta'], [/^\s*if \(on && tp\.nc\) return;/, 'bgPlay']]) assert.equal(at(re).length, 1, fn);
   assert.equal(at(/\btp\.nc\b/).length, 7, 'tp.nc on seven lines (the tp literal and begin() say nc: without the tp. prefix)');
+  for (const fn of ['coreBuf', 'coreKit', 'coreKitCheck', 'coreVar']) assert.ok(new RegExp('NCON\\(\\)[^\\n]*', 'm').test(cut(new RegExp('function ' + fn + '\\([^\\n]*(\\n[^\\n]*)?', 'm'), fn)), fn + ' has its branch');
+  assert.equal((src.match(/\bncPadApi\b/g) || []).length, 8, 'ncPadApi: its definition, the five PC2 calls (coreVar does not need it), and PC3\'s padApi line (typeof test and call)');
   assert.equal((src.match(/\bloadClient\b/g) || []).length, 2, 'loadClient: its declaration and its one call site');
   assert.equal((src.match(/window\.thunderCore/g) || []).length, 6, 'window.thunderCore: the loader comment, srGuess, updCore (options, get, comment), the call site');
   assert.equal((src.match(/aset\.core === 'native'/g) || []).length, 3, "aset.core === 'native': srGuess, updCore's getter, the call site");
@@ -131,14 +133,14 @@ test('(c) a load error leaves the page as it was: onerror only logs', () => {
 function clientRig(thunderCore, hostExtra = {}) {
   const sb = { window: null, Promise, Error, JSON, Object, Array, isFinite, setTimeout, clearTimeout, setInterval, clearInterval }; sb.window = sb; if (thunderCore) sb.thunderCore = thunderCore;
   vm.createContext(sb); vm.runInContext(H.read('thunder-core-client.js'), sb, { filename: 'thunder-core-client.js' });
-  const host = Object.assign({ tpLog: (...a) => (sb.__tp = sb.__tp || []).push(a.join(' ')), build: () => 677, prerender: () => { sb.__pre = (sb.__pre || 0) + 1; } }, hostExtra);
+  const host = Object.assign({ tpLog: (...a) => (sb.__tp = sb.__tp || []).push(a.join(' ')), build: () => 678, prerender: () => { sb.__pre = (sb.__pre || 0) + 1; } }, hostExtra);
   return { sb, host };
 }
 const fakeCore = reply => { const sent = []; return { sent, ask: (m) => { sent.push(m); return reply instanceof Error ? Promise.reject(reply) : Promise.resolve(reply); } }; };
 test('client: hello handshake turns it on only for v 1 + caps.nativeAudio + a sample rate, then re-renders pads once', async () => {
   const tc = fakeCore({ t: 'reply', v: 1, core: 'r1', caps: { nativeAudio: true }, sr: 44100, outLat: 256, host: 'android' }); const { sb, host } = clientRig(tc);
   assert.equal(sb.__thunderClient.on, false); assert.equal(await sb.__thunderClient.attach(host), true);
-  assert.equal(JSON.stringify(tc.sent), JSON.stringify([{ t: 'hello', v: 1, app: 677 }])); assert.equal(sb.__thunderClient.on, true); assert.equal(sb.__thunderClient.sr, 44100); assert.equal(sb.__pre, 1);
+  assert.equal(JSON.stringify(tc.sent), JSON.stringify([{ t: 'hello', v: 1, live: true, app: 678 }])); assert.equal(sb.__thunderClient.on, true); assert.equal(sb.__thunderClient.sr, 44100); assert.equal(sb.__pre, 1);
   sb.__thunderClient.detach(); assert.equal(sb.__thunderClient.on, false);
 });
 test('client: every failure leaves it off and the page untouched', async () => {

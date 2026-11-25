@@ -219,14 +219,14 @@ test('the next PLAY of the song that killed the engine uses the old engine', asy
   r.NC.start('song', { row: 0 }); await r.ck.advance(5); r.emit('err', { where: 'FATAL', fatal: true }); await r.ck.advance(5);
   assert.equal(r.NC.state().failed, true); assert.equal(r.NC.can('song', {}), false);
 });
-test('engine down while playing stops the transport; up sends the song again (and asks the pads hook to resend); nothing is sent while it is down', async () => {
-  const r = await up(); r.NC.resend = () => { r.state.resend++; };
+test('engine down while playing stops the transport; up sends the song again; nothing is sent while it is down', async () => {
+  const r = await up();
   r.NC.start('song', { row: 0 }); await r.ck.advance(5); const before = r.songLoads().length;
   r.emit('engine', { up: false }); await r.ck.advance(5);
   assert.equal(r.state.stopped, 1); assert.match(r.toasts.pop(), /restarting/); assert.equal(r.NC.can('song', {}), false);
   r.bump(); r.NC.edit(); await r.ck.advance(600); assert.equal(r.songLoads().length, before, 'down: no song.load');
   r.emit('engine', { up: true, sr: 44100 }); await r.ck.advance(5);
-  assert.equal(r.songLoads().length, before + 1, 'the song again'); assert.equal(r.state.resend, 1); assert.equal(r.NC.sr, 44100); assert.equal(r.state.prerender, 2, 'pads render again at the new rate (hello + up)');
+  assert.equal(r.songLoads().length, before + 1, 'the song again'); assert.equal(r.NC.sr, 44100); assert.equal(r.state.prerender, 2, 'pads render again at the new rate (hello + up)');
   r.beat(); assert.equal(r.NC.can('song', {}), true);
 });
 test('engine.reset: Settings > Reset audio engine sends it', async () => {
