@@ -19,6 +19,7 @@
 #include <thread>
 #include <vector>
 
+#include "live_events.h"
 #include "thunder/live.h"
 
 namespace tpa {
@@ -52,7 +53,10 @@ class LiveEngine {
   // After the audio callback has stopped and the threads are joined.
   void destroy();
   bool created() const { return L_ != nullptr; }
-  thunder_live* handle() const { return L_; }
+  bool chainsOn() const { return chainsOn_; }   // the host was created with F_CHAINS
+  const Config& config() const { return cfg_; }
+  thunder_live* handle() const { return L_; }   // control-thread use only: the pointer is not protected against destroy()
+  int64_t engineOffset();                       // ANY thread: host frame - engine frame, 0 when destroyed (guarded against destroy(), verify-n2 F10)
 
   // AUDIO. `out` is interleaved stereo, `frames` frames. Never allocates, never blocks. Silence when the engine is not created or the handle is dead.
   void render(float* out, int frames, int64_t wallNs);
@@ -69,6 +73,9 @@ class LiveEngine {
   std::string statusJson();
   // thunder_live_stats as JSON (control side may call: stats_get is ANY).
   std::string statsJson();
+  // The records the poller saw since the last call, as the bridge's JSON events, one per line ("" when none): live_events.h. Any thread.
+  std::string drainEvents() { return events_.drain(); }
+  size_t eventsDropped() const { return events_.dropped(); }
   int64_t audioCalls() const { return calls_.load(std::memory_order_relaxed); }
 
  private:
@@ -84,6 +91,7 @@ class LiveEngine {
   thunder_live* L_ = nullptr;
   std::shared_mutex lifeM_;                   // destroy() takes it exclusively to free the host; the ANY-thread getters (statsJson) take it shared (verify-n2 F10)
   Config cfg_;
+  bool chainsOn_ = false;
   std::vector<float> l_, r_;                  // the audio thread's de-interleave scratch (max_block each), made at create
   int64_t frame0_ = 0;                        // the running host frame: the audio thread's alone
   std::atomic<int64_t> calls_{0};
@@ -95,6 +103,7 @@ class LiveEngine {
   std::atomic<bool> run_{false};
   std::thread control_, poller_;
 
+  EventQueue events_;
   std::mutex sm_;                             // the status (poller writes, anyone reads)
   struct Status {
     int state = 0; int row = 0, step = 0; double bpm = 0; int64_t clockF = 0; int voices = 0; uint32_t under = 0; int outLat = 0;

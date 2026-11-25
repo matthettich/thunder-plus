@@ -79,13 +79,16 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
     }
 
     private fun onPageMessage(m: WebMessageCompat) {
-        if (m.type == WebMessageCompat.TYPE_ARRAY_BUFFER) { onBytes(m.arrayBuffer); return }
+        if (m.type == WebMessageCompat.TYPE_ARRAY_BUFFER) { if (LiveBridge.liveSession) LiveBridge.onBytes(m.arrayBuffer) else onBytes(m.arrayBuffer); return }
         val s = m.data ?: return
+        // N2 H1b: a page that said hello {live:true} talks to the LIVE host (LiveBridge, BridgeTranslator.kt); the N0 test core's messages below are unchanged for every other page.
+        if (BridgeTranslator.typeOf(s) == "hello" && s.length < 1024 && (try { JSONObject(s).optBoolean("live", false) } catch (e: Exception) { false })) { LiveBridge.handle(activity, s); return }
+        if (LiveBridge.liveSession) { LiveBridge.handle(activity, s); return }   // F16: also while the live engine is down: an error, never the N0 test core
         val j = try { JSONObject(s) } catch (e: Exception) { return }
         when (j.optString("t")) {
-            "hello" -> sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("v", 1).put("core", "n0-test")
+            "hello" -> { LiveBridge.endSession(); sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("v", 1).put("core", "n0-test")
                 .put("caps", JSONObject().put("nativeAudio", true).put("midi", false).put("link", false).put("plugins", false)
-                    .put("inputs", false).put("render", false)).toString())
+                    .put("inputs", false).put("render", false)).toString()) }
             "put.header" -> { header = j; if (j.optInt("o") == 0) putStartNs = System.nanoTime() }
             "info" -> sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("info", NativeEngine.nativeInfo()).toString())
             else -> ThunderHost.command(activity, s)

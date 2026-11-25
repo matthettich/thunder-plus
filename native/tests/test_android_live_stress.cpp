@@ -19,6 +19,7 @@
 #include "live_engine.h"
 #include "pad_filler.h"
 #include "engine_slot.h"
+#include "pad_block.h"
 #include "rt/json.h"
 using namespace tpa;
 static std::string readFile(const std::string& p) { std::ifstream f(p, std::ios::binary); std::stringstream ss; ss << f.rdbuf(); return ss.str(); }
@@ -47,8 +48,7 @@ int main(int argc, char** argv) {
         case 0: if (rng() % 8 == 0) rc = e->call([&](thunder_live* L) { char er[128]; return thunder_live_song_publish(L, (const uint8_t*)songT.data(), songT.size(), nullptr, 0, 1, er, sizeof er); }, 3000); break;
         case 1: case 2: { auto pad = (int)(rng() % 8); float* b = thunder_live_alloc(4800); if (!b) break; for (int i = 0; i < 4800; i++) b[i] = 0.3f * std::sin(i * 0.05f);
           // the block is owned by a holder the TASK shares: a task dropped at a timeout, or never run, frees it (verify-n2 F9); a taken block (pad_take == 0) belongs to the core
-          struct Blk { float* p; bool owned = true; explicit Blk(float* q) : p(q) {} ~Blk() { if (owned && p) thunder_live_free(p); } };
-          auto blk = std::make_shared<Blk>(b);
+          auto blk = std::make_shared<PadBlock>(b);
           rc = e->call([=](thunder_live* L) { int x = thunder_live_pad_take(L, pad, blk->p, 0, 4800, 48000.0); if (x) return x; blk->owned = false; x = thunder_live_pad_kit(L, pad, 0, 0, 0.0); if (x) return x; return thunder_live_pads_publish(L); }, 2000); break; }
         case 3: rc = e->call([](thunder_live* L) { thunder_live_play_opts po; std::memset(&po, 0, sizeof po); po.size = sizeof po; po.t0 = THUNDER_LIVE_NOW; po.pdc_mode = 1; po.random_seed = 7; po.spp = -1; return thunder_live_play(L, &po); }, 2000); break;
         case 4: rc = e->call([](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); }, 2000); break;
@@ -58,8 +58,8 @@ int main(int argc, char** argv) {
         case 8: rc = e->call([](thunder_live* L) { const char* s = "[]"; return thunder_live_chain_edit(L, (const uint8_t*)s, 2, THUNDER_LIVE_NOW); }, 2000); break;
         case 9: { const double hz = (double)(rng() % 20); rc = e->call([=](thunder_live* L) { return thunder_live_meters_want(L, hz); }, 2000); } break;
         case 10: (void)e->statusJson(); (void)e->statsJson(); break;
-        case 11: (void)e->statsJson(); (void)e->audioCalls(); break;
-        case 12: (void)e->statusJson(); break;
+        case 11: (void)e->statsJson(); (void)e->audioCalls(); (void)e->drainEvents(); break;
+        case 12: (void)e->statusJson(); (void)e->engineOffset(); (void)e->chainsOn(); break;
         case 13: e->setHostStats((int)(rng() % 500), (int)(rng() % 3)); break;
         case 14: rc = e->call([](thunder_live* L) { return thunder_live_loop(L, 1, 0, 4, THUNDER_LIVE_NOW); }, 2000); break;
         case 15: rc = e->call([](thunder_live* L) { return thunder_live_hold(L, THUNDER_LIVE_NOW); }, 2000); break;

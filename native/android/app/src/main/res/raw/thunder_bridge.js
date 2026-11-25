@@ -10,7 +10,7 @@
     port.onmessage = function (e) {
       var d = e.data; if (typeof d !== 'string') return;
       var m; try { m = JSON.parse(d); } catch (x) { return; }
-      if (m.t === 'reply' && pending[m.id]) { var p = pending[m.id]; delete pending[m.id]; clearTimeout(p.to); p.res(m); return; }
+      if (m.t === 'reply' && pending[m.id]) { if (m.host && m.sr) tc.host = m.host; var p = pending[m.id]; delete pending[m.id]; clearTimeout(p.to); p.res(m); return; }
       if (m.t === 'caps') caps = m;
       emit(m.t, m);
     };
@@ -31,7 +31,27 @@
     on: function (t, fn) { (handlers[t] = handlers[t] || []).push(fn); },
     off: function (t, fn) { var hs = handlers[t]; if (hs) handlers[t] = hs.filter(function (h) { return h !== fn; }); },
     /* Path (a): ArrayBuffer chunks on the port. `f32` is one Float32Array; chunkBytes <= 1 MB, or 0 for one message. */
-    put: function (id, f32, chunkBytes) {
+    /* N2 H1b (CORE-BRIDGE 2 and 7 G2): the contract's form put(id, {sr, ch, frames}, Float32Array[]), one header + ArrayBuffer per chunk of at most 1 MB per channel:
+       {t:'put.header', pid, id, c: channel, o: float offset in the channel, n: floats in the channel, last: true on the final chunk of the final channel, sr, ch, frames}.
+       The N0 form put(id, Float32Array, chunkBytes) still works (the old test core). */
+    put: function (id, meta, data, chunkBytes) {
+      if (meta instanceof Float32Array) return tc.putN0(id, meta, data);
+      return new Promise(function (res, rej) {
+        if (!port) { rej(new Error('bridge not up')); return; }
+        var ch = data.length, frames = meta.frames || data[0].length, cb = chunkBytes || (1 << 20), cf = cb >> 2;
+        var pid = nextId++, to = setTimeout(function () { rej(new Error('put timeout')); }, 120000);
+        var onDone = function (m) { if (m.pid === pid) { tc.off('put.done', onDone); clearTimeout(to); if (m.ok === false) rej(new Error(m.info || 'put refused')); else res(m); } };
+        tc.on('put.done', onDone);
+        for (var c = 0; c < ch; c++) {
+          for (var o = 0; o < frames; o += cf) {
+            var n = Math.min(cf, frames - o), piece = data[c].slice(o, o + n);
+            port.postMessage(JSON.stringify({ t: 'put.header', pid: pid, id: id, c: c, o: o, n: frames, last: (c === ch - 1) && (o + n >= frames), sr: meta.sr, ch: meta.ch || ch, frames: frames }));
+            port.postMessage(piece.buffer, [piece.buffer]);
+          }
+        }
+      });
+    },
+    putN0: function (id, f32, chunkBytes) {
       return new Promise(function (res, rej) {
         if (!port) { rej(new Error('bridge not up')); return; }
         var pid = nextId++, total = f32.length, cf = chunkBytes ? (chunkBytes >> 2) : total;

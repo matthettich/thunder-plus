@@ -25,7 +25,7 @@ int64_t LiveEngine::monoNs() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); r
 
 bool LiveEngine::create(const Config& c, std::string* err) {
   if (L_) { if (err) *err = "already created"; return false; }
-  cfg_ = c;
+  cfg_ = c; chainsOn_ = false;
   thunder_live_opts o; std::memset(&o, 0, sizeof o);
   o.size = (uint32_t)sizeof o;
   o.sample_rate = c.sampleRate;
@@ -33,7 +33,7 @@ bool LiveEngine::create(const Config& c, std::string* err) {
   o.max_block = c.maxBlock;
   o.flags = THUNDER_LIVE_F_EFFECTS | THUNDER_LIVE_F_MASTER | THUNDER_LIVE_F_METERS | THUNDER_LIVE_F_MIDI;
 #ifdef THUNDER_LIVE_F_CHAINS
-  if (c.chains) { o.flags |= THUNDER_LIVE_F_CHAINS; o.chains_bytes = c.chainsBytes; }
+  if (c.chains) { o.flags |= THUNDER_LIVE_F_CHAINS; o.chains_bytes = c.chainsBytes; chainsOn_ = true; }
 #endif
   char e[256] = {0};
   L_ = thunder_live_create(&o, e, sizeof e);
@@ -142,6 +142,7 @@ void LiveEngine::pollLoop() {
         if (st_.lastSeq && h.seq != st_.lastSeq + 1) st_.gaps++;
         st_.lastSeq = h.seq;
         const unsigned char* p = buf + off;
+        { std::string js; if (eventToJson(p, h.bytes, &js)) events_.push(std::move(js), eventIsCritical(h.type)); }
         switch (h.type) {
           case THUNDER_LIVE_EV_CLOCK: { thunder_live_ev_clock c; if (h.bytes < sizeof c) break; std::memcpy(&c, p, sizeof c); st_.clockF = c.h.f; st_.voices = c.voices; st_.under = c.under; st_.outLat = c.out_lat; break; }
           case THUNDER_LIVE_EV_POS: { thunder_live_ev_pos q; if (h.bytes < sizeof q) break; std::memcpy(&q, p, sizeof q); st_.row = q.row; st_.step = q.step; st_.bpm = q.bpm10 / 10.0; break; }
@@ -175,6 +176,13 @@ std::string LiveEngine::statusJson() {
     st_.state, st_.row, st_.step, st_.bpm, (long long)st_.clockF, st_.voices, st_.under, st_.outLat, (long long)st_.songRev, (long long)st_.padsId,
     (unsigned long long)st_.records, (unsigned long long)st_.gaps, (double)st_.masterPk[0], (double)st_.masterPk[1], st_.errors, st_.fatal, st_.lastError.c_str(), st_.notesLate, st_.runnerSkips);
   return b;
+}
+
+int64_t LiveEngine::engineOffset() {
+  std::shared_lock<std::shared_mutex> rd(lifeM_);
+  int64_t o = 0;
+  if (L_) thunder_live_engine_offset(L_, &o);
+  return o;
 }
 
 std::string LiveEngine::statsJson() {

@@ -50,7 +50,7 @@ object LiveEngine {
     }
 
     fun play(): Int = if (active && loaded != null) LiveNative.nativePlay(0) else -2
-    fun stop(): Int = if (active) LiveNative.nativeTransportStop() else -2
+    fun stop(): Int = if (active) LiveNative.nativeTransportStop(-1L) else -2
     fun status(): LiveStatus = if (active) LiveStatus.parse(LiveNative.nativeStatus()) else LiveStatus.EMPTY
 
     /** One line for the overlay. */
@@ -70,6 +70,7 @@ object LiveEngine {
     @Synchronized fun shutdown() {
         if (!active) return
         active = false
+        LiveBridge.reset()
         LiveNative.nativeShutdown()
         loaded = null; projectName = ""
     }

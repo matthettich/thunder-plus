@@ -82,6 +82,26 @@ double relOfVoice(thunder::Json V) {
   return (r > 0 ? std::fmax(1, r) : 30) / 1000;
 }
 
+bool kitEntryOf(thunder::Json kit, size_t slot, int* choke, bool* syn, double* rel) {
+  const thunder::Json voices = kit.arr("voices");
+  const thunder::Json v = voices.at(slot);
+  if (!v.isObj()) return false;
+  const bool vtrk = voices.size() > 16;   // GUESS, as in renderPads
+  const thunder::Json held = kit.arr("held");
+  const bool s = (!vtrk && held.isArr() && held.at(slot).isBool()) ? held.at(slot).asBool() : slot >= 8;
+  *choke = (int)v.num("choke"); *syn = s; *rel = s ? std::fmin(60.0, relOfVoice(v)) : 0;
+  return true;
+}
+
+// The page's rule (index.html: engFx, "Pad effects run on Layers and on every engine that always plays its render"): dry are Bass and Voice (renderVoice returns before padFx) and every engine of the XENG table with
+// live:true (acid, mach, wavesl) AND the pump synths' live twins (pump/synth/pump-synth-engine.js: LIVE, which PsynCore.xeng() enters with live:true). A TABLE, kept by hand: test_android_live_engine.cpp reads index.html
+// and the pump file and fails when they drift (verify-n2 F14).
+bool padFxApplies(std::string_view e) {
+  static const char* const dry[] = {"bass", "vox", "acid", "mach", "wavesl", "pmonol", "ppolyl", "pcoill", "porbitl", "pfoldl", "pglossl", "ptractl", "pstrikel", "pboingl", "pfreezel", "pwobl", "plifel", "px0xl"};
+  for (const char* d : dry) if (e == d) return false;
+  return true;
+}
+
 namespace {
 
 int dryFx(thunder::Json fx) {   // pad effects the core does not host (Kind::Other) that are switched on
@@ -132,7 +152,7 @@ bool renderPads(std::string_view kitJson, double bpm, double lpb, double sr, Pad
     std::memcpy(b, buf.data(), sizeof(float) * n);
     RenderedPad p; p.slot = (int)i; p.block = b; p.frames = (int64_t)n; p.choke = (int)v.num("choke"); p.syn = syn; p.rel = syn ? std::fmin(60.0, relOfVoice(v)) : 0;
     out->pads.push_back(p);
-    if (dryFx(v.arr("fx")) > 0) { out->dry++; out->notes.push_back(std::string(tag) + ": rendered without a pad effect the core does not have"); }
+    if (padFxApplies(v.str("engine")) && dryFx(v.arr("fx")) > 0) { out->dry++; out->notes.push_back(std::string(tag) + ": rendered without a pad effect the core does not have"); }
   }
   out->ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
   return true;

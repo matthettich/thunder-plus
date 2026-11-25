@@ -4,6 +4,7 @@
 //   3. LiveEngine: create, threads, song_publish + pad_take + pads_publish + play through the control thread (E_BUSY retried while no callback runs), a fake audio callback calling render()
 //      in blocks of 480 frames, the poller sees PLAYING, the audio is finite and not silent, nothing dropped, stop, destroy.
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -15,7 +16,9 @@
 #include <vector>
 
 #include "live_engine.h"
+#include "live_events.h"
 #include "pad_filler.h"
+#include "songfit.h"
 #include "rt/json.h"
 #ifdef THUNDER_HAVE_LXR
 #include "thunder/lxr_module.h"
@@ -40,6 +43,33 @@ int main() {
     CHECK(extractMember("[1,2]", "a").empty(), "not an object");
     CHECK(extractMember(R"({"a": {"b": )", "a").empty(), "malformed");
     CHECK(extractMember("", "a").empty(), "empty");
+  }
+  // padFxApplies against the PAGE (verify-n2 F14): the table is kept by hand, so read index.html and the pump engine file and fail on drift
+  {
+    const std::string page = readFile(std::string(THUNDER_ROOT) + "/index.html"), pump = readFile(std::string(THUNDER_ROOT) + "/pump/synth/pump-synth-engine.js");
+    CHECK(page.find("const engFx = V => isBlipV(V) || (isXEngV(V) && !(XENG[V.engine] && XENG[V.engine].live));") != std::string::npos, "the page's engFx rule changed: re-read it and update padFxApplies (pad_filler.cpp)");
+    CHECK(page.find("if (isBassV(V)) return renderBass(V, sr, hold);\n  if (isVoxV(V)) return renderVox(V, sr);") != std::string::npos, "renderVoice no longer returns for Bass and Voice before padFx: padFxApplies(bass / vox) must be re-checked");
+    CHECK(!padFxApplies("bass") && !padFxApplies("vox") && padFxApplies("layers") && padFxApplies("blip"), "bass / vox dry, layers / blip wet");
+    int n = 0, bad = 0;
+    const size_t a = page.find("const XENG = {"), b = page.find("const isXEngV", a);
+    CHECK(a != std::string::npos && b != std::string::npos, "XENG table not found");
+    size_t at = a;
+    while ((at = page.find("\n  ", at)) != std::string::npos && at < b) {   // lines `  name:{live:true|false, ...`
+      at += 3; size_t e = at; while (e < b && (std::isalnum((unsigned char)page[e]) || page[e] == '_')) e++;
+      if (e > at && page.compare(e, 7, ":{live:") == 0) {
+        const bool live = page.compare(e + 7, 4, "true") == 0; const std::string name = page.substr(at, e - at);
+        n++; if (padFxApplies(name) == live) { bad++; std::printf("  padFxApplies(%s) = %d but the page has live:%d\n", name.c_str(), (int)padFxApplies(name), (int)live); }
+      }
+    }
+    CHECK(n >= 24 && bad == 0, "XENG entries read: %d, disagreeing: %d", n, bad);
+    int tw = 0, twBad = 0;
+    const size_t pa = pump.find("const LIVE = {"), pb = pump.find("\n};", pa);
+    CHECK(pa != std::string::npos && pb != std::string::npos, "pump LIVE table not found");
+    for (size_t q = pa; (q = pump.find("\n  ", q)) != std::string::npos && q < pb;) {
+      q += 3; size_t e = q; while (e < pb && std::isalnum((unsigned char)pump[e])) e++;
+      if (e > q && pump.compare(e, 7, ":{twin:") == 0) { tw++; if (padFxApplies(pump.substr(q, e - q))) { twBad++; std::printf("  pump live twin %s takes pad effects\n", pump.substr(q, e - q).c_str()); } }
+    }
+    CHECK(tw >= 13 && twBad == 0, "pump live twins read: %d, wet: %d", tw, twBad);
   }
   // relOf
   {
@@ -69,9 +99,73 @@ int main() {
   for (auto& n : ps.notes) std::printf("  %s\n", n.c_str());
   CHECK(ps.pads.size() >= 36, "ELECTRO has 40 voices, all of engines the core has: %zu rendered", ps.pads.size());
   CHECK(ps.skipped == expectSkipped, "the two lxsnare voices render with the optional drum module and are left empty without it (thunder_lxr_api() is null): %d skipped, expected %d", ps.skipped, expectSkipped);
+  // ELECTRO's voice 10 (mach + spring) is DRY on the page too (engFx is false for a live engine): never a note or a reason. C2b (#311) ported the pad effects: voice 17 (layers + crush) renders with its effect now.
   CHECK(ps.dry == 0, "C2b (#311) ported the pad effects (spring, crush included): ELECTRO renders with none missing, got %d dry", ps.dry);   // was 2 before the merge of origin/native (step 0)
+  for (auto& n : ps.notes) CHECK(n.find("pad 10 ") == std::string::npos, "pad 10 (mach + spring) must not be reported: %s", n.c_str());
   { size_t loud = 0; for (auto& p : ps.pads) { float pk = 0; for (int64_t i = 0; i < p.frames; i++) pk = std::fmax(pk, std::fabs(p.block[i])); if (pk > 0.001f) loud++; } CHECK(loud >= 30, "pads with sound: %zu", loud); }
 
+  // 2b. SongFit (songfit.h). ELECTRO: two voices have a pad effect the core does not host, so by the lead's ruling the SONG is not natively playable.
+  {
+    const uint32_t full = THUNDER_LIVE_CAP_EFFECTS | 0x200u;
+    FitResult f = songFit(songT, kitT, full, 0, expectSkipped == 0);
+    int pe = 0, other = 0; for (auto& r : f.reasons) { if (r.code == "pad-effect") pe++; else other++; }
+    CHECK(pe <= 1 && other == 0 && f.ok == (pe == 0), "ELECTRO fit: ok %d, %d pad-effect, %d other (one until #314: crush on pad 17; none after)", (int)f.ok, pe, other);
+    for (auto& r : f.reasons) CHECK(r.text.find("pad 10 ") == std::string::npos, "voice 10 (mach + spring) is dry on the page: no reason: %s", r.text.c_str());
+    CHECK(f.warns.size() == 1 && f.warns[0].find("4 pads play its rendered twin") != std::string::npos, "ELECTRO warn: %zu entries, first '%s'", f.warns.size(), f.warns.empty() ? "" : f.warns[0].c_str());
+    { const std::string fj = f.json(3); CHECK(fj.find("\"ok\":true,\"reasons\":[],\"reasonTexts\":[]") != std::string::npos && fj.find("\"warn\":[\"4 pads") != std::string::npos, "fit json (C2b ported spring / crush: no reason left, the four twins stay a warning): %s", fj.c_str()); }
+    FitResult g = songFit(songT, kitT, THUNDER_LIVE_CAP_EFFECTS, 0, expectSkipped == 0);   // no chains in the host: ELECTRO has chainOn
+    bool nc = false; for (auto& r : g.reasons) if (r.code == "no-chains") nc = true;
+    CHECK(nc, "ELECTRO without CAP_CHAINS must say no-chains");
+    FitResult n = songFit(songT, kitT, 0, 0, true);
+    bool ne = false; for (auto& r : n.reasons) if (r.code == "no-effects") ne = true; CHECK(ne, "no-effects");
+    const std::string synthSong = R"({"insts":[{"sync":0},{"sync":2}],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"scin"}]}})";
+    const std::string synthKit = R"({"voices":[{"engine":"sf"},{"name":"lx","engine":"lxsnare"},{"layers":[{"type":"sine","on":true,"level":1}]}]})";
+    FitResult h = songFit(synthSong, synthKit, THUNDER_LIVE_CAP_EFFECTS | 0x200u, 0, false);
+    std::string codes; for (auto& r : h.reasons) codes += r.code + " ";
+    CHECK(codes.find("stretch") != std::string::npos && codes.find("sidechain") != std::string::npos && codes.find("font") != std::string::npos && codes.find("no-lxr") != std::string::npos && codes.find("no-chains") == std::string::npos, "synthetic fit codes: %s", codes.c_str());
+    const std::string emptyKit = R"({"voices":[]})";
+    CHECK(songFit(R"({"insts":[],"chainOn":[]})", emptyKit, THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "an empty song fits");
+    CHECK(!songFit("not json", emptyKit, THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "garbage does not fit");
+    CHECK(!songFit(R"({"insts":[]})", emptyKit, THUNDER_LIVE_CAP_EFFECTS, 10, true).ok, "too big");
+    // verify-n2 F6: NO kit, NO verdict (pending, never ok); an unreadable kit is a reason
+    { FitResult np = songFit(R"({"insts":[],"chainOn":[]})", "", THUNDER_LIVE_CAP_EFFECTS, 0, true);
+      CHECK(!np.ok && np.pending && np.reasons.size() == 1 && np.reasons[0].code == "no-kit", "no kit: pending, not ok");
+      CHECK(np.json(1).find("\"pending\":true") != std::string::npos, "pending in the json: %s", np.json(1).c_str());
+      CHECK(!songFit(R"({"insts":[]})", "{broken", THUNDER_LIVE_CAP_EFFECTS, 0, true).ok, "an unreadable kit does not fit"); }
+    // the song-level reasons the verifier found missing: Resample, a pump module in a chain, an unknown module, lxp with key follow, MIDI clock follow
+    { const uint32_t caps = THUNDER_LIVE_CAP_EFFECTS | 0x200u;
+      auto codesOf = [&](const std::string& song, FitContext ctx = FitContext()) { std::string c; for (auto& r : songFit(song, emptyKit, caps, 0, true, ctx).reasons) c += r.code + " "; return c; };
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"resample"}]}})").find("resample") != std::string::npos, "resample");
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"pecho"}]}})").find("pump-in-chain") != std::string::npos, "pump module in a chain");
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"nosuchmodule"}]}})").find("module") != std::string::npos, "unknown module");
+      CHECK(codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"vcf"},{"type":"chainOut"}]}})").empty(), "known modules fit: '%s'", codesOf(R"({"insts":[],"chainOn":[true],"chainPatch":{"modules":[{"type":"trackIn"},{"type":"vcf"},{"type":"chainOut"}]}})").c_str());
+      FitContext lx; lx.lxpActive = true; FitContext ck; ck.clockIn = true;
+      CHECK(codesOf(R"({"insts":[{"kf":true}]})", lx).find("lxp") != std::string::npos, "lxp with a key-follow instrument");
+      CHECK(codesOf(R"({"insts":[{"kf":false}]})", lx).empty() && codesOf(R"({"insts":[{"kf":true}]})").empty(), "lxp alone, or kf alone, is no reason");
+      CHECK(codesOf(R"({"insts":[]})", ck).find("clock-follow") != std::string::npos, "clock follow"); }
+    const std::string js = h.json(7);
+    CHECK(js.find("\"t\":\"fit\"") != std::string::npos && js.find("\"rev\":7") != std::string::npos && js.find("\"ok\":false") != std::string::npos, "fit json: %s", js.c_str());
+  }
+  // 2c. the event formatter on synthetic records
+  {
+    std::string o;
+    thunder_live_ev_pos p; std::memset(&p, 0, sizeof p); p.h.type = THUNDER_LIVE_EV_POS; p.h.bytes = sizeof p; p.h.f = 12345; p.row = 7; p.step = 3; p.cr = 2; p.bpm10 = 1310;
+    CHECK(eventToJson((const unsigned char*)&p, sizeof p, &o) && o == "{\"t\":\"pos\",\"f\":12345,\"row\":7,\"step\":3,\"cr\":2,\"bpm\":131.0}", "pos json: %s", o.c_str());
+    unsigned char rb[sizeof(thunder_live_ev_rows) + 16]; std::memset(rb, 0, sizeof rb);
+    thunder_live_ev_rows w; std::memset(&w, 0, sizeof w); w.h.type = THUNDER_LIVE_EV_ROWS; w.h.bytes = sizeof rb; w.h.f = 9; w.valid = (1ull << 1) | (1ull << 32);
+    std::memcpy(rb, &w, sizeof w); thunder_live_ev_rowent e1 = {4, 5, 6, 7}, e2 = {-1, 0, 0, -1}; std::memcpy(rb + sizeof w, &e1, 8); std::memcpy(rb + sizeof w + 8, &e2, 8);
+    CHECK(eventToJson(rb, sizeof rb, &o) && o.find("{\"tr\":1,\"row\":4,\"cr\":5,\"step\":6,\"phrase\":7}") != std::string::npos && o.find("\"tr\":32") != std::string::npos, "rows json: %s", o.c_str());
+    thunder_live_ev_state st; std::memset(&st, 0, sizeof st); st.h.type = THUNDER_LIVE_EV_STATE; st.h.bytes = sizeof st; st.state = THUNDER_LIVE_ST_STOPPED; st.arg = 1;
+    CHECK(eventToJson((const unsigned char*)&st, sizeof st, &o) && o.find("\"state\":\"stopped\"") != std::string::npos, "state json");
+    thunder_live_ev_head bad; std::memset(&bad, 0, sizeof bad); bad.type = 99; bad.bytes = sizeof bad;
+    CHECK(!eventToJson((const unsigned char*)&bad, sizeof bad, &o), "an unknown type is not forwarded");
+    CHECK(!eventToJson((const unsigned char*)&p, 8, &o), "a short record is refused");
+    EventQueue q(3);
+    q.push("1", false); q.push("2", true); q.push("3", false); q.push("4", true);   // full: the oldest non-critical (1) goes
+    CHECK(q.drain() == "2\n3\n4" && q.dropped() == 1 && q.drain().empty(), "queue drop rule");
+    EventQueue q2(2); q2.push("a", true); q2.push("b", true); q2.push("c", true);
+    CHECK(q2.drain() == "a\nb" && q2.dropped() == 1, "a queue of critical records refuses the newest");
+  }
   // 3. the engine
   LiveEngine E; LiveEngine::Config cfg; cfg.sampleRate = 48000; cfg.maxBlock = 1024;
   std::string err;
@@ -122,6 +216,9 @@ int main() {
   CHECK(peak.load() > 0.02f, "the song is silent: peak %.4f", (double)peak.load());
   CHECK(ss.find("\"seqDropped\":0") != std::string::npos, "sequencer dropped events");
   CHECK(st.find("\"fatal\":0") != std::string::npos, "a fatal error record");
+  { const std::string ev = E.drainEvents(); std::printf("events: %zu bytes, dropped %zu\n", ev.size(), E.eventsDropped());
+    for (const char* t : {"clock", "pos", "meters", "state", "song"}) CHECK(ev.find(std::string("\"t\":\"") + t + "\"") != std::string::npos, "no %s event in the drained queue", t);
+    CHECK(ev.size() > 2 && ev[0] == '{' && ev.back() == '}' && ev.find("}\n{") != std::string::npos, "events are JSON objects, one per line"); }
   rc = E.call([&](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); });
   CHECK(rc == 0, "stop: %d", rc);
   { bool idle = false;   // verify-n2 F3: a user Stop shows as IDLE (0), not as "ended" (2)
