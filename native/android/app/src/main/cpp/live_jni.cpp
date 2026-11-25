@@ -102,8 +102,9 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   std::string err;
   if (!eng->create(ec, &err)) { LOGI("live create failed: %s", err.c_str()); { std::lock_guard<std::mutex> dl(g_dev); ma_device_uninit(&g.device); g.deviceInit = false; } return -2; }
   eng->startThreads();
-  g.aaLib = dlopen("libaaudio.so", RTLD_NOW);   // resolved before the stream runs: the status call reads the xrun count and buffer size through these
-  if (g.aaLib) { g.aaXrun = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getXRunCount"); g.aaBuf = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getBufferSizeInFrames"); }
+  { std::lock_guard<std::mutex> dl(g_dev);   // resolved before the stream runs: the status call reads the xrun count and buffer size through these (under g_dev)
+    g.aaLib = dlopen("libaaudio.so", RTLD_NOW);
+    if (g.aaLib) { g.aaXrun = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getXRunCount"); g.aaBuf = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getBufferSizeInFrames"); } }
   rtlog_reset(&g_lrt, (int)g.device.sampleRate);
   g.eng.set(eng);
   g.audioEng.store(eng.get(), std::memory_order_release);   // before the stream starts: the callback never sees a half-made engine
@@ -113,8 +114,8 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
     g.audioEng.store(nullptr, std::memory_order_release);
     g.eng.take();
     eng->destroy();
-    { std::lock_guard<std::mutex> dl(g_dev); ma_device_uninit(&g.device); g.deviceInit = false; }
-    if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; }
+    { std::lock_guard<std::mutex> dl(g_dev); ma_device_uninit(&g.device); g.deviceInit = false;
+      if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; }
     return -3;
   }
   LOGI("live engine started at %u Hz", g.device.sampleRate);
@@ -138,7 +139,7 @@ JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown
   eng.reset();
   g.lastSlots.clear();
   g.songText.reset(); g.kitText.reset(); g.kitDoc.reset();   // the page re-sends song and kit after an engine reset: a verdict must never be judged with the old kit
-  if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; g.aaXrun = nullptr; g.aaBuf = nullptr; }
+  { std::lock_guard<std::mutex> dl(g_dev); if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; }
 }
 
 // A .thunder project's bytes (UTF-8): the song and the kit. The pads are rendered HERE (the caller's thread, not the control thread, not the audio thread), then ONE control call publishes the
@@ -174,14 +175,18 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeLoadP
     if (r) return r;
     for (int s : *goneP) { r = thunder_live_pad_set(L, s, nullptr, nullptr, 0, sr); if (r) return r; }
     for (auto& p : ps.pads) {
-      if (!p.block) continue;   // taken by an earlier attempt of this lambda (an E_BUSY retry repeats it from the start: the song publish is idempotent, a taken pad is already in)
-      r = thunder_live_pad_take(L, p.slot, p.block, 0, p.frames, sr); if (r) return r;
-      p.block = nullptr;
+      if (p.kitDone) continue;   // an E_BUSY retry repeats the lambda from the start: the song publish is idempotent, a pad whose take AND kit worked is already in
+      if (p.block) {             // not taken yet (a taken pad has block == nullptr: its take must not be repeated, only its kit may be missing)
+        r = thunder_live_pad_take(L, p.slot, p.block, 0, p.frames, sr); if (r) return r;
+        p.block = nullptr;
+      }
       r = thunder_live_pad_kit(L, p.slot, p.choke, p.syn ? 1 : 0, p.rel); if (r) return r;
+      p.kitDone = true;
     }
     return thunder_live_pads_publish(L);
   }, 20000);
   if (rc == 0) g.lastSlots = slots;
+  else { for (int t : slots) { bool have = false; for (int s : g.lastSlots) if (s == t) have = true; if (!have) g.lastSlots.push_back(t); } }   // a failed / timed-out load may have put some pads in: the next load removes the union
   std::string notes;
   for (size_t i = 0; i < ps.notes.size() && i < 8; i++) { if (i) notes += ","; notes += "\"" + jsonEscape(ps.notes[i]) + "\""; }
   char head[360];
@@ -221,10 +226,15 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMixSet(J
 JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStatus(JNIEnv* env, jobject) {
   auto eng = g.eng.get(); if (!eng) return env->NewStringUTF("{}");
   { std::lock_guard<std::mutex> dl(g_dev);   // the stream pointer and the two AAudio calls on it: shutdown / reopen change them only under g_dev
-    void* stream = g.deviceInit ? (void*)g.device.aaudio.pStreamPlayback : nullptr;
-    if (stream) {
-      const int x = g.aaXrun ? g.aaXrun(stream) : 0, b = g.aaBuf ? g.aaBuf(stream) : 0;
-      eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)
+    if (g.deviceInit) {
+      // miniaudio re-routes an AAudio stream BY ITSELF (headphones, Bluetooth): its job closes and reopens pStreamPlayback under rerouteLock on its own thread. Every read of the pointer and every AAudio call on it is inside this lock (taken after g_dev; ma_device_uninit, which destroys it, runs under g_dev too).
+      ma_mutex_lock(&g.device.aaudio.rerouteLock);
+      void* stream = (void*)g.device.aaudio.pStreamPlayback;
+      if (stream) {
+        const int x = g.aaXrun ? g.aaXrun(stream) : 0, b = g.aaBuf ? g.aaBuf(stream) : 0;
+        eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)
+      }
+      ma_mutex_unlock(&g.device.aaudio.rerouteLock);
     } }
   return env->NewStringUTF(eng->statusJson().c_str());
 }
@@ -306,14 +316,18 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeKitLo
     int r;
     for (int s : *goneP) { r = thunder_live_pad_set(L, s, nullptr, nullptr, 0, sr); if (r) return r; }
     for (auto& p : psP->pads) {
-      if (!p.block) continue;
-      r = thunder_live_pad_take(L, p.slot, p.block, 0, p.frames, sr); if (r) return r;
-      p.block = nullptr;
+      if (p.kitDone) continue;   // an E_BUSY retry repeats the lambda from the start: a pad whose take AND kit worked is in
+      if (p.block) {             // a taken pad (block == nullptr) is never taken again; only its kit may be missing
+        r = thunder_live_pad_take(L, p.slot, p.block, 0, p.frames, sr); if (r) return r;
+        p.block = nullptr;
+      }
       r = thunder_live_pad_kit(L, p.slot, p.choke, p.syn ? 1 : 0, p.rel); if (r) return r;
+      p.kitDone = true;
     }
     return thunder_live_pads_publish(L);
   }, 20000);
   if (rc == 0) g.lastSlots = slots;
+  else { for (int t : slots) { bool have = false; for (int s : g.lastSlots) if (s == t) have = true; if (!have) g.lastSlots.push_back(t); } }   // a failed / timed-out load (-1000, -1001) may have put some pads in: the next load removes the union
   std::string empty; for (size_t i = 0; i < g.kitDoc->root().arr("voices").size() && i < 256; i++) { bool have = false; for (int s : slots) if (s == (int)i) have = true; if (!have && g.kitDoc->root().arr("voices").at(i).isObj()) { if (!empty.empty()) empty += ","; empty += std::to_string(i); } }
   char extra[200]; std::snprintf(extra, sizeof extra, ",\"pads\":%zu,\"skipped\":%d,\"dry\":%d,\"renderMs\":%.0f,\"empty\":[%s]", psP->pads.size(), psP->skipped, psP->dry, psP->ms, empty.c_str());
   return jstr(env, loadJson(rc == 0, rc, "", extra));
@@ -353,9 +367,11 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadTake(
   int choke = 0; bool syn = false; double rel = 0;
   if (g.kitDoc) tpa::kitEntryOf(g.kitDoc->root(), (size_t)pad, &choke, &syn, &rel);
   const int rc = eng->call([=](thunder_live* L) {
-    int x = thunder_live_pad_take(L, pad, blk->p, r ? 1 : 0, frames, rate);   // E_BUSY: not taken, the retry repeats it
-    if (x) return x;
-    blk->owned = false;   // the core has the block
+    if (blk->owned) {   // an E_BUSY retry repeats the lambda from the start: once the core has the block (owned == false) pad_take must NOT be called again, only pad_kit
+      int x = thunder_live_pad_take(L, pad, blk->p, r ? 1 : 0, frames, rate);   // E_BUSY: not taken, the retry repeats it
+      if (x) return x;
+      blk->owned = false;   // the core has the block
+    }
     return thunder_live_pad_kit(L, pad, choke, syn ? 1 : 0, rel);
   }, 10000);
   return rc;

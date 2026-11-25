@@ -99,8 +99,8 @@ int main() {
   for (auto& n : ps.notes) std::printf("  %s\n", n.c_str());
   CHECK(ps.pads.size() >= 36, "ELECTRO has 40 voices, all of engines the core has: %zu rendered", ps.pads.size());
   CHECK(ps.skipped == expectSkipped, "the two lxsnare voices render with the optional drum module and are left empty without it (thunder_lxr_api() is null): %d skipped, expected %d", ps.skipped, expectSkipped);
-  // ELECTRO's voice 10 (mach + spring) is DRY on the page too (engFx is false for a live engine): never a note or a reason. Voice 17 (layers + crush) is dry here until the pad-effects unit (#314) is in the core, then 0.
-  CHECK(ps.dry <= 1, "at most one pad (crush on a layers voice) lacks its pad effect: %d", ps.dry);
+  // ELECTRO's voice 10 (mach + spring) is DRY on the page too (engFx is false for a live engine): never a note or a reason. C2b (#311) ported the pad effects: voice 17 (layers + crush) renders with its effect now.
+  CHECK(ps.dry == 0, "C2b (#311) ported the pad effects (spring, crush included): ELECTRO renders with none missing, got %d dry", ps.dry);   // was 2 before the merge of origin/native (step 0)
   for (auto& n : ps.notes) CHECK(n.find("pad 10 ") == std::string::npos, "pad 10 (mach + spring) must not be reported: %s", n.c_str());
   { size_t loud = 0; for (auto& p : ps.pads) { float pk = 0; for (int64_t i = 0; i < p.frames; i++) pk = std::fmax(pk, std::fabs(p.block[i])); if (pk > 0.001f) loud++; } CHECK(loud >= 30, "pads with sound: %zu", loud); }
 
@@ -225,6 +225,17 @@ int main() {
     for (int i = 0; i < 200 && !idle; i++) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); idle = E.statusJson().find("\"state\":0") != std::string::npos; }
     CHECK(idle, "after Stop the state must read 0 (IDLE): %s", E.statusJson().c_str()); }
   CHECK(stateOfRecord(THUNDER_LIVE_ST_PLAYING) == 1 && stateOfRecord(THUNDER_LIVE_ST_STOPPED) == 0 && stateOfRecord(THUNDER_LIVE_ST_ENDED) == 2, "stateOfRecord");
+  // fix B (lead's read 25 Nov): LiveEngine::call distinguishes a timeout BEFORE the task started (-1000: dropped, fn never runs) from one while it RUNS (-1001: unknown, it may still apply)
+  { std::atomic<bool> ranSlow{false}, ranQueued{false};
+    std::thread slow([&] { int r = E.call([&](thunder_live*) { std::this_thread::sleep_for(std::chrono::milliseconds(1200)); ranSlow = true; return 0; }, 100); CHECK(r == -1001, "timeout while RUNNING must be -1001, got %d", r); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));   // the slow task is on the control thread now
+    int r2 = E.call([&](thunder_live*) { ranQueued = true; return 0; }, 50);   // queued behind it: waits 550 ms, never started
+    CHECK(r2 == -1000, "timeout before START must be -1000, got %d", r2);
+    slow.join();
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));   // the slow fn ends at 1200 ms
+    CHECK(ranSlow.load(), "the -1001 task still ran to the end (that is what -1001 warns about)");
+    CHECK(!ranQueued.load(), "the -1000 task was dropped: its fn must never run");
+    CHECK(E.call([](thunder_live*) { return 7; }) == 7, "the control thread is alive after both"); }
   stop = true; audio.join();
   E.destroy();
   CHECK(!E.created(), "destroyed");

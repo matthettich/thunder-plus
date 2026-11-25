@@ -80,6 +80,9 @@ int fx_pump_bypass(int pt);            // the parameter index of the plugin's ow
 bool fx_pump_creative(int pt);         // the entry's `cr`: transport + notes (the creative effects and MASTER)
 bool fx_pump_clocked(int pt);          // the entry's `clk`: GATE, STUTTER, CHOP keep running on the clock while silent
 
+// PFX: the effect object of tfx id 0..33 (the page's tfx_new), made on the control thread; nullptr without the library or for another id. The caller deletes it.
+Fx* fx_make_tfx(int id, float sr);
+
 // ---- the effect table (fxtable.inc, generated from TFX: ids 0..33 and 93..95) and the parameter mapping ------------------------------------------------------
 int fx_type_of(std::string_view key);                 // the page's effect key ("eq", "reverb", "flex", ...) -> id 0..33 or 93..95, else -1
 const char* fx_key_of(int id);                        // id -> key (nullptr for an id the table has not)
