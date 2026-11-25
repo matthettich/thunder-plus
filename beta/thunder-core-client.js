@@ -63,7 +63,7 @@
     detach: function () {
       for (var i = 0; i < offs.length; i++) { try { offs[i](); } catch (e) { /* ignore */ } }
       offs = []; NC.on = false; NC.sr = 0;
-      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset();
+      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset(); mtrReset(); MTR.views = {}; MTR.wanted.fx = []; MTR.wanted.dyn = [];
     },
 
     // ---- PC3: the song -------------------------------------------------------------------------------------------------------------------
@@ -256,7 +256,7 @@
     if (o.loop && o.loop.y0 != null) m.loop = { y0: o.loop.y0 | 0, y1: (o.loop.y1 != null ? o.loop.y1 : o.loop.y0) | 0 };
     if (o.only && o.only.length != null) m.only = Array.prototype.slice.call(o.only);
     try { if (host.pdc) { var pm = host.pdc(); if (pm === 0 || pm === 1 || pm === 2) { m.pdc = pm; L.pdc = pm; } } } catch (e) { /* ignore */ }   // PC4: the latency compensation mode goes with PLAY
-    playSent = true; active = false; send(m); liveSoon();
+    playSent = true; active = false; send(m); liveSoon(); mtrNote(false);
     // the live state the JS core got at PLAY: PERFORM, the look-ahead, the tempo set while waiting
     try { var pf = host.perf && host.perf(); if (pf) NC.perf(pf); } catch (e) { /* ignore */ }
     if (NC.pendBpm != null) { var b = NC.pendBpm; NC.pendBpm = null; NC.bpm(b); }
@@ -276,7 +276,9 @@
   function watch(on) {
     clearInterval(watchT); watchT = 0;
     lastTick = on ? nowMs() : 0;
+    mtrNote(false);   // M5: every stop, fall-back, engine change and PLAY start passes here: the meter wish is looked at again (off when nothing plays natively)
     if (on) watchT = setInterval(function () {
+      mtrNote(false);   // M5: the page's meterHold() can change under a running PLAY (Settings > METERS)
       var n = nowMs(), late = lastTick && n - lastTick > TICK_LATE_MS; lastTick = n;
       if (late) { quietUntil = n + 600; return; }   // the page's main thread was busy: the `clock` events are still queued, not missing. Skip this round, wait one more period
       if (typeof document !== 'undefined' && document.hidden) quietUntil = n + 3000;   // the screen off: the page's timers and events run late, not the engine
@@ -298,6 +300,7 @@
     if (!tc || typeof tc.on !== 'function') return;
     var on = function (t, fn) { tc.on(t, fn); offs.push(function () { if (typeof tc.off === 'function') tc.off(t, fn); }); };
     on('clock', function (m) { lastClock = nowMs(); lost = false; if (m && m.sr && m.sr !== NC.sr && m.sr > 0) { /* a rate change arrives with engine / device events: handled there */ } });
+    if (meters2()) { on('fx.lvl', onFxLvl); on('fx.dyn', onFxDyn); }   // M5: only with caps.meters2
     on('song', function (m) { if (m && m.rev != null) songHeard = m.rev; });
     on('fit', function (m) {   // the shell's verdict again (after kit.load, after lxp): for the song last sent
       if (!m || !verdict || m.rev !== verdict.rev) return;
@@ -318,6 +321,7 @@
         return; }
       if (m.up === true) {   // rebuilt (engine.reset, a device change): the song goes again (PC2 re-sends the kit and pads itself on this event)
         engineUp = true; lost = false; lastClock = nowMs(); lxpSent = 0; verdict = null; sentRef = null; inflight = null; failed = null; liveReset();   // PC4: a rebuilt core holds nothing: the baseline is unknown until its song is accepted
+        MTR.sent = null; mtrNote(true);   // M5: nor does it hold the meter wish: the whole state again (all off, no PLAY runs)
         var rate = m.sr && m.sr > 0 && m.sr !== NC.sr; if (rate) NC.sr = m.sr;
         if (rate) { try { host.prerender && host.prerender(); } catch (e) { /* ignore */ } }
         publish();
@@ -718,6 +722,78 @@
     L.ops.set(id + '\u0000' + name, { op: 'param', id: id, name: name, value: value });
     liveSoon();
   };
+
+  /* ---- M5 (first half): the effect meters (docs/port/METERS-DESIGN.md 4.4, 4.5, 5a; CORE-BRIDGE 7.1). Only when hello's caps say `meters2`; otherwise nothing is asked and nothing here runs.
+     The page's FX bar / FX screen ask through a node-like view per track (fxNode): its port takes the page's own {lvl:bool} / {tel:bool} messages, so the page's one-node-at-a-time code is unchanged.
+     `wanted` is the page's wish; what goes out is the wish only while a native PLAY runs and the page's meterHold() is false (else everything off). ONE meters.want, whole state, 100 ms after the last change. ---- */
+  var METER_MS = 100;         // METERS-DESIGN 4.5: meters.want goes 100 ms after the last change
+  var METER_RATE = 10;        // the 70-float METERS rate the shell asked for at hello (live_jni); not changed by this unit
+  var MTR = { wanted: { rate: METER_RATE, fx: [], dyn: [], chains: false, master: false }, views: {}, t: 0, sig: null, sent: null, force: false };
+  function meters2() { return !!(NC.on && NC.caps && NC.caps.meters2); }
+  function mtrHold() { try { return !!(host && host.meterHold && host.meterHold()); } catch (e) { return false; } }
+  /** What goes out now: the wish, or everything off (METERS OFF while playing, nothing playing natively). */
+  function mtrState() {
+    var w = MTR.wanted, on = meters2() && playSent && !mtrHold();
+    return { t: 'meters.want', rate: w.rate, fx: on ? w.fx.slice() : [], dyn: on ? w.dyn.slice() : [], chains: on && !!w.chains, master: on && !!w.master };
+  }
+  function mtrSig(m) { return m.rate + '|' + m.fx.join() + '|' + m.dyn.join() + '|' + (m.chains ? 1 : 0) + (m.master ? 1 : 0); }
+  /** Something may have changed: when the state that would go out differs from the last one scheduled, (re)start the 100 ms timer. */
+  function mtrNote(force) {
+    if (!meters2() || !tc || down()) return;   // (an engine that is down hears nothing: engine {up:true} sends it all again)
+    var sg = mtrSig(mtrState());
+    if (!force && sg === MTR.sig) return;
+    if (force) MTR.force = true;
+    MTR.sig = sg; clearTimeout(MTR.t); MTR.t = setTimeout(mtrFlush, METER_MS);
+  }
+  function mtrFlush() {
+    MTR.t = 0; if (!meters2() || !tc || down()) return;
+    var m = mtrState(), sg = mtrSig(m); MTR.sig = sg;
+    var frc = MTR.force; MTR.force = false;
+    if (MTR.sent === sg) return;   // the core already has exactly this (a change that went back within the 100 ms)
+    if (MTR.sent === null && !frc && !m.fx.length && !m.dyn.length && !m.chains && !m.master) return;   // nothing was ever asked and nothing is wanted: the shell's own hello state stands
+    MTR.sent = sg; send(m);
+  }
+  function mtrReset() { clearTimeout(MTR.t); MTR.t = 0; MTR.sig = null; MTR.sent = null; MTR.force = false; }   // detach: nothing pending, nothing remembered
+  function want(list, tr, on) {
+    var i = list.indexOf(tr);
+    if (on) { if (list.length === 1 && i === 0) return false; list.length = 0; list.push(tr); return true; }   // ONE track at a time (ruling 3)
+    if (i < 0) return false; list.splice(i, 1); return true;
+  }
+  /** The page's node-like view of track tr (32 = the master's effects), or null: no meters2 (the panels stay empty as today) or a track outside 0..32. */
+  NC.fxNode = function (tr) {
+    if (!meters2() || !(tr >= 0 && tr <= 32) || tr !== Math.floor(tr)) return null;
+    var v = MTR.views[tr];
+    if (!v) {
+      v = MTR.views[tr] = { tr: tr, lvl: null, lvlT: 0, dyn: null, port: { postMessage: function (m) {
+        if (!m) return;
+        var ch = false;
+        if (m.lvl !== undefined) ch = want(MTR.wanted.fx, tr, !!m.lvl) || ch;
+        if (m.tel !== undefined) ch = want(MTR.wanted.dyn, tr, !!m.tel) || ch;
+        if (ch) mtrNote(false);
+      } } };
+    }
+    return v;
+  };
+  /** Anything that changes whether a PLAY runs, the engine, or the page's hold: the state is looked at again. */
+  NC.metersSync = function (force) { mtrNote(!!force); };
+  function onFxLvl(m) {
+    if (!meters2() || !m || !(m.tr >= 0 && m.tr <= 32) || !m.a || typeof m.a.length !== 'number') return;
+    var v = MTR.views[m.tr | 0]; if (!v) return;
+    var a = []; for (var i = 0; i < 8; i++) { var x = +m.a[i]; a.push(isFinite(x) && x > 0 ? x : 0); }
+    v.lvl = a; v.lvlT = nowMs();
+  }
+  function onFxDyn(m) {
+    if (!meters2() || !m || !(m.tr >= 0 && m.tr <= 32) || !m.d || typeof m.d.length !== 'number') return;
+    var v = MTR.views[m.tr | 0]; if (!v) return;
+    var S = host.S && host.S(), A = S ? (m.tr === 32 ? S.mfx : S.tfx && S.tfx[m.tr]) : null, list = [];
+    for (var i = 0; i < m.d.length; i++) {
+      var e = m.d[i]; if (!e || e.length < 5) continue;
+      var slot = e[0] | 0, f = A && A[slot];
+      if (!f || f.type !== e[1]) continue;   // a plan was just swapped: the report is for the old effect (4.5)
+      list.push([slot, slot + ':' + f.type, [+e[2] || 0, +e[3] || 0, +e[4] || 0]]);
+    }
+    if (list.length && typeof host.fxDynIn === 'function') try { host.fxDynIn(v, list); } catch (e) { log('native core client: fxDynIn failed', e); }
+  }
 
   window.__thunderClient = NC;
 })();
