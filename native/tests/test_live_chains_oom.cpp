@@ -47,7 +47,6 @@ static std::string songOf(const std::string& patch, bool on0 = true) {
   return s;
 }
 static thunder_live_opts copts() { return opts(getenv("OOM_NOCHAINS") ? 0 : FC, 1024); }
-static long engineLeak = 0;
 
 // a call failing at its k-th allocation, k = 1, 2, ...: until it succeeds without hitting the failure. `call` returns the code; `state` returns a fingerprint of what must not change on a failure.
 template <class Call, class State, class Undo>
@@ -60,7 +59,7 @@ static void sweep(const char* what, Call call, State state, Undo undo) {
     if (!hit) { CHECK(rc == 0, "%s: no failure injected (k=%ld) and the call works", what, k); undo(); break; }
     if (rc == 0) { undo(); continue; }   // the failure was absorbed (an allocation the code survives); fine
     fails++;
-    if (g_live > live0) { engineLeak += g_live - live0; if (getenv("OOM_VERBOSE")) std::printf("  %s: k=%ld leaves %+ld\n", what, k, g_live - live0); }   // a failure inside the ENGINE's preparePatch leaves what it allocated (U31, see C1-NOTES.md: the allowance of chains_host) AND inside chains_diff (C2a, cdiff.cpp modules_map: found by this sweep, see C2-NOTES.md 'For the lead'): neither is code of this unit. A drop is the call collecting a retired plan, fine
+    if (g_live > live0) { clean = false; if (getenv("OOM_VERBOSE")) std::printf("  %s: k=%ld leaves %+ld\n", what, k, g_live - live0); }   // STRICT: a failed call leaves +0 (a drop is the call collecting a retired plan: fine). C2a's chains_diff leaked here until cdiff.cpp got -fexceptions (37163b0)
     if (state() != st0) { same = false; std::printf("  %s: state changed at k=%ld\n", what, k); }
     const long l1 = g_live; const int rc2 = call(); if (rc2 != 0) { retry = false; std::printf("  %s: retry failed (%d) at k=%ld\n", what, rc2, k); }
     undo(); (void)l1;
@@ -99,7 +98,7 @@ static void testDestroy() {
   const std::string S0 = songOf(patchOf(330, 0)), S1 = songOf(patchOf(330, 1));
   { Host H(copts()); H.song(S0); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); H->play(po); int64_t fr = 0; H.run(Q * 8, Q, fr); H.song(S1, 2); H.run(Q * 4, Q, fr); H->collect(); }   // warm-up: one-time tables
   const long base = g_live;
-  auto level = [&](const char* what) { CHECK(g_live == base || engineLeak > 0 || g_live - base == 0, "%s: allocations back to the level (%+ld)", what, g_live - base); };
+  auto level = [&](const char* what) { CHECK(g_live == base, "%s: allocations back to the level (%+ld)", what, g_live - base); };
   { Host H(copts()); (void)H; }
   level("created and destroyed");
   { Host H(copts()); H.song(S0); }
@@ -144,7 +143,7 @@ int main() {
   testDestroy();
   testAudioAlloc();
   const long b0 = g_live; testSweep();
-  CHECK(g_live - b0 <= engineLeak, "after the sweep every host is gone and what is left is the engine's own allowance (%+ld vs %ld)", g_live - b0, engineLeak);
-  std::printf("live_chains_oom: %d checks, %d failed (engine leak allowance %ld)\n", g_checks, g_fail, engineLeak);
+  CHECK(g_live - b0 <= 0, "after the sweep every host is gone: every allocation given back (%+ld)", g_live - b0);
+  std::printf("live_chains_oom: %d checks, %d failed (strict: +0)\n", g_checks, g_fail);
   return g_fail ? 1 : 0;
 }

@@ -131,6 +131,24 @@ static void testEdits() {
   CHECK(nodeK->engine().busMap().empty() && K.st().chains_plans == 2, "(iii) the node's bus map follows the bus plan (empty now), one more plan");
   CHECK(ndiff(X.l, K.l) == 0 && ndiff(X.r, K.r) == 0, "(iii) its output equals a run without the switch (track 0 is silent): the state was kept (%zu samples differ)", ndiff(X.l, K.l));
   CHECK(K.st().chains_feed_mismatch == 0 && X.st().chains_feed_mismatch == 0, "no feed mismatch");
+
+  // R7 (M1 / M6 of the mutation table): (a) a play that is replaced or cancelled before it starts still COMMITS its plan: play(S1: a plan) + play + stop + play queued together, the node ends with S1's patch;
+  // (b) the param records of a chain_edit made right after a structural publish meet the NEW patch (the commit is applied first, then the records): the same samples as a publish that carries the value
+  {
+    Rig R(copts()); R.H.song(S0); R.play(); R.run(kEdit); R.H->stop(THUNDER_LIVE_NOW); R.run(Q * 4);
+    CHECK(R.H.song(SX1, 2) == 0, "song S1 while idle"); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW);
+    CHECK(R.H->play(po) == 0 && R.H->play(po) == 0 && R.H->stop(THUNDER_LIVE_NOW) == 0 && R.H->play(po) == 0, "play (with a plan), play, stop, play queued"); R.run(Q * 40); R.H->collect();
+    CHECK(R.ch()->node(1) && R.ch()->node(1)->engine().patchModules() == 5, "(R7) the plan of a replaced / cancelled play was committed: the node runs S1's patch (%d modules)", R.ch()->node(1) ? R.ch()->node(1)->engine().patchModules() : -1);
+    CHECK(R.H.song(SX1, 3) == 0 && R.st().chains_plans == 2, "the same song again makes no plan (the control view and the audio side agree; plans %u)", R.st().chains_plans);
+  }
+  {
+    Rig P(copts()), E(copts()); P.H.song(S0); P.play(); P.run(kEdit); E.H.song(S0); E.play(); E.run(kEdit);
+    const std::string SXF = songOf(patchOf(441, 1));
+    CHECK(P.H.song(SXF, 2) == 0, "structural publish carrying freq 441");
+    CHECK(E.H.song(SX1, 2) == 0 && edit(E, kEditOsc) == 0, "structural publish, then chain_edit freq 441 before the next quantum");
+    P.run(Q * 40); E.run(Q * 40);
+    CHECK(ndiff(P.l, E.l) == 0 && ndiff(P.r, E.r) == 0, "(R7) the records are applied AFTER the commit: %zu samples differ", ndiff(P.l, E.l));
+  }
   // the mixer's bus plan is the commit's alone (R7): a refused plan with another bus plan must leave it
   {
     Rig R(copts()); R.H.song(S0); R.play(); R.run(kEdit); CHECK(R.H->mixerForTest().plan().nFeeds[1] == 1, "bus 1 has one feed");
@@ -194,6 +212,7 @@ static void testRefused() {
     CHECK(R.H.song(SOff, 3) == 0 && R.st().chains_plans == 2, "a keep-patch plan needs one patch: it fits"); R.run(Q * 4); CHECK(R.ch()->node(1)->engine().busMap().empty(), "and lands");
     Rig T(copts(0, kChainsNodeOverhead / 2)); T.H.song(S0); CHECK(T.play() == 0, "budget below one node: play succeeds"); T.run(Q * 8);
     CHECK(T.st().chains_over_budget == 1 && T.ch()->node(1) == nullptr && T.st().chains_nodes == 0, "dry, over_budget 1");
+    CHECK(T.H->mixerForTest().plan().nFeeds[1] == 0, "R7 (tryStartPlay): a play whose plan was refused does not apply the song's bus plan either: the mixer's plan is the commit's alone (nFeeds[1] %d)", T.H->mixerForTest().plan().nFeeds[1]);
   }
 }
 
