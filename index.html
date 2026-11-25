@@ -8762,7 +8762,7 @@ let ctx = null, master = null;
    Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
 const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
 const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
-  s.src = 'thunder-core-client.js?v=1';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.src = 'thunder-core-client.js?v=2';   // bump with the ?v= in sw.js OPTIONAL when the file changes
   s.onload = () => { try { window.__thunderClient.attach({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}); } catch(e){ tpLog('native core client: attach failed', e); } };
   s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
   document.head.appendChild(s); };
@@ -15255,7 +15255,7 @@ function setKit(k, noUndo){
   setTimeout(kitUndoBase, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0;
   if (kit.voices.length < nslots()) growKit();
   try { instFit(); } catch(e){}
-  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } buildPads(); refreshAll(); save(); try { slotsUI(); } catch(e){} }
+  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } if (NCON()) NC().newKit(ncPadApi()); buildPads(); refreshAll(); save(); try { slotsUI(); } catch(e){} }
 // Before replacing the kit: when the current one has samples (recorded or imported) the new one doesn't, say so.
 async function kitReplaceOk(next, what){
   const keep = new Set(); for (const v of (next && next.voices) || []) for (const L of v.layers || []) if (L.sample && L.sample.id) keep.add(L.sample.id);
@@ -25392,13 +25392,14 @@ function coreDrop(){ coreMixOff(); const n = core.node; if (n){ try { n.port.pos
   Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0, vsent:null, sfSent:null}); core.sent.clear(); }
 const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = coreKitV(); core.kitSig = JSON.stringify(kv);
+  if (NCON()) return NC().kit(ncPadApi());   // native core: kit.load, then the pads (the line above only worked out kv)
   corePost({op:'kit', kv}); for (let i = 0; i < kv.length; i++) if (kv[i] && kv[i].sf || (core.sfSent && core.sfSent.has(i))) coreSf(i); }
 /* KIT WHILE PLAYING (owner, 7 Nov: "changing a synth engine on the synth screen during playback would hold the old sound until
    the song was stopped and restarted"). The core learns each pad's kind (live engine or rendered, which live node, held or
    one-shot, choke, release) from 'kit', which only went at PLAY; a new render reached it (coreBuf) but a pad that changed
    kind kept playing the old way. While the core plays, the page looks at most 5 times a second whether that list changed
    and sends it again (coreKitCheck, from the rows it gets). */
-function coreKitCheck(){ const now = performance.now(); if (now - (core.kitT || 0) < 200) return; core.kitT = now;
+function coreKitCheck(){ if (NCON()) return NC().kitCheck(ncPadApi()); const now = performance.now(); if (now - (core.kitT || 0) < 200) return; core.kitT = now;
   try { if (JSON.stringify(coreKitV()) !== core.kitSig) coreKit(); } catch(e){ tpLog('core kit', e); } }
 function coreKitV(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
@@ -25424,12 +25425,14 @@ function coreSf(i){ if (!core.ready) return; const v = kit.voices[i], M = core.s
     const a = SF.smp.get(font.id + ':' + k), d = a.d.slice(); smp[k] = {d, sr:a.sr, ls:a.ls, le:a.le}; tr.push(d.buffer); }
   corePost({op:'sf', pad:i, data:{P:PP, font:{samples}, pr:{zones:pr.zones}, smp}}, tr); }
 // MUT / GEN: a variation for the core (by instrument, variation and pad: the core can't work out the page's varKey), once
-function coreVar(ev, rec){ if (!core.ready || !rec || !rec.data || ev.ii == null || ev.pad == null) return;
+function coreVar(ev, rec){ if (NCON()) return NC().variation(ev, rec); if (!core.ready || !rec || !rec.data || ev.ii == null || ev.pad == null) return;
   const k = ev.ii + ':' + ev.vk + ':' + ev.pad, V = core.vsent || (core.vsent = new Map()); if (V.get(k) === rec.data) return; V.set(k, rec.data);
   const d = rec.data.slice(); corePost({op:'vbuf', k, pad:ev.pad, data:d, sr:rec.sr}, [d.buffer]); }
 // A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
-function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); coreVarGone(i); corePost({op:'buf', pad:i, data:null}); } return; }
+function coreBuf(i){ if (NCON()) return NC().pad(i, ncPadApi()); if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); coreVarGone(i); corePost({op:'buf', pad:i, data:null}); } return; }
   if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); coreVarGone(i); const d = c.data.slice(), d2 = c.data2 ? c.data2.slice() : null; corePost({op:'buf', pad:i, data:d, data2:d2, sr:c.sr}, d2 ? [d.buffer, d2.buffer] : [d.buffer]); }
+/* NATIVE CORE (PC2): what the client's pad code reads from the page, handed over per call so the loader's attach() list stays as PC1 made it. */
+const ncPadApi = () => ({cache:i => slotAt(cache, i), nslots:() => nslots(), kitV:() => coreKitV(), insts:() => S.insts, loopSecs, slicePoints, toast});
 /* SONG SYNC (owner, Fold, 2 Nov: stutters on STOP, on Shift-navigating, on the screen going off and on, and a late note
    preview). Posting the whole song after every save made the audio thread unpack hundreds of KB in its own time: a glitch
    each time. Now only what changed goes: top-level fields whole, and the big lists (phrases, chains, song rows,
@@ -27182,7 +27185,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ songRelease('a song was opened'); tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ songRelease('a song was opened'); tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; if (NCON()) NC().newSong(ncPadApi()); setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -27240,7 +27243,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 677;
+const BUILD = 678;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37714,6 +37717,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [678, '25 Nov', ['Behind the scenes: with the native engine on, the page now sends its pad renders, kit list, variations and chop data to it (copies, with a memory limit). Nothing changes while that is off.']],
   [677, '25 Nov', ['Behind the scenes: the page can now load the native-engine client file when the Android app (or the Native core test switch) asks for it. Nothing changes while that is off.']],
   [676, '24 Nov', ['Fixed: resizing the window while a song plays no longer hangs the screen. A drag used to redraw the whole tracker and Arrange on every event, and again on every playhead step; now the screen is re-fitted a few times a second during the drag and once more when it ends, and the dogs / piano / FX chain beside the grid are hidden until then, so they cannot sit over the text.', 'Fixed: the master\u2019s SIGNAL chain (and the other panels beside the grid) could sit over the Pattern view\u2019s columns after the window was resized or the view scrolled sideways. It now shows only when the grid is not scrolled sideways.']],
   [675, '24 Nov', ['Fixed: LOOP SEL (and LP.SEL) keep looping the rows you selected in Arrange after you go into a phrase, select or edit a note there and come back. A selection in the phrase used to replace the armed rows when you left it with the song stopped, so PLAY on Arrange no longer looped them.']],
