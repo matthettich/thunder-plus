@@ -64,4 +64,8 @@ object LiveNative {
     external fun nativeStreamState(): String
     /** The shell's output gain, 0..1 (audio-focus ducking), ramped in 150 ms by the audio thread. */
     external fun nativeSetDuck(gain: Float)
+
+    // ---- H2 ----
+    /** true when the MIDI host runs on this engine (MIDI out and in work). */
+    external fun nativeMidiOn(): Boolean
 }

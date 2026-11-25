@@ -137,18 +137,31 @@ bool MidiHost::engineStart(double sr, TsFn tsFn, void* tsUser) {
   std::lock_guard<std::mutex> g(ctl_);
   if (h_) return true;
   char err[128];
-  h_ = thunder_midi_create(sr, err, sizeof err);
-  if (!h_) return false;
+  thunder_midi* core = thunder_midi_create(sr, err, sizeof err);
+  if (!core) return false;
+  if (!startLocked(core, false, sr, tsFn, tsUser)) { thunder_midi_free(core); return false; }
+  return true;
+}
+
+bool MidiHost::engineStartExternal(thunder_midi* core, double sr, TsFn tsFn, void* tsUser) {
+  std::lock_guard<std::mutex> g(ctl_);
+  if (h_) return true;
+  if (!core) return false;
+  return startLocked(core, true, sr, tsFn, tsUser);
+}
+
+bool MidiHost::startLocked(thunder_midi* core, bool external, double sr, TsFn tsFn, void* tsUser) {
   sink_.user = this; sink_.now_ns = &SinkGlue::now; sink_.send = &SinkGlue::send; sink_.clear = &SinkGlue::clear;   // clearDev: drops the held messages of a port without timestamps, flushes a stamped port's
   sink_.caps = THUNDER_MIDIOUT_CAP_TS;   // per SINK, fixed at create: a port that cannot stamp is held by sendTo until its time (see there)
-  o_ = thunder_midiout_create(h_, sr, &sink_);
-  if (!o_) { thunder_midi_free(h_); h_ = nullptr; return false; }
+  o_ = thunder_midiout_create(core, sr, &sink_);
+  if (!o_) return false;
+  h_ = core; external_ = external;
   sr_ = sr; tsFn_ = tsFn; tsUser_ = tsUser;
-  frames_ = 0; lastMapNs_ = 0; mapped_ = false; mapReady_.store(false, std::memory_order_release); nHeld_ = 0; heldCount_.store(0, std::memory_order_relaxed);
+  frames_ = 0; lastMapNs_ = 0; mapped_ = false; mapReady_.store(false, std::memory_order_release); remap_.store(false, std::memory_order_relaxed); nHeld_ = 0; heldCount_.store(0, std::memory_order_relaxed);
   if (!held_) held_.reset(new (std::nothrow) Held[kHeld]);
-  if (!held_) { thunder_midiout_free(o_); thunder_midi_free(h_); o_ = nullptr; h_ = nullptr; return false; }
+  if (!held_) { thunder_midiout_free(o_); o_ = nullptr; h_ = nullptr; external_ = false; return false; }
   applyDevicesLocked();
-  for (int p = 0; p < 4; p++) applyAssignLocked(p);
+  for (int p = 0; p < 4; p++) { applyAssignLocked(p); thunder_midiout_set_clock(o_, p, clock_[p] ? 1 : 0); thunder_midiout_set_gear(o_, p, gear_[p]); }
   if (outLatNs_.load(std::memory_order_relaxed) > 0) thunder_midiout_set_out_latency(o_, outLatNs_.load(std::memory_order_relaxed));
   stop_.store(false, std::memory_order_release);
   sender_ = std::thread(&MidiHost::senderMain, this);
@@ -168,13 +181,17 @@ void MidiHost::engineStop() {
   std::lock_guard<std::mutex> g(ctl_);
   if (!h_) return;
   running_.store(false, std::memory_order_release);
+  { std::lock_guard<std::mutex> rg(runMu_); runner_ = nullptr; }
   // A song still playing: the audio callback has stopped, so THIS thread takes its role for one last block: Stop (notes off, CLEAR, clock Stop) goes through the real queue, and the
   // sender gets up to 200 ms to deliver it before it is stopped (a synth must not be left holding a note).
-  if (mapReady_.load(std::memory_order_acquire) && dbgOwned_ && dbgOwned_->state.load(std::memory_order_acquire) != DebugSong::FINISHED) {
-    const double now = (double)frames_ / sr_ + 0.01;
-    thunder::midi_begin(h_, now, 0.01, 0.0, ~(uint64_t)0);
-    thunder::midi_sched(h_).stop(now);
-    thunder::midi_end(h_, now, now, 120, false);
+  const bool debugLive = dbgOwned_ && dbgOwned_->state.load(std::memory_order_acquire) != DebugSong::FINISHED;
+  if (mapReady_.load(std::memory_order_acquire) && (debugLive || external_)) {
+    if (!external_) {   // the live host made its own Stop when the shell stopped the transport (live.h: stop posts thunder_midi_stop); only the debug song needs this last block
+      const double now = (double)frames_ / sr_ + 0.01;
+      thunder::midi_begin(h_, now, 0.01, 0.0, ~(uint64_t)0);
+      thunder::midi_sched(h_).stop(now);
+      thunder::midi_end(h_, now, now, 120, false);
+    }
     thunder_midiout_set_playing(o_, 0);
     // Quiet = the core's counters unchanged for `need` ms AND the sender holds nothing. The pump hands a message to the sink up to 20 ms before its time and the Stop is stamped 10 ms
     // ahead plus the output latency, so a window of 25 ms + the latency is what it takes for the Stop to have been handed over; a message held for a port without timestamps counts as
@@ -191,13 +208,57 @@ void MidiHost::engineStop() {
   stop_.store(true, std::memory_order_release);
   if (sender_.joinable()) sender_.join();   // the caller stopped the audio callback first: nobody calls clock_map or process any more
   thunder_midiout_free(o_); o_ = nullptr;
-  thunder_midi_free(h_); h_ = nullptr;
+  if (!external_) thunder_midi_free(h_);   // the live host's thunder_midi is freed by thunder_live_destroy
+  h_ = nullptr; external_ = false;
   freeDebugLocked(true);
   nHeld_ = 0; heldCount_.store(0, std::memory_order_relaxed);
   if (held_) for (int i = 0; i < kHeld; i++) held_[i].io.reset();
 }
 
-int MidiHost::setDevices(const std::vector<DevInfo>& devs) {
+void MidiHost::setControlRunner(std::function<int(std::function<int()>)> r) { std::lock_guard<std::mutex> g(runMu_); runner_ = std::move(r); }
+
+int MidiHost::viaControl(std::function<int()> fn) {
+  std::function<int(std::function<int()>)> r;
+  { std::lock_guard<std::mutex> g(runMu_); r = runner_; }
+  if (!r) return fn();
+  const int rc = r(fn);
+  // -1000: the runner says there is NO control thread (the engine is gone): nothing to race with, so fn runs here. A TIMEOUT or a busy control thread is the runner's own code (the shell's runner answers
+  // THUNDER_LIVE_E_BUSY): fn is NOT run on the caller's thread beside a thunder_live_* control call, which is exactly what the runner exists to prevent (verify-n2 F11).
+  return rc == -1000 ? fn() : rc;
+}
+
+int MidiHost::setDevices(const std::vector<DevInfo>& devs) { return viaControl([this, devs] { return setDevicesImpl(devs); }); }
+int MidiHost::assign(int port, const std::string& id) { if (port < 0 || port > 3) return THUNDER_MIDIOUT_E_ARG; return viaControl([this, port, id] { return assignImpl(port, id); }); }
+
+int MidiHost::setClock(int port, bool on) {
+  if (port < 0 || port > 3) return THUNDER_MIDIOUT_E_ARG;
+  return viaControl([this, port, on] { std::lock_guard<std::mutex> g(ctl_); clock_[port] = on; return o_ ? thunder_midiout_set_clock(o_, port, on ? 1 : 0) : 0; });
+}
+int MidiHost::setGear(int port, double ms) {
+  if (port < 0 || port > 3) return THUNDER_MIDIOUT_E_ARG;
+  return viaControl([this, port, ms] { std::lock_guard<std::mutex> g(ctl_); gear_[port] = ms; return o_ ? thunder_midiout_set_gear(o_, port, ms) : 0; });
+}
+int MidiHost::setPlaying(bool on) { return viaControl([this, on] { return setPlayingDirect(on); }); }
+int MidiHost::setPlayingDirect(bool on) { std::lock_guard<std::mutex> g(ctl_); return o_ ? thunder_midiout_set_playing(o_, on ? 1 : 0) : 0; }
+
+std::string MidiHost::portsJson() {
+  std::lock_guard<std::mutex> g(ctl_);
+  std::string s = "{\"ports\":[";
+  char b[512];
+  for (int i = 0; i < 4; i++) {
+    thunder_midiout_port p; std::memset(&p, 0, sizeof p);
+    if (o_) thunder_midiout_get_port(o_, i, &p);
+    auto esc = [](const char* in) { std::string o; for (; *in; in++) { if (*in == '"' || *in == '\\') { o += '\\'; o += *in; } else if ((unsigned char)*in < 0x20) o += ' '; else o += *in; } return o; };
+    std::snprintf(b, sizeof b, "%s{\"state\":%d,\"id\":\"%s\",\"name\":\"%s\",\"gear\":%.0f,\"clock\":%d}", i ? "," : "", o_ ? p.state : 0, esc(p.id).c_str(), esc(p.name).c_str(), o_ ? p.gear_ms : gear_[i], o_ ? p.clock : (clock_[i] ? 1 : 0));
+    s += b;
+  }
+  thunder_midiout_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st;
+  if (o_) thunder_midiout_stats_get(o_, &st);
+  std::snprintf(b, sizeof b, "],\"late\":%llu,\"sent\":%llu,\"gone\":%llu,\"qfull\":%llu,\"hang\":%llu}", (unsigned long long)st.late, (unsigned long long)st.sent, (unsigned long long)st.dropped_gone, (unsigned long long)st.queue_full, (unsigned long long)st.may_hang);
+  return s + b;
+}
+
+int MidiHost::setDevicesImpl(const std::vector<DevInfo>& devs) {
   std::lock_guard<std::mutex> g(ctl_);
   std::vector<DevInfo> old; old.swap(devs_); devs_ = devs;
   const int r = applyDevicesLocked();
@@ -205,18 +266,15 @@ int MidiHost::setDevices(const std::vector<DevInfo>& devs) {
   return r;
 }
 
-int MidiHost::assign(int port, const std::string& id) {
-  if (port < 0 || port > 3) return THUNDER_MIDIOUT_E_ARG;
+int MidiHost::assignImpl(int port, const std::string& id) {
   std::lock_guard<std::mutex> g(ctl_);
   assign_[port] = id;
   return applyAssignLocked(port);
 }
 
-void MidiHost::setOutLatencyNs(int64_t ns) {
-  std::lock_guard<std::mutex> g(ctl_);
+int MidiHost::setOutLatencyNs(int64_t ns) {
   const int64_t v = ns < 0 ? 0 : ns > 2000000000LL ? 2000000000LL : ns;
-  outLatNs_.store(v, std::memory_order_relaxed);
-  if (o_) thunder_midiout_set_out_latency(o_, v);
+  return viaControl([this, v] { std::lock_guard<std::mutex> g(ctl_); outLatNs_.store(v, std::memory_order_relaxed); if (o_) thunder_midiout_set_out_latency(o_, v); return 0; });
 }
 
 int MidiHost::debugTest() {
@@ -414,20 +472,30 @@ void MidiHost::audioBlock(int frames, int64_t t0) {
   } else {
     midi_end(h_, now, now, 120, false);
   }
-  // the clock map: core frame frame0 is AUDIBLE at host time host0. At most every 20 ms (AAudioStream_getTimestamp is not free), always at the first callback.
-  if (!mapped_ || mono - lastMapNs_ >= 20000000LL) {
-    int64_t frame0 = F, host0 = mono + outLatNs_.load(std::memory_order_relaxed); bool exact = false;   // fallback: the block starts to be heard one output latency (the floor) after the callback
-    TsPair p;
-    if (tsFn_ && tsFn_(tsUser_, &p)) {
-      const int64_t off = p.written - F;   // 0 in steady state if AAudio's frames written excludes the block being filled (UNVERIFIED on the device: reported in status)
-      if (p.ns > mono - 2000000000LL && p.ns < mono + 200000000LL) { frame0 = p.pos - off; host0 = p.ns; exact = true; lastOffsetFrames.store(off, std::memory_order_relaxed); }
-      else mapOdd.fetch_add(1, std::memory_order_relaxed);
-    }
-    (exact ? mapExact : mapFallback).fetch_add(1, std::memory_order_relaxed);
-    thunder_midiout_clock_map(o_, frame0, host0);
-    mapped_ = true; lastMapNs_ = mono; mapReady_.store(true, std::memory_order_release);
-  }
+  if (!mapped_ || mono - lastMapNs_ >= 20000000LL) publishMap(F, F, mono);
   frames_ = F + frames;
+}
+
+// The clock map: core (ENGINE) frame `coreFrame` is AUDIBLE at host time host0. `hostFrame` is the same block start on the host's own count (the one AAudio's frames written counts against); in
+// the debug path the two are equal. At most every 20 ms (AAudioStream_getTimestamp is not free), always at the first callback. AUDIO thread.
+void MidiHost::publishMap(int64_t coreFrame, int64_t hostFrame, int64_t mono) {
+  int64_t frame0 = coreFrame, host0 = mono + outLatNs_.load(std::memory_order_relaxed); bool exact = false;   // fallback: the block starts to be heard one output latency (the floor) after the callback
+  TsPair p;
+  if (tsFn_ && tsFn_(tsUser_, &p)) {
+    const int64_t off = p.written - hostFrame;   // 0 in steady state if AAudio's frames written excludes the block being filled (UNVERIFIED on the device: reported in status)
+    if (p.ns > mono - 2000000000LL && p.ns < mono + 200000000LL) { frame0 = p.pos - off - (hostFrame - coreFrame); host0 = p.ns; exact = true; lastOffsetFrames.store(off, std::memory_order_relaxed); }
+    else mapOdd.fetch_add(1, std::memory_order_relaxed);
+  }
+  (exact ? mapExact : mapFallback).fetch_add(1, std::memory_order_relaxed);
+  thunder_midiout_clock_map(o_, frame0, host0);
+  mapped_ = true; lastMapNs_ = mono; mapReady_.store(true, std::memory_order_release);
+}
+
+void MidiHost::audioBlockLive(int frames, int64_t hostFrame0, int64_t offset, int64_t t0) {
+  if (!o_ || !h_ || frames <= 0) return;
+  const int64_t mono = t0 > 0 ? t0 : nowFn_();
+  const bool force = remap_.exchange(false, std::memory_order_acq_rel);
+  if (force || !mapped_ || mono - lastMapNs_ >= 20000000LL) publishMap(hostFrame0 - offset, hostFrame0, mono);
 }
 
 std::string toJniUtf8(const std::string& s) {

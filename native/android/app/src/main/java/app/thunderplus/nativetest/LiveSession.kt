@@ -41,6 +41,7 @@ object LiveSession {
     private var devCb: AudioDeviceCallback? = null
     private val watch = StreamWatch(1000)
     private var lastSig = ""
+    private var tickN = 0
 
     @Volatile var hasFocus = false
         private set
@@ -190,6 +191,7 @@ object LiveSession {
             }
         }
         if (LiveEngine.gate is GateState.Running) exec.execute { LiveEngine.gateTick() }
+        if (++tickN % 6 == 0) service?.let { LiveMidi.publish(it.applicationContext) }   // every 3 s: the late / sent counts of the MIDI out (the page rescans at that rate too)
         // focus is given up when the song is not playing and nothing is waiting to resume (3 s of grace after a Play request: the poller needs a moment to see PLAYING)
         val s = LiveEngine.status()
         val playing = s.state == LiveState.PLAYING || s.state == LiveState.HELD

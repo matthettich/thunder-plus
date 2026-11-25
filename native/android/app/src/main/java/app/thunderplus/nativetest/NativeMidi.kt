@@ -19,4 +19,14 @@ object NativeMidi {
     external fun nativePoll(): Boolean
     external fun nativeSenderTid(): Int
     external fun nativeStatus(): String
+
+    // ---- N2 H2 ----
+    /** Opens the given OUTPUT ports (PortInfo TYPE_OUTPUT port numbers: the app READS them) of an open [MidiDevice] under the given tokens. Returns the tokens that opened. Messages arrive as `midi.in` bridge events. */
+    external fun nativeAttachIn(device: MidiDevice, tokens: LongArray, ports: IntArray): LongArray
+    external fun nativeDetachIn(tokens: LongArray)
+    /** Port letter 0..3: its clock box, and its Gear delay in ms (-50..200). Saved without an engine, applied through the live control thread with one. */
+    external fun nativeSetClock(port: Int, on: Boolean): Int
+    external fun nativeSetGear(port: Int, ms: Double): Int
+    /** {"ports":[{state,id,name,gear,clock} x4],"late","sent",...} */
+    external fun nativePortsJson(): String
 }

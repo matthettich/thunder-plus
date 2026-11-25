@@ -30,6 +30,7 @@
 #include <stdint.h>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -90,15 +91,33 @@ class MidiHost {
   // Creates the scheduler, the port table and the sender thread for an engine run (sample rate sr), applies the device list and the four letters saved so far, and starts the
   // sender. tsFn / tsUser: the AAudio timestamp source (null: the fallback map). Returns false (nothing left running) on a bad rate or no memory.
   bool engineStart(double sr, TsFn tsFn, void* tsUser);
+  // N2 H2: the LIVE host's scheduler. `core` = thunder_live_midi(L): it belongs to the live host, which runs midi_begin / onStep / midi_end inside thunder_live_process itself (U37 P5), so there is no debug song
+  // and audioBlock is NOT called: the audio callback calls audioBlockLive (the clock map only) after each process. thunder_midiout_create + devices + ports are CONTROL calls of the live handle's ONE control thread:
+  // call this before the live control thread starts, then give the host the control thread with setControlRunner. engineStop frees the thunder_midiout only (never the core's thunder_midi).
+  bool engineStartExternal(thunder_midi* core, double sr, TsFn tsFn, void* tsUser);
   // After the audio callback has stopped. Joins the sender, frees the core's objects. Safe when not started.
   void engineStop();
+  // N2 H2: every CONTROL method below (setDevices, assign, setClock, setGear, setPlaying, setOutLatencyNs) runs through `r` when one is set: the live host's control thread (LiveEngine::call), so the core's
+  // thunder_midi_set_* never run beside a thunder_live_* control call. `r` returns the function's result, or -1000 when that thread is not running (the function then runs here: no engine, nothing to race).
+  void setControlRunner(std::function<int(std::function<int()>)> r);
+  // The clock map is published again at the next audioBlockLive (after a stream rebuild: the AAudio timestamp pair of a new stream is a new one).
+  void remap() { remap_.store(true, std::memory_order_release); }
+  int setClock(int port, bool on);
+  int setGear(int port, double ms);
+  // The host's transport (thunder_midiout_set_playing). Through the control runner.
+  int setPlaying(bool on);
+  // The same call from the control thread itself (inside a LiveEngine::call task): no runner.
+  int setPlayingDirect(bool on);
+  // The four ports as JSON for the bridge's `midi.ports` event: {"ports":[{"state":0|1|2,"id":"","name":"","gear":0,"clock":0}x4],"late":N,"sent":N}. Any thread.
+  std::string portsJson();
   bool running() const { return running_.load(std::memory_order_acquire); }
   // The whole device list (after every scan / open / close). Saved, and applied now when an engine runs. Returns 0 or a THUNDER_MIDIOUT_E_* code (E_ARG: nothing changed).
   int setDevices(const std::vector<DevInfo>& devs);
   // Port letter 0..3 -> a device id ("" = none). Saved and applied now when an engine runs.
   int assign(int port, const std::string& id);
   // The clock map's floor: the output latency, ns (0 .. 2 s). Applied now when an engine runs.
-  void setOutLatencyNs(int64_t ns);
+  // Returns the control call's result (0, or THUNDER_LIVE_E_BUSY from the runner: retry later).
+  int setOutLatencyNs(int64_t ns);
   // The token -> port table (the sender reads it). attach / detach do NOT change the device list: setDevices does.
   void attach(uint64_t token, std::shared_ptr<PortIo> io, bool ts) { table_.put(token, std::move(io), ts); }
   void detach(uint64_t token) { table_.remove(token); }
@@ -121,6 +140,9 @@ class MidiHost {
   // callback-start fallback). The pair math is spec 3.4: frame0 = pos - (written - F_cb), host_ns0 = ns.
   // t0: CLOCK_MONOTONIC at the START of the callback (spec 3.4 takes the pair there); 0 = read the clock now (the Linux test).
   void audioBlock(int frames, int64_t t0 = 0);
+  // N2 H2: the LIVE host's block. Called after thunder_live_process of the callback. `hostFrame0` = the host frame of the block's first frame (what process was given), `offset` =
+  // thunder_live_engine_offset (host frame - engine frame); the core's scheduler talks ENGINE frames, so the map gets engine frame = host frame - offset (U37-P5-NOTES). No lock, no allocation.
+  void audioBlockLive(int frames, int64_t hostFrame0, int64_t offset, int64_t t0 = 0);
 
   // ---- test hooks (the Linux test) --------------------------------------------------------------------------------------------------------------------------
   void setNowFn(NowFn f) { nowFn_ = f ? f : &monoNs; }
@@ -140,6 +162,11 @@ class MidiHost {
   void flushAllHeld();                                               // SENDER: sends every held message now, in order
   void senderMain();
   int64_t flushDeferred(int64_t now);                               // SENDER: sends the held messages that are due; returns the next due time (INT64_MAX: none)
+  bool startLocked(thunder_midi* core, bool external, double sr, TsFn tsFn, void* tsUser);   // ctl_ held
+  void publishMap(int64_t coreFrame, int64_t hostFrame, int64_t mono);                      // AUDIO: the clock map (pair math of spec 3.4)
+  int viaControl(std::function<int()> fn);
+  int setDevicesImpl(const std::vector<DevInfo>& devs);
+  int assignImpl(int port, const std::string& id);
   int applyDevicesLocked();                                         // ctl_ held
   int applyAssignLocked(int port);
   void freeDebugLocked(bool force);
@@ -148,6 +175,12 @@ class MidiHost {
   PortTable table_;
   NowFn nowFn_;
   std::atomic<bool> running_{false};
+  bool external_ = false;                   // h_ belongs to the live host
+  std::atomic<bool> remap_{false};
+  std::mutex runMu_;
+  std::function<int(std::function<int()>)> runner_;
+  bool clock_[4] = {false, false, false, false};   // saved (control)
+  double gear_[4] = {0, 0, 0, 0};
   thunder_midi* h_ = nullptr;
   thunder_midiout* o_ = nullptr;
   thunder_midiout_sink sink_;

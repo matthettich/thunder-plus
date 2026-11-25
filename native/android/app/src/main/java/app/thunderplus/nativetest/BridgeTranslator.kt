@@ -22,7 +22,7 @@ import org.json.JSONObject
 //   * put (header + ArrayBuffer messages, see PutStore) then buf.use {id, pad, layer, kind:'pad'|'var', ii, vk: 'm3' | 'g1' (kind letter + number: the page's key, G4)} -> thunder_live_pad_take / thunder_live_var_set; pads become audible at pads.commit (no automatic publish). buf.free {id}.
 //     kinds 'sample', 'ir', 'wt', 'sf': err event (they are inputs of the core's pad render, which the page does not ask for here; 'sf' is E_UNSUPPORTED).
 //   * hello (ask) {live:true} -> the live engine starts (if it did not) and the reply carries caps; without `live` the N0 test core answers as before (Bridge.kt).
-//   * not on the live host (live.h NOT IN THIS API / H2 / later stages): note.on, note.off, midi.cfg, dev.list, dev.open, rec.*, render.*, link.set, lxp, song.patch, kit.patch, fx.set: an err event (`ask`: an error reply).
+//   * not on the live host (live.h NOT IN THIS API / later stages): note.on, note.off, dev.list, dev.open, rec.*, render.*, link.set, lxp, song.patch, kit.patch, fx.set: an err event (`ask`: an error reply).
 object BridgeTranslator {
     const val NOW = -1L
 
@@ -51,6 +51,8 @@ object BridgeTranslator {
         data class BufUse(val id: Int, val pad: Int, val layer: Int, val kind: String, val ii: Int, val vk: Int, val num: Int) : LiveCall()
         data class BufFree(val id: Int) : LiveCall()
         data class Hello(val id: Int, val live: Boolean) : LiveCall()
+        /** H2: midi.cfg {outs:[id x4], clockOut:[bool x4], gearDelay:[ms x4], clockIn}: the four letters (A..D), their clock boxes and Gear delays (-50..200 ms, whole ms). clockIn is read and ignored (clock follow is a fallback condition). */
+        data class MidiCfg(val outs: List<String>, val clockOut: List<Boolean>, val gear: List<Double>, val clockIn: Boolean) : LiveCall()
         /** The page's live transpose (the drum module's `lxp`): no live call exists (G11), so it only changes the SongFit verdict (a key-follow song then falls back). st = 0 is off. */
         data class Lxp(val st: Int) : LiveCall()
     }
@@ -68,7 +70,7 @@ object BridgeTranslator {
         "song.patch" to "the live host takes the whole song: send song.load",
         "kit.patch" to "the live host takes the whole kit: send kit.load",
         "note.on" to "notes from the host are not in the live API (live.h NOT IN THIS API)", "note.off" to "notes from the host are not in the live API (live.h NOT IN THIS API)",
-        "midi.cfg" to "MIDI out on the live host arrives with H2", "dev.list" to "audio devices are the shell's own (H1c)", "dev.open" to "audio devices are the shell's own (H1c)",
+        "dev.list" to "audio devices are the shell's own (H1c)", "dev.open" to "audio devices are the shell's own (H1c)",
         "rec.arm" to "recording is not on the live host", "rec.start" to "recording is not on the live host", "rec.stop" to "recording is not on the live host",
         "render.start" to "renders do not go through the live host", "render.cancel" to "renders do not go through the live host", "link.set" to "Link is not on the live host")
 
@@ -136,6 +138,15 @@ object BridgeTranslator {
                 val d = DoubleArray(12) { p.optDouble(it, Double.NaN) }
                 if (d.any { it.isNaN() || it.isInfinite() }) return refuse("$t: a value is not a number")
                 call(LiveCall.FxParam(tr, j.optInt("slot", -1), d, at(j)))
+            }
+            "midi.cfg" -> {
+                val outs = j.optJSONArray("outs"); val clk = j.optJSONArray("clockOut"); val gear = j.optJSONArray("gearDelay")
+                if (j.has("outs") && outs == null) return refuse("midi.cfg: outs must be an array of four ids")
+                call(LiveCall.MidiCfg(
+                    List(4) { i -> val v = outs?.opt(i); if (v is String) v else "" },
+                    List(4) { i -> val v = clk?.opt(i); v == true || (v is Number && v.toInt() != 0) },
+                    List(4) { i -> val v = gear?.opt(i); Math.round(((v as? Number)?.toDouble() ?: 0.0).coerceIn(-50.0, 200.0)).toDouble() },
+                    j.opt("clockIn").let { it == true || (it is String && it.isNotEmpty()) }))
             }
             "pads.commit" -> call(LiveCall.PadsCommit(j.optInt("n", 0)))
             "pad.chop" -> {

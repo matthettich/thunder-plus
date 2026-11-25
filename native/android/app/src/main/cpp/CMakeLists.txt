@@ -18,7 +18,7 @@ if(THUNDER_WITH_LXR)
   add_subdirectory(${NATIVE_ROOT}/lxr ${CMAKE_BINARY_DIR}/thunder_lxr)
 endif()
 
-add_library(thunder_android SHARED jni.cpp midi_jni.cpp midi_out.cpp live_jni.cpp live_engine.cpp live_events.cpp pad_filler.cpp songfit.cpp miniaudio_impl.c)
+add_library(thunder_android SHARED jni.cpp midi_jni.cpp midi_out.cpp midi_in.cpp live_jni.cpp live_engine.cpp live_events.cpp pad_filler.cpp songfit.cpp miniaudio_impl.c)
 target_include_directories(thunder_android PRIVATE ${REPO_ROOT}/io/vendor/miniaudio ${NATIVE_ROOT}/core/src)   # core/src: midi_out.cpp drives the scheduler (midi/midi_host.h) and a debug sequencer (seq/)
 # AAudio only; no decoding / encoding / generation code in the build. The same definitions for both files.
 target_compile_definitions(thunder_android PRIVATE

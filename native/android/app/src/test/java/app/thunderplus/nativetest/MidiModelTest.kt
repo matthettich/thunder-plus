@@ -115,4 +115,49 @@ class MidiModelTest {
         assertTrue(t.all { MidiIds.utf8Len(it.second) <= 95 })
         assertTrue(t[1].second.endsWith(" #2"))
     }
+
+    // ---- N2 H2: MIDI in ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    private fun raw(id: Int, name: String, t: Transport, vararg p: RawPort) = RawDevice(id, name, t, p.toList())
+
+    @Test fun scanSplitsTheDirections() {
+        val keys = raw(1, "Keys", Transport.USB, RawPort(0, "MIDI", false))                                          // a controller: reads only
+        val synth = raw(2, "Synth", Transport.USB, RawPort(0, "In", true), RawPort(0, "Out", false))                 // both
+        val box = raw(3, "Box", Transport.USB, RawPort(0, "A", true), RawPort(1, "B", true))                          // writes only, two ports
+        val devs = listOf(keys, synth, box)
+        assertEquals(listOf(2, 3), MidiScanSplit.outs(devs).map { it.deviceId })
+        assertEquals(listOf(1, 2), MidiScanSplit.ins(devs).map { it.deviceId })
+        assertEquals(2, MidiScanSplit.outs(devs).first { it.deviceId == 3 }.ports.size)
+        // each direction gets its own ids and tokens
+        val ro = MidiRegistry(); val ri = MidiRegistry()
+        ro.update(MidiScanSplit.outs(devs)); ri.update(MidiScanSplit.ins(devs))
+        assertEquals(listOf("n:Synth", "n:Box / A", "n:Box / B"), ro.entries.map { it.id })
+        assertEquals(listOf("n:Keys", "n:Synth"), ri.entries.map { it.id })
+        assertEquals(listOf(MidiScanSplit.deviceIds(ro.entries, ri.entries).size), listOf(3))
+    }
+
+    @Test fun hotPlugOfAnInputOnlyDevice() {
+        val ri = MidiRegistry()
+        val d1 = ri.update(MidiScanSplit.ins(listOf(raw(1, "Keys", Transport.USB, RawPort(0, "MIDI", false)))))
+        assertEquals(1, d1.added.size)
+        val tok = ri.entries[0].token
+        val d2 = ri.update(MidiScanSplit.ins(emptyList()))
+        assertEquals(listOf(tok), d2.removed.map { it.token })
+        val d3 = ri.update(MidiScanSplit.ins(listOf(raw(7, "Keys", Transport.USB, RawPort(0, "MIDI", false)))))   // plugged in again: a NEW token, the same id
+        assertEquals("n:Keys", ri.entries[0].id); assertTrue(ri.entries[0].token != tok); assertEquals(1, d3.added.size)
+    }
+
+    @Test fun midiPortsEvent() {
+        val o = PortEntry(3, PortKey(2, 0), "n:Synth", "Synth", true)
+        val i = PortEntry(9, PortKey(1, 0), "n:Keys", "Keys", true)
+        val core = "{\"ports\":[{\"state\":1,\"id\":\"n:Synth\",\"name\":\"Synth\",\"gear\":12,\"clock\":1},{\"state\":0,\"id\":\"\",\"name\":\"\",\"gear\":0,\"clock\":0}],\"late\":2,\"sent\":40}"
+        val j = org.json.JSONObject(MidiPortsEvent.build(listOf(o), listOf(i), core))
+        assertEquals("midi.ports", j.getString("t"))
+        assertEquals("n:Synth", j.getJSONArray("devs").getJSONObject(0).getString("id"))
+        assertEquals(9L, j.getJSONArray("ins").getJSONObject(0).getLong("port"))   // what midi.in events carry as `port`
+        assertEquals(1, j.getJSONArray("ports").getJSONObject(0).getInt("state"))
+        assertEquals(2L, j.getLong("late")); assertEquals(40L, j.getLong("sent"))
+        val none = org.json.JSONObject(MidiPortsEvent.build(emptyList(), emptyList(), ""))   // no engine: four empty letters
+        assertEquals(4, none.getJSONArray("ports").length()); assertEquals(0, none.getJSONArray("devs").length())
+    }
 }

@@ -74,6 +74,10 @@ object LiveBridge {
         }
         when (c) {
             is BridgeTranslator.LiveCall.Hello -> hello(ctx, c)
+            is BridgeTranslator.LiveCall.MidiCfg -> {
+                LiveMidi.apply(ctx, c).let { if (it.isNotEmpty()) err("midi.cfg", it) }
+                if (c.clockIn != clockFollow) { clockFollow = c.clockIn; refit() }   // clock follow is a fallback condition (SongFit clock-follow, F6)
+            }
             is BridgeTranslator.LiveCall.SongLoad -> {
                 // CORE-BRIDGE 7 G14: sent as an ask, the reply is {ok, rev, reasons, warn}; ok:false is the fallback verdict (the core refused the song, or SongFit says it cannot play natively)
                 val text = String(c.raw, Charsets.UTF_8)
@@ -145,10 +149,11 @@ object LiveBridge {
         val body = JSONObject().put("v", 1).put("core", "n2-live").put("sampleRate", LiveEngine.sampleRate)
             .put("sr", LiveEngine.sampleRate).put("outLat", (FlatJson.num(LiveNative.nativeStatus(), "outLat") ?: 0.0).toInt()).put("host", "android")   // CORE-BRIDGE 7 G1
             .put("maxPadBytes", (FlatJson.num(stats, "padBudget") ?: (128.0 * 1048576)).toLong()).put("maxSongBytes", 16L * 1048576)
-            .put("caps", JSONObject().put("nativeAudio", true).put("midi", false).put("link", false).put("plugins", false).put("inputs", false).put("render", false)
+            .put("caps", JSONObject().put("nativeAudio", true).put("midi", LiveNative.nativeMidiOn()).put("link", false).put("plugins", false).put("inputs", false).put("render", false)
                 .put("live", true).put("chains", LiveNative.nativeChainsOn()).put("sf", (caps and 8) != 0).put("engines", engines)
                 .put("fx", org.json.JSONArray(listOf("tfx", "pump", "modfx", "master"))).put("abi", 1).put("liveCaps", caps))
         reply(h.id, body)
+        LiveMidi.publish(ctx)   // H2: the page learns the ports (midi.ports) right after the hello
     }
 
     private fun startPump() {
