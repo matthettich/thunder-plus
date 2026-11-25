@@ -105,7 +105,7 @@ int LiveEngine::call(std::function<int(thunder_live*)> fn, int timeoutMs) {
   { std::lock_guard<std::mutex> g(qm_); q_.push_back(t); }
   qcv_.notify_all();
   std::unique_lock<std::mutex> lk(t->m);
-  if (!t->cv.wait_for(lk, std::chrono::milliseconds(timeoutMs + 500), [&] { return t->done; })) { t->abandoned = true; return -1000; }
+  if (!t->cv.wait_for(lk, std::chrono::milliseconds(timeoutMs + 500), [&] { return t->done; })) { t->abandoned = true; return t->started ? -1001 : -1000; }   // under t->m: the control thread sets `started` under it before fn, so -1000 = dropped, -1001 = may still apply
   return t->rc;
 }
 
@@ -119,7 +119,7 @@ void LiveEngine::controlLoop() {
     }
     if (!t) { thunder_live_collect(L_); continue; }
     int rc = -1000;
-    bool skip; { std::lock_guard<std::mutex> g(t->m); skip = t->abandoned; }
+    bool skip; { std::lock_guard<std::mutex> g(t->m); skip = t->abandoned; if (!skip) t->started = true; }
     if (!skip) {
       for (;;) {
         rc = t->fn(L_);
@@ -148,25 +148,25 @@ void LiveEngine::pollLoop() {
       int off = 0;
       while (off + (int)sizeof(thunder_live_ev_head) <= n) {
         thunder_live_ev_head h; std::memcpy(&h, buf + off, sizeof h);
-        if (h.bytes < sizeof h || off + h.bytes > n) break;
+        if (h.bytes < sizeof h || (int64_t)off + (int64_t)h.bytes > (int64_t)n) break;   // 64-bit: a huge `bytes` cannot wrap the sum
         st_.records++;
         if (st_.lastSeq && h.seq != st_.lastSeq + 1) st_.gaps++;
         st_.lastSeq = h.seq;
         const unsigned char* p = buf + off;
         { std::string js; if (eventToJson(p, h.bytes, &js)) events_.push(std::move(js), eventIsCritical(h.type)); }
         switch (h.type) {
-          case THUNDER_LIVE_EV_CLOCK: { thunder_live_ev_clock c; std::memcpy(&c, p, sizeof c); st_.clockF = c.h.f; st_.voices = c.voices; st_.under = c.under; st_.outLat = c.out_lat; break; }
-          case THUNDER_LIVE_EV_POS: { thunder_live_ev_pos q; std::memcpy(&q, p, sizeof q); st_.row = q.row; st_.step = q.step; st_.bpm = q.bpm10 / 10.0; break; }
-          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; std::memcpy(&s, p, sizeof s); st_.state = stateOfRecord(s.state); break; }
+          case THUNDER_LIVE_EV_CLOCK: { thunder_live_ev_clock c; if (h.bytes < sizeof c) break; std::memcpy(&c, p, sizeof c); st_.clockF = c.h.f; st_.voices = c.voices; st_.under = c.under; st_.outLat = c.out_lat; break; }
+          case THUNDER_LIVE_EV_POS: { thunder_live_ev_pos q; if (h.bytes < sizeof q) break; std::memcpy(&q, p, sizeof q); st_.row = q.row; st_.step = q.step; st_.bpm = q.bpm10 / 10.0; break; }
+          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; if (h.bytes < sizeof s) break; std::memcpy(&s, p, sizeof s); st_.state = stateOfRecord(s.state); break; }
           case THUNDER_LIVE_EV_HELD: st_.state = THUNDER_LIVE_STATE_HELD; break;
-          case THUNDER_LIVE_EV_SONG: { thunder_live_ev_song s; std::memcpy(&s, p, sizeof s); st_.songRev = s.rev; break; }
-          case THUNDER_LIVE_EV_PADS: { thunder_live_ev_pads s; std::memcpy(&s, p, sizeof s); st_.padsId = s.id; break; }
-          case THUNDER_LIVE_EV_METERS: { thunder_live_ev_meters m; std::memcpy(&m, p, sizeof m); st_.masterPk[0] = m.a[66]; st_.masterPk[1] = m.a[68]; break; }
+          case THUNDER_LIVE_EV_SONG: { thunder_live_ev_song s; if (h.bytes < sizeof s) break; std::memcpy(&s, p, sizeof s); st_.songRev = s.rev; break; }
+          case THUNDER_LIVE_EV_PADS: { thunder_live_ev_pads s; if (h.bytes < sizeof s) break; std::memcpy(&s, p, sizeof s); st_.padsId = s.id; break; }
+          case THUNDER_LIVE_EV_METERS: { thunder_live_ev_meters m; if (h.bytes < sizeof m) break; std::memcpy(&m, p, sizeof m); st_.masterPk[0] = m.a[66]; st_.masterPk[1] = m.a[68]; break; }
           case THUNDER_LIVE_EV_ERROR: {
-            thunder_live_ev_error e; std::memcpy(&e, p, sizeof e);
+            thunder_live_ev_error e; if (h.bytes < sizeof e) break; std::memcpy(&e, p, sizeof e);
             st_.errors++; if (e.fatal) st_.fatal++;
             char b[96]; std::snprintf(b, sizeof b, "where %d code %d fatal %d value %d", e.where, e.code, e.fatal, e.value); st_.lastError = b; break; }
-          case THUNDER_LIVE_EV_LATE: { thunder_live_ev_late l; std::memcpy(&l, p, sizeof l); st_.notesLate = l.notes_late; st_.runnerSkips = l.runner_skips; break; }
+          case THUNDER_LIVE_EV_LATE: { thunder_live_ev_late l; if (h.bytes < sizeof l) break; std::memcpy(&l, p, sizeof l); st_.notesLate = l.notes_late; st_.runnerSkips = l.runner_skips; break; }
           default: break;   // ROWS, HELD: a reader skips what it does not use, by `bytes`
         }
         off += h.bytes;

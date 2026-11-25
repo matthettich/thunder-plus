@@ -15,7 +15,7 @@ if(NOT MSVC)
 endif()
 target_sources(thunder_core PRIVATE src/modfx/fftr.cpp src/modfx/mod_spectral.cpp src/modfx/mod_convolve.cpp)   # U20
 target_sources(thunder_core PRIVATE src/engine/layer_u23.cpp src/engine/layer_click.cpp src/engine/layer_wavetable.cpp src/engine/layer_pd.cpp src/engine/layer_chip.cpp src/engine/layer_supersaw.cpp src/engine/layer_pwm.cpp src/engine/layer_sample.cpp src/engine/layer_vint.cpp src/engine/layer_grains.cpp)   # U23
-target_sources(thunder_core PRIVATE src/engine/xeng_util.cpp src/engine/xeng_voice.cpp src/engine/xeng_tone.cpp src/engine/xeng_modal.cpp src/engine/xeng_swarm.cpp src/engine/xeng_drift.cpp src/engine/xeng_piano.cpp src/engine/xeng_ep.cpp src/engine/xeng_organ.cpp src/engine/xeng_breath.cpp src/engine/xeng_strings.cpp src/engine/xeng_fmdrum.cpp src/engine/xeng_wind.cpp src/engine/xeng_phase.cpp src/engine/xeng_partials.cpp src/engine/xeng_skin.cpp src/engine/xeng_chip.cpp)   # U28
+target_sources(thunder_core PRIVATE src/engine/padfx.cpp src/engine/xeng_util.cpp src/engine/xeng_voice.cpp src/engine/xeng_tone.cpp src/engine/xeng_modal.cpp src/engine/xeng_swarm.cpp src/engine/xeng_drift.cpp src/engine/xeng_piano.cpp src/engine/xeng_ep.cpp src/engine/xeng_organ.cpp src/engine/xeng_breath.cpp src/engine/xeng_strings.cpp src/engine/xeng_fmdrum.cpp src/engine/xeng_wind.cpp src/engine/xeng_phase.cpp src/engine/xeng_partials.cpp src/engine/xeng_skin.cpp src/engine/xeng_chip.cpp)   # U28
 target_sources(thunder_core PRIVATE src/engine/xeng_table.cpp src/engine/xeng_vector.cpp src/engine/xeng_scanned.cpp src/engine/xeng_resynth.cpp src/engine/xeng_bytebeat.cpp)   # U29
 target_sources(thunder_core PRIVATE src/engine/xeng_live.cpp src/engine/xeng_blip.cpp)   # U27
 target_sources(thunder_core PRIVATE src/engine/bass_core.cpp src/engine/vox_core.cpp src/engine/live_shell.cpp src/engine/live_pool.cpp)   # U26 / LIVE ROUTE
@@ -39,6 +39,8 @@ else()
   # U31: the patch-preparation boundary of the …chains engine catches std::bad_alloc (a patch that cannot be built is refused, the process goes on): this one file has exceptions. The throw comes from operator new
   # in the other (-fno-exceptions) code, which has unwind tables; a half-made patch is simply dropped (its memory leaks on that path, which is already the failure path).
   set_source_files_properties(src/chains/cengine.cpp PROPERTIES COMPILE_OPTIONS "-fexceptions")
+  # PFX: the pad effects allocate (whole-pad vectors, Rings / Clouds objects) and a std::bad_alloc is caught in padfx.cpp and in the two pad render loops (kEngNoMemory)
+  set_source_files_properties(src/engine/padfx.cpp src/engine/engine.cpp src/engine/xeng_voice.cpp PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 
 # U02: the existing C++ DSP as static libraries (see dsp/CMakeLists.txt, third_party/PINS.md)
@@ -49,7 +51,7 @@ endif()
 # U14: the track-effect host links the tfx effects directly (make_* of dsp/tfx/tfx.h), no wasm
 if(TARGET thunder_dsp_tfx)
   target_link_libraries(thunder_core PUBLIC thunder_dsp_tfx)
-  target_include_directories(thunder_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../dsp/tfx)
+  target_include_directories(thunder_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../dsp/tfx ${CMAKE_CURRENT_SOURCE_DIR}/dsp)
   target_compile_definitions(thunder_core PUBLIC THUNDER_HAVE_TFX=1)
 endif()
 # U25: the Plaits / Elements layer types host the strict upstream build (thunder_dsp_pe, dsp/pe_host.h) directly. layer_pe.cpp is always built (without the library the two types are simply not supported).

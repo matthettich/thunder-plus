@@ -67,7 +67,8 @@ class LiveEngine {
   float duck() const { return duckTarget_.load(std::memory_order_relaxed); }
 
   // CONTROL from any thread, one at a time or many: `fn` runs on the control thread. E_BUSY (-8) is retried after the next audio callback until timeoutMs; the result is fn's last return.
-  // Returns -1000 when the control thread is not running or the wait timed out (the task is then dropped if it has not started).
+  // Returns -1000 when the control thread is not running, or the wait timed out BEFORE the control thread started `fn` (the task is dropped: it never runs, nothing changed).
+  // Returns -1001 when the wait timed out while `fn` was already RUNNING (or its E_BUSY retries were): UNKNOWN, the work may still be applied (a load may be half or fully in). The caller must not assume "nothing changed".
   int call(std::function<int(thunder_live*)> fn, int timeoutMs = 5000);
 
   // The host's output latency (frames) and xrun count as the stream knows them; the poller passes them to thunder_live_host_stats.
@@ -85,7 +86,7 @@ class LiveEngine {
  private:
   struct Task {
     std::function<int(thunder_live*)> fn;
-    std::mutex m; std::condition_variable cv; bool done = false; bool abandoned = false; int rc = 0;
+    std::mutex m; std::condition_variable cv; bool done = false; bool abandoned = false; bool started = false; int rc = 0;   // started / abandoned: under m
     int64_t deadlineNs = 0;
   };
   void controlLoop();
