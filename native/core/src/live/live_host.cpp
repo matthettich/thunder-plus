@@ -816,10 +816,12 @@ void LiveHost::quantum() {
   const double t0 = (double)qStart / sr_;
   // 1. APPLY COMMANDS
   const uint32_t nChainParams = chainParams_.avail();   // C2 L1: the snapshot of the edit ring BEFORE the command loop
+  const uint32_t nFxParams = fxParams_.avail();         // P3b: the same snapshot for the effects parameters (a record pushed after a commit that the loop did not see waits for the next quantum)
   retryStalledPlay(qStart);
   if (clearPend_) { clearPend_ = false; clearWaiting(qStart); }   // (a stalled play that started now)
   applyCommands(qStart, qStart + kLiveQuantum);
-  applyFxParams(qStart);
+  if (testFxSeam_) testFxSeam_(testFxSeamUser_);   // TEST ONLY (null in a product): between the command loop and the effects drain
+  applyFxParams(qStart, nFxParams);
   if (testCmdSeam_) testCmdSeam_(testCmdSeamUser_);   // TEST ONLY (null in a product)
   if (!stalledPlay_) applyChainParams(nChainParams);   // after the commands: a param sent after a commit meets the new patch. NOT while a play waits for its snapshot: its plan is not committed yet (a param applied now would be lost under the swap)
   // 2. ADOPT: seq_adopt, then seqGone() if the Seq was dropped, then PadsHost::beginQuantum(players, runner's Seq) every quantum
@@ -1014,9 +1016,9 @@ void LiveHost::applyChainParams(uint32_t n) {
     if (chains_) chains_->param(r.id, r.name, r.v);
   }   // (NUL-terminated by the control side; every node gets it: ChainsHost::param)
 }
-void LiveHost::applyFxParams(int64_t qStart) {
+void LiveHost::applyFxParams(int64_t qStart, uint32_t n) {   // at most the `n` records that were in the ring before the command loop (P3b, as applyChainParams)
   LiveFxParam fp;
-  while (fxParams_.pop(fp)) {
+  while (n-- && fxParams_.pop(fp)) {
     if (!fxBank_) continue;
     const double now = (double)qStart / sr_, at = fp.at < 0 || fp.at - off_ < qStart ? now : (double)(fp.at - off_) / sr_;
     fxBank_->host(fp.track).psetAt(at, fp.slot, fp.p);   // FXV's queue (FxHost::psetAt): applied by the first block that starts within 64 samples of `at`
