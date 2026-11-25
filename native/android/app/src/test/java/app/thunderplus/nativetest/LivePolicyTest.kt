@@ -5,9 +5,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import app.thunderplus.nativetest.FocusPolicy.Act as A
 
 class LivePolicyTest {
-    private val A = FocusPolicy.Act
 
     @Test fun lossStopsForGood() {
         assertEquals(A.STOP_FOR_GOOD, FocusPolicy.decide(FocusPolicy.LOSS, playing = true, armed = false, ducked = false))
