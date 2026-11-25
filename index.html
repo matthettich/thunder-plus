@@ -24953,7 +24953,7 @@ let fxRestartN = 0;
 const songRow = () => { const y0 = cs.song.y; for (let y = y0; y < 256; y++){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; } return 0; };
 let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP clears it, so a STOP inside the window is not followed by the song
 /* NATIVE CORE, PC3 (docs/port/N2-PAGE-CLIENT.md 4.3 rows 4-6, 15-17): the page's side of a PLAY that the engine in the shell plays. tp.nc is true from that PLAY to its STOP; the page's own sequencer,
-   AudioContext and the JS core are not used then. The client file is handed these through attach() (loadClient); nothing here runs unless tStart let the native engine in. */
+   AudioContext and the JS core are not used then. The client file is handed these through attach(); nothing here runs unless tStart let the native engine in. */
 const ncSongHost = () => ({
   songVer:() => songVer, vars:() => coreVars(), title:() => msTitle(), lxp:() => lxp.st | 0, pbLog:s => pbLog(s),
   perf:() => perfLive.init ? {xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill} : null,
