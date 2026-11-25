@@ -7,6 +7,7 @@
 
 #include <time.h>
 
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
@@ -80,23 +81,27 @@ struct InPort {
 };
 struct InTable {
   std::mutex mu;
-  std::condition_variable cv;
+  std::condition_variable cv;        // the reader waits on it (no ports / stopped) and midiInStop waits for the reader's exit on it
   std::vector<std::unique_ptr<InPort>> v;
-  bool started = false;
+  bool run = false;                  // the reader should run: set by midiInStart (the live engine has a sink), cleared by midiInStop (verify B3: no 1 kHz polling with no engine)
+  uint64_t gen = 0;                  // the running reader's generation: a reader whose generation is not the current one exits
+  uint64_t exitedGen = 0;            // the last reader generation that has left inLoop
+  std::thread th;
 };
 InTable& inTable() { static InTable* t = new InTable; return *t; }   // never destroyed: the reader thread outlives static destruction
 
 struct InCtx { uint64_t token; int64_t ts; };
 void inEmit(void* user, const tpa::MidiInMsg& m) { const InCtx* c = static_cast<const InCtx*>(user); if (tpa::MidiInSink s = tpa::midiInSink()) s(c->token, c->ts, m); }
 
-void inLoop() {
+void inLoop(uint64_t myGen) {
   InTable& t = inTable();
   uint8_t buf[1024];
   for (;;) {
     bool any = false;
     {
       std::unique_lock<std::mutex> lk(t.mu);
-      t.cv.wait(lk, [&] { return !t.v.empty(); });
+      t.cv.wait(lk, [&] { return !t.v.empty() || !t.run || t.gen != myGen; });
+      if (!t.run || t.gen != myGen) { t.exitedGen = myGen; lk.unlock(); t.cv.notify_all(); return; }
       for (auto& p : t.v) {
         for (int k = 0; k < 64; k++) {
           int32_t op = 0; size_t n = 0; int64_t ts = 0;
@@ -112,6 +117,35 @@ void inLoop() {
 }
 
 JavaVM* g_vm = nullptr;
+}  // namespace
+
+namespace tpa {
+// B3: the reader runs only while a live engine has the MIDI-in sink. Start: a new generation. Stop: the reader leaves at its next pass (a pass is bounded: 64 non-blocking receives per port); joined with a
+// bound of 200 ms, detached after that (its generation is stale, so it exits by itself and a later start cannot meet two readers). The ports stay attached: the next start reads them again.
+void midiInStart() {
+  InTable& t = inTable();
+  std::thread old;
+  { std::lock_guard<std::mutex> lk(t.mu);
+    if (t.run) return;
+    t.run = true; t.gen++; old = std::move(t.th);
+    t.th = std::thread(inLoop, t.gen); }
+  if (old.joinable()) old.detach();
+  t.cv.notify_all();
+}
+void midiInStop() {
+  InTable& t = inTable();
+  std::thread th; uint64_t g;
+  { std::unique_lock<std::mutex> lk(t.mu);
+    if (!t.run) return;
+    t.run = false; g = t.gen; th = std::move(t.th);
+    t.cv.notify_all();
+    t.cv.wait_for(lk, std::chrono::milliseconds(200), [&] { return t.exitedGen == g; });
+    if (t.exitedGen != g) { lk.unlock(); if (th.joinable()) th.detach(); return; } }
+  if (th.joinable()) th.join();
+}
+}  // namespace tpa
+
+namespace {
 // The sender thread is a std::thread: attached to the JVM for its life, because dropping the LAST reference to an AmidiPort (after a hot-unplug, while a send was in flight)
 // runs AMidiDevice_release on it, and that calls JavaVM::GetEnv and aborts on an unattached thread.
 void senderEnter() { if (g_vm) { JNIEnv* e = nullptr; g_vm->AttachCurrentThread(&e, nullptr); } }
@@ -175,7 +209,6 @@ JNIEXPORT jlongArray JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeAt
   {
     std::lock_guard<std::mutex> lk(t.mu);
     for (auto& ip : add) t.v.push_back(std::move(ip));
-    if (!t.started && !t.v.empty()) { t.started = true; std::thread(inLoop).detach(); }
   }
   t.cv.notify_all();
   return result();

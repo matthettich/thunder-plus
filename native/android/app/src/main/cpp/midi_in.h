@@ -42,6 +42,9 @@ std::string midiInJson(int64_t f, int64_t wallNs, uint64_t port, const MidiInMsg
 typedef void (*MidiInSink)(uint64_t token, int64_t ns, const MidiInMsg& m);
 void setMidiInSink(MidiInSink s);
 MidiInSink midiInSink();
+// Android only (midi_jni.cpp): the shared reader thread of the attached MIDI-in ports runs between these two (the live engine's start and teardown). Stop joins with a 200 ms bound.
+void midiInStart();
+void midiInStop();
 
 }  // namespace tpa
 #endif
