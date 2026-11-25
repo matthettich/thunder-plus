@@ -155,6 +155,20 @@ void testStopMidSong() {
   CHECK(io->count(0x80) >= io->count(0x90), "no note left on: %d on, %d off", io->count(0x90), io->count(0x80));
 }
 
+// verify-n2 F11: a runner that says BUSY (a control call timed out) must NOT make the host run the function on the caller's thread; -1000 (no control thread) does
+void testRunnerBusy() {
+  tpa::MidiHost h;
+  CHECK(h.engineStart(48000, nullptr, nullptr), "start");
+  int ran = 0;
+  h.setControlRunner([&ran](std::function<int()>) { ran++; return -8; });   // BUSY: the function is never invoked
+  CHECK(h.setPlaying(true) == -8 && h.setClock(0, true) == -8, "busy comes back as busy");
+  CHECK(ran == 2, "the runner was asked");
+  int ranHere = 0; h.setControlRunner([&ranHere](std::function<int()>) { ranHere++; return -1000; });   // no control thread: runs on this thread
+  CHECK(h.setPlaying(false) == 0 && ranHere == 1, "-1000 runs the function here");
+  h.setControlRunner(nullptr);
+  h.engineStop();
+}
+
 void testNoDevice() {
   tpa::MidiHost h;
   CHECK(h.debugTest() == -1, "no engine");
@@ -390,6 +404,7 @@ void testJniUtf8() {
 int main() {
   testTable();
   testNoDevice();
+  testRunnerBusy();
   testStopMidSong();
   testJniUtf8();
   testMapPair();

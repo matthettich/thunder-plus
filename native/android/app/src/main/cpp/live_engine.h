@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -22,6 +23,10 @@
 #include "thunder/live.h"
 
 namespace tpa {
+
+// The poller's STATE record carries THUNDER_LIVE_ST_* (1 playing, 2 stopped, 3 ended); everything above the poller (statusJson, LiveState.kt, the MIDI hook) speaks THUNDER_LIVE_STATE_* (0 idle, 1 playing, 2 ended, 3 held).
+// ONE mapping, here (verify-n2 F3): STOPPED -> IDLE (a user Stop shows "stopped"), ENDED -> ENDED (a natural end shows "song ended"). The HELD record sets HELD directly.
+inline int stateOfRecord(int st) { return st == THUNDER_LIVE_ST_PLAYING ? THUNDER_LIVE_STATE_PLAYING : st == THUNDER_LIVE_ST_ENDED ? THUNDER_LIVE_STATE_ENDED : THUNDER_LIVE_STATE_IDLE; }
 
 void setFlushToZero();   // arm64 FPCR.FZ / x86 FTZ+DAZ for the calling thread (the audio thread is the system's: set at the top of every callback; cheap)
 
@@ -50,7 +55,8 @@ class LiveEngine {
   bool created() const { return L_ != nullptr; }
   bool chainsOn() const { return chainsOn_; }   // the host was created with F_CHAINS
   const Config& config() const { return cfg_; }
-  thunder_live* handle() const { return L_; }
+  thunder_live* handle() const { return L_; }   // control-thread use only: the pointer is not protected against destroy()
+  int64_t engineOffset();                       // ANY thread: host frame - engine frame, 0 when destroyed (guarded against destroy(), verify-n2 F10)
 
   // AUDIO. `out` is interleaved stereo, `frames` frames. Never allocates, never blocks. Silence when the engine is not created or the handle is dead.
   void render(float* out, int frames, int64_t wallNs);
@@ -66,7 +72,7 @@ class LiveEngine {
   // The host frame the NEXT callback will start at (audio thread, or any after it stopped). With offset(), what the MIDI clock map needs.
   int64_t hostFrameNow() const { return frame0_; }
   // The engine offset (host frame - engine frame), thunder_live_engine_offset: wait-free, any thread. 0 when no host.
-  int64_t engineOffset() const { int64_t o = 0; if (L_) thunder_live_engine_offset(L_, &o); return o; }
+  int64_t engineOffsetRT() const { int64_t o = 0; if (L_) thunder_live_engine_offset(L_, &o); return o; }   // AUDIO thread only (no lock: the stream is stopped before destroy()); every other thread uses engineOffset()
   // A bridge event made by the shell itself (midi.in, midi.ports ...): goes out with the core's, in the same drained list. Any thread.
   void pushEvent(std::string json, bool critical) { events_.push(std::move(json), critical); }
   // Called by the poller thread for every STATE record (state 0 stopped, 1 playing, 2 ended, 3 held). Set before startThreads.
@@ -80,6 +86,7 @@ class LiveEngine {
   // CONTROL from any thread, one at a time or many: `fn` runs on the control thread. E_BUSY (-8) is retried after the next audio callback until timeoutMs; the result is fn's last return.
   // Returns -1000 when the control thread is not running or the wait timed out (the task is then dropped if it has not started).
   int call(std::function<int(thunder_live*)> fn, int timeoutMs = 5000);
+  bool running() const { return run_.load(); }   // the control thread is up: a -1000 from call() with running() true was a TIMEOUT, not "no control thread"
 
   // The host's output latency (frames) and xrun count as the stream knows them; the poller passes them to thunder_live_host_stats.
   void setHostStats(int outLatencyFrames, int underruns) { outLat_.store(outLatencyFrames, std::memory_order_relaxed); under_.store(underruns, std::memory_order_relaxed); }
@@ -104,6 +111,7 @@ class LiveEngine {
   static int64_t monoNs();
 
   thunder_live* L_ = nullptr;
+  std::shared_mutex lifeM_;                   // destroy() takes it exclusively to free the host; the ANY-thread getters (statsJson) take it shared (verify-n2 F10)
   Config cfg_;
   bool chainsOn_ = false;
   std::vector<float> l_, r_;                  // the audio thread's de-interleave scratch (max_block each), made at create

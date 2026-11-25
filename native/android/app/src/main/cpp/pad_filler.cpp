@@ -93,7 +93,14 @@ bool kitEntryOf(thunder::Json kit, size_t slot, int* choke, bool* syn, double* r
   return true;
 }
 
-bool padFxApplies(std::string_view e) { return !(e == "bass" || e == "vox" || e == "acid" || e == "mach" || e == "wavesl"); }
+// The page's rule (index.html: engFx, "Pad effects run on Layers and on every engine that always plays its render"): dry are Bass and Voice (renderVoice returns before padFx) and every engine of the XENG table with
+// live:true (acid, mach, wavesl) AND the pump synths' live twins (pump/synth/pump-synth-engine.js: LIVE, which PsynCore.xeng() enters with live:true). A TABLE, kept by hand: test_android_live_engine.cpp reads index.html
+// and the pump file and fails when they drift (verify-n2 F14).
+bool padFxApplies(std::string_view e) {
+  static const char* const dry[] = {"bass", "vox", "acid", "mach", "wavesl", "pmonol", "ppolyl", "pcoill", "porbitl", "pfoldl", "pglossl", "ptractl", "pstrikel", "pboingl", "pfreezel", "pwobl", "plifel", "px0xl"};
+  for (const char* d : dry) if (e == d) return false;
+  return true;
+}
 
 namespace {
 
