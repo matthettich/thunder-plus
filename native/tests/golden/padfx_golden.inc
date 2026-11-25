@@ -125,5 +125,11 @@ static const PadFxGolden kPadFxGolden[] = {
   {"pad_crush_room", 0x4e3b076acd968691ull, 54000},
   {"pad_spring_eq", 0xe8e7297a6d3a40d1ull, 53343},
   {"pad_three", 0x588f6643eee8989bull, 54000},
+  {"voice_crush", 0x22704179f1aabb8full, 19328},
+  {"voice_spring", 0x888c2b5b8e0598b6ull, 58494},
+  {"voice_tape_room", 0x548d6f3d448f2f80ull, 48000},
+  {"voice_off", 0x78f110cc9955da16ull, 12019},
+  {"electro_v10_mach", 0xb283a02c89ce546dull, 196320},
+  {"electro_v17_layers", 0xd8795b158168883cull, 21711},
 };
-static const int kPadFxGoldenN = 124;
+static const int kPadFxGoldenN = 130;

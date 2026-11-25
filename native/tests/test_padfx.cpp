@@ -14,6 +14,7 @@
 #include "engine/engine.h"
 #include "engine/engine_json.h"
 #include "engine/padfx.h"
+#include "engine/xeng.h"
 #include "rt/json.h"
 #include "golden/padfx_golden.inc"
 
@@ -47,11 +48,17 @@ int main(int argc, char** argv) {
     Json c = doc.root(); const double sr = c.num("sr", 48000), bpm = c.num("bpm", 120);
     const std::vector<float> a = floats(in), want = floats(ref);
     std::vector<float> got; bool ok = true;
-    if (std::string(c.str("kind")) == "voice") {   // renderVoice: layers, pad effects, trim, fade
+    if (std::string(c.str("kind")) == "voice" || std::string(c.str("kind")) == "electro") {   // renderVoice: layers, pad effects, trim, fade
       Json vj = c.get("voice"); EngVoice* V = new EngVoice; EngRenderOpts o; o.sr = sr; o.hold = 0; o.bpm = bpm;
+      const std::string_view en = vj.str("engine");
+      if (!en.empty() && en != "layers") {   // an X engine pad (ELECTRO's Machine voice): padFx runs only for the engines that are not live
+        XengVoice* X = new XengVoice; ok = xeng_voice_from_json(*X, vj, vj.arr("fx"));
+        if (ok) { const size_t bound = xeng_render_bound(*X, o); got.assign(bound, 0.0f); size_t n = 0; ok = bound && xeng_render_voice(*X, o, got.data(), bound, &n) == kEngOk; got.resize(n); }
+        delete X; delete V;
+      } else {
       ok = eng_voice_from_json(*V, vj, vj.arr("layers"), vj.arr("fx"));
       if (ok) { const size_t bound = eng_render_bound(*V, o); got.assign(bound, 0.0f); size_t n = 0; ok = bound && eng_render_voice(*V, o, got.data(), bound, &n) == kEngOk; got.resize(n); }
-      delete V;
+      delete V; }
     } else if (std::string(c.str("kind")) == "fx") {
       EngFx f; eng_fx_from_json(f, c.get("fx"));
       if (f.kind != EngFx::Kind::Lib) { std::printf("%-26s not hosted (kind %d)\n", G.name, (int)f.kind); fails++; continue; }

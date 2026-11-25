@@ -76,11 +76,18 @@ function cases(E) {
   voice('voice_spring', [L1], [['spring', false]], { len: 0.3, tail: 1.0 });
   voice('voice_tape_room', [L1, L2], [['tape', false], ['room', true]], { len: 0.4, tail: 0.6 });
   voice('voice_off', [L1], [['crush', false]], { len: 0.3, tail: 0.2 });
+  // ELECTRO's own pads that carry pad effects (the saved voice object as the song holds it)
+  try { const song = JSON.parse(rd('sounds/ELECTRO.thunder').toString('utf8')), vs = (song.kit && song.kit.voices) || [];
+    vs.forEach((v, i) => { if (v && v.fx && v.fx.length) out.push({ name: `electro_v${i}_${v.engine || 'layers'}`, kind: 'electro', saved: v, sr: SR, bpm: (song.song && song.song.bpm) || 120 }); }); } catch (e) {}
   return out;
 }
 
 function run(E, c) {
   E.setBpm(c.bpm);
+  if (c.kind === 'electro') {
+    const V = JSON.parse(JSON.stringify(c.saved)); c.voice = c.saved;
+    return { inp: new Float32Array(0), out: E.renderVoice(V, c.sr, null, 0) };
+  }
   if (c.kind === 'voice') {
     const layers = c.v.layers.map(l => E.freshLayer ? E.freshLayer(l) : l), V = E.mkVoice('x', layers, JSON.parse(JSON.stringify(c.v.over)));
     V.fx = c.v.fxs.map(f => JSON.parse(JSON.stringify(f)));
