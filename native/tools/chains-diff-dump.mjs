@@ -285,6 +285,21 @@ run('syn/module-order-differs-ops-follow-next', S([M('a', { x: 1 }), M('b', { x:
   run('electro/knob-drag-sequence-2', ed(P, q => { mod(q, 'smixer').params.l1 = 0.81; }), ed(P, q => { mod(q, 'smixer').params.l1 = 0.82; }));
   run('electro/bus-level-and-pre-toggle', P, ed(P, q => { mod(q, 'chainOut').params.level = 0.5; mod(q, 'trackIn').params.pre = 1; })); }
 
+// ---- verify-c2a finding 1: truthiness of st2 / ti2 with negative numbers, bool ids, a null param on both sides ----
+{ const withF = (k, v) => ed(S0, q => { if (v === undefined) delete q[k]; else q[k] = v; });
+  for (const k of ['st2', 'ti2']) {
+    run('verify/' + k + '-minus-1-vs-absent', withF(k, undefined), withF(k, -1));
+    run('verify/' + k + '-minus-1-vs-minus-5-both-truthy', withF(k, -1), withF(k, -5));
+    run('verify/' + k + '-minus-half-vs-absent', withF(k, undefined), withF(k, -0.5));
+    run('verify/' + k + '-minus-1-vs-zero', withF(k, -1), withF(k, 0)); }
+  run('verify/ids-true-vs-false', S([M(true, { x: 1 })], []), S([M(false, { x: 1 })], []));
+  run('verify/ids-false-same', S([M(false, { x: 1 })], []), S([M(false, { x: 2 })], []));
+  run('verify/ids-null-vs-false', S([M(null, { x: 1 })], []), S([M(false, { x: 1 })], []));
+  run('verify/ids-null-vs-missing', S([M(null, {})], []), S([{ type: 'vca', params: {} }], []));
+  run('verify/param-null-on-both-sides', S([M('a', { x: null, y: 1 })], []), S([M('a', { x: null, y: 1 })], []));
+  run('verify/param-null-both-sides-other-changes', S([M('a', { x: null, y: 1 })], []), S([M('a', { x: null, y: 2 })], []));
+  run('verify/param-null-vs-false', S([M('a', { x: null })], []), S([M('a', { x: false })], [])); }
+
 // ---- the deep-equal departure (lead's ruling): objects / arrays as params ----
 { const D = (extra) => S([M('a', Object.assign({ n: 1, o: { x: 1, y: [1, 2, { z: 3 }], w: { v: null, u: 'q', t: true } }, arr: [1, [2, 3], { k: [4] }] }, extra || {}))], [], { st2: 1, ti2: 1 });
   const nest = (n, leaf) => { let v = leaf; for (let i = 0; i < n; i++) v = [v]; return v; };
