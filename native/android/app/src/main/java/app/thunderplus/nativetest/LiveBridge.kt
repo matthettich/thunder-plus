@@ -82,6 +82,7 @@ object LiveBridge {
                 // CORE-BRIDGE 7 G14: sent as an ask, the reply is {ok, rev, reasons, warn}; ok:false is the fallback verdict (the core refused the song, or SongFit says it cannot play natively)
                 val text = String(c.raw, Charsets.UTF_8)
                 val id = idOf(text); lastRev = revOf(text)
+                Recovery.tracker.onSongLoad(c.raw, SongTitle.fromMessage(text, LiveEngine.projectFile))   // H5-1: what a swipe-away from recents keeps if it was not saved
                 val r = LiveNative.nativeSongLoad(c.raw)
                 val published = FlatJson.bool(r, "ok") ?: false
                 if (published) { LiveEngine.songTitle = SongTitle.fromMessage(text, LiveEngine.projectFile); LiveSession.refresh() }   // H1c: the notification and the media session say this name
@@ -141,6 +142,7 @@ object LiveBridge {
 
     private fun hello(ctx: Context, h: BridgeTranslator.LiveCall.Hello) {
         session = h.live
+        Recovery.tracker.onHello()   // a new page session
         if (!LiveEngine.start(ctx)) { err("hello", "the live engine did not start"); reply(h.id, JSONObject().put("err", "live engine did not start")); return }
         flag = h.live
         startPump()
@@ -155,6 +157,7 @@ object LiveBridge {
                 .put("fx", org.json.JSONArray(listOf("tfx", "pump", "modfx", "master"))).put("abi", 1).put("liveCaps", caps))
         reply(h.id, body)
         LiveMidi.publish(ctx)   // H2: the page learns the ports (midi.ports) right after the hello
+        Recovery.announce(ctx)  // H5-1: {t:'recovery', ...} when a swipe-away left an unsaved copy
     }
 
     private fun startPump() {

@@ -74,6 +74,20 @@ class ThunderService : Service() {
         startForeground(NOTIF_ID, b.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     }
 
+    /**
+     * H5-1 (owner decision 3, 25 Nov): the owner swiped the app away from recents. The page is gone and Android shows no dialog, so nothing is asked of it: the shell writes the last song the page sent as a recovery copy
+     * when it was not saved (Recovery.kt), then STOPS playback and shuts the engine down, then ends this service. All of it off the main thread (the engine's shutdown can sit behind a project load: the ANR fix).
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val ctx = applicationContext
+        Thread({
+            Recovery.saveForTaskRemoved(ctx)   // BEFORE the engine goes: nothing here depends on it
+            try { if (LiveEngine.active) { LiveEngine.stop(); LiveEngine.shutdown() } else ThunderHost.stop(ctx) } catch (t: Throwable) { android.util.Log.i("ThunderService", "task removed: $t") }
+            android.os.Handler(android.os.Looper.getMainLooper()).post { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
+        }, "thunder-task-removed").start()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         LiveSession.detach()
         LiveEngine.shutdown()

@@ -98,3 +98,59 @@ object FileProtocol {
         .put("open", JSONObject().put("mtime", open.mtime).put("size", open.size))
         .also { if (now != null) it.put("now", JSONObject().put("mtime", now.mtime).put("size", now.size)) }
 }
+
+/** One persisted URI permission, as the system lists it. */
+data class Grant(val uri: String, val time: Long)
+
+/** H3-7: which persisted grants to give back. The songs / samples folder grants are never released; of all others the [maxFiles] newest stay (a file opened a minute ago may be saved again), the rest go. Android keeps only 128 (API 29) or 512 grants and drops the OLDEST silently. */
+object GrantRules {
+    fun toRelease(grants: List<Grant>, keep: Set<String>, maxFiles: Int): List<String> =
+        grants.filter { it.uri !in keep }.sortedByDescending { it.time }.drop(maxFiles).map { it.uri }
+}
+
+/** H3-1 .. H3-4: the limits and the decisions of a save (pure). */
+object SaveRules {
+    /** Song text: matches `maxSongBytes` of the hello reply (LiveBridge). Bigger would not survive the copies a WebMessage needs on a phone's heap. */
+    const val MAX_TEXT = 16L shl 20
+    /** A sample travels as base64 in one JSON reply: 16 MiB of audio is 21.4 million characters (43 MB as UTF-16), copied by JSONObject and toString: about the most a phone's heap takes. Bigger samples need the binary `take` route (later). */
+    const val MAX_SAMPLE = 16L shl 20
+    const val MARGIN = 1L shl 20
+    const val QUICK_MS = 20_000L
+    const val SAVE_MS = 30_000L
+
+    /** H3-2: null when the text may be saved; else why not. A real project is never empty (JSON.stringify of the project starts with "{"). */
+    fun refuseText(has: Boolean, text: String?): String? = when {
+        !has || text == null -> "the save came without the song text: nothing was written"
+        text.isEmpty() -> "the song text is empty: nothing was written"
+        text.length > MAX_TEXT -> "the song is bigger than ${MAX_TEXT shr 20} MiB: not saved"
+        else -> null
+    }
+
+    /** The backup goes to the app's private storage: room for the old content and a margin. */
+    fun backupSpaceOk(usable: Long, oldSize: Long): Boolean = usable >= oldSize + MARGIN
+
+    /** [free]: what the file's storage reports (null = the provider does not say: no objection). The write truncates first, so the old size comes back. */
+    fun targetSpaceOk(free: Long?, oldSize: Long, newSize: Long): Boolean = free == null || free + maxOf(oldSize, 0L) >= newSize + 65536L
+
+    /** H3-4: how long the page may wait for one request before it is told the provider did not answer. */
+    fun timeoutMs(type: String): Long = if (type == "file.save" || type == "file.saveAs") SAVE_MS else QUICK_MS
+
+    /** H3-3: what the page is told when the file work threw; an OutOfMemoryError is named as such. */
+    fun describe(t: Throwable): String = if (t is OutOfMemoryError) "out of memory: this song or sample is too big for the phone (nothing was written)" else "shell error: $t"
+}
+
+/** H3-1: the shell's private backups of a file's previous content: dir/<tag>-<time>.bak, the newest [keep] stay. */
+object Backups {
+    /** Writes [old] as a new backup and checks it reads back the same length; prunes older ones only after that. false (and no partial file) when it could not be made. */
+    fun make(dir: java.io.File, tag: String, old: ByteArray, keep: Int, now: Long): Boolean {
+        val f = java.io.File(dir, "$tag-$now.bak")
+        try {
+            if (!dir.isDirectory && !dir.mkdirs()) return false
+            val older = dir.listFiles { x -> x.name.startsWith("$tag-") }?.sortedBy { it.lastModified() } ?: emptyList()
+            f.writeBytes(old)
+            if (f.length() != old.size.toLong()) { f.delete(); return false }
+            older.dropLast(keep - 1).forEach { it.delete() }
+            return true
+        } catch (e: Exception) { f.delete(); return false }
+    }
+}
