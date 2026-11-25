@@ -70,22 +70,24 @@ object LiveEngine {
     fun startGate(): Int {
         if (!active || loaded == null) return -2
         LiveNative.nativeRtReset()
-        gate = GateState.Running(0.0, true)
+        synchronized(gateLock) { gate = GateState.Running(0.0, true) }
         val rc = play()
-        if (rc != 0) gate = GateState.Aborted("play failed (rc $rc)", 0.0)
+        if (rc != 0) synchronized(gateLock) { gate = GateState.Aborted("play failed (rc $rc)", 0.0) }
         return rc
     }
-    fun gateAbort(reason: String) { val g = gate; if (g is GateState.Running) gate = GateState.Aborted(reason, g.elapsedS) }
+    /** The gate moves only from the Running state this call SAW (verify-n2 F7a): an abort from another thread between the read and the write is never overwritten (an aborted run cannot end as PASS). */
+    private val gateLock = Any()
+    private fun gateMove(from: GateState.Running, to: GateState): Boolean = synchronized(gateLock) { if (gate === from) { gate = to; true } else false }
+    fun gateAbort(reason: String) { synchronized(gateLock) { val g = gate; if (g is GateState.Running) gate = GateState.Aborted(reason, g.elapsedS) } }
     fun gateTick() {
-        if (gate !is GateState.Running) return
+        val g0 = gate as? GateState.Running ?: return
         if (!active) { gateAbort("the engine ended"); return }
         val rt = Rt(try { org.json.JSONObject(LiveNative.nativeRtSnapshot()) } catch (e: Exception) { return })
         if (GateRule.done(rt)) {
-            gate = GateState.Finished(rt.pass, rt.numbers())
-            LiveNative.nativeTransportStop(-1L); LiveSession.afterUserStop()
+            if (gateMove(g0, GateState.Finished(rt.pass, rt.numbers()))) { LiveNative.nativeTransportStop(-1L); LiveSession.afterUserStop() }
             return
         }
-        gate = GateState.Running(GateRule.elapsed(rt), rt.pass || rt.elapsedS < 2)
+        if (!gateMove(g0, GateState.Running(GateRule.elapsed(rt), rt.pass || rt.elapsedS < 2))) return
         val s = status()
         if (s.state == LiveState.ENDED || s.state == LiveState.IDLE) LiveNative.nativePlay(0)   // the song ended inside the 10 minutes: again
     }
