@@ -296,7 +296,7 @@ class LiveHost {
   // C2 (control): what a play / a publish has to do for the chains, decided against chainsSong_ (R3) and made (R4..R6). chainsDecide() makes the plan (and the param records), changes NOTHING of the host's own state; chainsFinish()
   // moves chainsSong_ / chainsBus_ / chainsFeed_ forward and pushes the param records, only once the call can no longer fail; chainsAbandon() settles and deletes a plan that was not handed over.
   struct ChainsWork { ChainsPlan* plan = nullptr; bool hasPlan = false; uint32_t nodeMask = 0; std::vector<LiveChainParam> params; bool move = false; uint32_t feed = 0; BusPlan bus; std::shared_ptr<const Song> song; };
-  int chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w, bool forPlay);   // 0, E_BUSY (a plan is in flight, or the edit ring has no room: counted), E_MEMORY; on an error `w` owns nothing
+  int chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w);   // 0, E_BUSY (a plan is in flight, or the edit ring has no room: counted), E_MEMORY; on an error `w` owns nothing
   void chainsAbandon(ChainsWork& w);
   void chainsFinish(ChainsWork& w, bool asCommand);   // asCommand: push the plan as a ChainsCommit (a publish); a play's plan rides in its PlayPlan
 

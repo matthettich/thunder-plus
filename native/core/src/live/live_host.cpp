@@ -16,6 +16,7 @@
 #include <new>
 #include <string>
 
+#include "chains/cdiff.h"
 #include "engine/layer_pe.h"
 #include "live/dump_plain.h"
 #include "midi/midi_spp.h"
@@ -40,25 +41,6 @@ constexpr double kPlayDelaySec = 0.08;       // t0 < 0: the next quantum's start
 constexpr int kBudgetErr = THUNDER_LIVE_E_LIMIT;
 inline bool finite(double x) { return std::isfinite(x); }
 inline int64_t toFrame(double sec, double sr) { return (int64_t)std::llround(sec * sr); }
-}  // namespace
-
-// STAGE 1 STUB of C2a's interface (docs/port/C2-DESIGN.md, "C2a": chains/cdiff.h). It answers Same when the two chain patches write the same text, Structural when they differ (never Params), and compares the bus plans
-// field by field. Stage 2 deletes this block and includes chains/cdiff.h: the calls below are written against the real signatures.
-namespace {
-enum class ChainsDiffKind { Same, Params, Structural };
-struct ChainsParamOp { std::string id, name; double v = 0; };
-struct ChainsDiff { ChainsDiffKind kind = ChainsDiffKind::Same; std::vector<ChainsParamOp> params; };
-ChainsDiff chains_diff(Json prev, Json next) {
-  ChainsDiff d; const bool a = prev.isObj(), b = next.isObj();
-  if (!a && !b) return d;
-  if (a != b || json_write(prev) != json_write(next)) d.kind = ChainsDiffKind::Structural;
-  return d;
-}
-bool bus_plan_equal(const BusPlan& a, const BusPlan& b) {
-  return std::memcmp(a.feeds, b.feeds, sizeof a.feeds) == 0 && std::memcmp(a.nFeeds, b.nFeeds, sizeof a.nFeeds) == 0 && std::memcmp(a.feedLen, b.feedLen, sizeof a.feedLen) == 0 && std::memcmp(a.feedMask, b.feedMask, sizeof a.feedMask) == 0
-      && std::memcmp(a.targets, b.targets, sizeof a.targets) == 0 && std::memcmp(a.loopTo, b.loopTo, sizeof a.loopTo) == 0 && std::memcmp(a.srcAll, b.srcAll, sizeof a.srcAll) == 0 && std::memcmp(a.busAll, b.busAll, sizeof a.busAll) == 0
-      && a.pure == b.pure && a.pre == b.pre && a.loop == b.loop;
-}
 }  // namespace
 
 PlayPlan::~PlayPlan() {
@@ -216,7 +198,7 @@ int LiveHost::songPublish(const uint8_t* song, size_t n, const uint8_t* vars, si
     // checked with the decision), then postMidi(), then the pushes that cannot fail. Any failure after the plan was made ABANDONS it (settle uncommitted: the control view stays; delete frees what it made).
     ChainsWork cw;
     if (chains_) {
-      const int cr = chainsDecide(sp, cw, false);
+      const int cr = chainsDecide(sp, cw);
       if (cr != THUNDER_LIVE_OK) { sess_->rollback(); delete bm; refreshCtl(); return cr; }
       if (cw.plan && cmds_.space() == 0) { chainsAbandon(cw); sess_->rollback(); delete bm; cmdBusy_.fetch_add(1, std::memory_order_relaxed); refreshCtl(); return THUNDER_LIVE_E_BUSY; }
     }
@@ -448,7 +430,7 @@ int LiveHost::play(const thunder_live_play_opts& o) {
   // up the way a failed effects plan does (they must reach their hosts). The edit ring's room was checked with the decision; the Play command's slot was checked at the top.
   ChainsWork cw;
   if (chains_) {
-    const int cr = chainsDecide(songCur_, cw, true);
+    const int cr = chainsDecide(songCur_, cw);
     if (cr != THUNDER_LIVE_OK) { unwindFx(); sess->rollback(); delete plan; delete bm; refreshCtl(); return cr; }
     plan->chains = cw.plan; plan->chainsHost = chains_.get(); cw.plan = nullptr;   // (the PlayPlan owns it now: its destructor settles and deletes it on every path from here)
   }
@@ -585,14 +567,13 @@ int LiveHost::masterConfig(const uint8_t* mst, size_t n, bool safety) {
 // A param record that does not fit its fixed fields (id 47 / name 31 bytes + NUL), or a diff of more records than the ring holds, is a Structural change (a full plan carries every value).
 // A plan the host refuses whole (the engine refused the patch, over budget) comes back noop: NOT an error: the call succeeds, nothing moves, nothing is sent (the song plays with the chains it had; the next call tries again).
 // ONE plan in flight (R5): plan() returns null with busyRefused moved: E_BUSY, cmd_busy + 1, nothing changed. Null otherwise: E_MEMORY. On any non-zero return `w` owns nothing.
-int LiveHost::chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w, bool forPlay) {
+int LiveHost::chainsDecide(const std::shared_ptr<const Song>& S, ChainsWork& w) {
   try {
     const Song& s = *S;
     w.song = S; w.bus = bus_plan(s.chainPatch, s.chainOn); w.feed = chains_feed(s.chainPatch, s.chainOn);
     bool onSame = true; for (int t = 0; t < kSongNT; t++) if ((chainsSong_ ? chainsSong_->chainOn[t] : false) != s.chainOn[t]) { onSame = false; break; }
     const bool busSame = onSame && w.feed == chainsFeed_ && bus_plan_equal(w.bus, chainsBus_);
     ChainsDiff d = chains_diff(chainsSong_ ? chainsSong_->chainPatch : Json(), s.chainPatch);
-    if (forPlay) d.kind = ChainsDiffKind::Structural;   // STAGE 1: a full plan at every play (stage 2: R3 for a play too)
     std::vector<LiveChainParam> recs;
     if (d.kind == ChainsDiffKind::Params) {
       if (d.params.size() > kLiveChainRing) d.kind = ChainsDiffKind::Structural;
