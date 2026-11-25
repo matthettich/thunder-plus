@@ -49,6 +49,15 @@ new="""      // Thunder: the three draws in a fixed order (time, pitch, shape: t
 if s.count(old)!=1: sys.exit("Beads delay_granular_player.h patch failed")
 open(p,'w').write(s.replace(old,new,1))
 PY
+# Beads (PFX review, F1): DelayController::RenderInternal<true> (Tail = Hold) divides `max_delay_ / slice_duration`, and slice_duration = int(clock_.interval(i) * tap_ratio[r]) is 0 when
+#   Size is at its maximum (the page caps it at .995). On the host that is a SIGFPE (integer division by zero); the page's tfx.wasm returns a finite sound. A slice is never shorter than one sample.
+python3 - "$E/beads/dsp/delay_controller.cc" <<'PY'
+import sys; p=sys.argv[1]; s=open(p).read()
+old="          const int slice_duration = int(\n              clock_.interval(interval) * tap_ratio[ratio]);\n"
+new="          int slice_duration = int(\n              clock_.interval(interval) * tap_ratio[ratio]);\n#ifndef __wasm__\n          if (slice_duration < 1) slice_duration = 1;   // Thunder (host builds only: tfx.wasm is unchanged): never divide by zero (prepare.sh)\n#endif\n"
+if s.count(old)!=1: sys.exit("Beads delay_controller.cc patch failed")
+open(p,'w').write(s.replace(old,new,1))
+PY
 # stmlib::Random (U14 diagnosis): its state is one static. In the web app every ThunderFx node has its own wasm instance, so its own state
 # (0x21 at start); natively all effect hosts in the process shared one, so a Beads / Clouds heard the draws of every other. Host builds
 # (not wasm: that code is unchanged) read the state through a per-thread pointer the effect host sets around its work (FxHost, see
