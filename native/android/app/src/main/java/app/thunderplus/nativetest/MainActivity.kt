@@ -141,6 +141,7 @@ class MainActivity : Activity() {
         val liveRow = row(
             btn("Play bundled song natively (test path)") { playBundledNatively() },
             btn("Stop (native)") { LiveEngine.async { LiveEngine.stop() } },
+            btn("A5 gate 10 min (native)") { startNativeGate() },
             btn("Quit native") { LiveEngine.async { LiveEngine.quit(applicationContext) } })
         liveLine = TextView(this).apply { setTextColor(Color.rgb(255, 200, 120)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); text = "native live engine: off" }
         midiLine = TextView(this).apply { setTextColor(Color.rgb(120, 220, 255)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); text = "MIDI out: -" }
@@ -163,6 +164,16 @@ class MainActivity : Activity() {
         if (!started) Toast.makeText(this, "The native engine is busy loading", Toast.LENGTH_SHORT).show()
     }
 
+    /** N2 H1c: the A5 timing gate on the live callback: WORKPLAN H1 "1.00 +- 0.1 % for 10 minutes". Loads the bundled song when nothing is loaded, plays it (again when it ends), judges after 600 s of AUDIO frames. */
+    private fun startNativeGate() {
+        val started = LiveEngine.async {
+            if (LiveEngine.loaded == null) { val r = LiveEngine.loadAsset(applicationContext, LiveEngine.BUNDLED_SONG); if (!r.ok) { ui.post { Toast.makeText(this, "gate: " + r.summary(), Toast.LENGTH_LONG).show() }; return@async } }
+            val rc = LiveEngine.startGate()
+            ui.post { Toast.makeText(this, if (rc == 0) "A5 gate started: 10 minutes, any screen state" else "gate did not start (rc $rc)", Toast.LENGTH_LONG).show() }
+        }
+        if (!started) Toast.makeText(this, "The native engine is busy loading", Toast.LENGTH_SHORT).show()
+    }
+
     /** All three runs as text: on the clipboard, and in the selectable box under the buttons in case the clipboard is refused. */
     private fun copyResults() {
         val wv = WebViewCompat.getCurrentWebViewPackage(this)
@@ -175,6 +186,7 @@ class MainActivity : Activity() {
             sb.append("\n$l 5 min: ").append(if (r == null) "NOT RUN" else if (r.pass) "PASS" else "FAIL").append('\n')
             if (r != null) sb.append("  ").append(r.numbers).append("\n  cross-check (core clock events): ").append(r.crossCheck).append('\n')
         }
+        sb.append("\nnative live engine (H1c): ").append(LiveEngine.gate.line()).append('\n')
         val text = sb.toString()
         resultsBox.text = text; resultsBox.visibility = View.VISIBLE
         try {

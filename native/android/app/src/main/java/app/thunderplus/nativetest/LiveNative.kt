@@ -56,4 +56,12 @@ object LiveNative {
     external fun nativePadChop(pad: Int, loopSecs: Double, nSlices: Int, pointsFrames: DoubleArray): Int
     /** The callback's time over its period, peak-held (CORE-BRIDGE 7 G9). */
     external fun nativeLoad(): Double
+
+    // ---- H1c ----
+    /** Rebuilds the OUTPUT STREAM at the engine's rate and keeps the host (song, pads, rate). Stops the transport first and does not restart it. The rate, or a negative code (the host ended too when -1). */
+    external fun nativeReopenStream(): Int
+    /** {"calls", "state" (miniaudio's, 3 = started), "sr", "duck"} or "{}" without a host. */
+    external fun nativeStreamState(): String
+    /** The shell's output gain, 0..1 (audio-focus ducking), ramped in 150 ms by the audio thread. */
+    external fun nativeSetDuck(gain: Float)
 }

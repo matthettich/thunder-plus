@@ -61,6 +61,11 @@ class LiveEngine {
   // AUDIO. `out` is interleaved stereo, `frames` frames. Never allocates, never blocks. Silence when the engine is not created or the handle is dead.
   void render(float* out, int frames, int64_t wallNs);
 
+  // H1c: the SHELL's output gain (audio-focus ducking), applied after the core's master and safety limiter, so the page's master volume is never touched. Any thread; the audio thread ramps to it
+  // over 150 ms (no click). 1 = unity.
+  void setDuck(float g) { duckTarget_.store(g < 0.f ? 0.f : (g > 1.f ? 1.f : g), std::memory_order_relaxed); }
+  float duck() const { return duckTarget_.load(std::memory_order_relaxed); }
+
   // CONTROL from any thread, one at a time or many: `fn` runs on the control thread. E_BUSY (-8) is retried after the next audio callback until timeoutMs; the result is fn's last return.
   // Returns -1000 when the control thread is not running, or the wait timed out BEFORE the control thread started `fn` (the task is dropped: it never runs, nothing changed).
   // Returns -1001 when the wait timed out while `fn` was already RUNNING (or its E_BUSY retries were): UNKNOWN, the work may still be applied (a load may be half or fully in). The caller must not assume "nothing changed".
@@ -95,6 +100,8 @@ class LiveEngine {
   std::vector<float> l_, r_;                  // the audio thread's de-interleave scratch (max_block each), made at create
   int64_t frame0_ = 0;                        // the running host frame: the audio thread's alone
   std::atomic<int64_t> calls_{0};
+  std::atomic<float> duckTarget_{1.f};
+  float duckCur_ = 1.f;                       // the audio thread's alone
   std::atomic<int> outLat_{0}, under_{0};
 
   std::mutex qm_;

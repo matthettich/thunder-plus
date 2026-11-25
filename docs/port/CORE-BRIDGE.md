@@ -128,7 +128,7 @@ multiply-add and uses its own `exp` (fdlibm's, as V8), so values the sequencer a
 bits as the web copy's on every platform. `pow` and `sin` join `js_exp` in the first unit whose golden needs them exact.
 
 
-## 7. BRIDGE_V 1 additions for N2 (24 Nov 2026, the lead on Opus; DRAFT until the lead's top-model read, then frozen)
+## 7. BRIDGE_V 1 additions for N2 (24 Nov 2026, the lead on Opus; FROZEN 25 Nov 2026 after the lead's top-model read)
 
 All ADDITIVE (unknown types are ignored and logged once; reply fields are only added), so BRIDGE_V stays 1. Source: `docs/port/N2-PAGE-CLIENT.md` section 3 (gaps G1..G14), which has the page side and file:line for each.
 Adopted as proposed there:
@@ -138,7 +138,7 @@ Adopted as proposed there:
 - **G4** `buf.use` with `kind:'var'` adds `ii`, `vk`; new `pad.chop {pad, loopSecs, slices:[frames...]}` (shell: `var_set`, `pad_chop`, `pad_hits`).
 - **G5a** new `fx.plan {tr, slots, bpm}` (shell: `fx_plan` then `fx_commit` at NOW); `fx.set {tr, slot, p:[12]}` as section 3. **G5b** new `master.config {mst, safety}`. **G5c** new `chain.edit {ops}` (shell: `thunder_live_chain_edit`; all or nothing; an `err` event on refusal).
 - **G8** new `pdc.set {mode: 0|1|2}`. **G9** `clock` adds `load` (callback time over period, measured by the shell). **G13** new `engine.reset {}` (shell: stop, panic, destroy, create; the page re-sends song, kit and pads on `{t:'engine', up:true}`).
-- **G14** `song.load` may be sent with `ask`; reply `{ok, rev, reasons:[...], warn:[...]}`; `ok:false` is the fallback verdict (the shell's `SongFit`). No reply within 5 s: treated as ok.
+- **G14** `song.load` may be sent with `ask`; reply `{ok, rev, reasons:[...], warn:[...]}`; `ok:false` is the fallback verdict (the shell's `SongFit`). No reply within 5 s: treated as NOT ok (reason `no-verdict`): the old engine plays the song (the lead's ruling, 25 Nov: a missing verdict must never put a song the core may not fit on the new engine).
 Deferred (not in N2; the page shows nothing or falls back): **G6** FX / chains / master / TRIM meters, **G7** spectrum, **G10** `note.on` / `note.off` (hand-played sound stays on the page's own AudioContext in N2), **G11** `lxp` (a song using it falls back), **G12** `play` from a step (RESUME restarts the row).
 - **Added from H1c (#315), same status:** a shell event `{t:'device', reason:'noisy'|'focus'|'stream', stopped:true, sr?, resume?}` (headphones pulled, audio focus lost, output stream rebuilt: the page shows its transport stopped); `song.load` may carry `title` (the notification's song name; else the song's name unless it is "Song N", else the file name). The page must not set `navigator.mediaSession` while the native engine plays (one media notification, the shell's).
 - **Added from H2 (#316), same status:** `midi.ports` (shell -> page, after hello, on every hot-plug and every 3 s): `{devs, ins:[{id, name, port}], ports:[four, with name], late, sent}` (`ins` and `ports[].name` extend the U36-SPEC sketch); `midi.in` (shell -> page, channel messages, Clock / Start / Continue / Stop, SPP; Active Sensing, Reset, SysEx, MTC dropped); `midi.cfg` (page -> shell: the four port letters, the clock boxes, Gear delay clamped to -50..200 ms; `clockIn` has no effect natively: MIDI-clock follow stays a fallback condition); `hello` reply `caps.midi`.

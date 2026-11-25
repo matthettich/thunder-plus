@@ -4,6 +4,7 @@
 #include <android/log.h>
 #include <dlfcn.h>
 #include <jni.h>
+#include <pthread.h>
 #include <time.h>
 
 #include <array>
@@ -16,6 +17,7 @@
 #include <string>
 #include <thread>
 
+#include "a5_xrun.h"
 #include "engine_slot.h"
 #include "live_engine.h"
 #include "miniaudio.h"
@@ -50,9 +52,10 @@ struct Live {
   double bpm = 120, lpb = 4;
 };
 Live g;
-std::mutex g_dev;    // the ma_device fields other threads read (sample rate, the AAudio stream pointer): held briefly by readers, and by start / shutdown around init / uninit
+std::mutex g_dev;    // the ma_device fields other threads read (sample rate, the AAudio stream pointer, its state): held by start / teardown / reopen around init, start and uninit; the ANY-thread readers (status, stream state) only TRY it and skip a round while the stream is rebuilt
 std::mutex g_life;   // start / shutdown / load: one at a time (the JNI threads are Kotlin's; the audio thread never takes it)
 rtlog g_lrt;         // A5's clock-drift logger on the live callback
+tpa::XrunGate g_xrun;   // the stream's xrun count since the A5 run began: fed to g_lrt by the status poll (verify-n2 F2)
 std::atomic<double> g_load{0.0};   // CORE-BRIDGE 7 G9: the callback's time over its period, peak-held with decay (written by the audio thread, read by Kotlin)
 
 inline int64_t monoNs() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (int64_t)t.tv_sec * 1000000000LL + t.tv_nsec; }
@@ -69,6 +72,12 @@ void dataCallback(ma_device* dev, void* out, const void*, ma_uint32 frames) {
   const double period = (double)frames / (double)dev->sampleRate, work = (double)(t1 - t0) * 1e-9, prev = g_load.load(std::memory_order_relaxed);
   const double now = work / period;
   g_load.store(now > prev ? now : prev * 0.95 + now * 0.05, std::memory_order_relaxed);   // no allocation, no lock
+}
+
+// miniaudio's notification callback. It runs on miniaudio's OWN thread (the job thread that re-routed the stream, or the thread that started / stopped it): atomics only, no lock, no JNI, no log.
+// After a re-route (headphones, Bluetooth: miniaudio closed the stream and opened another by itself) AAudio's xrun counter belongs to the new stream and restarts at 0: tell the A5 gate.
+void onDeviceNotification(const ma_device_notification* n) {
+  if (n->type == ma_device_notification_type_rerouted) g_xrun.newStream();
 }
 
 std::string jsonEscape(const std::string& s) { std::string o; for (char c : s) { if (c == '"' || c == '\\') { o += '\\'; o += c; } else if ((unsigned char)c < 0x20) o += ' '; else o += c; } return o; }
@@ -94,6 +103,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   cfg.pUserData = &g;
   cfg.performanceProfile = ma_performance_profile_low_latency;
   cfg.aaudio.usage = ma_aaudio_usage_media;
+  cfg.notificationCallback = onDeviceNotification;
   auto eng = std::make_shared<tpa::LiveEngine>();
   { std::lock_guard<std::mutex> dl(g_dev);
     if (ma_device_init(nullptr, &cfg, &g.device) != MA_SUCCESS) { LOGI("ma_device_init failed"); return -1; }
@@ -105,7 +115,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   { std::lock_guard<std::mutex> dl(g_dev);   // resolved before the stream runs: the status call reads the xrun count and buffer size through these (under g_dev)
     g.aaLib = dlopen("libaaudio.so", RTLD_NOW);
     if (g.aaLib) { g.aaXrun = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getXRunCount"); g.aaBuf = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getBufferSizeInFrames"); } }
-  rtlog_reset(&g_lrt, (int)g.device.sampleRate);
+  rtlog_reset(&g_lrt, (int)g.device.sampleRate); g_xrun.newStream();
   g.eng.set(eng);
   g.audioEng.store(eng.get(), std::memory_order_release);   // before the stream starts: the callback never sees a half-made engine
   int started;
@@ -122,18 +132,18 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   return (jint)g.device.sampleRate;
 }
 
-// The destroy order (live.h destroy, N0's nativeStop): stop the transport, let two callbacks run it, stop the stream (no more process), join the threads, destroy.
+// The destroy order (live.h destroy, N0's nativeStop): stop the transport, let two callbacks run it, stop the stream (no more process), join the threads, destroy. g_life held.
 // The slot is emptied FIRST: from then on no new JNI call gets the engine; a call already inside it holds its own copy, and destroy() below waits for / refuses it (live_engine.h).
-JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown(JNIEnv*, jobject) {
-  std::lock_guard<std::mutex> lk(g_life);
-  if (!g.deviceInit) return;
+// Also right after a failed reopen (the stream is gone, deviceInit false, the engine still there): the engine is destroyed all the same.
+void teardownLocked() {
   std::shared_ptr<tpa::LiveEngine> eng = g.eng.take();
-  if (eng) {
+  if (!eng && !g.deviceInit) return;
+  if (eng && g.deviceInit) {
     eng->call([](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); }, 500);
     const int64_t c0 = eng->audioCalls();
     for (int i = 0; i < 100 && eng->audioCalls() < c0 + 2; i++) std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
-  { std::lock_guard<std::mutex> dl(g_dev); ma_device_uninit(&g.device); g.deviceInit = false; }   // stops the callback
+  { std::lock_guard<std::mutex> dl(g_dev); if (g.deviceInit) { ma_device_uninit(&g.device); g.deviceInit = false; } }   // stops the callback
   g.audioEng.store(nullptr, std::memory_order_release);
   if (eng) eng->destroy();       // joins the control and poller threads, then thunder_live_destroy
   eng.reset();
@@ -141,6 +151,55 @@ JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown
   g.songText.reset(); g.kitText.reset(); g.kitDoc.reset();   // the page re-sends song and kit after an engine reset: a verdict must never be judged with the old kit
   { std::lock_guard<std::mutex> dl(g_dev); if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; }
 }
+
+JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown(JNIEnv*, jobject) {
+  std::lock_guard<std::mutex> lk(g_life);
+  teardownLocked();
+}
+
+// H1c: the output changed under the host (a device was unplugged, a Bluetooth sink came or went, the stream died). The HOST stays: its sample rate, song and pads are kept. Only the stream is rebuilt, and at the
+// ENGINE's rate (the new device may run at another rate: Android's mixer converts, miniaudio converts if it does not; no new create, no pad re-render, no song re-publish). The transport is stopped first
+// and is NOT restarted (a defined state: stopped; the owner presses Play). process() takes the new frame0 count as a re-anchor (live.h TIME), so no seam is possible.
+// Returns the stream's rate (the engine's), or -1 when no stream could be opened (the host is then ended too: the shell reports "engine down" and the page re-sends everything).
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeReopenStream(JNIEnv*, jobject) {
+  std::lock_guard<std::mutex> lk(g_life);
+  auto eng = g.eng.get();
+  if (!g.deviceInit || !eng) return -2;
+  eng->call([](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); }, 500);
+  const int64_t c0 = eng->audioCalls();
+  for (int i = 0; i < 40 && eng->audioCalls() < c0 + 2; i++) std::this_thread::sleep_for(std::chrono::milliseconds(5));   // a dead stream makes no calls: the wait is 200 ms at most
+  std::unique_lock<std::mutex> dl(g_dev);   // status / stream-state readers skip their round while the stream is rebuilt
+  ma_device_uninit(&g.device);
+  g.deviceInit = false;
+  ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
+  cfg.playback.format = ma_format_f32;
+  cfg.playback.channels = 2;
+  cfg.sampleRate = (ma_uint32)eng->config().sampleRate;
+  cfg.dataCallback = dataCallback;
+  cfg.pUserData = &g;
+  cfg.performanceProfile = ma_performance_profile_low_latency;
+  cfg.aaudio.usage = ma_aaudio_usage_media;
+  cfg.notificationCallback = onDeviceNotification;
+  if (ma_device_init(nullptr, &cfg, &g.device) != MA_SUCCESS) { dl.unlock(); LOGI("reopen: ma_device_init failed: the host ends"); teardownLocked(); return -1; }
+  g.deviceInit = true;
+  if (ma_device_start(&g.device) != MA_SUCCESS) { dl.unlock(); LOGI("reopen: ma_device_start failed: the host ends"); teardownLocked(); return -1; }
+  g_xrun.newStream();   // AAudio counts xruns per stream
+  LOGI("stream reopened at the engine's %u Hz", g.device.sampleRate);
+  return (jint)g.device.sampleRate;
+}
+
+// The stream as the watchdog sees it: {"calls": audio callbacks since create, "state": ma_device state (3 = started), "sr", "duck"}. "{}" when no host or while the stream is being rebuilt.
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStreamState(JNIEnv* env, jobject) {
+  auto eng = g.eng.get(); if (!eng) return env->NewStringUTF("{}");
+  std::unique_lock<std::mutex> dl(g_dev, std::try_to_lock);
+  if (!dl.owns_lock() || !g.deviceInit) return env->NewStringUTF("{}");
+  char b[160];
+  std::snprintf(b, sizeof b, "{\"calls\":%lld,\"state\":%d,\"sr\":%u,\"duck\":%.3f}", (long long)eng->audioCalls(), (int)ma_device_get_state(&g.device), g.device.sampleRate, (double)eng->duck());
+  return env->NewStringUTF(b);
+}
+
+// The shell's output gain (audio-focus ducking): 0..1, ramped by the audio thread.
+JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeSetDuck(JNIEnv*, jobject, jfloat gain) { auto eng = g.eng.get(); if (eng) eng->setDuck(gain); }
 
 // A .thunder project's bytes (UTF-8): the song and the kit. The pads are rendered HERE (the caller's thread, not the control thread, not the audio thread), then ONE control call publishes the
 // song and the pads. Returns a JSON object {ok, rc, err, pads, skipped, dry, renderMs, notes[]}.
@@ -225,16 +284,20 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMixSet(J
 // The poller's latest state as JSON. Also hands AAudio's xrun count and buffer size to the host (the poller thread passes them to thunder_live_host_stats every 100 ms).
 JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStatus(JNIEnv* env, jobject) {
   auto eng = g.eng.get(); if (!eng) return env->NewStringUTF("{}");
-  { std::lock_guard<std::mutex> dl(g_dev);   // the stream pointer and the two AAudio calls on it: shutdown / reopen change them only under g_dev
-    if (g.deviceInit) {
+  { std::unique_lock<std::mutex> dl(g_dev, std::try_to_lock);   // the stream pointer and the two AAudio calls on it: start / teardown / reopen change them only under g_dev; a busy lock skips this round
+    if (dl.owns_lock() && g.deviceInit) {
       // miniaudio re-routes an AAudio stream BY ITSELF (headphones, Bluetooth): its job closes and reopens pStreamPlayback under rerouteLock on its own thread. Every read of the pointer and every AAudio call on it is inside this lock (taken after g_dev; ma_device_uninit, which destroys it, runs under g_dev too).
-      ma_mutex_lock(&g.device.aaudio.rerouteLock);
-      void* stream = (void*)g.device.aaudio.pStreamPlayback;
-      if (stream) {
-        const int x = g.aaXrun ? g.aaXrun(stream) : 0, b = g.aaBuf ? g.aaBuf(stream) : 0;
-        eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)
+      // ma_mutex is a pthread mutex on Android: TRY-lock (this call can come from the main thread, and a reroute holds the lock for as long as the reopen takes): a busy lock skips this round, like g_dev above.
+      if (pthread_mutex_trylock((pthread_mutex_t*)&g.device.aaudio.rerouteLock) == 0) {
+        void* stream = (void*)g.device.aaudio.pStreamPlayback;
+        if (stream) {
+          const int x = g.aaXrun ? g.aaXrun(stream) : 0, b = g.aaBuf ? g.aaBuf(stream) : 0;
+          eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)
+          // F2: the xruns AAudio counted since the A5 run began reach the gate's logger (N0 does the same in jni.cpp): "0 underruns" is then a measurement
+          rtlog_host_underruns(&g_lrt, g_xrun.onStream(x));
+        }
+        ma_mutex_unlock(&g.device.aaudio.rerouteLock);
       }
-      ma_mutex_unlock(&g.device.aaudio.rerouteLock);
     } }
   return env->NewStringUTF(eng->statusJson().c_str());
 }
@@ -243,7 +306,7 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStats
   return env->NewStringUTF(eng->statsJson().c_str());
 }
 
-JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeRtReset(JNIEnv*, jobject) { std::lock_guard<std::mutex> dl(g_dev); if (g.deviceInit) rtlog_reset(&g_lrt, (int)g.device.sampleRate); }
+JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeRtReset(JNIEnv*, jobject) { std::lock_guard<std::mutex> dl(g_dev); if (g.deviceInit) { rtlog_reset(&g_lrt, (int)g.device.sampleRate); g_xrun.beginRun(); } }
 JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeRtSnapshot(JNIEnv* env, jobject) {
   char b[400];
   rtlog_snapshot sn = rtlog_read(&g_lrt);

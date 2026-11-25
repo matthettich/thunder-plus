@@ -83,6 +83,17 @@ void LiveEngine::render(float* out, int frames, int64_t wallNs) {
     for (int i = 0; i < n; i++) { o[2 * i] = l[i]; o[2 * i + 1] = r[i]; }
     frame0_ += n; done += n;
   }
+  // the shell's gain: a linear ramp to the target over 150 ms, per call (no allocation, no lock)
+  const float tgt = duckTarget_.load(std::memory_order_relaxed);
+  if (duckCur_ != tgt || duckCur_ != 1.f) {
+    const float step = (float)(1.0 / (0.15 * cfg_.sampleRate));
+    float g = duckCur_;
+    for (int i = 0; i < frames; i++) {
+      if (g < tgt) { g += step; if (g > tgt) g = tgt; } else if (g > tgt) { g -= step; if (g < tgt) g = tgt; }
+      out[2 * (size_t)i] *= g; out[2 * (size_t)i + 1] *= g;
+    }
+    duckCur_ = g;
+  }
   calls_.fetch_add(1, std::memory_order_release);
 }
 
