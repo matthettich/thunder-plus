@@ -14,6 +14,8 @@
   var offs = [];             // listeners to remove in detach()
   var ASK_MS = 5000;         // CORE-BRIDGE section 2 / 7 G14: no song.load verdict within 5 s = NOT ok (reason 'no-verdict')
   var PUBLISH_MS = 250;      // N2-PAGE-CLIENT 4.4: the whole song, 250 ms after the last edit
+  var SLOW_SEND_MS = 4, SLOW_PUBLISH_MS = 1000;   // 4.4's fallback for a big song: when handing it to the bridge held the page 4 ms or more, the next publish waits for a second of quiet
+  var sendCost = 0;          // how long the last song.load took to hand over (the bridge stringifies it: the main-thread cost the design watches)
   var BEAT_PLAY_MS = 2000;   // can(): a `clock` event within 2 s (4.6)
   var BEAT_LOST_MS = 2500;   // while playing: no `clock` for this long = the engine is gone (the design says 1 s; 2.5 s is the page's own audioInterrupted precedent)
   var revN = 0;              // song.load revision counter
@@ -64,7 +66,7 @@
     /** Called from saveS(): the whole song goes 250 ms after the last edit (never song.patch: the live host takes whole text only). */
     edit: function () {
       if (!NC.on) return;
-      clearTimeout(publishT); publishT = setTimeout(function () { publishT = 0; if (stale()) publish(); }, PUBLISH_MS);
+      clearTimeout(publishT); publishT = setTimeout(function () { publishT = 0; if (stale()) publish(); }, sendCost >= SLOW_SEND_MS ? SLOW_PUBLISH_MS : PUBLISH_MS);
     },
 
     // ---- PC3: the transport --------------------------------------------------------------------------------------------------------------
@@ -134,7 +136,7 @@
     /** Settings > Audio > Reset audio engine (branch 17): the shell stops, rebuilds and says {t:'engine', up:true}; the page then sends the song again. */
     reset: function () { if (NC.on && tc) { send({ t: 'engine.reset' }); } },
     /** Test and report hooks. */
-    state: function () { return { engineUp: engineUp, playing: playSent, verdict: verdict, rev: revN, heard: songHeard, failed: !!failed }; }
+    state: function () { return { engineUp: engineUp, playing: playSent, verdict: verdict, rev: revN, heard: songHeard, failed: !!failed, sendCost: sendCost }; }
   };
 
   // ---- helpers ----------------------------------------------------------------------------------------------------------------------------
@@ -159,7 +161,7 @@
     return '';
   }
 
-  function current() { return verdict && !verdict.pending && verdict.sref === host.S() && verdict.ver === host.songVer(); }
+  function current() { return verdict && !verdict.pending && verdict.sref === host.S() && verdict.ver === host.songVer() && !stale(); }
   function stale() { return sentRef !== host.S() || sentVer !== host.songVer() || (host.lxp ? host.lxp() | 0 : 0) !== lxpSent; }
 
   var TEXT = { 'no-verdict': 'the native engine did not answer', 'no-kit': 'the kit has not reached the native engine yet' };
@@ -190,10 +192,17 @@
     var msg;
     try { msg = { t: 'song.load', title: host.title ? host.title() : '', S: sref, vars: host.vars(), rev: rev }; }
     catch (e) { log('native core client: song.load not made', e); return Promise.resolve(settleV(mine, false, ['no-verdict'], [])); }
-    var p = Promise.resolve().then(function () { return tc.ask(msg, ASK_MS); }).then(function (r) { return onReply(mine, r); }, function (e) {
+    var p = askWithin(msg, ASK_MS).then(function (r) { return onReply(mine, r); }, function (e) {
       log('native core client: song.load got no answer', e); return settleV(mine, false, ['no-verdict'], []); });
     inflight = p; p.then(function () { if (inflight === p) inflight = null; });
     return p;
+  }
+  // ask() has its own 5 s timeout in the bridge (CORE-BRIDGE 2); this one is for a shell that does not: no answer, no verdict.
+  function askWithin(msg, ms) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { rej(new Error('no verdict within ' + ms + ' ms')); }, ms + 250);
+      Promise.resolve().then(function () { var t0 = nowMs(), p = tc.ask(msg, ms); sendCost = nowMs() - t0; return p; }).then(function (r) { clearTimeout(t); res(r); }, function (e) { clearTimeout(t); rej(e); });
+    });
   }
   // PLAY: the song as it is now. Already published and answered for this version: that answer; else publish now (the debounce timer is cancelled).
   function verdictNow() {
