@@ -1,6 +1,6 @@
 /* thunder-core-client.js: the page's client of window.thunderCore (docs/port/N2-PAGE-CLIENT.md, docs/port/CORE-BRIDGE.md).
    PC1 = the loader's target and the `hello` handshake. PC2 = pads (put / buf.use / buf.free / pads.commit / pad.chop, kit.load, the pad memory budget). PC3 = the song and the transport: publish the whole song (song.load, debounced),
-   PLAY / STOP / HOLD / bpm / loop / perf, can() and the fallback to the old engine, engine down / up, device stopped. Mixer diffs, events for the playhead and meters are later PRs (PC4, PC5).
+   PLAY / STOP / HOLD / bpm / loop / perf, can() and the fallback to the old engine, engine down / up, device stopped. PC4 = live edits: while a native PLAY runs, one small message per changed thing (mixer, effects, master, PDC, chains parameter), the whole song still follows. Events for the playhead and meters are PC5.
    With `on` false (no shell, switch off) nothing here runs; with `on` true the page reacts only where index.html has an NCON() / tp.nc branch.
    Loaded by index.html's loadClient() only when window.thunderCore exists or Settings > Audio > Sequencer is "Native core (test)".
    A classic script: no import, one global (window.__thunderClient). It reads the page only through the object attach() is given. */
@@ -63,14 +63,15 @@
     detach: function () {
       for (var i = 0; i < offs.length; i++) { try { offs[i](); } catch (e) { /* ignore */ } }
       offs = []; NC.on = false; NC.sr = 0;
-      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false;
+      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset();
     },
 
     // ---- PC3: the song -------------------------------------------------------------------------------------------------------------------
     /** Called from saveS(): the whole song goes 250 ms after the last edit (never song.patch: the live host takes whole text only). */
     edit: function () {
       if (!NC.on) return;
-      clearTimeout(publishT); publishT = setTimeout(function () { publishT = 0; if (stale()) publish(); }, sendCost >= SLOW_SEND_MS ? SLOW_PUBLISH_MS : PUBLISH_MS);
+      liveSoon();   // PC4: the small messages first (one task per 16 ms), then the whole song follows
+      schedPublish();
     },
 
     // ---- PC3: the transport --------------------------------------------------------------------------------------------------------------
@@ -149,6 +150,9 @@
   function send(m) { try { tc.send(m); } catch (e) { log('native core client: send ' + (m && m.t) + ' failed', e); } }
   function sendLxp(st) { if (st === lxpSent) return; lxpSent = st; send({ t: 'lxp', st: st }); }
   var nowMs = function () { return host && host.now ? host.now() : Date.now(); };
+  function schedPublish() {
+    clearTimeout(publishT); publishT = setTimeout(function () { publishT = 0; if (stale()) publish(); }, sendCost >= SLOW_SEND_MS ? SLOW_PUBLISH_MS : PUBLISH_MS);
+  }
 
   // Native PLAY is wanted: Android's shell is the choice (the old engine only when the owner picked "Page (old)"); any other host only on the owner's pick.
   function wanted() {
@@ -196,6 +200,7 @@
     if (down()) return Promise.resolve(verdict);
     var rev = ++revN, ver = host.songVer(), sref = host.S(), mine = { rev: rev, ver: ver, sref: sref, ok: false, pending: true, reasons: [], warn: [] };
     sentRef = sref; sentVer = ver; verdict = mine;
+    try { mine.snap = liveSnap(L.sent); } catch (e) { mine.snap = null; log('native core client: live snapshot failed', e); }   // PC4: what the core holds once this song is accepted
     try { sendLxp(host.lxp ? host.lxp() | 0 : 0); } catch (e) { /* ignore */ }
     var msg;
     try { msg = { t: 'song.load', title: host.title ? host.title() : '', S: sref, vars: host.vars(), rev: rev }; }
@@ -236,6 +241,7 @@
   }
   function settleV(v, ok, reasons, warn) {
     v.ok = ok; v.pending = false; v.reasons = reasons; v.warn = warn;
+    if (ok && v === verdict) liveAccepted(v);   // PC4: the core now holds exactly this song: the diff baseline
     var rest = []; for (var i = 0; i < waiters.length; i++) { if (waiters[i].v === v) waiters[i].res(v); else rest.push(waiters[i]); } waiters = rest;
     // an edit that the shell refused while the old version plays on
     if (!ok && playSent && v === verdict) { try { host.toast('Native engine: ' + reasonText(v) + '. The song keeps playing as it was before this edit.', 4000); } catch (e) { /* ignore */ } }
@@ -249,7 +255,8 @@
     if (o.phrase != null) m.phrase = o.phrase | 0;
     if (o.loop && o.loop.y0 != null) m.loop = { y0: o.loop.y0 | 0, y1: (o.loop.y1 != null ? o.loop.y1 : o.loop.y0) | 0 };
     if (o.only && o.only.length != null) m.only = Array.prototype.slice.call(o.only);
-    playSent = true; active = false; send(m);
+    try { if (host.pdc) { var pm = host.pdc(); if (pm === 0 || pm === 1 || pm === 2) { m.pdc = pm; L.pdc = pm; } } } catch (e) { /* ignore */ }   // PC4: the latency compensation mode goes with PLAY
+    playSent = true; active = false; send(m); liveSoon();
     // the live state the JS core got at PLAY: PERFORM, the look-ahead, the tempo set while waiting
     try { var pf = host.perf && host.perf(); if (pf) NC.perf(pf); } catch (e) { /* ignore */ }
     if (NC.pendBpm != null) { var b = NC.pendBpm; NC.pendBpm = null; NC.bpm(b); }
@@ -306,11 +313,11 @@
     on('engine', function (m) {
       if (!m) return;
       if (m.up === false) {   // being rebuilt: a song playing stops (the shell has stopped it), nothing is sent until it is up
-        var was = active || playSent; engineUp = false; verdict = null; sentRef = null; inflight = null; playTok++; playSent = false; active = false; watch(false);
+        var was = active || playSent; engineUp = false; verdict = null; sentRef = null; inflight = null; playTok++; playSent = false; active = false; watch(false); liveReset();
         if (was) { host.stopped(); host.toast('The native engine is restarting: the song stopped.', 3000); }
         return; }
       if (m.up === true) {   // rebuilt (engine.reset, a device change): the song goes again (PC2 re-sends the kit and pads itself on this event)
-        engineUp = true; lost = false; lastClock = nowMs(); lxpSent = 0; verdict = null; sentRef = null; inflight = null; failed = null;
+        engineUp = true; lost = false; lastClock = nowMs(); lxpSent = 0; verdict = null; sentRef = null; inflight = null; failed = null; liveReset();   // PC4: a rebuilt core holds nothing: the baseline is unknown until its song is accepted
         var rate = m.sr && m.sr > 0 && m.sr !== NC.sr; if (rate) NC.sr = m.sr;
         if (rate) { try { host.prerender && host.prerender(); } catch (e) { /* ignore */ } }
         publish();
@@ -591,7 +598,7 @@
   };
   // setSong: a new song. Variations and chop data belonged to the old one: every pad is sent again (a pad that is gone is removed).
   NC.newSong = function (api) {
-    wire(api); if (!NC.on) return;
+    wire(api); liveReset(); if (!NC.on) return;
     var had = Array.from(P.sent.keys()); padReset(true);
     if (P.api && P.api.cache) for (var k = 0; k < had.length; k++) { var c = P.api.cache(had[k]); if (!c || !c.data) P.q.push({ k: 'rm', pad: had[k], raw: true, gen: P.gen }); }
     NC.padsAll(P.api); pump();
@@ -602,6 +609,115 @@
     return new Promise(function (res) { var w = { res: res, t: setTimeout(function () { var j = P.waiters.indexOf(w); if (j >= 0) P.waiters.splice(j, 1); res(false); }, ms == null ? COMMIT_WAIT_MS : ms) }; P.waiters.push(w); });
   };
   NC.padStats = function () { return { sent: P.sent.size, queued: P.q.length, bytes: P.bytes, vars: P.vars.size, committed: P.committed, idle: idle() }; };
+
+  /* ---- PC4: live edits (N2-PAGE-CLIENT 4.4 step 1; CORE-BRIDGE 7: mix.set, fx.plan, fx.set, master.config, pdc.set, chain.edit).
+     While a native PLAY runs, saveS() -> NC.edit() sends ONE small message per thing that changed, so a fader moves the sound at once. The whole song still goes 250 ms after the last edit
+     (the song text must carry every change: the Seq reads S.mix, the shell classifies a chains change itself), so a small message is a shortcut and never the only copy.
+     `L.sent` is the signature of what the core holds: the song as last ACCEPTED (its snapshot is taken in publish(), the moment the text is made) plus what the small messages have said since.
+     A STALE `L.sent` IS A SILENT FADER (a change equal to the stale value is never sent), so it is dropped (null: no small message until the next accepted song) on engine up / down, on a new song
+     (NC.newSong, and a different S object), on detach, and replaced by every accepted publish. Never patched up from anywhere else. ---- */
+  var LIVE_MS = 16;           // one diff task per 16 ms: a drag's last value wins (N2-PAGE-CLIENT 4.4)
+  var MUTE_RAMP_S = 0.012;    // the page's mute glide (applyMix: setTargetAtTime 12 ms), as frames for mix.set's ramp
+  var MIX_KEYS = ['vol', 'trim', 'pan', 'mute', 'solo'];   // the order of a track's signature row; the shell's MIX_KEYS also has 'out' (the master's); 'send' is refused: it rides in the song text
+  var CHAIN_ROUTED = { trackIn: 1, chainOut: 1, scin: 1, scout: 1 };   // chain_edit answers E_ARG for these modules (their params move the bus plan): they go with the song
+  var CHAIN_NAMES = { track: 1, src: 1, pre: 1 };                       // the same, by parameter name (the page re-routes tracks and taps for these)
+  var L = { sent: null, pdc: null, t: 0, ops: new Map(), poke: false };
+  function liveReset() { L.sent = null; L.pdc = null; L.ops.clear(); L.poke = false; clearTimeout(L.t); L.t = 0; }
+  function liveSoon() { if (L.t || !playSent || !L.sent) return; L.t = setTimeout(liveFlush, LIVE_MS); }
+  function fin(x) { return typeof x === 'number' && isFinite(x); }
+  function lvl(x) { x = +x; return isFinite(x) ? Math.max(0, Math.min(255, x)) : null; }
+
+  // One track's (or the master's) effect list: `raw` is what fx.plan would carry (plus the tempo the tempo-locked effects are mapped for), `str` the structure (which slots, which effect, on / off),
+  // `p` the 12 mapped values of each ordinary slot. A pump or modular slot has no fx.set (live.h): its parameters ride in the song, its on / type / position in fx.plan.
+  function fxEntry(A, bpm, prev) {
+    var raw = bpm + '|' + JSON.stringify(A || null);
+    if (prev && prev.raw === raw) return prev;
+    var e = { raw: raw, str: '', p: [], pump: false }, sr = NC.sr;
+    if (A && A.length) for (var k = 0; k < A.length; k++) {
+      var f = A[k], info = f && host.fxSlot ? host.fxSlot(f, sr, bpm) : null;
+      if (!f) { e.str += '-,'; e.p.push(null); continue; }
+      if (!info) { e.str += k + ':?' + f.type + ',';  e.p.push(null); continue; }   // an effect the page does not know either: only its type is a structure
+      e.str += k + ':' + f.type + ':' + (f.on ? 1 : 0) + ':' + info.kind + ',';
+      if (info.kind === 'pump') e.pump = true;
+      var p = null; if (info.kind === 'fx' && info.p && info.p.length === 12) { p = info.p.slice(); for (var q = 0; q < 12; q++) if (!fin(p[q])) { p = null; break; } }   // a value the shell would refuse: the song carries it
+      e.p.push(p);
+    }
+    return e;
+  }
+  // The signature of the live-editable state. `prev` (a snapshot) lets an unchanged effect list keep its entry: the maps run only for a list that changed.
+  function liveSnap(prev) {
+    var S = host.S(); if (!S) return null;
+    var bpm = +S.bpm > 0 ? +S.bpm : 120, z = { ref: S, mix: [], master: lvl(S.master), mout: S.mout == null ? 255 : lvl(S.mout), fx: [], mst: '', safety: S.limiter !== false, mods: {} };
+    var mx = S.mix || [];
+    for (var i = 0; i < mx.length && i < 32; i++) { var m = mx[i] || {}; z.mix.push([lvl(m.vol), lvl(m.trim), lvl(m.pan), m.mute ? 1 : 0, m.solo ? 1 : 0]); }
+    for (var t = 0; t <= 32; t++) z.fx.push(host.fxSlot ? fxEntry(t < 32 ? S.tfx && S.tfx[t] : S.mfx, bpm, prev && prev.fx && prev.fx[t]) : null);
+    z.mst = S.mst ? JSON.stringify(S.mst) : '';
+    try { z.mods = host.chainMods ? host.chainMods() || {} : {}; } catch (e) { z.mods = {}; }
+    return z;
+  }
+  // The shell accepted this song (ok verdict): it is what the core holds. Edits made since the snapshot go out at once.
+  function liveAccepted(v) {
+    if (v.live || !v.snap || v.snap.ref !== host.S()) return;   // once per song: a later `fit` event for the same song must not put an older baseline back
+    v.live = true; L.sent = v.snap; L.ops.clear();
+    if (playSent && NC.on && hasMods(v.snap)) L.poke = true;   // live.h pdc_set: "the page calls it after a song_publish that changes the chains patch" (sent whenever a song with chains is accepted mid-play)
+    liveSoon();
+  }
+  function hasMods(z) { for (var k in z.mods) return true; return false; }
+
+  function liveFlush() {
+    L.t = 0;
+    if (!playSent || down() || !L.sent || !NC.on) { L.ops.clear(); return; }
+    var S = host.S();
+    if (!S || S !== L.sent.ref) { L.sent = null; L.ops.clear(); return; }   // another song: nothing to compare with (the next accepted song brings the baseline)
+    var cur, o = L.sent, sr = NC.sr || 48000;
+    try { cur = liveSnap(o); } catch (e) { log('native core client: live diff failed', e); return; }
+    if (!cur) return;
+    // A song that is out and not yet answered will become the baseline: it must also hear what is sent now, or a value changed back to its old one in that gap would never be sent.
+    var n = verdict && verdict.pending && verdict.snap && verdict.snap.ref === S && verdict.snap !== o ? verdict.snap : null;
+    // the mixer: one mix.set per track and key (the page's 12 ms law; the mute glide as frames)
+    for (var i = 0; i < cur.mix.length && i < o.mix.length; i++) for (var j = 0; j < 5; j++) {
+      var a = cur.mix[i][j], b = o.mix[i][j];
+      if (a === b || a === null) continue;
+      send({ t: 'mix.set', tr: i, k: MIX_KEYS[j], v: a, ramp: j >= 3 ? Math.round(sr * MUTE_RAMP_S) : -1 });
+      o.mix[i][j] = a; if (n && n.mix[i]) n.mix[i][j] = a;
+    }
+    if (cur.master !== null && cur.master !== o.master) { send({ t: 'mix.set', tr: 32, k: 'vol', v: cur.master, ramp: -1 }); o.master = cur.master; if (n) n.master = cur.master; }
+    if (cur.mout !== null && cur.mout !== o.mout) { send({ t: 'mix.set', tr: 32, k: 'out', v: cur.mout, ramp: -1 }); o.mout = cur.mout; if (n) n.mout = cur.mout; }
+    // the effects: a changed structure is a new plan (the whole track's slots), a moved parameter one fx.set per slot
+    for (var t = 0; t <= 32; t++) {
+      var c = cur.fx[t], w = o.fx[t]; if (!c || !w || c === w) continue;
+      var A = t < 32 ? S.tfx && S.tfx[t] : S.mfx, bpm = +S.bpm > 0 ? +S.bpm : 120;
+      if (c.str !== w.str) { send({ t: 'fx.plan', tr: t, slots: A || [], bpm: bpm }); if (c.pump || w.pump) L.poke = true; }
+      else for (var k = 0; k < c.p.length; k++) {   // (a slot whose values could not be sent, now or before, is left to the song)
+        var np = c.p[k], op = w.p[k]; if (!np || !op) continue;
+        for (var q = 0; q < 12; q++) if (np[q] !== op[q]) { send({ t: 'fx.set', tr: t, slot: k, p: np }); break; }
+      }
+      o.fx[t] = c; if (n) n.fx[t] = c;
+    }
+    // the master chain (mastering and the safety limiter)
+    if (cur.mst !== o.mst || cur.safety !== o.safety) {
+      if (cur.mst) send({ t: 'master.config', mst: S.mst, safety: cur.safety });
+      o.mst = cur.mst; o.safety = cur.safety; if (n) { n.mst = cur.mst; n.safety = cur.safety; }
+    }
+    // latency compensation: the mode (an aset value, not in the song), and live.h's "recompute after a pump slot's plan / a chains publish"
+    var pm = null; try { pm = host.pdc ? host.pdc() : null; } catch (e) { /* ignore */ }
+    if ((pm === 0 || pm === 1 || pm === 2) && L.pdc !== null && (pm !== L.pdc || L.poke)) { send({ t: 'pdc.set', mode: pm }); L.pdc = pm; }
+    L.poke = false;
+    // chains parameters (see chainParam): one chain.edit with every parameter that moved
+    if (L.ops.size) { var ops = []; L.ops.forEach(function (v) { ops.push(v); }); L.ops.clear(); send({ t: 'chain.edit', ops: ops }); }
+  }
+
+  /** thunderChains.param (branch 13): a slider on a chains module. The page's own copy of the patch is already changed (and it does not saveS, the editor's autosave comes about a second later):
+   *  the whole song is made stale so it carries the value, and while a PLAY runs a plain number on a module the shell knows goes ahead as chain.edit. */
+  NC.chainParam = function (id, name, value) {
+    if (!NC.on) return;
+    sentVer = -1; schedPublish();   // the song text must carry it (the shell finds the same value there: harmless); the page's param() does not bump songVer
+    id = String(id); name = String(name);
+    var ty = L.sent && L.sent.mods ? L.sent.mods[id] : undefined;
+    if (!playSent || !L.sent || ty === undefined || CHAIN_ROUTED[ty] || CHAIN_NAMES[name] || !fin(value) || id.length > 47 || name.length > 31) return;   // chain_edit is all or nothing: nothing it could refuse goes in
+    L.ops.set(id + '\u0000' + name, { op: 'param', id: id, name: name, value: value });
+    liveSoon();
+  };
 
   window.__thunderClient = NC;
 })();
