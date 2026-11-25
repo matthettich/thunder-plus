@@ -129,6 +129,11 @@ class FxPlan {
   Fx* retired_[kFxSlots] = {nullptr}; // filled by commit(): what the live chain no longer holds
   int nRetired_ = 0;
   bool committed_ = false;
+  // P3b: this plan's own copy of the statics of the effect sources (wasi rand(), stmlib::Random, DaisySP myrand()): plan() runs the effects' constructors on it (control
+  // thread, the only one that touches it), commit() copies it into the host's audio-side state when the plan made an effect of that kind (rsUsed_). The audio thread never reads a
+  // field the control thread writes: the plan is handed over by a ring, and not touched by the control thread again.
+  struct Rs { uint64_t rand; uint32_t stm, daisy; };
+  Rs rs_ = {0, 0x21, 1}; bool rsUsed_ = false;
 };
 
 struct FxDyn { int slot; char key[kFxKey]; float v[3]; };   // [reduction dB, level in dB, peak out dB]
@@ -215,6 +220,7 @@ class FxHost {
     float lip = 0, lop = 0;
   };
   struct Q { double at; int slot; int n; double p[kModMaxParams]; };
+  void seedPlan(FxPlan* pl);                      // P3b (control thread)
   void applyEntry(Slot& s, const FxEntry& c, bool fresh = false);   // fresh: a slot made by this commit (the JS's new slot: not `dirty`)
   void applyPset(int slot, const double* p, int n);
   void applyPumpPset(int slot, const float* pv, int n);
@@ -253,6 +259,8 @@ class FxHost {
   bool lvl_ = false, tel_ = false; int lvlN_ = 0, telN_ = 0; float lvlP_[8] = {0};
   bool lvlReady_ = false; float lvlOut_[8] = {0};
   int nDynOut_ = 0; FxDyn dynOut_[kFxSlots];
+  uint32_t planSeq_ = 0;   // P3b (control thread only): plans so far that made an effect with statics; the first starts from the fresh-instance values, the k-th from a hash of k
+  // audio thread only from here (until the next line's comment): written by process() and by commit()
   uint64_t rand_ = 0;   // wasi-libc's rand() state of this host's "module" (see dsp/wasi_rand.cpp)
   // the other statics of this host's "module" (dsp/host_fx_state.h): stmlib::Random's state (Beads, Clouds) and DaisySP myrand()'s seed
   // (PitchShifter), with the values a fresh wasm instance starts from
