@@ -116,7 +116,8 @@ class MidiHost {
   // Port letter 0..3 -> a device id ("" = none). Saved and applied now when an engine runs.
   int assign(int port, const std::string& id);
   // The clock map's floor: the output latency, ns (0 .. 2 s). Applied now when an engine runs.
-  void setOutLatencyNs(int64_t ns);
+  // Returns the control call's result (0, or THUNDER_LIVE_E_BUSY from the runner: retry later).
+  int setOutLatencyNs(int64_t ns);
   // The token -> port table (the sender reads it). attach / detach do NOT change the device list: setDevices does.
   void attach(uint64_t token, std::shared_ptr<PortIo> io, bool ts) { table_.put(token, std::move(io), ts); }
   void detach(uint64_t token) { table_.remove(token); }
