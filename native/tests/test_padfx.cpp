@@ -92,15 +92,27 @@ static int trackBeads() {
   return bad;
 }
 
+// A build without the effects library (the Windows MSVC job: thunder_dsp is not built there) hosts only the MODFX modules and the hand-written kinds; a library effect then reads as Kind::Other (the page's
+// songs fall back, as for any effect not ported) and its cases (and the voices, pads and chains that hold one: their tail rule depends on it) are SKIPPED here, said, not failed.
+static bool hasOther(Json fx) { EngFx f; eng_fx_from_json(f, fx); return f.kind == EngFx::Kind::Other; }
+static bool needsMissingLib(Json c) {
+  const std::string k(c.str("kind"));
+  if (k == "fx") return hasOther(c.get("fx"));
+  Json l = k == "pad" ? c.arr("fxs") : c.get("voice").arr("fx");
+  for (size_t i = 0; i < l.size(); i++) if (hasOther(l.at(i))) return true;
+  return false;
+}
+
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("SKIP: no reference directory (no node: tools/padfx-dump.mjs makes it)\n"); return 77; }
   const std::string dir = argv[1];
-  int exact = 0, ran = 0; double worst = -1e9; std::string worstName;
+  int exact = 0, ran = 0, skipped = 0; double worst = -1e9; std::string worstName;
   for (int g = 0; g < kPadFxGoldenN; g++) {
     const PadFxGolden& G = kPadFxGolden[g]; std::string js, in, ref;
     if (!readFile(dir + "/" + G.name + ".json", &js) || !readFile(dir + "/" + G.name + ".in.f32", &in) || !readFile(dir + "/" + G.name + ".f32", &ref)) { std::printf("%-26s MISSING reference\n", G.name); fails++; continue; }
     JsonDoc doc; if (!doc.parse(js)) { std::printf("%-26s bad json\n", G.name); fails++; continue; }
     Json c = doc.root(); const double sr = c.num("sr", 48000), bpm = c.num("bpm", 120);
+    if (needsMissingLib(c)) { std::printf("%-26s SKIPPED (no effects library in this build: the effect is Kind::Other)\n", G.name); skipped++; continue; }
     const std::vector<float> a = floats(in), want = floats(ref);
     std::vector<float> got; bool ok = true;
     if (std::string(c.str("kind")) == "voice" || std::string(c.str("kind")) == "electro") {   // renderVoice: layers, pad effects, trim, fade
@@ -143,7 +155,7 @@ int main(int argc, char** argv) {
     std::printf("%-26s %-10s%s%s\n", G.name, b, hashOk ? "" : "  [committed hash disagrees with the reference run]", pass ? "" : "  FAIL");
     if (!pass) fails++;
   }
-  std::printf("padfx: %d cases run, %d bit-exact, worst %s (%s), %d failed (gate -100 dB RMS; pshift -70, rings and pad_three -80, Beads media 0 (Dirty tape) -50 (measured -58); clouds 1.6 int16 steps)\n", ran, exact, worst < -900 ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName.c_str(), fails);
+  std::printf("padfx: %d cases skipped (no effects library), %d cases run, %d bit-exact, worst %s (%s), %d failed (gate -100 dB RMS; pshift -70, rings and pad_three -80, Beads media 0 (Dirty tape) -50 (measured -58); clouds 1.6 int16 steps)\n", skipped, ran, exact, worst < -900 ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName.c_str(), fails);
   fails += fuzz();
   fails += trackBeads();
   return fails ? 1 : 0;
