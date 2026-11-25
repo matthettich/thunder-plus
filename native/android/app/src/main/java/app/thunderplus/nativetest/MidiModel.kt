@@ -122,3 +122,37 @@ class MidiRegistry {
         return ScanDiff(added, removed, changed, kept)
     }
 }
+
+
+// ---- N2 H2: MIDI IN and the bridge's `midi.ports` event (pure; tested in MidiModelTest) -----------------------------------------------------------------------------------------------------------
+
+/** A port of a device as MidiDeviceInfo lists it. [input] = TYPE_INPUT: the port the app WRITES to (a MIDI out); false = TYPE_OUTPUT: the port the app READS from (a MIDI in). */
+data class RawPort(val portNumber: Int, val name: String, val input: Boolean)
+
+data class RawDevice(val deviceId: Int, val name: String, val transport: Transport, val ports: List<RawPort>)
+
+/** One scan, split into the two directions. Each goes to its own [MidiRegistry] (ids and tokens are per direction: the page lists outputs and inputs apart). */
+object MidiScanSplit {
+    private fun part(devs: List<RawDevice>, input: Boolean): List<ScanDevice> =
+        devs.filter { d -> d.ports.any { it.input == input } }.map { d -> ScanDevice(d.deviceId, d.name, d.transport, d.ports.filter { it.input == input }.map { ScanPort(it.portNumber, it.name) }) }
+    /** The devices with ports the app writes to (MIDI out). */
+    fun outs(devs: List<RawDevice>): List<ScanDevice> = part(devs, true)
+    /** The devices with ports the app reads from (MIDI in). */
+    fun ins(devs: List<RawDevice>): List<ScanDevice> = part(devs, false)
+    /** Every device id that has a port in either direction. */
+    fun deviceIds(outs: List<PortEntry>, ins: List<PortEntry>): List<Int> = (outs.map { it.key.deviceId } + ins.map { it.key.deviceId }).distinct()
+}
+
+/** The `midi.ports` event (CORE-BRIDGE 4 and U36-SPEC 5.5): {t, devs:[{id,name}], ins:[{id,name,port}], ports:[{state,id,name,gear,clock}], late, sent}. `port` in `ins` is the number `midi.in` events carry. */
+object MidiPortsEvent {
+    /** [corePorts]: the host's own JSON ({"ports":[...],"late":N,"sent":N,...}), "" or "{}" when there is no engine (then four empty ports). */
+    fun build(outs: List<PortEntry>, ins: List<PortEntry>, corePorts: String): String {
+        val o = org.json.JSONObject().put("t", "midi.ports")
+        o.put("devs", org.json.JSONArray().also { a -> outs.forEach { a.put(org.json.JSONObject().put("id", it.id).put("name", it.name)) } })
+        o.put("ins", org.json.JSONArray().also { a -> ins.forEach { a.put(org.json.JSONObject().put("id", it.id).put("name", it.name).put("port", it.token)) } })
+        val core = try { org.json.JSONObject(if (corePorts.isBlank()) "{}" else corePorts) } catch (e: Exception) { org.json.JSONObject() }
+        val ports = core.optJSONArray("ports") ?: org.json.JSONArray().also { a -> repeat(4) { a.put(org.json.JSONObject().put("state", 0).put("id", "").put("name", "").put("gear", 0).put("clock", 0)) } }
+        o.put("ports", ports).put("late", core.optLong("late", 0)).put("sent", core.optLong("sent", 0))
+        return o.toString()
+    }
+}

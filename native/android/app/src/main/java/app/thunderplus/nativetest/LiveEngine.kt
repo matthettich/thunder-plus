@@ -42,6 +42,7 @@ object LiveEngine {
         val sr = LiveNative.nativeStart(true)
         if (sr <= 0) { Log.i(TAG, "start failed: $sr"); return false }
         sampleRate = sr; active = true; appCtx = ctx.applicationContext
+        LiveMidi.engineUp()
         try { ctx.startForegroundService(Intent(ctx, ThunderService::class.java)) } catch (e: Exception) { Log.i(TAG, "service did not start: $e") }
         return true
     }

@@ -91,6 +91,17 @@ class BridgeTranslatorTest {
         assertTrue(call("{\"t\":\"engine.reset\"}") === LiveCall.EngineReset)
     }
 
+    @Test fun midiCfgIsFourLetters() {   // CORE-BRIDGE 3 midi.cfg (H2)
+        val c = call("{\"t\":\"midi.cfg\",\"outs\":[\"n:Synth\",\"\",\"n:Drums / A\"],\"clockOut\":[true,0,1],\"gearDelay\":[12.4,-80,500,3],\"clockIn\":\"n:Keys\"}") as LiveCall.MidiCfg
+        assertEquals(listOf("n:Synth", "", "n:Drums / A", ""), c.outs)
+        assertEquals(listOf(true, false, true, false), c.clockOut)
+        assertEquals(listOf(12.0, -50.0, 200.0, 3.0), c.gear)   // whole ms, clamped to -50..200
+        assertTrue(c.clockIn)
+        val e = call("{\"t\":\"midi.cfg\"}") as LiveCall.MidiCfg   // nothing given: four empty letters, no clocks, no delay
+        assertEquals(listOf("", "", "", ""), e.outs); assertEquals(listOf(false, false, false, false), e.clockOut); assertEquals(listOf(0.0, 0.0, 0.0, 0.0), e.gear)
+        assertEquals("midi.cfg", refused("{\"t\":\"midi.cfg\",\"outs\":\"n:x\"}").where)
+    }
+
     @Test fun metersClamp() {
         assertEquals(LiveCall.MetersWant(30.0), call("{\"t\":\"meters.want\",\"rate\":60}"))
         assertEquals(LiveCall.MetersWant(0.0), call("{\"t\":\"meters.want\",\"rate\":-1}"))
@@ -109,7 +120,7 @@ class BridgeTranslatorTest {
 
     @Test fun helloAndNotOnTheLiveHost() {
         assertEquals(LiveCall.Hello(3, true), call("{\"t\":\"hello\",\"id\":3,\"v\":1,\"app\":\"thunder\",\"live\":true}"))
-        for (t in listOf("song.patch", "kit.patch", "note.on", "note.off", "midi.cfg", "dev.list", "dev.open", "rec.arm", "render.start", "link.set", "lxp")) {
+        for (t in listOf("song.patch", "kit.patch", "note.on", "note.off", "dev.list", "dev.open", "rec.arm", "render.start", "link.set", "lxp")) {
             val r = refused("{\"t\":\"$t\",\"id\":1}")
             assertEquals(t, r.where); assertEquals(1, r.replyId)
         }

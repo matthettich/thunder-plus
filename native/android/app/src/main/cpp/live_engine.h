@@ -55,6 +55,23 @@ class LiveEngine {
   // AUDIO. `out` is interleaved stereo, `frames` frames. Never allocates, never blocks. Silence when the engine is not created or the handle is dead.
   void render(float* out, int frames, int64_t wallNs);
 
+  // H2: the host frame the LAST callback started at, and when (CLOCK_MONOTONIC): the shell's estimate of "now" on the host's frame count (a MIDI-in message's `f`). hostFrameAt(ns) = that frame plus the time since
+  // at the stream's rate. 0 before the first callback. Any thread.
+  int64_t hostFrameAt(int64_t ns) const {
+    const int64_t f = cbFrame_.load(std::memory_order_relaxed), t = cbNs_.load(std::memory_order_relaxed);
+    if (t <= 0) return 0;
+    const int64_t d = ns <= 0 ? 0 : ns - t;
+    return f + (int64_t)((double)d * 1e-9 * cfg_.sampleRate);
+  }
+  // The host frame the NEXT callback will start at (audio thread, or any after it stopped). With offset(), what the MIDI clock map needs.
+  int64_t hostFrameNow() const { return frame0_; }
+  // The engine offset (host frame - engine frame), thunder_live_engine_offset: wait-free, any thread. 0 when no host.
+  int64_t engineOffset() const { int64_t o = 0; if (L_) thunder_live_engine_offset(L_, &o); return o; }
+  // A bridge event made by the shell itself (midi.in, midi.ports ...): goes out with the core's, in the same drained list. Any thread.
+  void pushEvent(std::string json, bool critical) { events_.push(std::move(json), critical); }
+  // Called by the poller thread for every STATE record (state 0 stopped, 1 playing, 2 ended, 3 held). Set before startThreads.
+  void setStateHook(std::function<void(int)> f) { stateHook_ = std::move(f); }
+
   // H1c: the SHELL's output gain (audio-focus ducking), applied after the core's master and safety limiter, so the page's master volume is never touched. Any thread; the audio thread ramps to it
   // over 150 ms (no click). 1 = unity.
   void setDuck(float g) { duckTarget_.store(g < 0.f ? 0.f : (g > 1.f ? 1.f : g), std::memory_order_relaxed); }
@@ -93,6 +110,8 @@ class LiveEngine {
   int64_t frame0_ = 0;                        // the running host frame: the audio thread's alone
   std::atomic<int64_t> calls_{0};
   std::atomic<float> duckTarget_{1.f};
+  std::atomic<int64_t> cbFrame_{0}, cbNs_{0};
+  std::function<void(int)> stateHook_;
   float duckCur_ = 1.f;                       // the audio thread's alone
   std::atomic<int> outLat_{0}, under_{0};
 

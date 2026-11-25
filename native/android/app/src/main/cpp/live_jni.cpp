@@ -17,6 +17,8 @@
 #include <thread>
 
 #include "live_engine.h"
+#include "midi_in.h"
+#include "midi_out.h"
 #include "miniaudio.h"
 #include "pad_filler.h"
 #include "songfit.h"
@@ -33,12 +35,16 @@
 namespace {
 
 struct Live {
-  std::unique_ptr<tpa::LiveEngine> eng;
+  std::shared_ptr<tpa::LiveEngine> eng;   // shared: the MIDI control runner and the MIDI-in sink hold a copy, so neither can meet a freed engine
   ma_device device;
   bool deviceInit = false;
   void* aaLib = nullptr;
   int32_t (*aaXrun)(void*) = nullptr;
   int32_t (*aaBuf)(void*) = nullptr;
+  int32_t (*aaTs)(void*, int32_t, int64_t*, int64_t*) = nullptr;   // H2: the clock map's AAudio pair (read by the audio callback only)
+  int64_t (*aaWritten)(void*) = nullptr;
+  bool midiOn = false;     // H2: the MIDI host runs on this engine. Set before the stream starts, cleared after it stopped (the callback reads it plainly)
+  int64_t lastLatNs = -1;
   int64_t rev = 0;
   std::vector<int> lastSlots;   // pads the previous project filled (to remove the ones a reload does not fill)
   // H1b: what the page last sent (song.load, kit.load): the texts SongFit and the kit entries read. Guarded by g_life.
@@ -52,19 +58,44 @@ std::mutex g_life;   // start / shutdown / load: one at a time (the JNI threads 
 rtlog g_lrt;         // A5's clock-drift logger on the live callback
 std::atomic<double> g_load{0.0};   // CORE-BRIDGE 7 G9: the callback's time over its period, peak-held with decay (written by the audio thread, read by Kotlin)
 
+std::mutex g_inMu;
+std::shared_ptr<tpa::LiveEngine> g_inEng;   // the engine the MIDI-in sink pushes to (a copy under g_inMu: the reader thread never meets a freed one)
+
 inline int64_t monoNs() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (int64_t)t.tv_sec * 1000000000LL + t.tv_nsec; }
 
 // THE AUDIO CALLBACK: the logger, then LiveEngine::render (flush-to-zero, thunder_live_process, interleave). No allocation, no lock, no JNI, no log.
 void dataCallback(ma_device* dev, void* out, const void*, ma_uint32 frames) {
   const int64_t t0 = monoNs();
-  tpa::LiveEngine* e = static_cast<Live*>(dev->pUserData)->eng.get();
+  Live* lv = static_cast<Live*>(dev->pUserData);
+  tpa::LiveEngine* e = lv->eng.get();
   rtlog_begin(&g_lrt, t0);
+  const int64_t hostF = e->hostFrameNow();
   e->render(static_cast<float*>(out), (int)frames, t0);
+  if (lv->midiOn) tpa::host().audioBlockLive((int)frames, hostF, e->engineOffset(), t0);   // H2: AFTER process, the clock map (engine frame = host frame - offset); the sender thread pumps
   const int64_t t1 = monoNs();
   rtlog_end(&g_lrt, t1, (int)frames);
   const double period = (double)frames / (double)dev->sampleRate, work = (double)(t1 - t0) * 1e-9, prev = g_load.load(std::memory_order_relaxed);
   const double now = work / period;
   g_load.store(now > prev ? now : prev * 0.95 + now * 0.05, std::memory_order_relaxed);   // no allocation, no lock
+}
+
+// H2: the AAudio timestamp pair for the MIDI clock map (spec 3.4). Called by audioBlockLive on the audio thread, at most every 20 ms: the only reader of getTimestamp.
+bool liveTsRead(void*, tpa::TsPair* p) {
+  void* stream = (void*)g.device.aaudio.pStreamPlayback;
+  if (!stream || !g.aaTs || !g.aaWritten) return false;
+  int64_t pos = 0, ns = 0;
+  if (g.aaTs(stream, CLOCK_MONOTONIC, &pos, &ns) != 0) return false;
+  p->pos = pos; p->ns = ns; p->written = g.aaWritten(stream);
+  return true;
+}
+
+// H2: a message from a device's MIDI port: one bridge event. `f` = the host frame of that moment (the CLOCK events map it to wall time); note messages are kept when the queue must drop.
+void midiInSink(uint64_t token, int64_t ns, const tpa::MidiInMsg& m) {
+  std::shared_ptr<tpa::LiveEngine> e;
+  { std::lock_guard<std::mutex> lk(g_inMu); e = g_inEng; }
+  if (!e) return;
+  const int64_t now = ns > 0 ? ns : monoNs();
+  e->pushEvent(tpa::midiInJson(e->hostFrameAt(now), now, token, m), tpa::midiInIsNote(m));
 }
 
 std::string jsonEscape(const std::string& s) { std::string o; for (char c : s) { if (c == '"' || c == '\\') { o += '\\'; o += c; } else if ((unsigned char)c < 0x20) o += ' '; else o += c; } return o; }
@@ -74,6 +105,9 @@ std::string jsonEscape(const std::string& s) { std::string o; for (char c : s) {
 extern "C" {
 
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeCaps(JNIEnv*, jobject) { return (jint)thunder_live_caps(); }
+
+// H2: the MIDI host runs on this engine (its start, MIDI out and MIDI in).
+JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMidiOn(JNIEnv*, jobject) { return (g.deviceInit && g.eng && g.midiOn) ? JNI_TRUE : JNI_FALSE; }
 
 // Opens the output, creates the live host at the stream's rate, starts the control and poller threads, then the stream. Returns the sample rate, or a negative code.
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JNIEnv*, jobject, jboolean chains) {
@@ -96,11 +130,26 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   tpa::LiveEngine::Config ec; ec.sampleRate = (double)g.device.sampleRate; ec.maxBlock = 4096; ec.chains = chains == JNI_TRUE;
   std::string err;
   if (!g.eng->create(ec, &err)) { LOGI("live create failed: %s", err.c_str()); ma_device_uninit(&g.device); g.deviceInit = false; g.eng.reset(); return -2; }
+  // H2: the MIDI host on the live handle's thunder_midi (U37-P5-NOTES call order: create, thunder_midiout_create + devices / ports on the control thread, then the audio callback). Before the control
+  // thread starts, this thread IS the control thread; afterwards every MIDI control call goes through the control thread's queue (the runner).
+  g.midiOn = false;
+  if (thunder_midi* cm = thunder_live_midi(g.eng->handle())) g.midiOn = tpa::host().engineStartExternal(cm, (double)g.device.sampleRate, &liveTsRead, nullptr);
+  if (!g.midiOn) LOGI("MIDI host did not start (MIDI out and in are off)");
+  g.eng->setStateHook([](int st) { if (g.midiOn && st == THUNDER_LIVE_STATE_ENDED) tpa::host().setPlaying(false); });   // a song that ends by itself: the clock box goes quiet (the play and stop calls set it themselves)
   g.eng->startThreads();
+  if (g.midiOn) {
+    std::shared_ptr<tpa::LiveEngine> keep = g.eng;
+    tpa::host().setControlRunner([keep](std::function<int()> fn) { return keep->call([fn](thunder_live*) { return fn(); }, 1500); });
+    { std::lock_guard<std::mutex> lk(g_inMu); g_inEng = g.eng; }
+    tpa::setMidiInSink(&midiInSink);
+  }
   g.aaLib = dlopen("libaaudio.so", RTLD_NOW);   // resolved before the stream runs: the status call reads the xrun count and buffer size through these
-  if (g.aaLib) { g.aaXrun = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getXRunCount"); g.aaBuf = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getBufferSizeInFrames"); }
+  if (g.aaLib) { g.aaXrun = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getXRunCount"); g.aaBuf = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getBufferSizeInFrames");
+                g.aaTs = (int32_t(*)(void*, int32_t, int64_t*, int64_t*))dlsym(g.aaLib, "AAudioStream_getTimestamp"); g.aaWritten = (int64_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getFramesWritten"); }
   rtlog_reset(&g_lrt, (int)g.device.sampleRate);
   if (ma_device_start(&g.device) != MA_SUCCESS) {
+    tpa::setMidiInSink(nullptr); { std::lock_guard<std::mutex> lk(g_inMu); g_inEng.reset(); }
+    g.eng->stopThreads(); if (g.midiOn) { g.midiOn = false; tpa::host().engineStop(); }
     g.eng->destroy(); ma_device_uninit(&g.device); g.deviceInit = false; g.eng.reset();
     if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; }
     return -3;
@@ -117,10 +166,15 @@ void teardownLocked() {
   for (int i = 0; i < 100 && g.eng->audioCalls() < c0 + 2; i++) std::this_thread::sleep_for(std::chrono::milliseconds(5));
   ma_device_uninit(&g.device);   // stops the callback
   g.deviceInit = false;
-  g.eng->destroy();              // joins the control and poller threads, then thunder_live_destroy
+  tpa::setMidiInSink(nullptr);
+  { std::lock_guard<std::mutex> lk(g_inMu); g_inEng.reset(); }
+  g.eng->stopThreads();          // the control thread is the live handle's ONE control thread: it ends before this thread makes the MIDI control calls below
+  if (g.midiOn) { g.midiOn = false; tpa::host().engineStop(); }   // the sender delivers the Stop (<= about 0.5 s), then thunder_midiout_free: BEFORE destroy (live.h thunder_live_midi)
+  g.eng->destroy();              // joins what is left, then thunder_live_destroy
   g.eng.reset();
   g.lastSlots.clear();
-  if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; g.aaXrun = nullptr; g.aaBuf = nullptr; }
+  g.lastLatNs = -1;
+  if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; g.aaXrun = nullptr; g.aaBuf = nullptr; g.aaTs = nullptr; g.aaWritten = nullptr; }
 }
 
 JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown(JNIEnv*, jobject) {
@@ -153,6 +207,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeReopenSt
   g.deviceInit = true;
   if (ma_device_start(&g.device) != MA_SUCCESS) { g_reopening.store(false); LOGI("reopen: ma_device_start failed: the host ends"); teardownLocked(); return -1; }
   g_reopening.store(false);
+  if (g.midiOn) tpa::host().remap();   // a new stream is a new AAudio timestamp pair: the clock map is published again at the next callback
   LOGI("stream reopened at the engine's %u Hz", g.device.sampleRate);
   return (jint)g.device.sampleRate;
 }
@@ -223,13 +278,14 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePlay(JNI
     thunder_live_play_opts po; std::memset(&po, 0, sizeof po);
     po.size = (uint32_t)sizeof po; po.t0 = THUNDER_LIVE_NOW; po.mode = THUNDER_LIVE_MODE_SONG; po.row = row; po.pdc_mode = 1; po.random_seed = seed; po.spp = -1;
     int r = thunder_live_meters_want(L, 10.0); (void)r;
+    if (g.midiOn) tpa::host().setPlayingDirect(true);   // before play: a port set after play() is in force for its Start (live.h), the transport flag first
     return thunder_live_play(L, &po);
   });
 }
 
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeTransportStop(JNIEnv*, jobject, jlong at) {
   if (!g.deviceInit || !g.eng) return -2;
-  return g.eng->call([=](thunder_live* L) { return thunder_live_stop(L, at); });
+  return g.eng->call([=](thunder_live* L) { const int r = thunder_live_stop(L, at); if (r == 0 && g.midiOn) tpa::host().setPlayingDirect(false); return r; });
 }
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeBpm(JNIEnv*, jobject, jdouble bpm, jlong at) {
   if (!g.deviceInit || !g.eng) return -2;
@@ -252,7 +308,11 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStatu
   void* stream = (lk.owns_lock() && g.deviceInit && !g_reopening.load()) ? (void*)g.device.aaudio.pStreamPlayback : nullptr;
   if (stream) {
     const int x = g.aaXrun ? g.aaXrun(stream) : 0, b = g.aaBuf ? g.aaBuf(stream) : 0;
-    g.eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)
+    g.eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);
+    if (g.midiOn && b > 0 && g.device.sampleRate > 0) {   // the clock map's floor: one output buffer (an upper bound, as the host stats use it); only when it changed (the call goes through the control thread)
+      const int64_t ns = (int64_t)b * 1000000000LL / (int64_t)g.device.sampleRate;
+      if (ns != g.lastLatNs) { g.lastLatNs = ns; tpa::host().setOutLatencyNs(ns); }
+    }   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)
   }
   return env->NewStringUTF(g.eng->statusJson().c_str());
 }
@@ -409,6 +469,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePlayEx(J
     po.size = (uint32_t)sizeof po; po.t0 = t0 < 0 ? THUNDER_LIVE_NOW : t0; po.mode = mode; po.row = row; po.track = track; po.sect = sect; po.phrase = phrase;
     po.has_loop = hasLoop; po.loop_y0 = y0; po.loop_y1 = y1; po.has_seed = hasSeed; po.seed = (uint32_t)seed; po.random_seed = rs; po.spp = -1; po.pdc_mode = pdc;
     po.only = (uint64_t)onlyBits; po.has_only = hasOnly;
+    if (g.midiOn) tpa::host().setPlayingDirect(true);
     return thunder_live_play(L, &po);
   });
 }

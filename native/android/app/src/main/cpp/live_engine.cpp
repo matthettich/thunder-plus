@@ -73,6 +73,7 @@ void LiveEngine::render(float* out, int frames, int64_t wallNs) {
   if (!L_ || l_.empty()) { std::memset(out, 0, sizeof(float) * 2 * (size_t)frames); return; }
   float* const l = l_.data(); float* const r = r_.data();
   const int mb = cfg_.maxBlock;
+  cbFrame_.store(frame0_, std::memory_order_relaxed); cbNs_.store(wallNs, std::memory_order_relaxed);
   int done = 0;
   while (done < frames) {
     int n = frames - done; if (n > mb) n = mb;
@@ -143,6 +144,8 @@ void LiveEngine::pollLoop() {
       const int n = thunder_live_poll(L_, buf, (int)sizeof buf);
       if (n <= 0) break;
       any = true;
+      int hookState = -1;
+      {   // the lock covers the parse only: the state hook (H2: the MIDI transport flag) runs after it, because it waits for the control thread
       std::lock_guard<std::mutex> g(sm_);
       int off = 0;
       while (off + (int)sizeof(thunder_live_ev_head) <= n) {
@@ -156,7 +159,7 @@ void LiveEngine::pollLoop() {
         switch (h.type) {
           case THUNDER_LIVE_EV_CLOCK: { thunder_live_ev_clock c; std::memcpy(&c, p, sizeof c); st_.clockF = c.h.f; st_.voices = c.voices; st_.under = c.under; st_.outLat = c.out_lat; break; }
           case THUNDER_LIVE_EV_POS: { thunder_live_ev_pos q; std::memcpy(&q, p, sizeof q); st_.row = q.row; st_.step = q.step; st_.bpm = q.bpm10 / 10.0; break; }
-          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; std::memcpy(&s, p, sizeof s); st_.state = s.state; break; }
+          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; std::memcpy(&s, p, sizeof s); st_.state = s.state; hookState = s.state; break; }
           case THUNDER_LIVE_EV_SONG: { thunder_live_ev_song s; std::memcpy(&s, p, sizeof s); st_.songRev = s.rev; break; }
           case THUNDER_LIVE_EV_PADS: { thunder_live_ev_pads s; std::memcpy(&s, p, sizeof s); st_.padsId = s.id; break; }
           case THUNDER_LIVE_EV_METERS: { thunder_live_ev_meters m; std::memcpy(&m, p, sizeof m); st_.masterPk[0] = m.a[66]; st_.masterPk[1] = m.a[68]; break; }
@@ -169,6 +172,8 @@ void LiveEngine::pollLoop() {
         }
         off += h.bytes;
       }
+      }
+      if (hookState >= 0 && stateHook_) stateHook_(hookState);
     }
     const int64_t now = monoNs();
     if (now - lastHs > 100000000LL) { lastHs = now; thunder_live_host_stats(L_, outLat_.load(std::memory_order_relaxed), under_.load(std::memory_order_relaxed)); }
