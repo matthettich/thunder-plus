@@ -24,6 +24,10 @@ bool isLxrEngine(std::string_view e) { return e == "lxdrum" || e == "lxsnare" ||
 std::string FitResult::json(int64_t rev) const {
   std::string s = "{\"t\":\"fit\",\"rev\":" + std::to_string((long long)rev) + ",\"ok\":" + (ok ? "true" : "false") + ",\"reasons\":[";
   for (size_t i = 0; i < reasons.size(); i++) { if (i) s += ","; s += "{\"code\":\"" + esc(reasons[i].code) + "\",\"text\":\"" + esc(reasons[i].text) + "\"}"; }
+  s += "],\"reasonTexts\":[";
+  for (size_t i = 0; i < reasons.size(); i++) { if (i) s += ","; s += "\"" + esc(reasons[i].text) + "\""; }
+  s += "],\"warn\":[";
+  for (size_t i = 0; i < warns.size(); i++) { if (i) s += ","; s += "\"" + esc(warns[i]) + "\""; }
   return s + "]}";
 }
 
@@ -50,7 +54,7 @@ FitResult songFit(std::string_view songJson, std::string_view kitJson, uint32_t 
       const Json voices = kd.root().arr("voices");
       eng_init();
       auto xv = std::make_unique<XengVoice>(); auto ev = std::make_unique<EngVoice>();
-      int dryPads = 0;
+      int dryPads = 0, twins = 0;
       for (size_t i = 0; i < voices.size() && i < (size_t)THUNDER_LIVE_PADS; i++) {
         const Json v = voices.at(i);
         if (!v.isObj()) continue;
@@ -64,9 +68,11 @@ FitResult songFit(std::string_view songJson, std::string_view kitJson, uint32_t 
         if (xeng_voice_from_json(*xv, v, v.arr("fx"))) renders = xeng_render_bound(*xv, o) > 0;
         else if (xv->kind == XKind::None) { *ev = EngVoice(); renders = eng_voice_from_json(*ev, v, v.arr("layers"), v.arr("fx")) && eng_render_bound(*ev, o) > 0; }
         if (!renders) { add(r, "engine", std::string(tag) + " (" + std::string(eng.empty() ? "layers" : eng) + ") is an instrument the new engine cannot render"); continue; }
+        if (eng == "bass" || eng == "vox" || eng == "acid" || eng == "mach") twins++;
         const Json fx = v.arr("fx");
         for (size_t k = 0; k < fx.size(); k++) { EngFx f; eng_fx_from_json(f, fx.at(k)); if (f.kind == EngFx::Kind::Other && f.on) { dryPads++; if (dryPads <= 8) add(r, "pad-effect", std::string(tag) + " has a pad effect the new engine does not have"); else r.ok = false; break; } }
       }
+      if (twins > 0) r.warns.push_back(std::to_string(twins) + (twins == 1 ? " pad plays" : " pads play") + " its rendered twin (the live engines are not in the new engine yet)");
     }
   }
   return r;

@@ -80,6 +80,8 @@ int main() {
     FitResult f = songFit(songT, kitT, full, 0, expectSkipped == 0);
     int pe = 0, other = 0; for (auto& r : f.reasons) { if (r.code == "pad-effect") pe++; else other++; }
     CHECK(!f.ok && pe == 2 && other == 0, "ELECTRO fit: ok %d, %d pad-effect, %d other", (int)f.ok, pe, other);
+    CHECK(f.warns.size() == 1 && f.warns[0].find("4 pads play its rendered twin") != std::string::npos, "ELECTRO warn: %zu entries, first '%s'", f.warns.size(), f.warns.empty() ? "" : f.warns[0].c_str());
+    { const std::string fj = f.json(3); CHECK(fj.find("\"reasonTexts\":[\"pad ") != std::string::npos && fj.find("\"warn\":[\"4 pads") != std::string::npos, "fit json lists: %s", fj.c_str()); }
     FitResult g = songFit(songT, kitT, THUNDER_LIVE_CAP_EFFECTS, 0, expectSkipped == 0);   // no chains in the host: ELECTRO has chainOn
     bool nc = false; for (auto& r : g.reasons) if (r.code == "no-chains") nc = true;
     CHECK(nc, "ELECTRO without CAP_CHAINS must say no-chains");

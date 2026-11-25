@@ -50,4 +50,9 @@ object LiveNative {
     /** The events the poller saw since the last call, one JSON object per line ("" when none). */
     external fun nativeDrainEvents(): String
     external fun nativeEngineOffset(): Long
+    external fun nativePdcSet(mode: Int): Int
+    /** pad.chop: slice points in FRAMES (divided by the engine rate in C++); nSlices 2..64. */
+    external fun nativePadChop(pad: Int, loopSecs: Double, nSlices: Int, pointsFrames: DoubleArray): Int
+    /** The callback's time over its period, peak-held (CORE-BRIDGE 7 G9). */
+    external fun nativeLoad(): Double
 }

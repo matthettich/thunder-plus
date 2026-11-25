@@ -72,9 +72,23 @@ class BridgeTranslatorTest {
         assertTrue(String(ce.opsJson).contains("\"op\":\"param\""))
     }
 
-    @Test fun fxSetCannotBeAnswered() {
-        val r = refused("{\"t\":\"fx.set\",\"tr\":1,\"slot\":0,\"p\":2,\"v\":0.5,\"id\":9}")
-        assertEquals("fx.set", r.where); assertTrue(r.msg.contains("fx.param")); assertEquals(9, r.replyId)
+    @Test fun fxSetIsTheVectorForm() {   // CORE-BRIDGE 7 G5a
+        val c = call("{\"t\":\"fx.set\",\"tr\":3,\"slot\":2,\"p\":[0,1,2,3,4,5,6,7,8,9,10,11],\"at\":5}") as LiveCall.FxParam
+        assertEquals(3, c.track); assertEquals(2, c.slot); assertEquals(11.0, c.p[11], 0.0); assertEquals(5L, c.at)
+        val r = refused("{\"t\":\"fx.set\",\"tr\":1,\"slot\":0,\"p\":2,\"v\":0.5,\"id\":9}")   // the old single-parameter form
+        assertEquals("fx.set", r.where); assertTrue(r.msg.contains("p")); assertEquals(9, r.replyId)
+    }
+
+    @Test fun section7Additions() {
+        assertEquals(LiveCall.PadsCommit(40), call("{\"t\":\"pads.commit\",\"n\":40}"))
+        val pc = call("{\"t\":\"pad.chop\",\"pad\":4,\"loopSecs\":1.5,\"slices\":[0,12000,24000,36000]}") as LiveCall.PadChop
+        assertEquals(4, pc.pad); assertEquals(1.5, pc.loopSecs, 0.0); assertEquals(4, pc.nSlices); assertArrayEquals(doubleArrayOf(0.0, 12000.0, 24000.0, 36000.0), pc.slices, 0.0)
+        val none = call("{\"t\":\"pad.chop\",\"pad\":4,\"loopSecs\":0}") as LiveCall.PadChop
+        assertEquals(0, none.slices.size); assertEquals(2, none.nSlices)
+        assertTrue(refused("{\"t\":\"pad.chop\",\"pad\":4,\"slices\":[-1]}").msg.contains("slice"))
+        assertEquals(LiveCall.PdcSet(2), call("{\"t\":\"pdc.set\",\"mode\":2}"))
+        assertTrue(refused("{\"t\":\"pdc.set\",\"mode\":3}").msg.contains("pdc"))
+        assertTrue(call("{\"t\":\"engine.reset\"}") === LiveCall.EngineReset)
     }
 
     @Test fun metersClamp() {
@@ -85,7 +99,9 @@ class BridgeTranslatorTest {
 
     @Test fun bufUse() {
         assertEquals(LiveCall.BufUse(4, 9, 0, "pad", 0, 'g'.code, 0), call("{\"t\":\"buf.use\",\"id\":4,\"pad\":9,\"kind\":\"pad\"}"))
-        assertEquals(LiveCall.BufUse(5, 9, 0, "var", 3, 'm'.code, 7), call("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\",\"ii\":3,\"vk\":\"m\",\"num\":7}"))
+        assertEquals(LiveCall.BufUse(5, 9, 0, "var", 3, 'm'.code, 7), call("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\",\"ii\":3,\"vk\":\"m7\"}"))
+        assertEquals(LiveCall.BufUse(6, 2, 0, "var", 0, 'g'.code, 1), call("{\"t\":\"buf.use\",\"id\":6,\"pad\":2,\"kind\":\"var\",\"ii\":0,\"vk\":\"g1\"}"))
+        assertTrue(refused("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\",\"ii\":3,\"vk\":\"x7\"}").msg.contains("vk"))
         assertTrue(refused("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"ir\"}").msg.contains("ir"))
         assertTrue(refused("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\"}").msg.contains("ii"))
         assertEquals(LiveCall.BufFree(5), call("{\"t\":\"buf.free\",\"id\":5}"))

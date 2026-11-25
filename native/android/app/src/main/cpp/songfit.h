@@ -28,7 +28,8 @@ struct FitReason { std::string code; std::string text; };
 struct FitResult {
   bool ok = true;
   std::vector<FitReason> reasons;
-  std::string json(int64_t rev) const;   // {"t":"fit","rev":N,"ok":true|false,"reasons":[{"code":..,"text":..}]}: the bridge's `fit` event
+  std::vector<std::string> warns;   // non-fatal facts the page shows ("3 pads play their rendered twin": a live-engine pad (bass, vox, acid, mach) stays on the sampler route, live.h CAP_ENGINES / ruling D8)
+  std::string json(int64_t rev) const;   // {"t":"fit","rev":N,"ok":..,"reasons":[{"code","text"}],"reasonTexts":[..],"warn":[..]}: the bridge's `fit` event (reasonTexts and warn are the flat lists of the song.load reply, CORE-BRIDGE 7 G14)
 };
 
 // songJson: the song object (a .thunder file's `song`, or the page's S). kitJson: the kit object (`kit`; empty: voices are not checked, the page will `put` its own pads).

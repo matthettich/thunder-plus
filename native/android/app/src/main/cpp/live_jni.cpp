@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -48,6 +49,7 @@ struct Live {
 Live g;
 std::mutex g_life;   // start / shutdown / load: one at a time (the JNI threads are Kotlin's; the audio thread never takes it)
 rtlog g_lrt;         // A5's clock-drift logger on the live callback
+std::atomic<double> g_load{0.0};   // CORE-BRIDGE 7 G9: the callback's time over its period, peak-held with decay (written by the audio thread, read by Kotlin)
 
 inline int64_t monoNs() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (int64_t)t.tv_sec * 1000000000LL + t.tv_nsec; }
 
@@ -57,7 +59,11 @@ void dataCallback(ma_device* dev, void* out, const void*, ma_uint32 frames) {
   tpa::LiveEngine* e = static_cast<Live*>(dev->pUserData)->eng.get();
   rtlog_begin(&g_lrt, t0);
   e->render(static_cast<float*>(out), (int)frames, t0);
-  rtlog_end(&g_lrt, monoNs(), (int)frames);
+  const int64_t t1 = monoNs();
+  rtlog_end(&g_lrt, t1, (int)frames);
+  const double period = (double)frames / (double)dev->sampleRate, work = (double)(t1 - t0) * 1e-9, prev = g_load.load(std::memory_order_relaxed);
+  const double now = work / period;
+  g_load.store(now > prev ? now : prev * 0.95 + now * 0.05, std::memory_order_relaxed);   // no allocation, no lock
 }
 
 std::string jsonEscape(const std::string& s) { std::string o; for (char c : s) { if (c == '"' || c == '\\') { o += '\\'; o += c; } else if ((unsigned char)c < 0x20) o += ' '; else o += c; } return o; }
@@ -395,5 +401,24 @@ JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeChai
 // The poller's events since the last call, one JSON object per line ("" when none).
 JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeDrainEvents(JNIEnv* env, jobject) { if (!ready()) return jstr(env, ""); return jstr(env, g.eng->drainEvents()); }
 JNIEXPORT jlong JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeEngineOffset(JNIEnv*, jobject) { int64_t o = 0; if (ready() && g.eng->handle()) thunder_live_engine_offset(g.eng->handle(), &o); return (jlong)o; }
+
+
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePdcSet(JNIEnv*, jobject, jint mode) { if (!ready()) return -2; return g.eng->call([=](thunder_live* L) { return thunder_live_pdc_set(L, mode); }, 10000); }
+// pad.chop {pad, loopSecs, slices}: the chop data of a pad (live.h pad_chop / pad_hits). `pts` are SECONDS (render.h CHOP DATA); the page sends frames, the shell divides by the engine's rate.
+// loopSecs <= 0 removes the loop; nSlices < 2 or an empty `pts` removes the hits.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadChop(JNIEnv* env, jobject, jint pad, jdouble loopSecs, jint nSlices, jdoubleArray pts) {
+  if (!ready()) return -2;
+  auto v = std::make_shared<std::vector<double>>();
+  if (pts) { const jsize n = env->GetArrayLength(pts); v->resize((size_t)n); if (n > 0) env->GetDoubleArrayRegion(pts, 0, n, v->data()); }
+  const double sr = (double)g.device.sampleRate;
+  for (auto& x : *v) x /= sr;
+  return g.eng->call([=](thunder_live* L) {
+    int r = thunder_live_pad_chop(L, pad, loopSecs > 0 ? loopSecs : 0.0); if (r) return r;
+    const int cnt = (int)v->size();
+    if (cnt == 0 || nSlices < 2) return thunder_live_pad_hits(L, pad, 2, nullptr, 0);
+    return thunder_live_pad_hits(L, pad, nSlices > 64 ? 64 : nSlices, v->data(), cnt > nSlices ? nSlices : cnt);
+  }, 10000);
+}
+JNIEXPORT jdouble JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeLoad(JNIEnv*, jobject) { return (jdouble)g_load.load(std::memory_order_relaxed); }
 
 }  // extern "C"

@@ -13,12 +13,13 @@ import org.json.JSONObject
 //   * play {mode:'song'|'sect'|'phrase'|0|1|2, row, track?, sect?, phrase?, loop?:{y0,y1}, seed?, pdc?:0|1|2 (default 1), only?:[tracks], at?} -> thunder_live_play.
 //   * stop {at?}, hold {at?}, loop {has?, y0, y1, at?}, bpm {bpm|v, at?}, lead {s|v, at?}, perf {what, i, v, at?} -> thunder_live_stop / hold / loop / bpm / lead / perf.
 //   * mix.set {tr: 0..31 | 'm', k: 'vol'|'trim'|'pan'|'mute'|'solo'|'out', v, ramp?, at?} -> thunder_live_mix_set (tr 'm' = 32). k 'send' has no live call: err event.
-//   * fx.plan {tr, slots: [..], bpm}, fx.commit {tr, at?}, fx.param {tr, slot, p: [12 numbers], at?}, master.config {mst, safety?} -> thunder_live_fx_plan / fx_commit / fx_param / master_config.
-//     `fx.set` (CORE-BRIDGE's single-parameter form {tr, slot, p, v}) CANNOT be answered: thunder_live_fx_param takes the slot's whole vector of 12 values and the shell does not hold the slot's values.
-//     It gets an err event naming fx.param: the designer decides whether the page sends the vector (the shell's reading) or the contract changes.
+//   * CORE-BRIDGE section 7 (the lead's additions, 24 Nov): fx.plan {tr, slots, bpm} -> thunder_live_fx_plan then fx_commit at NOW; fx.set {tr, slot, p:[12 numbers], at?} -> thunder_live_fx_param (G5a: the vector form;
+//     the old single-parameter form {tr, slot, p:n, v} is refused with a message); fx.commit {tr, at?} and fx.param (the same as fx.set with a vector) are kept; master.config {mst, safety?} -> master_config (G5b);
+//     chain.edit {ops, at?} (G5c); pdc.set {mode} (G8); pads.commit {n} -> pads_publish (G3); pad.chop {pad, loopSecs, slices:[frames], n?} -> pad_chop + pad_hits (G4); engine.reset {} (G13);
+//     song.load may be an ask: reply {ok, rev, reasons, warn} from SongFit (G14).
 //   * chain.edit {ops: [..], at?} -> thunder_live_chain_edit (needs the chains host).
 //   * meters.want {rate} -> thunder_live_meters_want (rate 0: off; > 30 is clamped to 30).
-//   * put (header + ArrayBuffer messages, see PutStore) then buf.use {id, pad, layer, kind:'pad'|'var', ii?, vk?, num?} -> thunder_live_pad_take (+ pads_publish, debounced) / thunder_live_var_set. buf.free {id}.
+//   * put (header + ArrayBuffer messages, see PutStore) then buf.use {id, pad, layer, kind:'pad'|'var', ii, vk: 'm3' | 'g1' (kind letter + number: the page's key, G4)} -> thunder_live_pad_take / thunder_live_var_set; pads become audible at pads.commit (no automatic publish). buf.free {id}.
 //     kinds 'sample', 'ir', 'wt', 'sf': err event (they are inputs of the core's pad render, which the page does not ask for here; 'sf' is E_UNSUPPORTED).
 //   * hello (ask) {live:true} -> the live engine starts (if it did not) and the reply carries caps; without `live` the N0 test core answers as before (Bridge.kt).
 //   * not on the live host (live.h NOT IN THIS API / H2 / later stages): note.on, note.off, midi.cfg, dev.list, dev.open, rec.*, render.*, link.set, lxp, song.patch, kit.patch, fx.set: an err event (`ask`: an error reply).
@@ -43,6 +44,10 @@ object BridgeTranslator {
         class MasterConfig(val mstJson: ByteArray, val safety: Int) : LiveCall()
         class ChainEdit(val opsJson: ByteArray, val at: Long) : LiveCall()
         data class MetersWant(val hz: Double) : LiveCall()
+        data class PadsCommit(val n: Int) : LiveCall()
+        class PadChop(val pad: Int, val loopSecs: Double, val nSlices: Int, val slices: DoubleArray) : LiveCall()
+        data class PdcSet(val mode: Int) : LiveCall()
+        object EngineReset : LiveCall()
         data class BufUse(val id: Int, val pad: Int, val layer: Int, val kind: String, val ii: Int, val vk: Int, val num: Int) : LiveCall()
         data class BufFree(val id: Int) : LiveCall()
         data class Hello(val id: Int, val live: Boolean) : LiveCall()
@@ -60,7 +65,6 @@ object BridgeTranslator {
     private val UNSUPPORTED = mapOf(
         "song.patch" to "the live host takes the whole song: send song.load",
         "kit.patch" to "the live host takes the whole kit: send kit.load",
-        "fx.set" to "send fx.param with the slot's 12 values (thunder_live_fx_param), or fx.plan + fx.commit for a change of effect",
         "note.on" to "notes from the host are not in the live API (live.h NOT IN THIS API)", "note.off" to "notes from the host are not in the live API (live.h NOT IN THIS API)",
         "midi.cfg" to "MIDI out on the live host arrives with H2", "dev.list" to "audio devices are the shell's own (H1c)", "dev.open" to "audio devices are the shell's own (H1c)",
         "rec.arm" to "recording is not on the live host", "rec.start" to "recording is not on the live host", "rec.stop" to "recording is not on the live host",
@@ -116,15 +120,26 @@ object BridgeTranslator {
                 val text = when (slots) { is JSONArray -> slots.toString(); is JSONObject -> slots.toString(); is String -> slots; else -> return refuse("fx.plan without slots") }
                 call(LiveCall.FxPlan(tr, text.toByteArray(Charsets.UTF_8), num(j, "bpm") ?: 120.0))
             }
-            "fx.commit" -> call(LiveCall.FxCommit(track(j.opt("tr")) ?: return refuse("fx.commit: bad tr"), at(j)))
-            "fx.param" -> {
-                val tr = track(j.opt("tr")) ?: return refuse("fx.param: bad tr")
-                val p = j.optJSONArray("p") ?: return refuse("fx.param without p")
-                if (p.length() != 12) return refuse("fx.param needs exactly 12 values")
+            "fx.set", "fx.param" -> {
+                val tr = track(j.opt("tr")) ?: return refuse("$t: bad tr")
+                val p = j.optJSONArray("p") ?: return refuse("$t needs p: the slot's 12 values (a change of effect goes by fx.plan)")
+                if (p.length() != 12) return refuse("$t needs exactly 12 values")
                 val d = DoubleArray(12) { p.optDouble(it, Double.NaN) }
-                if (d.any { it.isNaN() || it.isInfinite() }) return refuse("fx.param: a value is not a number")
+                if (d.any { it.isNaN() || it.isInfinite() }) return refuse("$t: a value is not a number")
                 call(LiveCall.FxParam(tr, j.optInt("slot", -1), d, at(j)))
             }
+            "pads.commit" -> call(LiveCall.PadsCommit(j.optInt("n", 0)))
+            "pad.chop" -> {
+                if (!j.has("pad")) return refuse("pad.chop needs pad")
+                val s = j.optJSONArray("slices")
+                val pts = DoubleArray(s?.length() ?: 0) { s!!.optDouble(it, Double.NaN) }
+                if (pts.any { it.isNaN() || it < 0 }) return refuse("pad.chop: a slice point is not a number")
+                val n = j.optInt("n", pts.size).coerceIn(2, 64)
+                call(LiveCall.PadChop(j.optInt("pad"), num(j, "loopSecs") ?: 0.0, n, pts))
+            }
+            "pdc.set" -> { val m = j.optInt("mode", -1); if (m !in 0..2) return refuse("pdc.set mode must be 0, 1 or 2"); call(LiveCall.PdcSet(m)) }
+            "engine.reset" -> call(LiveCall.EngineReset)
+            "fx.commit" -> call(LiveCall.FxCommit(track(j.opt("tr")) ?: return refuse("fx.commit: bad tr"), at(j)))
             "master.config" -> {
                 val m = j.opt("mst")
                 val text = when (m) { is JSONObject -> m.toString(); is JSONArray -> m.toString(); else -> return refuse("master.config without mst") }
@@ -136,8 +151,11 @@ object BridgeTranslator {
                 val kind = j.optString("kind", "pad")
                 if (kind != "pad" && kind != "var") return refuse("buf.use kind '$kind' is not an input of the live host")
                 if (!j.has("id") || !j.has("pad")) return refuse("buf.use needs id and pad")
-                if (kind == "var" && !(j.has("ii") && j.has("num"))) return refuse("buf.use var needs ii, vk and num")
-                call(LiveCall.BufUse(j.optInt("id"), j.optInt("pad"), j.optInt("layer", 0), kind, j.optInt("ii", 0), if (j.optString("vk", "g") == "m") 'm'.code else 'g'.code, j.optInt("num", 0)))
+                // the page's variation key (G4): vk 'm3' = a MUT variation number 3, 'g1' = GEN number 1; `ii` the instrument
+                val vk = j.optString("vk", "")
+                val m = Regex("^([gm])([0-9]{1,3})$").find(vk)
+                if (kind == "var" && (!j.has("ii") || m == null)) return refuse("buf.use var needs ii and vk like 'm3' or 'g1'")
+                call(LiveCall.BufUse(j.optInt("id"), j.optInt("pad"), j.optInt("layer", 0), kind, j.optInt("ii", 0), m?.groupValues?.get(1)?.get(0)?.code ?: 'g'.code, m?.groupValues?.get(2)?.toInt() ?: 0))
             }
             "buf.free" -> call(LiveCall.BufFree(j.optInt("id", -1)))
             "open", "close", "put.header", "info" -> Translation.Ignored(t)   // the N0 path's messages (Bridge.kt)
