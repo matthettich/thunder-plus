@@ -82,7 +82,7 @@ void go(const Cfg& c, Run& o) {
   if (c.poll) drain();
   o.st = stats(H.h);
   H->setTestTap(nullptr, nullptr);
-  if (rp) { /* the plan is the host's (commit took the objects); its shell goes with the host */ }
+  delete rp;   // the plan stays its owner's after commit (FxHost REAL-TIME RULES): the reference host keeps the objects
 }
 std::vector<std::vector<uint8_t>> ofType(const Run& r, int type) { std::vector<std::vector<uint8_t>> v; for (auto& x : r.recs) if (evType(x) == type) v.push_back(x); return v; }
 thunder_live_meters_spec spec(uint32_t kinds, uint64_t tracks, double rate = 0) { thunder_live_meters_spec s; std::memset(&s, 0, sizeof s); s.size = sizeof s; s.kinds = kinds; s.fx_tracks = tracks; s.rate_hz = rate; return s; }

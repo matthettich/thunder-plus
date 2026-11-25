@@ -31,4 +31,5 @@ Branch `n1/m1-fx-meters`, draft PR into `native`. Built by a builder; the lead r
 ## Tests run (Release, Linux, 2 cores)
 - `live_meters2`: 615 checks, 0 failed: sizes and offsets; E_STATE / E_ARG / size rule / E_BUSY at exactly 256; FXLVL and FXDYN bit-equal to a lock-step reference `FxHost` (popLevels / popDyn) on a fixed signal through tape + level comp + pump COMP (deepest reduction -30.5 dB; types 7 and 201); track 1 identical chain and signal but unwatched posts nothing; the audio is bit-equal with and without watching; master (bit 32); kinds apart; off stops; replacement drops a track; re-send is a no-op; `meters_want` alone = METERS only and METERS records bit-equal with the spec run; one gapless `seq` order; a consumer that never polls drops and counts without changing a sample; type-name round trip.
 - `live_meters2_alloc`: 400 quanta, 246 records (204 FX), 0 allocator calls on the audio path.
+- ASan + UBSan (THUNDER_SANITIZE=ON): `live_meters2` 285 checks, 0 failed, no leak (the TSan variant was not built: the test is single-threaded).
 - ctest `^live_|^fx|^android_live|^meter|^mix`: 54 of 54 passed.
