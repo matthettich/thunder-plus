@@ -921,6 +921,7 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 **Native-core client loader, switch off (25 Nov; build 677, PR #321)** (nothing should change; the file is fetched only by the Android app)
 - [x] **Phone (Fold, Chrome): build 677 plays as before** (owner, 25 Nov 12:40).
 - [ ] **Computer: update to build 677 (Settings → App) and play a song as usual.** Pass: opens and plays exactly as on 676; no new toast or message.
+- [ ] **Phone (Fold, Chrome) and computer: build 678 (PC2 + PC3, PR #325) opens and plays as before.** Pass: no new toast; PLAY, STOP, loop play, a kit change and opening another song behave as on 677.
 - [ ] **Computer: Settings → Audio → Sequencer.** Pass: only the two old choices (Audio thread, Page (old)); no "Native core (test)".
 
 **Resizing the window while a song plays (24 Nov; build 676, branch `fix/resize-during-playback`)** (details: the 24 Nov entry "resize during playback" below)
