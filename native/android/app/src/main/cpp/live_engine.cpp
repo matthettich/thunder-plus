@@ -202,7 +202,16 @@ std::string LiveEngine::statsJson() {
     "\"notesPlayed\":%d,\"notesLate\":%d,\"notesNoPad\":%d,\"notesVarMissing\":%d,\"cmdBusy\":%u,\"cmdLate\":%u,\"evtDropped\":%u}",
     s.state, (long long)s.frames, (unsigned long long)s.quanta, (unsigned long long)s.calls, (unsigned long long)s.steps, (unsigned long long)s.seq_dropped, (unsigned long long)s.runner_skips,
     (unsigned long long)s.pad_bytes_held, (unsigned long long)s.pad_budget, s.latency_frames, s.voices, s.peak_voices, s.notes_played, s.notes_late, s.notes_no_pad, s.notes_var_missing, s.cmd_busy, s.cmd_late, s.evt_dropped);
-  return b;
+  std::string out = b;
+#ifdef THUNDER_LIVE_F_CHAINS
+  if (chainsOn_ && !out.empty() && out.back() == '}') {   // the chains host's counters (C2): nodes > 0 means a song's chain is running
+    char x[220];
+    std::snprintf(x, sizeof x, ",\"chainsNodes\":%u,\"chainsPlans\":%u,\"chainsRefused\":%u,\"chainsOver\":%u,\"chainsFailed\":%llu,\"chainsBlocks\":%llu}",
+      s.chains_nodes, s.chains_plans, s.chains_refused, s.chains_over_budget, (unsigned long long)s.chains_failed_blocks, (unsigned long long)s.chains_blocks);
+    out.pop_back(); out += x;
+  }
+#endif
+  return out;
 }
 
 }  // namespace tpa

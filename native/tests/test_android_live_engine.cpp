@@ -171,6 +171,14 @@ int main() {
   CHECK(nonfinite.load() == 0, "non-finite samples: %d", nonfinite.load());
   CHECK(peak.load() > 0.02f, "the song is silent: peak %.4f", (double)peak.load());
   CHECK(ss.find("\"seqDropped\":0") != std::string::npos, "sequencer dropped events");
+#ifdef THUNDER_LIVE_F_CHAINS
+  { // C2b: with F_CHAINS the host runs ELECTRO's chain: a node exists, nothing was refused and no block failed
+    CHECK(E.chainsOn(), "the host was created with F_CHAINS");
+    const size_t k = ss.find("\"chainsNodes\":"); const int nodes = k == std::string::npos ? -1 : std::atoi(ss.c_str() + k + 14);
+    std::printf("chains: nodes %d  %s\n", nodes, k == std::string::npos ? "" : ss.c_str() + k);
+    CHECK(nodes > 0, "ELECTRO's chain has a node: chainsNodes %d", nodes);
+    CHECK(ss.find("\"chainsRefused\":0") != std::string::npos && ss.find("\"chainsFailed\":0") != std::string::npos, "a chain plan was refused or a block failed"); }
+#endif
   CHECK(st.find("\"fatal\":0") != std::string::npos, "a fatal error record");
   { const std::string ev = E.drainEvents(); std::printf("events: %zu bytes, dropped %zu\n", ev.size(), E.eventsDropped());
     for (const char* t : {"clock", "pos", "meters", "state", "song"}) CHECK(ev.find(std::string("\"t\":\"") + t + "\"") != std::string::npos, "no %s event in the drained queue", t);
