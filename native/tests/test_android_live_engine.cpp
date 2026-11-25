@@ -17,6 +17,9 @@
 #include "live_engine.h"
 #include "pad_filler.h"
 #include "rt/json.h"
+#ifdef THUNDER_HAVE_LXR
+#include "thunder/lxr_module.h"
+#endif
 
 static int g_fail = 0;
 #define CHECK(c, ...) do { if (!(c)) { g_fail++; std::printf("FAIL %s:%d: ", __FILE__, __LINE__); std::printf(__VA_ARGS__); std::printf("\n"); } } while (0)
@@ -47,6 +50,11 @@ int main() {
     thunder::JsonDoc f; f.parse(std::string(R"({"layers":[]})"));
     CHECK(std::fabs(relOfVoice(f.root()) - 0.03) < 1e-12, "default 30 ms");
   }
+#ifdef THUNDER_HAVE_LXR
+  thunder_lxr_module_register(); const int expectSkipped = 0;
+#else
+  const int expectSkipped = 2;
+#endif
   // 2. the pads of ELECTRO
   const std::string root = THUNDER_ROOT;
   const std::string proj = readFile(root + "/sounds/ELECTRO.thunder");
@@ -60,7 +68,7 @@ int main() {
   std::printf("pads: %zu rendered, %d skipped, %d dry, %.0f ms\n", ps.pads.size(), ps.skipped, ps.dry, ps.ms);
   for (auto& n : ps.notes) std::printf("  %s\n", n.c_str());
   CHECK(ps.pads.size() >= 36, "ELECTRO has 40 voices, all of engines the core has: %zu rendered", ps.pads.size());
-  CHECK(ps.skipped == 2, "the two lxsnare voices are left empty while the optional drum module is not linked (thunder_lxr_api() is null): %d skipped", ps.skipped);
+  CHECK(ps.skipped == expectSkipped, "the two lxsnare voices render with the optional drum module and are left empty without it (thunder_lxr_api() is null): %d skipped, expected %d", ps.skipped, expectSkipped);
   CHECK(ps.dry == 2, "ELECTRO has two voices with a pad effect the core does not host (spring, crush): %d", ps.dry);
   { size_t loud = 0; for (auto& p : ps.pads) { float pk = 0; for (int64_t i = 0; i < p.frames; i++) pk = std::fmax(pk, std::fabs(p.block[i])); if (pk > 0.001f) loud++; } CHECK(loud >= 30, "pads with sound: %zu", loud); }
 

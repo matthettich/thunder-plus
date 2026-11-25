@@ -15,7 +15,9 @@ android {
         versionName = "n0"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
-            cmake { arguments += listOf("-DANDROID_STL=c++_static") }
+            // The optional LXR drum module (GPL-3.0-only) is ON; a closed build passes -PthunderWithLxr=false (docs/port/IF-SOLD.md).
+            val withLxr = (project.findProperty("thunderWithLxr") as String?) != "false"
+            cmake { arguments += listOf("-DANDROID_STL=c++_static", "-DTHUNDER_WITH_LXR=" + if (withLxr) "ON" else "OFF") }
         }
     }
 

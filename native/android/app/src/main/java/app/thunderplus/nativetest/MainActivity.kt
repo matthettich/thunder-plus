@@ -139,7 +139,7 @@ class MainActivity : Activity() {
             })
         // N2 H1a: the LIVE engine (thunder_live_*): the bundled ELECTRO, its pads rendered by the core, played through the foreground service. The N0 runs above are untouched.
         val liveRow = row(
-            btn("Play bundled song natively") { playBundledNatively() },
+            btn("Play bundled song natively (test path)") { playBundledNatively() },
             btn("Stop (native)") { LiveEngine.async { LiveEngine.stop() } },
             btn("Quit native") { LiveEngine.async { LiveEngine.quit(applicationContext) } })
         liveLine = TextView(this).apply { setTextColor(Color.rgb(255, 200, 120)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); text = "native live engine: off" }

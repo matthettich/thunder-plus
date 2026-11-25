@@ -20,6 +20,9 @@
 #include "pad_filler.h"
 #include "rt/json.h"
 #include "thunder/rtlog.h"
+#ifdef THUNDER_HAVE_LXR
+#include "thunder/lxr_module.h"   // the optional drum module (native/lxr): registered once at start
+#endif
 
 #define LOG_TAG "ThunderLive"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -63,6 +66,9 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeCaps(JNI
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JNIEnv*, jobject, jboolean chains) {
   std::lock_guard<std::mutex> lk(g_life);
   if (g.deviceInit) return (jint)g.device.sampleRate;
+#ifdef THUNDER_HAVE_LXR
+  thunder_lxr_module_register();   // idempotent registry of one pointer (lxr_seam.h); pads of the LXR engines are rendered through it
+#endif
   ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
   cfg.playback.format = ma_format_f32;
   cfg.playback.channels = 2;
