@@ -16011,7 +16011,8 @@ function natAudEvent(m){
   if (m.kind === 'lost'){
     if (m.which === 'out') toastErr('The audio output ' + (m.name || nm(m.id, 'outId') || '') + ' was unplugged' + (m.fellBack ? ': playing through the system default' : '') + '.', 6000);
     else if (m.which === 'in') toastErr('The audio input ' + (nm(m.id, 'inId') || '') + ' was unplugged.', 5000);
-  } else if (m.kind === 'reopened') toast('Audio is playing through ' + (m.name || 'the new device') + '.', 3500);
+  } else if (m.kind === 'reopened'){ if (m.fellBack && +aset.natSr && !C.devRates($('naOut').value).includes(+aset.natSr)){ aset.natSr = 0; asetSave(); }   // (the saved rate is asked again only if the new device has it)
+    toast('Audio is playing through ' + (m.name || 'the new device') + '.', 3500); }
   else if (m.kind === 'changed' && m.wantedBack === 'out') toast((nm(m.id, 'outId') || 'Your audio output') + ' is back. Pick it in Settings › Audio to switch to it.', 6000);
   natAudSync();
 }

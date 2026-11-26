@@ -52,6 +52,17 @@ An input unplugged mid-take: the shell ends the take itself (`rec.done {partial}
 - **Q5:** Pattern-synced takes need the playhead (PC5) and a `rec.start` tied to a song frame (`at`), or the `hostNs0` + `clock` `wallNs` mapping; which?
 - **Q6:** `take` returns float32 base64 in 256k-frame events; 28-channel takes are not needed here (only the picked pair is armed), but a long mono-stem workflow would want a file path instead.
 
+## Lead's decisions (applied)
+- **Q2:** the page re-asks a rate only if it is in the (new) output device's `rates`, else 0: `devOpen` already did this against the wanted device; after a `reopened` with `fellBack` the saved `aset.natSr` is also reset to 0 if the new device lacks it. The shell's own fall-back (`devFallback`, which asks the old rate again) is native-side: see below.
+- **Q3:** `dev.open` carries one `sr` (the engine's); the input is opened at that rate by the shell. The protocol cannot say "input rate only if in the input device's rates", and no message was invented: nothing on the page side.
+- **Q5:** accepted: free-length takes until PC5. `IOAPI = null` under `window.thunderCore` and the test count changes: accepted.
+
+## For native (later)
+- Q1: `dev.list` should return the requested `sr` / `buf` (e.g. `want:{out,in,sr,buf}`).
+- Q2: `devFallback` should ask the old rate only if the new device's `rates` has it, else 0.
+- Q3: the input's rate rule (in the input device's own `rates`, else 0) needs the shell to apply it when opening the input.
+- Q4: a raw MIDI-out message and an input monitor.
+
 ## Resume
 - Tests: `node --test tests/native-client-pc7.test.js tests/native-client-inert.test.js`, then `npm test`.
 - Lines to review: `thunder-core-client.js` PC7 block (`h7*`, `devOpen`, `recTake`, `onMidiIn`, `NC.midiCfg`); `index.html`: `natC / natDev / natIn / natMidi` (after `padSR`), `IOAPI`, `natAudSync / natAudApply / natAudEvent / natAudInit` (before `updLat`), `ncMidiConnect / midiCfgPush` (after `nmClose`), `rcdOpenNat / natArm / natFinish / natInDev` (before `rcdCloseIo`), the one-line branches in `rcdOpen1`, `rcdStart`, `rcdTake`, `rcdRateMsg`, `rcdCloseIo`, `midiLatRun`, the Record window's `fillIn`, `connectMidi1`, `midiAccessDrop`, `saveMidi`, `audStatus`, `audRefresh`.
