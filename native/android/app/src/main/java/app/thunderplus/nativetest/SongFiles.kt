@@ -313,7 +313,7 @@ object SongFiles {
         if (failure == null) {
             val after = stampOf(ctx, uri)
             if (after != null && after.size >= 0 && after.size != bytes.size.toLong()) failure = FileProtocol.error("the file on disk has ${after.size} bytes, expected ${bytes.size}: not saved completely").put("short", true)
-            else { s.stamp = after ?: Stamp(0, bytes.size.toLong()); Recovery.tracker.onSaved(key); return JSONObject().put("ok", true).put("uri", key).put("name", s.name).put("mtime", s.stamp.mtime).put("size", bytes.size) }
+            else { s.stamp = after ?: Stamp(0, bytes.size.toLong()); Recovery.onSaved(ctx, key); return JSONObject().put("ok", true).put("uri", key).put("name", s.name).put("mtime", s.stamp.mtime).put("size", bytes.size) }
         }
         // the write failed or came out short: put the previous content back now (the file may have been truncated)
         if (old != null && (w.opened || failure!!.optBoolean("short", false))) {
@@ -369,7 +369,7 @@ object SongFiles {
         val name = nameOf(ctx, uri)
         val st = stampOf(ctx, uri) ?: Stamp(0, bytes.size.toLong())
         sessions[key] = Session(st, bom, name)
-        Recovery.tracker.onSaved(key)
+        Recovery.onSaved(ctx, key)
         return JSONObject().put("ok", true).put("uri", key).put("name", name).put("mtime", st.mtime).put("size", bytes.size)
     }
 

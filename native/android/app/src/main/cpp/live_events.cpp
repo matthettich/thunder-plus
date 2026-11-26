@@ -1,6 +1,7 @@
 // N2 H1b: see live_events.h.
 #include "live_events.h"
 
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -50,6 +51,23 @@ bool eventToJson(const unsigned char* r, int bytes, std::string* out) {
       uint32_t cnt; std::memcpy(&cnt, &m.reserved[0], sizeof cnt);
       ap(out, "{\"t\":\"meters\",\"seq\":%u,\"at\":%lld,\"a\":[", cnt, (long long)m.h.f);
       for (int i = 0; i < THUNDER_LIVE_METER_FLOATS; i++) ap(out, "%s%.5g", i ? "," : "", (double)m.a[i]);
+      out->append("]}"); return true; }
+    case THUNDER_LIVE_EV_FXLVL: { thunder_live_ev_fxlvl v; if (!take(r, bytes, &v)) return false;   // M4: {t:"fx.lvl", seq, f, tr, a:[8]} (METERS-DESIGN 4.4; the page's onFxLvl): linear peaks, 0 for a slot that did not report
+      if (v.track < 0 || v.track > 32) return false;
+      ap(out, "{\"t\":\"fx.lvl\",\"seq\":%u,\"f\":%lld,\"tr\":%d,\"a\":[", v.h.seq, (long long)v.h.f, v.track);
+      for (int k = 0; k < 8; k++) { double x = (double)v.lvl[k]; if (!(x > 0.0) || x > 1e30) x = 0.0; ap(out, "%s%.5g", k ? "," : "", x); }
+      out->append("]}"); return true; }
+    case THUNDER_LIVE_EV_FXDYN: { thunder_live_ev_fxdyn v; if (!take(r, bytes, &v)) return false;   // M4: {t:"fx.dyn", seq, f, tr, d:[[slot, "type", red, in, out], ...]}: dB as the core gives them (-180 = silence); the type is the page's string
+      if (v.track < 0 || v.track > 32) return false;
+      ap(out, "{\"t\":\"fx.dyn\",\"seq\":%u,\"f\":%lld,\"tr\":%d,\"d\":[", v.h.seq, (long long)v.h.f, v.track);
+      int n = v.n < 0 ? 0 : v.n > 8 ? 8 : v.n, first = 1;
+      for (int i = 0; i < n; i++) {
+        const thunder_live_ev_fxdyn_ent& e = v.ent[i];
+        const char* nm = thunder_fx_type_name(e.type);
+        if (e.slot < 0 || e.slot > 7 || !nm) continue;   // an entry the page could not match to a slot would be dropped by it anyway
+        auto db = [](float x, double dflt) { return (std::isfinite(x) && x > -1000.f && x < 1000.f) ? (double)x : dflt; };
+        ap(out, "%s[%d,\"%s\",%.3f,%.3f,%.3f]", first ? "" : ",", e.slot, nm, db(e.red_db, 0.0), db(e.in_db, -180.0), db(e.out_db, -180.0)); first = 0;
+      }
       out->append("]}"); return true; }
     case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; if (!take(r, bytes, &s)) return false;
       const char* n = s.state == THUNDER_LIVE_ST_PLAYING ? "playing" : s.state == THUNDER_LIVE_ST_STOPPED ? "stopped" : s.state == THUNDER_LIVE_ST_ENDED ? "ended" : "unknown";

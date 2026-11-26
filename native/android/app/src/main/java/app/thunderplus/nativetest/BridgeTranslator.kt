@@ -19,12 +19,22 @@ import org.json.JSONObject
 //     song.load may be an ask: reply {ok, rev, reasons, warn} from SongFit (G14).
 //   * chain.edit {ops: [..], at?} -> thunder_live_chain_edit (needs the chains host).
 //   * meters.want {rate} -> thunder_live_meters_want (rate 0: off; > 30 is clamped to 30).
+//   * M4: meters.want {rate, fx:[tracks], dyn:[tracks], chains?, master?, trim?} (any of fx / dyn / chains / master / trim present) -> thunder_live_meters_set, a REPLACEMENT state: rate_hz as above, ONE fx_tracks mask (the union of the
+//     fx and dyn lists: tracks 0..31, 32 or "m" = the master's effects), kinds FXLVL (1) if `fx` is non-empty, FXDYN (2) if `dyn` is non-empty. The page sends one track per list. A track outside 0..32 refuses the message.
+//     chains / master / trim are read and ignored until M3 / M2 / M7 (the core accepts the bits and posts nothing for them yet). The core has no cap on watched tracks (METERS-DESIGN 5a ruling 3), so the shell adds none.
+//   * M4 (PP): fx.values {tr, slot, kind:'pump'|'mod', v:[numbers], at?} -> thunder_live_fx_values (the whole value list of a pump or a modular slot, instant). With an id (an ask, PC6) the reply is {ok:true} / {ok:false, busy:true} / {ok:false, error}; without one a refusal is an err event.
 //   * put (header + ArrayBuffer messages, see PutStore) then buf.use {id, pad, layer, kind:'pad'|'var', ii, vk: 'm3' | 'g1' (kind letter + number: the page's key, G4)} -> thunder_live_pad_take / thunder_live_var_set; pads become audible at pads.commit (no automatic publish). buf.free {id}.
 //     kinds 'sample', 'ir', 'wt', 'sf': err event (they are inputs of the core's pad render, which the page does not ask for here; 'sf' is E_UNSUPPORTED).
 //   * hello (ask) {live:true} -> the live engine starts (if it did not) and the reply carries caps; without `live` the N0 test core answers as before (Bridge.kt).
 //   * not on the live host (live.h NOT IN THIS API / later stages): note.on, note.off, dev.list, dev.open, rec.*, render.*, link.set, lxp, song.patch, kit.patch, fx.set: an err event (`ask`: an error reply).
 object BridgeTranslator {
     const val NOW = -1L
+    const val MK_FXLVL = 1
+    const val MK_FXDYN = 2
+    const val FXV_PUMP = 1
+    const val FXV_MOD = 2
+    /** The most values one fx.values may carry (a pump plugin's parameter list or a module's controls: far below this; the core checks the exact count). */
+    const val FXV_MAX = 512   // a pump slot carries up to 280 (live_host.h); the core checks the exact planned count
 
     sealed class LiveCall {
         class SongLoad(val raw: ByteArray) : LiveCall()
@@ -44,6 +54,13 @@ object BridgeTranslator {
         class MasterConfig(val mstJson: ByteArray, val safety: Int) : LiveCall()
         class ChainEdit(val opsJson: ByteArray, val at: Long) : LiveCall()
         data class MetersWant(val hz: Double) : LiveCall()
+        /** M4: meters.want with effect lists. [kinds]: THUNDER_LIVE_MK_* bits ([MK_FXLVL], [MK_FXDYN]); [fxTracks]: bit t (0..31), bit 32 the master's. */
+        data class MetersSet(val hz: Double, val kinds: Int, val fxTracks: Long) : LiveCall()
+        /** M4 (PP): [kind] 1 = pump, 2 = mod (THUNDER_LIVE_FXV_*). */
+        class FxValues(val track: Int, val slot: Int, val kind: Int, val v: DoubleArray, val at: Long, val id: Int = -1) : LiveCall() {
+            override fun equals(other: Any?) = other is FxValues && track == other.track && slot == other.slot && kind == other.kind && v.contentEquals(other.v) && at == other.at && id == other.id
+            override fun hashCode() = (((track * 31 + slot) * 31 + kind) * 31 + v.contentHashCode()) * 31 + at.hashCode()
+        }
         data class PadsCommit(val n: Int) : LiveCall()
         class PadChop(val pad: Int, val loopSecs: Double, val nSlices: Int, val slices: DoubleArray) : LiveCall()
         data class PdcSet(val mode: Int) : LiveCall()
@@ -82,6 +99,13 @@ object BridgeTranslator {
 
     /** The message's type without parsing the whole text (a song.load is a megabyte): the "t" member near the front, which JSON.stringify of {t: ..} writes first. */
     fun typeOf(raw: String): String? = Regex("\"t\"\\s*:\\s*\"([^\"]*)\"").find(raw.take(256))?.groupValues?.get(1)
+
+    /** The reply body to an fx.values ASK (PC6): {ok:true}; {ok:false, busy:true, error:'busy'} for E_BUSY (-8); {ok:false, error:'rc N ...'} for anything else. */
+    fun fxValuesReply(rc: Int): JSONObject = when (rc) {
+        0 -> JSONObject().put("ok", true)
+        -8 -> JSONObject().put("ok", false).put("busy", true).put("error", "busy")
+        else -> JSONObject().put("ok", false).put("error", "rc $rc" + when (rc) { -1 -> " (refused: not a hosted slot of that kind, a wrong value count, or a value the core keeps in the song)"; -2 -> " (not allowed now)"; -9 -> " (not supported by this build)"; else -> "" })
+    }
 
     private fun at(j: JSONObject): Long = if (j.has("at") && !j.isNull("at")) j.optDouble("at", -1.0).toLong() else NOW
     private fun num(j: JSONObject, vararg keys: String): Double? { for (k in keys) if (j.has(k) && !j.isNull(k)) { val v = j.optDouble(k, Double.NaN); if (!v.isNaN()) return v } ; return null }
@@ -166,7 +190,29 @@ object BridgeTranslator {
                 call(LiveCall.MasterConfig(text.toByteArray(Charsets.UTF_8), if (j.optBoolean("safety", true)) 1 else 0))
             }
             "chain.edit" -> { val a = j.optJSONArray("ops") ?: return refuse("chain.edit without ops"); call(LiveCall.ChainEdit(a.toString().toByteArray(Charsets.UTF_8), at(j))) }
-            "meters.want" -> { val r = num(j, "rate") ?: return refuse("meters.want without rate"); call(LiveCall.MetersWant(if (r < 0) 0.0 else if (r > 30) 30.0 else r)) }
+            "meters.want" -> {
+                val r = num(j, "rate") ?: return refuse("meters.want without rate")
+                val hz = if (r < 0) 0.0 else if (r > 30) 30.0 else r
+                if (!(j.has("fx") || j.has("dyn") || j.has("chains") || j.has("master") || j.has("trim"))) return call(LiveCall.MetersWant(hz))   // the rate-only form (the shell's own, and the old page's)
+                var mask = 0L; var kinds = 0
+                for ((key, kind) in listOf("fx" to MK_FXLVL, "dyn" to MK_FXDYN)) {
+                    if (!j.has(key) || j.isNull(key)) continue
+                    val a = j.optJSONArray(key) ?: return refuse("meters.want: $key must be an array of tracks")
+                    for (i in 0 until a.length()) { val tr = track(a.opt(i)) ?: return refuse("meters.want: $key has a bad track (0..32 or 'm')"); mask = mask or (1L shl tr) }
+                    if (a.length() > 0) kinds = kinds or kind
+                }
+                call(LiveCall.MetersSet(hz, kinds, mask))
+            }
+            "fx.values" -> {
+                val tr = track(j.opt("tr")) ?: return refuse("fx.values: bad tr")
+                val slot = j.optInt("slot", -1); if (slot !in 0..7) return refuse("fx.values: slot must be 0..7")
+                val kind = when (j.optString("kind", "")) { "pump" -> FXV_PUMP; "mod" -> FXV_MOD; else -> return refuse("fx.values: kind must be 'pump' or 'mod'") }
+                val a = j.optJSONArray("v") ?: return refuse("fx.values needs v: the slot's value list")
+                if (a.length() == 0 || a.length() > FXV_MAX) return refuse("fx.values: v must hold 1..$FXV_MAX numbers")
+                val d = DoubleArray(a.length()) { val x = a.opt(it); if (x is Number) x.toDouble() else Double.NaN }
+                if (d.any { it.isNaN() || it.isInfinite() }) return refuse("fx.values: a value is not a number")
+                call(LiveCall.FxValues(tr, slot, kind, d, at(j), id))
+            }
             "buf.use" -> {
                 val kind = j.optString("kind", "pad")
                 if (kind != "pad" && kind != "var") return refuse("buf.use kind '$kind' is not an input of the live host")
