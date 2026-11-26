@@ -57,10 +57,31 @@ jobs:
           if (-not $p.WaitForExit(150000)) { $p.Kill(); Write-Host "selftest timed out"; if (Test-Path $rep) { Get-Content $rep }; exit 2 }
           if (Test-Path $rep) { Get-Content $rep } else { Write-Host "no report file" }
           exit $p.ExitCode
+      # The UI sweep of the top-bar and right-click menus (tests/sweep/menus.mjs), driven over the DevTools Protocol into the SHELL's WebView2 (native/desktop/tests/sweep/ui-lib-shell.mjs replaces
+      # the sweep's own Chrome). First runs report without failing the job (continue-on-error): read the log, then make it a gate.
+      - name: Menus sweep inside the shell (WebView2 over CDP)
+        id: sweep
+        continue-on-error: true
+        timeout-minutes: 45
+        shell: pwsh
+        run: |
+          npm i --no-save --no-audit --no-fund playwright-core@1.49.1
+          $exe = Resolve-Path "build\desktop\Release\Thunder Plus.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--null-audio","--cdp-port","9222" -PassThru
+          $up = $false
+          for ($i = 0; $i -lt 60 -and -not $up; $i++) { try { Invoke-WebRequest "http://127.0.0.1:9222/json/version" -UseBasicParsing | Out-Null; $up = $true } catch { Start-Sleep -Seconds 1 } }
+          if (-not $up) { Write-Host "the shell did not open its DevTools port"; $p.Kill(); exit 2 }
+          $env:TPD_CDP = "http://127.0.0.1:9222"
+          $env:SWEEP_LIVE = "1"
+          node --import ./native/desktop/tests/sweep/register.mjs tests/sweep/menus.mjs 2>&1 | Tee-Object -FilePath menus-sweep-windows.txt
+          $code = $LASTEXITCODE
+          try { $p.Kill() } catch {}
+          exit $code
       - name: Package (unsigned)
         if: ${{ always() }}
         shell: pwsh
         run: |
+          if (Test-Path menus-sweep-windows.txt) { New-Item -ItemType Directory -Force out | Out-Null; Copy-Item menus-sweep-windows.txt out\menus-sweep-windows.txt }
           New-Item -ItemType Directory -Force out | Out-Null
           if (Test-Path "build\desktop\Release\Thunder Plus.exe") { Compress-Archive -Path "build\desktop\Release\*" -DestinationPath "out\thunder-plus-windows-x64-unsigned.zip" }
           if (Test-Path selftest.txt) { Copy-Item selftest.txt out\selftest-windows.txt }

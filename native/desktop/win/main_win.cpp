@@ -1,6 +1,6 @@
 // H6: the Windows shell. One Win32 window with a WebView2 control that loads app://thunder/index.html (served from the bundled web\ folder next to the exe through a registered custom scheme and
 // WebResourceRequested), the page bridges in shell_core.h (window.thunderCore, window.thunderDesktop), audio through the core's live host and miniaudio (WASAPI). UNSIGNED.
-// Options: --selftest (run the page's selftest, write the verdict, exit 0 / 1 / 2), --null-audio (no sound device), --web <dir> (serve another web folder), --report <file> (the selftest verdict as a file:
+// Options: --selftest (run the page's selftest, write the verdict, exit 0 / 1 / 2), --null-audio (no sound device), --web <dir> (serve another web folder), --cdp-port <n> (DevTools Protocol for the UI sweeps), --report <file> (the selftest verdict as a file:
 // a GUI-subsystem exe has no console on a CI runner). UNVERIFIED on a PC: this box cannot build it; the Windows runner of .github/workflows/native-desktop.yml is the compile check and runs --selftest.
 // NOT HERE (H8): single instance, .thunder association, updater, signing. The WebView2 loader is the DLL (WebView2Loader.dll, copied next to the exe), the Evergreen runtime is on Windows 11 and most Windows 10.
 #ifndef UNICODE
@@ -63,6 +63,7 @@ ComPtr<ICoreWebView2Controller> g_ctrl;
 ComPtr<ICoreWebView2> g_web;
 std::unique_ptr<tpd::ShellCore> g_core;
 std::string g_webDir, g_report;
+int g_cdpPort = 0;   // --cdp-port N: the DevTools Protocol on 127.0.0.1:N, for the UI sweeps (tests/sweep/ui-lib-shell.mjs)
 bool g_selftest = false, g_nullAudio = false, g_selfTestStarted = false;
 std::string g_pendingOpen;
 
@@ -172,7 +173,9 @@ void onControllerReady() {
 void createWebView() {
   auto opts = Make<CoreWebView2EnvironmentOptions>();
   // what Electron's switches did (electron/main.js): audio without a first click; no throttling of a window in the back, so the sequencer keeps feeding on time
-  opts->put_AdditionalBrowserArguments(L"--autoplay-policy=no-user-gesture-required --disable-renderer-backgrounding --disable-background-timer-throttling --disable-backgrounding-occluded-windows");
+  std::wstring browserArgs = L"--autoplay-policy=no-user-gesture-required --disable-renderer-backgrounding --disable-background-timer-throttling --disable-backgrounding-occluded-windows";
+  if (g_cdpPort > 0) browserArgs += L" --remote-debugging-port=" + std::to_wstring(g_cdpPort) + L" --remote-allow-origins=*";
+  opts->put_AdditionalBrowserArguments(browserArgs.c_str());
   ComPtr<ICoreWebView2EnvironmentOptions4> o4;
   if (SUCCEEDED(opts.As(&o4))) {
     const WCHAR* allowed[1] = {L"*"};
@@ -229,6 +232,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     else if (a == L"--null-audio") g_nullAudio = true;
     else if (a == L"--web" && i + 1 < argc) g_webDir = U(argv[++i]);
     else if (a == L"--report" && i + 1 < argc) g_report = U(argv[++i]);
+    else if (a == L"--cdp-port" && i + 1 < argc) g_cdpPort = _wtoi(argv[++i]);
     else if (a.size() > 8 && a.compare(a.size() - 8, 8, L".thunder") == 0) g_pendingOpen = U(a);
   }
   if (g_webDir.empty()) { wchar_t exe[MAX_PATH]; GetModuleFileNameW(nullptr, exe, MAX_PATH); PathRemoveFileSpecW(exe); g_webDir = U(std::wstring(exe) + L"\\web"); }
