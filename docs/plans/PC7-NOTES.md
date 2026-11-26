@@ -57,7 +57,13 @@ An input unplugged mid-take: the shell ends the take itself (`rec.done {partial}
 - **Q3:** `dev.open` carries one `sr` (the engine's); the input is opened at that rate by the shell. The protocol cannot say "input rate only if in the input device's rates", and no message was invented: nothing on the page side.
 - **Q5:** accepted: free-length takes until PC5. `IOAPI = null` under `window.thunderCore` and the test count changes: accepted.
 
+## Verifier findings (PC7-VERIFY.md)
+- M1 fixed: `NC.midiOn()` needs `caps.midi` AND `caps.devices` (the Android live shell says `midi` too, but not `devices`); inert test added.
+- M2: native-side (listed below).
+- Left open: L1 (after `detach` + re-attach the `dev` / MIDI-in listeners are not re-registered until reload), L2 (`wantOut` seeded from the open device until `dev.list` answers), L3 (a later input pick resends the unplugged out id: a noisy fellBack toast), L4 (mono pick hands the same Float32Array as L and R: look once on the Mac), L5 (= Q1), L6 (take metadata unused).
+
 ## For native (later)
+- M2 / Q2 / Q3: the shell's `devFallback` re-asks the old rate and the input opens at the engine rate; both must follow the "device's own rates, else 0" rule in the shell.
 - Q1: `dev.list` should return the requested `sr` / `buf` (e.g. `want:{out,in,sr,buf}`).
 - Q2: `devFallback` should ask the old rate only if the new device's `rates` has it, else 0.
 - Q3: the input's rate rule (in the input device's own `rates`, else 0) needs the shell to apply it when opening the input.

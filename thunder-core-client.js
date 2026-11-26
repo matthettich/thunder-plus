@@ -942,9 +942,9 @@
       devList();   // the list for Settings > Audio (the hello reply carries the open device only)
     }
     if (capOn('inputs')) { on('rec', function (m) { emit7('rec', m); }); on('rec.done', function (m) { emit7('rec.done', m); }); }
-    if (capOn('midi')) { on('midi.ports', onMidiPorts); on('midi.in', onMidiIn); }
+    if (NC.midiOn()) { on('midi.ports', onMidiPorts); on('midi.in', onMidiIn); }
   }
-  function h7EngineUp() { MI.cfg = ''; if (capOn('midi') && host && typeof host.midiCfg === 'function') { try { NC.midiCfg(host.midiCfg()); } catch (e) { /* ignore */ } } }
+  function h7EngineUp() { MI.cfg = ''; if (NC.midiOn() && host && typeof host.midiCfg === 'function') { try { NC.midiCfg(host.midiCfg()); } catch (e) { /* ignore */ } } }
 
   // devices
   function takeList(r) {
@@ -1033,7 +1033,7 @@
 
   NC.devOn = function () { return capOn('devices'); };
   NC.inOn = function () { return capOn('devices') && capOn('inputs'); };
-  NC.midiOn = function () { return capOn('midi'); };
+  NC.midiOn = function () { return capOn('midi') && capOn('devices'); };   // the Android live shell also says caps.midi (its own MIDI path): the desktop shell is the one that says caps.devices
   NC.rtOn = function () { return capOn('rt'); };
   NC.devState = function () { return DV; };
   NC.devList = devList; NC.devOpen = devOpen; NC.devRates = devRates; NC.bufSizes = function () { return BUFS.slice(); };
@@ -1047,7 +1047,7 @@
   NC.midiState = function () { return MI; };
   /** The page's four ports: {outs:[4 ids], clockOut:[4 bool], gearDelay:[4 ms], clockIn}. Sent when it differs from what the shell holds. */
   NC.midiCfg = function (c) {
-    if (!capOn('midi') || !c) return false;
+    if (!NC.midiOn() || !c) return false;
     var outs = [], ck = [], gd = [], i;
     for (i = 0; i < 4; i++) { outs.push(c.outs && typeof c.outs[i] === 'string' ? c.outs[i] : ''); ck.push(!!(c.clockOut && c.clockOut[i])); gd.push(Math.max(-50, Math.min(200, Math.round(+(c.gearDelay && c.gearDelay[i]) || 0)))); }
     var m = { t: 'midi.cfg', outs: outs, clockOut: ck, gearDelay: gd, clockIn: !!c.clockIn }, sig = JSON.stringify(m);

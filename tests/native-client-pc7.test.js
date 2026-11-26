@@ -58,6 +58,13 @@ test('caps true: dev.list is asked after hello, the hello bodies and the list ar
   assert.ok(r.NC.inOn() && r.NC.midiOn() && r.NC.rtOn());
 });
 
+test('M1: an Android-shaped hello (caps.midi true, no caps.devices) leaves MIDI on the old path: no listeners, no midi.cfg, midiOn false', async () => {
+  const r = await up({ caps: { nativeAudio: true, midi: true, link: false, inputs: false } });
+  assert.equal(r.NC.midiOn(), false); assert.equal(r.handlers['midi.ports'], undefined); assert.equal(r.handlers['midi.in'], undefined);
+  assert.equal(r.NC.midiCfg({ outs: ['n:x'] }), false); assert.equal(r.msgs('midi.cfg').length, 0);
+  r.mcfg = { outs: ['n:A'] }; r.emit('engine', { up: false }); r.emit('engine', { up: true, sr: 48000 }); assert.equal(r.msgs('midi.cfg').length, 0);
+});
+
 // ---- dev.open: the device's own rates ---------------------------------------------------------------------------------------------------
 test('devRates: the device\'s own list; "" is the system default output; an unknown device has none', async () => {
   const r = await up();
