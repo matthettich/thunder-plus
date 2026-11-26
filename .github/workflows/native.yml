@@ -212,7 +212,7 @@ jobs:
           grep -h -o "<ExceptionHandling>[A-Za-z]*</ExceptionHandling>" -r build/core/dsp --include=*.vcxproj | sort | uniq -c
       # live_meters2 parts (3) to (7) expect the pump COMP slot (type 201) in the chain: there is no pump on Windows until W-PUMP, so it fails here for that reason only (see the separate step below, kept visible).
       - run: ctest --test-dir build -C Release --output-on-failure -E "^live_meters2$"
-      - name: live_meters2 (needs pump: expected to fail on Windows until W-PUMP; its TFX line and failures are shown)
+      - name: "live_meters2 (needs pump; expected to fail on Windows until W-PUMP; its TFX line and failures are shown)"
         shell: bash
         continue-on-error: true
         run: ctest --test-dir build -C Release -R "^live_meters2$" -V 2>&1 | grep -E "TFX:|FAIL|checks|Passed|Failed" | cut -c1-300
