@@ -108,6 +108,46 @@ class BridgeTranslatorTest {
         assertEquals(LiveCall.MetersWant(10.0), call("{\"t\":\"meters.want\",\"rate\":10,\"tracks\":[0]}"))
     }
 
+    @Test fun metersWantEffectLists() {
+        // the page's exact messages (M5): one track per list
+        assertEquals(LiveCall.MetersSet(10.0, 3, 1L shl 3), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[3],\"dyn\":[3],\"chains\":false,\"master\":false}"))
+        assertEquals(LiveCall.MetersSet(10.0, 1, 1L shl 3), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[3],\"dyn\":[]}"))
+        assertEquals(LiveCall.MetersSet(10.0, 2, 1L shl 5), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[],\"dyn\":[5]}"))
+        // all off: a replacement state with no kinds and an empty mask (the core switches the effect records off)
+        assertEquals(LiveCall.MetersSet(10.0, 0, 0L), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[],\"dyn\":[],\"chains\":false,\"master\":false}"))
+        // the master's effects: 32 or "m"; different tracks in the two lists: one mask holds both
+        assertEquals(LiveCall.MetersSet(10.0, 3, (1L shl 32) or (1L shl 2)), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[32],\"dyn\":[\"m\",2]}"))
+        // the rate keeps its clamp; chains / master / trim are read and ignored for now
+        assertEquals(LiveCall.MetersSet(30.0, 0, 0L), call("{\"t\":\"meters.want\",\"rate\":99,\"chains\":true,\"master\":true,\"trim\":true}"))
+        assertEquals(LiveCall.MetersSet(0.0, 1, 1L), call("{\"t\":\"meters.want\",\"rate\":0,\"fx\":[0]}"))
+        // a repeated track is one bit
+        assertEquals(LiveCall.MetersSet(10.0, 1, 1L shl 7), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[7,7]}"))
+        // refusals: a track out of range, not a number, a list that is not an array; no rate
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[33]}").where)
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"dyn\":[-1]}").where)
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[\"x\"],\"id\":4}").where)
+        assertEquals(4, refused("{\"t\":\"meters.want\",\"rate\":10,\"fx\":3,\"id\":4}").replyId)
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"fx\":[1]}").where)
+    }
+
+    @Test fun fxValues() {
+        assertEquals(LiveCall.FxValues(3, 2, 1, doubleArrayOf(0.5, 1.0, -2.0), -1L), call("{\"t\":\"fx.values\",\"tr\":3,\"slot\":2,\"kind\":\"pump\",\"v\":[0.5,1,-2]}"))
+        assertEquals(LiveCall.FxValues(32, 0, 2, doubleArrayOf(0.0), 9000L), call("{\"t\":\"fx.values\",\"tr\":\"m\",\"slot\":0,\"kind\":\"mod\",\"v\":[0],\"at\":9000}"))
+        for (bad in listOf(
+            "{\"t\":\"fx.values\",\"tr\":40,\"slot\":0,\"kind\":\"pump\",\"v\":[1]}",     // track
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":8,\"kind\":\"pump\",\"v\":[1]}",      // slot
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":-1,\"kind\":\"pump\",\"v\":[1]}",
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"tfx\",\"v\":[1]}",       // kind
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"v\":[1]}",
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\"}",                 // no v
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\",\"v\":[]}",
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\",\"v\":[1,\"x\"]}",   // not a number
+            "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\",\"v\":[1,null]}",
+        )) assertEquals(bad, "fx.values", refused(bad).where)
+        val big = (0..256).joinToString(",")
+        assertEquals("fx.values", refused("{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\",\"v\":[$big]}").where)
+    }
+
     @Test fun bufUse() {
         assertEquals(LiveCall.BufUse(4, 9, 0, "pad", 0, 'g'.code, 0), call("{\"t\":\"buf.use\",\"id\":4,\"pad\":9,\"kind\":\"pad\"}"))
         assertEquals(LiveCall.BufUse(-1, 9, 0, "pad", 0, 'g'.code, 0, 0), call("{\"t\":\"buf.use\",\"id\":-1,\"pad\":9,\"kind\":\"pad\",\"frames\":0}"))

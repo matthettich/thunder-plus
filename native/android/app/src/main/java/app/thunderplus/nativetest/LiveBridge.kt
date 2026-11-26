@@ -124,6 +124,11 @@ object LiveBridge {
             is BridgeTranslator.LiveCall.MasterConfig -> check(type, LiveNative.nativeMasterConfig(c.mstJson, c.safety))
             is BridgeTranslator.LiveCall.ChainEdit -> check(type, LiveNative.nativeChainEdit(c.opsJson, c.at))
             is BridgeTranslator.LiveCall.MetersWant -> check(type, LiveNative.nativeMetersWant(c.hz))
+            is BridgeTranslator.LiveCall.MetersSet -> check(type, LiveNative.nativeMetersSet(c.hz, c.kinds, c.fxTracks))   // E_ARG: a bad rate / track bit, E_STATE: no meters in this build, E_BUSY: ring full (the page re-sends its whole state on its next change)
+            is BridgeTranslator.LiveCall.FxValues -> LiveNative.nativeFxValues(c.track, c.slot, c.kind, c.v, c.at).let { rc ->
+                // the core refuses the EQ's phase / lin_quality and a linear-phase EQ (they ride in the song), a wrong value count, an empty or non-hosted slot: an err event, the audio is untouched
+                if (rc != 0) err(type, "rc $rc" + when (rc) { -1 -> " (refused: not a hosted slot of that kind, a wrong value count, or a value the core keeps in the song)"; -2 -> " (not allowed now)"; -8 -> " (busy, not applied)"; -9 -> " (not supported by this build)"; else -> "" })
+            }
             is BridgeTranslator.LiveCall.BufFree -> puts.free(c.id)
             is BridgeTranslator.LiveCall.BufUse -> {
                 if (c.kind == "pad" && c.frames == 0) { check("buf.use", LiveNative.nativePadRemove(c.pad)); return }   // the page's removal: no put, zero frames (live.h pad_set: frames == 0 removes)
@@ -153,7 +158,7 @@ object LiveBridge {
             .put("sr", LiveEngine.sampleRate).put("outLat", (FlatJson.num(LiveNative.nativeStatus(), "outLat") ?: 0.0).toInt()).put("host", "android")   // CORE-BRIDGE 7 G1
             .put("maxPadBytes", (FlatJson.num(stats, "padBudget") ?: (128.0 * 1048576)).toLong()).put("maxSongBytes", 16L * 1048576)
             .put("caps", JSONObject().put("nativeAudio", true).put("midi", LiveNative.nativeMidiOn()).put("link", false).put("plugins", false).put("inputs", false).put("render", false).put("files", true)
-                .put("live", true).put("chains", LiveNative.nativeChainsOn()).put("sf", (caps and 8) != 0).put("engines", engines)
+                .put("live", true).put("meters2", (caps and 0x400) != 0).put("fxValues", (caps and 0x800) != 0).put("chains", LiveNative.nativeChainsOn()).put("sf", (caps and 8) != 0).put("engines", engines)
                 .put("fx", org.json.JSONArray(listOf("tfx", "pump", "modfx", "master"))).put("abi", 1).put("liveCaps", caps))
         reply(h.id, body)
         LiveMidi.publish(ctx)   // H2: the page learns the ports (midi.ports) right after the hello
