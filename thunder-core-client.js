@@ -839,7 +839,7 @@
   var RV = { t: 0, last: '', hold: false, asked: false, cost: 0, big: false };
   function rcvPutOn() { return !!(NC.on && NC.caps && NC.caps.recoveryPut && host && typeof host.projText === 'function' && typeof host.dirty === 'function'); }
   function rcvTick() {
-    RV.t = 0; if (!NC.on) return;
+    RV.t = 0; if (!NC.on || !rcvPutOn()) return;
     var wait = RCV_MS;
     if (rcvPutOn() && !RV.hold && !down()) {
       try {
@@ -855,7 +855,7 @@
     }
     RV.t = setTimeout(rcvTick, wait);
   }
-  function rcvStart() { if (!RV.t) RV.t = setTimeout(rcvTick, RCV_MS); }
+  function rcvStart() { if (!RV.t && rcvPutOn()) RV.t = setTimeout(rcvTick, RCV_MS); }   // (no timer at all without caps.recoveryPut: nothing to put, and nothing keeps a test process alive)
   function rcvStop() { clearTimeout(RV.t); RV.t = 0; RV.last = ''; RV.hold = false; RV.asked = false; }
   function ago(ms) { var m = Math.round((Date.now() - ms) / 60000); return !(m >= 0) ? '' : m < 1 ? 'just now' : m < 90 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; }
   /** The copy as a project text for the page's loader: the page's own put, or (only the song.load message) the song wrapped as a project, which has no kit. */
