@@ -673,6 +673,20 @@ typedef struct thunder_live_ev_fxdyn {    /* 152 bytes. One post of a track's dy
   thunder_live_ev_fxdyn_ent ent[8];
 } thunder_live_ev_fxdyn;
 
+/* M3 (METERS-DESIGN 4.1 / 5a, owner's choice (a)): the chains in / out levels of one track. Type 13, ONE record per watched track that has a chains node, on the big ring, in step 9 after the FX records of the same quantum,
+   at the spec's chains_hz (default 16 a second when 0, at most 30; paced in whole quanta). Only with F_METERS | F_CHAINS and thunder_live_meters_set with THUNDER_LIVE_MK_CHLVL and the track's bit in chains_tracks: nothing is
+   computed and nothing is posted for a track that is not watched; a watched track with no node posts nothing. The peaks are the running max(abs) of each channel since the previous record of that track (the first one after
+   watching starts covers one quantum), linear. in = the track's pair as the chains node got it (after the mixer's TRIM), out = the pair after the node. f = the frame at the end of the quantum that posted it. A full ring
+   refuses the newest and counts it (stats.evt_dropped). (The design's 280-byte all-tracks record was replaced by this per-track one: the page watches ONE track, and it carries L and R.) */
+#define THUNDER_LIVE_EV_CHLVL 13
+typedef struct thunder_live_ev_chlvl {    /* 40 bytes */
+  thunder_live_ev_head h;
+  int32_t track;                          /* 0 .. 31 */
+  uint32_t reserved;                      /* 0 */
+  float in[2];                            /* peak in, left and right */
+  float out[2];                           /* peak out, left and right */
+} thunder_live_ev_chlvl;
+
 /* ANY thread, once before audio: the host's output latency in frames and its underrun count; the next CLOCK records carry them (core.h thunder_host_stats). */
 void thunder_live_host_stats(thunder_live* L, int out_latency_frames, int underruns);
 
@@ -685,21 +699,23 @@ int thunder_live_poll(thunder_live* L, void* buf, int cap);
 int thunder_live_meters_want(thunder_live* L, double rate_hz);
 
 /* M1: CONTROL. The whole metering subscription as one REPLACEMENT state (METERS-DESIGN 4.2 / 5a): the page may re-send it at any time (after hello, after an engine restart); what it leaves out is switched off.
-   `size` first (the ABI rule of the other structs). rate_hz: METERS exactly as thunder_live_meters_want (0 off, > 0 and <= 30 on). kinds: THUNDER_LIVE_MK_* bits; CHLVL and MASTERM are reserved now (accepted, they post
+   `size` first (the ABI rule of the other structs). rate_hz: METERS exactly as thunder_live_meters_want (0 off, > 0 and <= 30 on). kinds: THUNDER_LIVE_MK_* bits; CHLVL (M3: see THUNDER_LIVE_EV_CHLVL) works, MASTERM is reserved now (accepted, it posts
    nothing yet). fx_tracks: bit t (0 .. 31) watches track t's effects, bit 32 the master's; with THUNDER_LIVE_MK_FXLVL the watched hosts post FXLVL, with THUNDER_LIVE_MK_FXDYN FXDYN (no cap on the number of
-   tracks: the page asks for one). chains_hz: reserved for CHLVL (0 .. 30). Applied at the top of the next quantum (a NEW command: thunder_live_meters_want alone is unchanged and may still be used alone;
+   tracks: the page asks for one). chains_hz: the CHLVL rate (M3; 0 .. 30, 0 = 16 a second). chains_tracks (M3, last field: a caller with the older 32-byte struct passes size 32 and watches no chains track): bit t (0 .. 31) watches
+   track t's chains node, used with THUNDER_LIVE_MK_CHLVL (bits above 31: E_ARG). Applied at the top of the next quantum (a NEW command: thunder_live_meters_want alone is unchanged and may still be used alone;
    the later of the two calls wins for the METERS rate). Needs F_METERS (E_STATE otherwise); without F_EFFECTS the FX kinds simply post nothing. E_ARG: NULL, size < 4, a field past our struct that is not zero,
    unknown kinds bits, fx_tracks above bit 32, a rate or chains_hz that is NaN, negative or above 30. E_BUSY: the command ring is full, nothing changed. */
 #define THUNDER_LIVE_MK_FXLVL 1u
 #define THUNDER_LIVE_MK_FXDYN 2u
-#define THUNDER_LIVE_MK_CHLVL 4u      /* reserved (M3) */
+#define THUNDER_LIVE_MK_CHLVL 4u      /* M3: the chains in / out peaks of the tracks in chains_tracks */
 #define THUNDER_LIVE_MK_MASTERM 8u    /* reserved (M2) */
 typedef struct thunder_live_meters_spec {
   uint32_t size;
   uint32_t kinds;               /* THUNDER_LIVE_MK_* */
   double rate_hz;               /* METERS: 0 off, <= 30 */
   uint64_t fx_tracks;           /* bit t: track t's effects (0 .. 31), bit 32: the master's */
-  double chains_hz;             /* reserved for CHLVL */
+  double chains_hz;             /* M3: CHLVL rate, 0 .. 30 (0: 16) */
+  uint64_t chains_tracks;       /* M3: bit t (0 .. 31): track t's chains node (CHLVL) */
 } thunder_live_meters_spec;
 int thunder_live_meters_set(thunder_live* L, const thunder_live_meters_spec* spec);
 

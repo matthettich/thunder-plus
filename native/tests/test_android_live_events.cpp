@@ -27,6 +27,19 @@ int main() {
     v.track = 1; CHECK(!eventToJson((const unsigned char*)&v, sizeof v - 8, &o), "a short record is refused");
     CHECK(!eventIsCritical(THUNDER_LIVE_EV_FXLVL) && !eventIsCritical(THUNDER_LIVE_EV_FXDYN), "meters may be dropped first");
   }
+  {   // M3: CHLVL -> {t:"ch.lvl", seq, f, tr, in:[l,r], out:[l,r]}: linear peaks, non-finite and negative are 0, a track above 31 is not forwarded
+    thunder_live_ev_chlvl v; std::memset(&v, 0, sizeof v);
+    v.h.type = THUNDER_LIVE_EV_CHLVL; v.h.bytes = sizeof v; v.h.seq = 21; v.h.f = 96000; v.track = 5; v.in[0] = 0.8f; v.in[1] = 0.3f; v.out[0] = 0.4f; v.out[1] = 0.15f;
+    CHECK(eventToJson((const unsigned char*)&v, sizeof v, &o), "chlvl decodes");
+    CHECK(o == "{\"t\":\"ch.lvl\",\"seq\":21,\"f\":96000,\"tr\":5,\"in\":[0.8,0.3],\"out\":[0.4,0.15]}", "ch.lvl json: %s", o.c_str());
+    CHECK(o.find('\n') == std::string::npos && !eventIsCritical(THUNDER_LIVE_EV_CHLVL), "one line, droppable");
+    v.in[0] = NAN; v.in[1] = -1.f; v.out[0] = INFINITY; v.out[1] = 0.f;
+    CHECK(eventToJson((const unsigned char*)&v, sizeof v, &o) && o.find("\"in\":[0,0],\"out\":[0,0]}") != std::string::npos, "non-finite and negative are 0: %s", o.c_str());
+    v.track = 32; CHECK(!eventToJson((const unsigned char*)&v, sizeof v, &o), "track 32 is not a chains track");
+    v.track = -1; CHECK(!eventToJson((const unsigned char*)&v, sizeof v, &o), "a negative track is not forwarded");
+    v.track = 31; CHECK(eventToJson((const unsigned char*)&v, sizeof v, &o), "track 31 is the last");
+    CHECK(!eventToJson((const unsigned char*)&v, sizeof v - 8, &o), "a short record is refused");
+  }
   {   // FXDYN: [slot, type string, red, in, out], dB as given (-180 = silence)
     thunder_live_ev_fxdyn v; std::memset(&v, 0, sizeof v);
     v.h.type = THUNDER_LIVE_EV_FXDYN; v.h.bytes = sizeof v; v.h.seq = 9; v.h.f = 48000; v.track = 2; v.n = 2;

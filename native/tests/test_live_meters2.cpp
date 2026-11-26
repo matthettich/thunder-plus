@@ -22,7 +22,7 @@ static_assert(offsetof(thunder_live_ev_fxdyn, track) == 16 && offsetof(thunder_l
 static_assert(offsetof(thunder_live_ev_fxdyn_ent, slot) == 0 && offsetof(thunder_live_ev_fxdyn_ent, type) == 2 && offsetof(thunder_live_ev_fxdyn_ent, red_db) == 4
               && offsetof(thunder_live_ev_fxdyn_ent, in_db) == 8 && offsetof(thunder_live_ev_fxdyn_ent, out_db) == 12, "FXDYN entry layout");
 static_assert(THUNDER_LIVE_EV_FXLVL == 11 && THUNDER_LIVE_EV_FXDYN == 12 && THUNDER_LIVE_EV_MAX >= sizeof(thunder_live_ev_fxdyn), "type numbers, the poll slot");
-static_assert(sizeof(thunder_live_meters_spec) == 32, "the spec: size, kinds, rate_hz, fx_tracks, chains_hz");
+static_assert(sizeof(thunder_live_meters_spec) == 40, "the spec: size, kinds, rate_hz, fx_tracks, chains_hz, chains_tracks (M3)");
 
 namespace {
 #if defined(THUNDER_SANITIZE_BUILD) || defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)

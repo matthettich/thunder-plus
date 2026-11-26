@@ -57,6 +57,10 @@ bool eventToJson(const unsigned char* r, int bytes, std::string* out) {
       ap(out, "{\"t\":\"fx.lvl\",\"seq\":%u,\"f\":%lld,\"tr\":%d,\"a\":[", v.h.seq, (long long)v.h.f, v.track);
       for (int k = 0; k < 8; k++) { double x = (double)v.lvl[k]; if (!(x > 0.0) || x > 1e30) x = 0.0; ap(out, "%s%.5g", k ? "," : "", x); }
       out->append("]}"); return true; }
+    case THUNDER_LIVE_EV_CHLVL: { thunder_live_ev_chlvl v; if (!take(r, bytes, &v)) return false;   // M3: {t:"ch.lvl", seq, f, tr, in:[l,r], out:[l,r]}: linear peaks of the track's chains node, in = what goes in (after TRIM), out = what comes out
+      if (v.track < 0 || v.track > 31) return false;
+      auto pk = [](float x) { return (std::isfinite(x) && x > 0.f && x < 1e30f) ? (double)x : 0.0; };
+      ap(out, "{\"t\":\"ch.lvl\",\"seq\":%u,\"f\":%lld,\"tr\":%d,\"in\":[%.5g,%.5g],\"out\":[%.5g,%.5g]}", v.h.seq, (long long)v.h.f, v.track, pk(v.in[0]), pk(v.in[1]), pk(v.out[0]), pk(v.out[1])); return true; }
     case THUNDER_LIVE_EV_FXDYN: { thunder_live_ev_fxdyn v; if (!take(r, bytes, &v)) return false;   // M4: {t:"fx.dyn", seq, f, tr, d:[[slot, "type", red, in, out], ...]}: dB as the core gives them (-180 = silence); the type is the page's string
       if (v.track < 0 || v.track > 32) return false;
       ap(out, "{\"t\":\"fx.dyn\",\"seq\":%u,\"f\":%lld,\"tr\":%d,\"d\":[", v.h.seq, (long long)v.h.f, v.track);

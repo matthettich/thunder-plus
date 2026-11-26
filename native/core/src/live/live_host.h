@@ -54,7 +54,7 @@ enum class LiveCmdType : uint8_t {
   MixSet,       // i0 = track, i1 = key (MixKey as int), i2 = Send's index (always 0), x = value, y = ramp frames; at = when
   FxCommit,     // i0 = track; p = FxPlan* (ownership to the audio side; the plan comes back through fxBack_ after the commit)
   Meters,       // x = rate Hz (0: off)
-  /* M1 */ MetersSet,    // x = METERS rate Hz (0: off), y = chains_hz (reserved), i0 = kinds (THUNDER_LIVE_MK_*), i64a = fx_tracks (bit t, 32 = master): the whole metering subscription, a replacement state
+  /* M1 */ MetersSet,    // x = METERS rate Hz (0: off), y = chains_hz (0: 16), i1 = chains_tracks (M3, bit t 0..31), i0 = kinds (THUNDER_LIVE_MK_*), i64a = fx_tracks (bit t, 32 = master): the whole metering subscription, a replacement state
   ChainsCommit, // p = ChainsPlan* (ownership goes to the audio side; the plan comes back through chBack_ after the commit); at = NOW always: it never waits in pend_
 };
 struct LiveCmd {
@@ -294,6 +294,7 @@ class LiveHost {
   int64_t latencyFrames() const;                              // the output's lateness behind the song: master chain + PDC trim + master pump effects (SongRenderer::latencyFrames)
   void postMeters();                                          // step 9: the bank's events as METERS records
   /* M1 */ void applyMetersSet(const LiveCmd& c);                // AUDIO, step 1: setLevels / setTelemetry on the hosts whose watching changed; METERS rate as `meters`
+  /* M3 */ void postChainsMeters(int64_t qEnd);                  // AUDIO, step 9 after postFxMeters: CHLVL for the watched tracks that have a chains node (ChainsHost::popPeaks); nothing for the others
   /* M1 */ void postFxMeters(int64_t qEnd);                       // AUDIO, step 9 after postMeters: FXLVL / FXDYN for the watched hosts only (a copy of FxHost's own post; no pop for an unwatched host)
   // ---- C2: the chains host (audio) ----
   void commitChains(ChainsPlan* p);                                    // AUDIO: ChainsHost::commit + the whole-patch count (V3a)
@@ -404,6 +405,7 @@ class LiveHost {
   std::unique_ptr<MasterChain> mchain_;              // F_MASTER (chain.h)
   std::unique_ptr<MeterBank> meterBank_;             // F_METERS (meter.h)
   bool metersOn_ = false;                            // AUDIO: thunder_live_meters_want switched the bank on (it is fed and advanced only then)
+  /* M3 */ uint32_t chWatch_ = 0; double chHz_ = 16; int64_t nextChAt_ = 0;   // AUDIO: tracks whose chains peaks are tapped (ChainsHost::setPeakWatch) and posted in step 9 at chHz_ (paced in whole quanta); nextChAt_ = the engine frame the next post is due at
   /* M1 */ uint64_t fxLvlWatch_ = 0, fxDynWatch_ = 0;           // AUDIO: bit t (32 = master) set by the last MetersSet: the hosts that have setLevels / setTelemetry on and are popped in step 9
   PdcPlan pdcCur_; PdcMode pdcMode_ = PdcMode::Auto; bool pdcHave_ = false;   // AUDIO: the PDC plan in force (the play's or pdc_set's); re-applied with playing = false at a stop
   int64_t playQ_ = -1;                               // AUDIO: the engine frame of the quantum a play started in (applyPdc: the 10 ms glide applies in that quantum only)

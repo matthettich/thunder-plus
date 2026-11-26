@@ -125,7 +125,7 @@ object LiveBridge {
             is BridgeTranslator.LiveCall.MasterConfig -> check(type, LiveNative.nativeMasterConfig(c.mstJson, c.safety))
             is BridgeTranslator.LiveCall.ChainEdit -> check(type, LiveNative.nativeChainEdit(c.opsJson, c.at))
             is BridgeTranslator.LiveCall.MetersWant -> check(type, LiveNative.nativeMetersWant(c.hz))
-            is BridgeTranslator.LiveCall.MetersSet -> check(type, LiveNative.nativeMetersSet(c.hz, c.kinds, c.fxTracks))   // E_ARG: a bad rate / track bit, E_STATE: no meters in this build, E_BUSY: ring full (the page re-sends its whole state on its next change)
+            is BridgeTranslator.LiveCall.MetersSet -> check(type, LiveNative.nativeMetersSet(c.hz, c.kinds, c.fxTracks, c.chainsTracks))   // E_ARG: a bad rate / track bit, E_STATE: no meters in this build, E_BUSY: ring full (the page re-sends its whole state on its next change)
             is BridgeTranslator.LiveCall.FxValues -> LiveNative.nativeFxValues(c.track, c.slot, c.kind, c.v, c.at).let { rc ->
                 // the core refuses the EQ's phase / lin_quality and a linear-phase EQ (they ride in the song), a wrong value count, an empty or non-hosted slot; the audio is untouched.
                 // An ask (id) is answered either way; without an id a refusal is an err event.
