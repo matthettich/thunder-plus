@@ -34,7 +34,7 @@ object BridgeTranslator {
     const val FXV_PUMP = 1
     const val FXV_MOD = 2
     /** The most values one fx.values may carry (a pump plugin's parameter list or a module's controls: far below this; the core checks the exact count). */
-    const val FXV_MAX = 256
+    const val FXV_MAX = 512   // a pump slot carries up to 280 (live_host.h); the core checks the exact planned count
 
     sealed class LiveCall {
         class SongLoad(val raw: ByteArray) : LiveCall()

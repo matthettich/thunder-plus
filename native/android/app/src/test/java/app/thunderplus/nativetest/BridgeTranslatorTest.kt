@@ -144,8 +144,11 @@ class BridgeTranslatorTest {
             "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\",\"v\":[1,\"x\"]}",   // not a number
             "{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\",\"v\":[1,null]}",
         )) assertEquals(bad, "fx.values", refused(bad).where)
-        val big = (0..256).joinToString(",")
+        val big = (0..512).joinToString(",")   // 513 values: over FXV_MAX
         assertEquals("fx.values", refused("{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"mod\",\"v\":[$big]}").where)
+        val pump280 = (1..280).joinToString(",")   // a pump slot's longest value list must pass the shell (the core checks the exact count)
+        val c = call("{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"pump\",\"v\":[$pump280]}") as LiveCall.FxValues
+        assertEquals(280, c.v.size)
     }
 
     @Test fun bufUse() {
