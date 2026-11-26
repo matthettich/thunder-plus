@@ -202,7 +202,8 @@ void ChainsHost::setPeakWatch(uint32_t mask) {
   pkWatch_ = mask;
 }
 bool ChainsHost::popPeaks(int t, float pk[4]) {
-  if (t < 0 || t >= kSongNT || !node_[t]) return false;
+  if (t < 0 || t >= kSongNT) return false;
+  if (!node_[t]) { for (int k = 0; k < 4; k++) pk_[t][k] = 0.f; return false; }   // lead's read: a node that went away leaves no old peak for the next one
   for (int k = 0; k < 4; k++) { pk[k] = pk_[t][k]; pk_[t][k] = 0.f; }
   return true;
 }
