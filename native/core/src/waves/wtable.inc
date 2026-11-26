@@ -159,6 +159,9 @@ static const ParamDef kWP_xfade[] = {{"mix", 0.5, 0.0, 1.0, 0.01}, {"curve", 0.0
 static const PortDef kWI_const[] = {{nullptr, nullptr}};
 static const PortDef kWO_const[] = {{"out", "cv"}};
 static const ParamDef kWP_const[] = {{"value", 0.0, -1.0, 1.0, 0.01}, {"fine", 0.0, -0.01, 0.01, 0.0001}};
+static const PortDef kWI_knob[] = {{nullptr, nullptr}};
+static const PortDef kWO_knob[] = {{"out", "cv"}};
+static const ParamDef kWP_knob[] = {{"n", 1.0, 1.0, 8.0, 1.0}, {"value", 0.0, 0.0, 1.0, 0.01}, {"min", 0.0, -1.0, 1.0, 0.01}, {"max", 1.0, -1.0, 1.0, 0.01}};
 static const PortDef kWI_steps[] = {{"clock", "gate"}, {"reset", "gate"}};
 static const PortDef kWO_steps[] = {{"out", "cv"}, {"gate", "gate"}};
 static const ParamDef kWP_steps[] = {{"div", 3.0, 0.0, 9.0, 1.0}, {"len", 8.0, 1.0, 8.0, 1.0}, {"glide", 0.0, 0.0, 1.0, 0.01}, {"depth", 1.0, 0.0, 1.0, 0.01}, {"s1", 0.0, -1.0, 1.0, 0.01}, {"s2", 0.0, -1.0, 1.0, 0.01}, {"s3", 0.0, -1.0, 1.0, 0.01}, {"s4", 0.0, -1.0, 1.0, 0.01}, {"s5", 0.0, -1.0, 1.0, 0.01}, {"s6", 0.0, -1.0, 1.0, 0.01}, {"s7", 0.0, -1.0, 1.0, 0.01}, {"s8", 0.0, -1.0, 1.0, 0.01}};
@@ -309,6 +312,12 @@ static const ParamDef kWP_buscomp[] = {{"thresh", -12.0, -40.0, 0.0, 0.1}, {"rat
 static const PortDef kWI_glue[] = {{"in", "audio"}, {"inR", "audio"}, {"sc", "audio"}};
 static const PortDef kWO_glue[] = {{"out", "audio"}, {"outR", "audio"}};
 static const ParamDef kWP_glue[] = {{"thresh", -15.0, -40.0, 0.0, 0.1}, {"ratio", 2.0, 1.0, 10.0, 0.1}, {"attack", 0.01, 0.0001, 0.03, 0.0001}, {"release", 0.3, 0.05, 1.5, 0.01}, {"auto", 1.0, 0.0, 1.0, 1.0}, {"knee", 8.0, 0.0, 18.0, 0.1}, {"range", 20.0, 1.0, 40.0, 0.5}, {"makeup", 0.0, 0.0, 20.0, 0.1}, {"clip", 0.0, 0.0, 1.0, 1.0}, {"schpf", 0.0, 0.0, 4.0, 1.0}, {"sck", 0.0, 0.0, 136.0, 1.0}, {"mix", 1.0, 0.0, 1.0, 0.01}};
+static const PortDef kWI_send[] = {{"in", "audio"}, {"inR", "audio"}};
+static const PortDef kWO_send[] = {{nullptr, nullptr}};
+static const ParamDef kWP_send[] = {{"lab", 1.0, 0.0, 8.0, 1.0}};
+static const PortDef kWI_recv[] = {{nullptr, nullptr}};
+static const PortDef kWO_recv[] = {{"out", "audio"}, {"outR", "audio"}};
+static const ParamDef kWP_recv[] = {{"lab", 1.0, 0.0, 8.0, 1.0}};
 static const PortDef kWI_string[] = {{"pitch", "cv"}, {"gate", "gate"}};
 static const PortDef kWO_string[] = {{"out", "audio"}};
 static const ParamDef kWP_string[] = {{"tune", 0.0, -24.0, 24.0, 1.0}, {"bright", 0.6, 0.0, 1.0, 0.01}, {"decay", 0.55, 0.0, 1.0, 0.01}, {"pos", 0.13, 0.0, 0.5, 0.01}, {"mute", 0.4, 0.0, 1.0, 0.01}, {"level", 0.8, 0.0, 1.5, 0.01}};
@@ -444,6 +453,7 @@ static const WInfo kWInfo[] = {
   {"switch", 1, 0, 3, kWI_switch, 1, kWO_switch, 2, kWP_switch},
   {"xfade", 1, 0, 3, kWI_xfade, 1, kWO_xfade, 2, kWP_xfade},
   {"const", 1, 0, 0, kWI_const, 1, kWO_const, 2, kWP_const},
+  {"knob", 1, 0, 0, kWI_knob, 1, kWO_knob, 4, kWP_knob},
   {"steps", 0, 0, 2, kWI_steps, 2, kWO_steps, 12, kWP_steps},
   {"clock", 0, 0, 1, kWI_clock, 3, kWO_clock, 4, kWP_clock},
   {"clkmul", 1, 0, 2, kWI_clkmul, 1, kWO_clkmul, 2, kWP_clkmul},
@@ -494,6 +504,8 @@ static const WInfo kWInfo[] = {
   {"pump", 0, 0, 2, kWI_pump, 2, kWO_pump, 4, kWP_pump},
   {"buscomp", 0, kWF_Show, 3, kWI_buscomp, 2, kWO_buscomp, 8, kWP_buscomp},
   {"glue", 0, kWF_Show, 3, kWI_glue, 2, kWO_glue, 12, kWP_glue},
+  {"send", 0, kWF_Text, 2, kWI_send, 0, kWO_send, 1, kWP_send},
+  {"recv", 0, kWF_Text, 0, kWI_recv, 2, kWO_recv, 1, kWP_recv},
   {"string", 1, 0, 2, kWI_string, 1, kWO_string, 6, kWP_string},
   {"hostIn", 2, 0, 0, kWI_hostIn, 3, kWO_hostIn, 1, kWP_hostIn},
   {"vco", 1, 0, 2, kWI_vco, 1, kWO_vco, 3, kWP_vco},
@@ -504,7 +516,7 @@ static const WInfo kWInfo[] = {
   {"elements", 1, 0, 3, kWI_elements, 2, kWO_elements, 13, kWP_elements},
   {"vcf", 1, 0, 2, kWI_vcf, 1, kWO_vcf, 3, kWP_vcf},
   {"vca", 1, 0, 2, kWI_vca, 1, kWO_vca, 1, kWP_vca},
-  {"mixer", 1, 0, 16, kWI_mixer, 1, kWO_mixer, 18, kWP_mixer},
+  {"mixer", 1, kWF_Show, 16, kWI_mixer, 1, kWO_mixer, 18, kWP_mixer},
   {"eq", 0, kWF_Effect | kWF_Destroy, 2, kWI_eq, 2, kWO_eq, 8, kWP_eq},
   {"comp", 0, kWF_Effect | kWF_Show | kWF_Destroy, 2, kWI_comp, 2, kWO_comp, 5, kWP_comp},
   {"saturation", 0, kWF_Effect | kWF_Destroy, 2, kWI_saturation, 2, kWO_saturation, 4, kWP_saturation},
@@ -522,4 +534,4 @@ static const WInfo kWInfo[] = {
   {"seq", 0, kWF_PlaysNotes | kWF_Destroy, 2, kWI_seq, 3, kWO_seq, 12, kWP_seq},
   {"out", 0, 0, 2, kWI_out, 0, kWO_out, 2, kWP_out},
 };
-static const int kWInfoCount = 130;
+static const int kWInfoCount = 133;

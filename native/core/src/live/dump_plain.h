@@ -34,7 +34,7 @@ inline void event(std::string& o, const SeqEvent& e) {
     case SEV_FXP: if (e.has & SH_BAND) w.n("b", e.band); w.n("pi", e.pi); w.n("slot", e.slot); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
     case SEV_STP: w.b("all", e.flag); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); break;
     case SEV_FXC: w.s("p", e.p < 8 ? "sw" + std::to_string(e.p) : e.p == 8 ? "flx" : e.p == 9 ? "gat" : "rtg"); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
-    case SEV_CHC: w.s("p", "b" + std::to_string(e.p)); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
+    case SEV_CHC: w.s("p", e.p > 15 ? "k" + std::to_string(e.p - 15) : "b" + std::to_string(e.p)); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
     case SEV_MVOL: w.n("t", e.t); w.s("type", ty); w.n("v", e.v); break;
     case SEV_ENG: w.n("t", e.t); w.n("track", e.track); w.s("type", ty); break;   // (c and o are objects: corePlain drops them)
     case SEV_MPG: case SEV_MPB: case SEV_MAT: w.n("ii", e.ii); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;

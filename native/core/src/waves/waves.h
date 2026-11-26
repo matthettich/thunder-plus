@@ -131,6 +131,7 @@ class WavesEngine {
   void connect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort, bool fb = false);
   void disconnect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort);
   void setParam(std::string_view id, std::string_view name, double v);
+  void setKnob(int n, double v) { if (n >= 1 && n <= 8) knobs_[n] = (float)v; }   // PATCH KNOBS: the live node's k1..k8 (a float32 AudioParam value; -1 the Knob module's own Value)
   void setText(std::string_view id, std::string_view text);
   void setTransport(const Transport& t) { transport_ = t; }
   void setTransportTempo(double t) { transport_.tempo = t; }
@@ -186,6 +187,7 @@ class WavesEngine {
   int onlyBus_ = 0; bool only_ = false; bool cullDirty_ = false;
   float busesL_[kBuses * kBlock]; float busesR_[kBuses * kBlock];
   WCtx ctx_; Stats stats_; bool lastFailed_ = false;
+  float knobs_[9];   // knobs_[1..8]: the live node's k1..k8 (patch knobs, S2): KN1-KN8 as 0..1, -1 the Knob module's own Value
 };
 
 // The worklet's mix-down: every bus summed (float32 adds in bus order), then soft() on each side. L / R: n floats.
@@ -201,9 +203,9 @@ void waves_fbadd(float* dst, const float* b, double g);
 // engine runs one 128-frame block per quantum. Here an event lands on its own sample (the block is cut there) and the output is delayed by 127 samples, as U26 (docs/port/U26-NOTES.md): a block is rendered
 // only when no event not yet seen can cut it, so the output does not depend on the host's block size. The offline render of the same events (WavesLive::renderOffline) is the same loop with no queue.
 struct LiveEvent {
-  enum Kind : uint8_t { NoteOn, NoteOff, Pitch, Tempo, Level, Drive, Bus, Patch };
+  enum Kind : uint8_t { NoteOn, NoteOff, Pitch, Tempo, Level, Drive, Bus, Patch, Knob };
   Kind kind = NoteOn; uint8_t lane = 0; bool legato = false; int64_t at = 0;   // at: the engine sample the event lands on
-  double a = 0, b = 0;   // NoteOn: a pitch (semitones from C4), b velocity 0..1; Pitch: a pitch; Tempo: a bpm; Level: a dB; Drive: a 0..1; Bus: a 1..8; Patch: a the mailbox slot preparePatch gave
+  double a = 0, b = 0;   // NoteOn: a pitch (semitones from C4), b velocity 0..1; Pitch: a pitch; Tempo: a bpm; Level: a dB; Drive: a 0..1; Bus: a 1..8; Patch: a the mailbox slot preparePatch gave; Knob: a the knob 1..8 (the node's k1..k8), b its value (-1 the Knob module's own Value, else 0..1; KN1-KN8, patch knobs S2)
 };
 constexpr int kLiveLanes = 4, kLiveLatency = 127, kLiveQueue = 4096, kLivePending = 4096, kLiveSlots = 8;
 void waves_free_patch(PatchImpl* p);   // deletes a patch preparePatch / swapPatch handed out (PatchImpl is private to engine.cpp)

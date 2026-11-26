@@ -63,6 +63,7 @@ WavesEngine::WavesEngine(double sampleRate, const EngineOptions& o, Host* host)
   if (!host_) { ownHost_.reset(new Host()); host_ = ownHost_.get(); }
   if (o.hasSeed) host_->seedN = js_to_uint32(o.seed);
   std::memset(busesL_, 0, sizeof busesL_); std::memset(busesR_, 0, sizeof busesR_);
+  for (float& k : knobs_) k = -1.f;
   p_.reset(new PatchImpl(this, valid_ ? sr_ : 48000, voices_.max, host_));
 }
 WavesEngine::~WavesEngine() { p_.reset(); }
@@ -91,10 +92,12 @@ void WavesEngine::setParam(std::string_view id, std::string_view name, double v)
   ModNode* m = p_->find(std::string(id)); if (!m) return;
   const int k = wparam(*m->wi, name); if (k >= 0) { m->base[(size_t)k] = v; repin(*m); }
   if (name == "slot") cullDirty_ = true;
+  if (name == "lab" && (m->wi->type == std::string_view("send") || m->wi->type == std::string_view("recv"))) { p_->compile(); p_->sync(true); cullDirty_ = true; }   // SEND / RECEIVE: another label, another cable set
 }
 void WavesEngine::setText(std::string_view id, std::string_view text) {
   ModNode* m = p_->find(std::string(id)); if (!m || !(m->wi->flags & kWF_Text)) return;
   m->text.resize(kMaxText); const int n = toU16(text, m->text.data(), kMaxText); m->text.resize((size_t)n); m->textLen = n;
+  if (m->wi->type == std::string_view("send") || m->wi->type == std::string_view("recv")) { p_->compile(); p_->sync(true); cullDirty_ = true; }   // SEND / RECEIVE: the text is the label (lab 0)
 }
 
 // loadPatch's reading of the doc: false = refused (nothing changed). U31: the JS's own reading, odd documents included (a document that is not an object is an empty patch; `modules` / `cables` that are falsy are empty,
@@ -318,7 +321,7 @@ void WavesEngine::render(int frames) {
   PatchImpl& G = *p_; WCtx& ctx = ctx_;
   ctx.sr = sr_; ctx.block = frames; ctx.full = quality_ == Quality::Full; ctx.draft = quality_ == Quality::Draft;
   ctx.tempo = transport_.tempo != transport_.tempo ? 120 : transport_.tempo < -1e5 ? -1e5 : transport_.tempo > 1e5 ? 1e5 : transport_.tempo;   /* hostile tempo (NaN, inf, huge) held to +-1e5 BPM: a beat clock that overflows breaks the step gate's index */ ctx.lpb = transport_.lpb; ctx.ticks = transport_.ticks; ctx.playing = transport_.playing; ctx.startN = transport_.startN;
-  ctx.eng = this; ctx.notes = voices_.rows.data(); ctx.nNotes = (int)voices_.rows.size(); ctx.host = host_; ctx.fail = false;
+  ctx.knobs = knobs_; ctx.eng = this; ctx.notes = voices_.rows.data(); ctx.nNotes = (int)voices_.rows.size(); ctx.host = host_; ctx.fail = false;
   for (int k = 0; k < kBuses; k++) { ctx.busL[k] = busesL_ + k * kBlock; ctx.busR[k] = busesR_ + k * kBlock; }
   const bool meter = telemetryOn_, only = only_;
   voices_.now += frames;

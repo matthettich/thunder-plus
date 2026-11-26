@@ -439,6 +439,8 @@ class Out : public WModule {
     for (int i = 0; i < c.block; i++) { L[i] = (float)((double)L[i] + (double)io.in[0][i] * g); R[i] = (float)((double)R[i] + (double)inR[i] * g); }
   }
 };
+class SendM : public WModule { public: SendM(double, Seeds&) {} void process(const IO&, const Ctx&) override {} };   // Send / Receive (15 Nov): nothing runs, the compile step resolves the cables (graph.h srResolve)
+class RecvM : public WModule { public: RecvM(double, Seeds&) {} void process(const IO& io, const Ctx&) override { outp(io, 0).fill(kBlock, 0); outp(io, 1).fill(kBlock, 0); } };   // (a Receive with no Send is silent)
 class Scope : public WModule { public: Scope(double, Seeds&) {} void process(const IO&, const Ctx&) override {} };   // a probe: it only draws a picture (show() is not ported)
 
 // ---- String (Karplus-Strong) --------------------------------------------------------------------------------------------------------
@@ -804,7 +806,7 @@ struct Own { const char* type; std::unique_ptr<Module> (*make)(double, Seeds&); 
 #define EF(T, ID, MAP, WET, R) {T, [](double sr, Seeds& s) -> std::unique_ptr<Module> { return std::unique_ptr<Module>(new Eff(sr, s, T, ID, MAP, WET, R)); }, true}
 const Own kOwn[] = {
   {"hostIn", mk<HostIn>}, {"vco", mk<VCO>}, {"fm", mk<FM>}, {"additive", mk<Additive>}, {"noise", mk<Noise>}, {"plaits", mk<PlaitsM>}, {"elements", mk<ElementsM>}, {"vcf", mk<VCF>}, {"vca", mk<VCA>}, {"mixer", mk<Mixer>},
-  {"lfo", mk<LFO>}, {"adsr", mk<ADSR>}, {"random", mk<RandomM>}, {"atten", mk<Atten>}, {"seq", mk<Sequencer>}, {"out", mk<Out>}, {"string", mk<KString>}, {"scope", mk<Scope>}, {"expr", mk<Expression>},
+  {"lfo", mk<LFO>}, {"adsr", mk<ADSR>}, {"random", mk<RandomM>}, {"atten", mk<Atten>}, {"seq", mk<Sequencer>}, {"out", mk<Out>}, {"string", mk<KString>}, {"scope", mk<Scope>}, {"expr", mk<Expression>}, {"send", mk<SendM>}, {"recv", mk<RecvM>},
   {"pdelay", mk<PDelayM>}, {"preverb", mk<PReverbM>},
   EF("eq", 6, m_eq, -1, false), EF("comp", 7, m_comp, -1, false), EF("reverb", 8, m_reverb, 4, false), EF("delay", 9, m_delay, -1, false), EF("saturation", 2, m_sat, -1, false), EF("tape", 3, m_tape, -1, false),
   EF("chorus", 4, m_chorus, -1, false), EF("crush", 5, m_crush, -1, false), EF("rings", 0, m_rings, -1, true), EF("clouds", 1, m_clouds, -1, false), EF("beads", 10, m_beads, -1, false),

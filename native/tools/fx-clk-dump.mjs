@@ -1,6 +1,6 @@
 // U15: THE TEMPO-LOCKED EFFECTS' REFERENCE (exact, Node only): the real ThunderFx worklet (the TFX_SRC template of index.html, with FlexCore, StepGateCore,
 // RetrigCore and clkSpb cut out of index.html as the page has them) run in Node on deterministic stereo signals and a beat clock made here, for Flex (95),
-// Step gate (94) and Retrigger (93): default and other parameter sets, every Flex pattern (a sweep: FLX 01..FF and FLY 01..FF), the tests/flex.test.js
+// Step gate (94) and Retrigger (93): default and other parameter sets, every Flex pattern (a sweep: FLX 01..FF, FLY 01..FF and FLZ 01..FF), the tests/flex.test.js
 // scenarios (STARTS ON FLX / ON GAT, FLX unclamped, FLX 00, FXO on), tempo changes, the clock stopping and restarting, a clock jump (a song loop), the
 // clock param constant or absent, odd block sizes (1, 37, 128, 480, 1024), commands on block edges, a chain set / FXV mid-run, the node's sleep rules
 // (`ck`) and the three effects in series.
@@ -72,11 +72,11 @@ add({ name: 'flex_flx', clock: running(480), frames: 60000, chain: chainOf([flex
 add({ name: 'flex_fxo', clock: running(480), frames: 70000, chain: chainOf([flex({ pat: 6, on: false, mix: 255, xf: 2 })]), ops: [['sw0', t(10000), 1], ['sw0', t(25000), 0], ['sw0', t(35000), -1], ['sw0', t(45000), 1], ['flx', t(55000), 0x22]] });   // fed while off: switching on mid-bar already has the bar
 add({ name: 'flex_fxo_wait', clock: running(480), frames: 40000, chain: chainOf([flex({ pat: 5, wait: 1 })]), ops: [['sw0', t(8000), 1], ['sw0', t(20000), -1]] });   // FXO on: its own PATTERN even when it waits
 // every pattern: eight sweeps, one bar of 600 BPM (19200 frames) each, a new FLX at every bar line
-{ const groups = [[1, 64], [65, 128], [129, 192], [193, 255], [257, 320], [321, 384], [385, 448], [449, 511]];
+{ const groups = [[1, 64], [65, 128], [129, 192], [193, 255], [257, 320], [321, 384], [385, 448], [449, 511], [513, 576], [577, 640], [641, 704], [705, 767]];   // 513-767: FLZ (the third bank, chains of FLX / FLY stages)
   groups.forEach(([a, b], gi) => { const ops = []; for (let k = a; k <= b; k++) ops.push(['flx', t((k - a) * 19200), k]);
     add({ name: `flex_sweep${gi}`, sig: gi % 2 ? 'loop' : 'steady', frames: (b - a + 1) * 19200, clock: running(600, gi), chain: chainOf([flex({ pat: 1, wait: 1, mix: 255, xf: 40 })]), ops }); }); }
 // patterns that change every bar, held for eight bars (240 BPM)
-for (const [nm, k] of [['chaos', 0xf1], ['mut', 256 + 0x81], ['prob', 256 + 0x33], ['chaos2', 256 + 0xf1], ['grain', 256 + 0xd2], ['tex', 256 + 0xe1]])
+for (const [nm, k] of [['chaos', 0xf1], ['mut', 256 + 0x81], ['prob', 256 + 0x33], ['chaos2', 256 + 0xf1], ['grain', 256 + 0xd2], ['tex', 256 + 0xe1], ['flz_stutter', 512 + 0x21], ['flz_juggle', 512 + 0x2d], ['flz_echo3', 512 + 0xb3], ['flz_chaos', 512 + 0xff]])
   add({ name: `flex_bars_${nm}`, sig: 'loop', frames: 8 * 48000 * 4 / 4, clock: running(240), chain: chainOf([flex({ pat: 1, wait: 1 })]), ops: [['flx', 0, k]] });
 // tempo changes mid-run (a real change snaps and crossfades; a small one glides), the clock stopping and restarting, a jump (a song loop), a wrap past 16
 add({ name: 'flex_tempo', sig: 'loop', frames: 240000, clock: [{ at: 0, bpm: 120, beat: 0 }, { at: 48000, bpm: 150 }, { at: 96000, bpm: 90 }, { at: 144000, bpm: 91.5 }, { at: 192000, bpm: 180 }], chain: chainOf([flex({ pat: 0x2a, wait: 0, mix: 255, xf: 60 })]) });

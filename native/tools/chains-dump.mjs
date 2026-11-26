@@ -55,7 +55,7 @@ const outDir = process.argv.find((a, i) => i > 1 && !a.startsWith('--'));
   }
   const gold = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/golden/chains-modules.json'), 'utf8'));
   for (const type of Object.keys(M).sort()) {
-    const m = M[type]; if (!m || !m.process || type === 'trackIn' || type === 'chainOut') continue;
+    const m = M[type]; if (!m || !m.process || type === 'trackIn' || type === 'chainOut' || type === 'send' || type === 'recv') continue;   // send, recv: never run, the graph's compile step resolves them (as tests/chains.test.js SKIP)
     for (const [set, over] of [['default', undefined], ['stressed', stress(m)], ['switches-on', switchesOn(m)]]) {
       const r = render(type, over), arrs = [r.L, r.R, ...r.ports.map(p => r.rec[p])], h = hashOf(arrs), key = `${type} @${set}`;
       if (gold[key] !== h) throw new Error(`the JS gives ${h} for "${key}", the committed golden has ${gold[key]}`);

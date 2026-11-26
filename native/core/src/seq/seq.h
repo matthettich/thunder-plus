@@ -80,6 +80,8 @@ struct SeqOpts {
 // rest of the 12288 is theirs (1793). Past that the events are still counted (Seq::dropped, RenderStats::seqDropped), never silent.
 // 12288 x sizeof(SeqEvent) (456 B since the chop members, was 416) = 5.6 MB, allocated once with the renderer.
 constexpr int kSeqStepEvents = 12288;
+// CHC events: p 1-15 is the BYP switch b1..b15, p 16-23 (kSeqKnobBase + N) the patch knob k1..k8 of KN1-KN8 (v 0..1; -1 the patch's own). A row may add 8 more (KN1-KN8, one each, no end event): 33 x 8 = 264 within the 1793 spare.
+constexpr int kSeqKnobBase = 15;
 
 // ---- events ----------------------------------------------------------------------------------------------------------
 enum SeqEvType : uint8_t { SEV_BEAT = 0, SEV_TVA, SEV_TPN, SEV_MOUT, SEV_TVL, SEV_FXP, SEV_STP, SEV_FXC, SEV_CHC, SEV_MVOL, SEV_ENG, SEV_MPG, SEV_MPB,
@@ -97,7 +99,7 @@ enum : uint32_t { SH_CUT = 1u << 0, SH_REL = 1u << 1, SH_SLIDE = 1u << 2, SH_TW 
 //   tva / tpn / mout / tvl   t, track, v          mvol   t, v
 //   fxp    t, track, slot, pi, v, band [b] (SH_BAND)
 //   stp    t, track, flag [all]                   fxc    t, track, p (0-7: sw0-sw7, 8 flx, 9 gat, 10 rtg), v
-//   chc    t, track, p (1-15: b1-b15), v          eng    t, track, engC[5] [c: cut res dec atk rel], engO[7] [o: cut res env atk dec sus rel]
+//   chc    t, track, p (1-15: b1-b15; 16-23: knob k1-k8, v 0..1 or -1), v          eng    t, track, engC[5] [c: cut res dec atk rel], engO[7] [o: cut res env atk dec sus rel]
 //   mpg / mpb / mat   t, track, ii, v             mcc    t, track, ii, k, v, ramp
 //   off    t, track, cols (SH_COLS: bit c = note column c)
 //   note   every member from `poly` down          mod    t, track and gain / pan / wob / mul / arp / bend / vib / cut / rel when their SH_ bit is set

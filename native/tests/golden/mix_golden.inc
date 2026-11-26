@@ -60,7 +60,7 @@ static const MixGolden kBusPlanGolden[] = {
   {"bus_of_buses", 0x224f95c3e0615375ull, 0},
   {"own_in", 0xd17c1504123f5247ull, 0},
   {"send_keeps_out", 0x0e60030f0c1b9629ull, 0},
-  {"cross", 0x3728801881853557ull, 0},
+  {"cross", 0xf1a361b8fea7ae47ull, 0},
   {"bad_tracks", 0x0923950f82983d61ull, 0},
   {"odd_ids", 0xce3ff4376dd5c9f2ull, 0},
   {"twice", 0x2c711a08ed615473ull, 0},
@@ -68,7 +68,9 @@ static const MixGolden kBusPlanGolden[] = {
   {"aud_solo_bus", 0xa25cda2d2e321276ull, 0},
   {"aud_solo_src", 0x577409a250297450ull, 0},
   {"many", 0xb06114027d5efa3aull, 0},
+  {"file:BETA-TESTING-ELECTRO.thunder", 0x8642e3e4ada23eb4ull, 0},
+  {"file:BETA-TESTING-ELECTRO.thunder:all-on", 0x8642e3e4ada23eb4ull, 0},
   {"file:ELECTRO.thunder", 0xf049b637be54e1b3ull, 0},
   {"file:ELECTRO.thunder:all-on", 0xf049b637be54e1b3ull, 0},
 };
-static const int kBusPlanGoldenN = 19;
+static const int kBusPlanGoldenN = 21;

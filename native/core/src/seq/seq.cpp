@@ -48,8 +48,8 @@ constexpr int NT = kSongNT, MT = kSeqMT, NI = kNI, ROOT = 48, NOTE_OFF = 200, TI
 // FXC, in index.html's order (the numbers a phrase stores)
 enum Fxc { ARP = 0, ARC, CHA, DEL, GRV, GGR, HOP, INS, KIL, OFF, NTH, RET, REP, RND, RNL, PSL, PBN, PVB, SED, TPO, TSP, VOL, PIT, FIN, PLY, STA, PAN, TIC, WOB, FXO, FLX, GAT, RTG,
   CCA, CCB, CCC, CCD, PGM, BYP, CSL, DIR, MUT, GEN, PRB, FXS, FXV, SCA, SCG, CUT, RES, DEC, FDI, TRM, APN, TVL, TPN, STP, LPB, PDL, ONE, MPB, MAT, CND, NUD, RTV, SLC, XFD, MAC,
-  LK1, LK2, LK3, LK4, PRT, END, JMP, FLY, ATK, REL, TCH, SKP, CHD, FXC_N };
-static_assert(FXC_N == kFxcCount, "FXC has 81 commands");
+  LK1, LK2, LK3, LK4, PRT, END, JMP, FLY, ATK, REL, TCH, SKP, CHD, KN1, KN2, KN3, KN4, KN5, KN6, KN7, KN8, FLZ, FXC_N };   // KN1-KN8 (patch knobs, build 663) and FLZ (build 672) are at the end, as in index.html
+static_assert(FXC_N == kFxcCount, "FXC has 90 commands");
 
 inline bool isSigned(int c) { return c == PBN || c == TSP || c == PIT || c == FIN || c == NUD || c == RTV; }
 inline int rstep(int c) {   // RSTEP[c] || 17
@@ -121,8 +121,8 @@ std::string idKey(Json v) {   // a Map key (SameValueZero) as text
   return "o" + json_write(v);
 }
 
-enum Kind { K_VOL = 0, K_PAN, K_CUT, K_RES, K_DEC, K_TCH, K_ENV, K_ATK, K_SUS, K_REL, K_FX };
-const char* const KIND_NAME[11] = {"vol", "pan", "cut", "res", "dec", "tch", "env", "atk", "sus", "rel", "fx"};
+enum Kind { K_VOL = 0, K_PAN, K_CUT, K_RES, K_DEC, K_TCH, K_ENV, K_ATK, K_SUS, K_REL, K_FX, K_KN };
+const char* const KIND_NAME[12] = {"vol", "pan", "cut", "res", "dec", "tch", "env", "atk", "sus", "rel", "fx", "kn"};
 const int ENGK[7] = {K_CUT, K_RES, K_ENV, K_ATK, K_DEC, K_SUS, K_REL};   // ENGK = ['cut', 'res', 'env', 'atk', 'dec', 'sus', 'rel']
 inline int engIdx(int kind) { for (int i = 0; i < 7; i++) if (ENGK[i] == kind) return i; return -1; }
 inline int pnoIdx(int kind) { return kind == K_CUT ? 0 : kind == K_RES ? 1 : kind == K_DEC ? 2 : kind == K_TCH ? 3 : -1; }
@@ -201,15 +201,17 @@ void Seq::fresh(Tr& T) {
 // ---- construction ----------------------------------------------------------------------------------------------------
 void Seq::parseId(TgtId& g) const {   // tgtParse and tgtOk
   std::vector<std::string_view> a; { std::string_view s = g.s; size_t p0 = 0; for (;;) { const size_t q = s.find(':', p0); if (q == std::string_view::npos) { a.push_back(s.substr(p0)); break; } a.push_back(s.substr(p0, q - p0)); p0 = q + 1; } }
-  g.kind = -1; for (int k = 0; k < 11; k++) if (a[0] == KIND_NAME[k]) g.kind = k;
+  g.kind = -1; for (int k = 0; k < 12; k++) if (a[0] == KIND_NAME[k]) g.kind = k;
   g.t = a.size() > 1 ? strNum(a[1]) : kNaN; g.sl = a.size() > 2 ? strNum(a[2]) : -1; g.p = a.size() > 3 ? strNum(a[3]) : -1; g.hasB = a.size() > 4; g.b = g.hasB ? strNum(a[4]) : 0;
-  g.ok = g.kind >= 0 && (g.kind == K_FX ? (a.size() == 4 || a.size() == 5) : a.size() == 2); for (size_t i = 1; g.ok && i < a.size(); i++) g.ok = allDigits(a[i]);
+  g.ok = g.kind >= 0 && (g.kind == K_FX ? (a.size() == 4 || a.size() == 5) : g.kind == K_KN ? a.size() == 3 : a.size() == 2); for (size_t i = 1; g.ok && i < a.size(); i++) g.ok = allDigits(a[i]);
+  if (g.ok && g.kind == K_KN) g.ok = a[2].size() == 1 && a[2][0] >= '1' && a[2][0] <= '8';   // tgtOk: ^kn:\d+:[1-8]$
   g.tch4 = g.s.compare(0, 4, "tch:") == 0;
 }
 double Seq::tgtOwnOf(const TgtId& g, bool* fxOk) const {   // tgtOwn (and tgtFx: *fxOk)
   *fxOk = false;
   if (g.kind == K_VOL) return g.t < NT ? S_.mix[(int)g.t].vol : S_.mout;
   if (g.kind == K_PAN) return g.t < NT ? S_.mix[(int)g.t].pan : 128;
+  if (g.kind == K_KN) return 128;   // PATCH KNOBS S3: the page can't see the Knob's own Value: an LFO swings round the middle
   if (g.kind == K_FX) {
     const Json A = g.t >= MT ? S_.mfx : S_.tfx.at((size_t)g.t), f = A.isArr() && g.sl < 4294967295.0 ? A.at((size_t)g.sl) : Json();   // (g.t < MT here: a small index)
     if (!truthy(f)) return 0;
@@ -620,6 +622,7 @@ void Seq::tgtEvs(Ctx& c, int id, bool own, double v, double at) {
     else if (g.t == MT) { SeqEvent* e = push(c); e->type = SEV_MOUT; e->t = at; e->track = MT; e->v = own ? g.own : v; }
     return; }
   if (g.kind == K_PAN) { if (g.t < NT) { SeqEvent* e = push(c); e->type = SEV_TPN; e->t = at; e->track = (int)g.t; e->v = own ? S_.mix[(int)g.t].pan : v; } return; }
+  if (g.kind == K_KN) { if (g.t < NT && g.sl >= 1 && g.sl <= 8) { SeqEvent* e = push(c); e->type = SEV_CHC; e->t = at; e->track = (int)g.t; e->p = kSeqKnobBase + (int)g.sl; e->v = own ? -1 : cd(v, 0, 255) / 255; } return; }   // PATCH KNOBS S3: as KN1-KN8 (own: the Knob's Value again)
   if (g.kind == K_FX && g.fxOk) { SeqEvent* e = push(c); e->type = SEV_FXP; e->t = at; e->track = (int)std::min(g.t, 2147483647.0); e->slot = (int)std::min(g.sl, 2147483647.0); e->pi = (int)std::min(g.p, 2147483647.0);
     if (g.hasB) { e->has |= SH_BAND; e->band = g.b; } e->v = own ? g.own : v; }
 }
@@ -639,7 +642,7 @@ void Seq::slotWake(Ctx& c, int t, int need, bool on, double sw, double at2) {
   if (!on) return;
   for (int k = 0; k < FXSLOTS; k++) if (need_[t][k] == need) { SeqEvent* e = push(c); e->type = SEV_FXC; e->t = at2; e->track = t; e->p = k; e->v = sw; }
 }
-// fxEvs(t, fx, at, line): FXO / FLX / FLY / GAT / RTG, the master column's VOL, BYP
+// fxEvs(t, fx, at, line): FXO / FLX / FLY / FLZ / GAT / RTG, the master column's VOL, BYP, KN1-KN8
 void Seq::fxEvs(Ctx& c, int t, const Fx& fx, double at, double line) {
   const auto fxc = [&](double tt, int p, double v) { SeqEvent* e = push(c); e->type = SEV_FXC; e->t = tt; e->track = t; e->p = p; e->v = v; };
   if (fx.H(FXO)) { const int X = fx[FXO] >> 4, Y = fx[FXO] & 15;
@@ -647,6 +650,7 @@ void Seq::fxEvs(Ctx& c, int t, const Fx& fx, double at, double line) {
     else if (X <= FXSLOTS || X == 9) for (int k = X == 9 ? 0 : X - 1; k < (X == 9 ? FXSLOTS : X); k++) { fxc(at, k, Y ? 1 : 0); if (Y >= 2) fxc(at + Y * line, k, -1); } }
   if (fx.H(FLX)) { fxc(at, 8, flxOld_ ? std::min(16, fx[FLX]) : std::min(255, fx[FLX])); slotWake(c, t, 1, fx[FLX] > 0, -1, at); }
   if (fx.H(FLY)) { fxc(at, 8, fx[FLY] ? 256 + fx[FLY] : 0); slotWake(c, t, 1, fx[FLY] > 0, -1, at); }
+  if (fx.H(FLZ)) { fxc(at, 8, fx[FLZ] ? 512 + fx[FLZ] : 0); slotWake(c, t, 1, fx[FLZ] > 0, -1, at); }   // FLZ (23 Nov): the third bank, 512 + v
   if (fx.H(GAT)) { fxc(at, 9, fx[GAT] == 0 ? 0 : fx[GAT] >= 16 ? 16 : fx[GAT]); slotWake(c, t, 2, fx[GAT] != 0, -1, at); }
   if (fx.H(RTG)) { const int X = fx[RTG] >> 4, Y = fx[RTG] & 15; fxc(at, 10, X ? std::min(8, X) : 0); slotWake(c, t, 3, true, X ? 1 : -1, at);
     if (X && Y) { fxc(at + Y * line, 10, -1); slotWake(c, t, 3, true, -1, at + Y * line); } }
@@ -654,6 +658,8 @@ void Seq::fxEvs(Ctx& c, int t, const Fx& fx, double at, double line) {
   if (fx.H(BYP) && t < MT) { const int X = fx[BYP] >> 4, Y = fx[BYP] & 15;
     for (int k = X ? X : 1; k <= (X ? X : 15); k++) { SeqEvent* e = push(c); e->type = SEV_CHC; e->t = at; e->track = t; e->p = k; e->v = Y >= 2 ? 2 : Y;
       if (Y >= 2) { SeqEvent* e2 = push(c); e2->type = SEV_CHC; e2->t = at + Y * line; e2->track = t; e2->p = k; e2->v = -1; } } }
+  // KN1-KN8 (22 Nov, patch knobs): knob N of the track's chains patch, 00-FF as 0-1 (chc p = kSeqKnobBase + N; STOP hands the Knob's own Value back)
+  if (t < MT) for (int k = 1; k <= 8; k++) if (fx.H(KN1 + k - 1)) { SeqEvent* e = push(c); e->type = SEV_CHC; e->t = at; e->track = t; e->p = kSeqKnobBase + k; e->v = fx[KN1 + k - 1] / 255.0; }
 }
 // engEmit(u, t0, dur, ne, pts): the `eng` event of track u (pts: the LFO's points per ENGK kind, ptsHas: which kinds have them; null: one point)
 void Seq::engEmit(Ctx& c, int u, double t0, double dur, int ne, const double (*pts)[4], unsigned ptsHas) {
@@ -784,7 +790,7 @@ int Seq::step(SeqEvent* evs, int cap, SeqStep* out) {
         }
         T.hasLast = true; T.lastC = cm; T.lastV = v; cmds[nc++] = Cmd{cm, v};
       }
-      Fx fx; for (int i = 0; i < nc; i++) { const Cmd& q = cmds[i]; if (q.c == FLX) fx.has[FLY] = false; else if (q.c == FLY) fx.has[FLX] = false; fx.has[q.c] = true; fx.v[q.c] = q.v; }
+      Fx fx; for (int i = 0; i < nc; i++) { const Cmd& q = cmds[i]; if (q.c == FLX) { fx.has[FLY] = false; fx.has[FLZ] = false; } else if (q.c == FLY) { fx.has[FLX] = false; fx.has[FLZ] = false; } else if (q.c == FLZ) { fx.has[FLX] = false; fx.has[FLY] = false; } fx.has[q.c] = true; fx.v[q.c] = q.v; }
       if (fx.H(TPO) && fx[TPO] >= 40) nb = fx[TPO];
       if (fx.H(GRV)) { T.hasGrv = fx[GRV] != 0; T.grv[0] = (fx[GRV] >> 4) ? (fx[GRV] >> 4) : tks_; T.grv[1] = (fx[GRV] & 15) ? (fx[GRV] & 15) : tks_; }
       if (fx.H(GGR)) { nHasGrv = fx[GGR] != 0; ngrv[0] = (fx[GGR] >> 4) ? (fx[GGR] >> 4) : tks_; ngrv[1] = (fx[GGR] & 15) ? (fx[GGR] & 15) : tks_; }

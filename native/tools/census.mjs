@@ -11,7 +11,7 @@ import path from 'node:path';
 // index.html line ~18016 (const FXC). A command's code in a phrase row is its INDEX in this list (-1 = none). The test
 // checks this list against index.html so it cannot drift silently.
 export const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8','FLZ'];
 const FX0 = 6, RW = 12;   // a phrase row: 4 notes, volume, instrument, then 3 (command, value) pairs
 
 const CATS = ['engines', 'layerTypes', 'trackFx', 'masterFx', 'pumpTypes', 'chainsModules', 'wavesModules', 'commands', 'masteringStages', 'trackFxOn', 'masterFxOn', 'raw'];

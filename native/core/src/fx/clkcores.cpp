@@ -27,7 +27,7 @@ inline double rdf(const float* b, int N, double i) { return i >= 0 && i < N ? (d
 
 // The pattern table (FlexCore.SPEC()): made once, on the first Flex made (the control thread), never changed.
 const FlexPat* flexTable() {
-  static FlexPat* T = [] { FlexPat* t = new FlexPat[512]; flexSpecFill(t); return t; }();
+  static FlexPat* T = [] { FlexPat* t = new FlexPat[768]; flexSpecFill(t); return t; }();
   return T;
 }
 
@@ -84,9 +84,9 @@ FlexCore::FlexCore(double sr) : sr_(sr), N_((int)std::ceil(sr * 13)), c_(sr), sp
   bL_.reset(new float[(size_t)N_]()); bR_.reset(new float[(size_t)N_]());
 }
 
-// 17-255 (and FLY 257-511): sets pg_ (gain), plp_ / php_ (filter, 0-1; 1 / 0 = open), pcr_ / pbt_ (hold, bits; 1 / 0 = clean); returns the read position
+// 17-255 (FLY 257-511, FLZ 513-767): sets pg_ (gain), plp_ / php_ (filter, 0-1; 1 / 0 = open), pcr_ / pbt_ (hold, bits; 1 / 0 = clean); returns the read position
 double FlexCore::ext(int k, double p, double bar) {
-  const FlexPat* op = k >= 0 && k < 512 && T_[k].f ? &T_[k] : nullptr;   // (this.T || SPEC())[k]: undefined outside the table
+  const FlexPat* op = k >= 0 && k < 768 && T_[k].f ? &T_[k] : nullptr;   // (this.T || SPEC())[k]: undefined outside the table
   double r = p, g = 1, lp = 1, hp = 0, cr = 1, bt = 0;
   if (op) {
     const FlexPat& o = *op;
@@ -131,7 +131,7 @@ double FlexCore::ext(int k, double p, double bar) {
           r = src * G + (rv ? G - u : u); } } break;
       case PK_swing: { const double C = o.C, c = cs(p, C), u = (p - c) / C, h = 0.5 + o.a;
         r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
-      case PK_tup: { const double C = o.C, c = cs(p, C), u = (p - c) / C, j = js_min(o.q - 1, std::floor(u * o.q + 1e-9)), sj = o.q == 5 ? flex_tup_slot(j) : j;   // FLX CHECK 2: the downbeat doubles and 2-4 land late, as a quintuplet does
+      case PK_tup: { const double C = o.C, c = cs(p, C), u = (p - c) / C, j = js_max(0, js_min(o.q - 1, std::floor(u * o.q + 1e-9))), sj = o.q == 5 ? flex_tup_slot(j) : j;   // FLX CHECK 2: the downbeat doubles and 2-4 land late, as a quintuplet does
         r = c + C * (sj / 4 + (u - j / o.q)); } break;
       case PK_drunk: { const double s = std::floor(p * 4); r = p - hh((double)(i32(bar) & 3), s, 41) * 0.06; } break;
       case PK_lag: r = mod(p, 1) >= 0.5 ? p - 1.0 / 16 : p; break;
@@ -201,6 +201,14 @@ double FlexCore::ext(int k, double p, double bar) {
           else if (opn == 5) g = u < G / 2 ? 1 : 0;             // gate
           else if (opn == 6) { cr = 6 + std::floor(h3 * 16); bt = 5; }   // crush
           else r = c0 + mod(u, G / 3); } } break;               // ratchet
+      // ===== FLZ (23 Nov): k 513-767, a chain of FLX / FLY stages (flexspec.inc: S). Gains multiply; filters take the closest (lowest low-pass, highest high-pass); crush takes the strongest hold and the fewest bits.
+      // Stage ks below 17 are not allowed in a chain. Each stage sees its input as a phase in [0, 4) of the right bar, and the result moves back by the same bars; gains are never negative (CodeRabbit on #297).
+      case PK_chain: { double x = p;
+        for (int i = 0; i < o.nS; i++) { const double sk = o.S[i]; if (!(sk > 16 && sk < 512)) continue;
+          const double sh = std::floor(x / 4 + 1e-9) * 4, xp = js_max(0, x - sh);
+          x = ext((int)sk, xp, bar + js_round(sh / 4)) + sh; g *= js_max(0, pg_); if (plp_ < lp) lp = plp_; if (php_ > hp) hp = php_; if (pcr_ > cr) cr = pcr_;
+          if (pbt_ > 0 && (bt == 0 || pbt_ < bt)) bt = pbt_; }
+        r = x; } break;
       default: break;
     }
   }
@@ -238,7 +246,7 @@ double FlexCore::pat(int k, double p, double bar) {
 
 // 4-point Hermite read (half speed, tape stops and scratches stay clean on cymbals); linear within 2 samples of now, where the Hermite's far point would still be unwritten.
 double FlexCore::rd(const float* b, int w, double D) const {
-  const int N = N_; double x = w - D; if (x < 0) x += N;
+  const int N = N_; double x = w - D; if (x < 0) x += N; if (x >= N) x = 0;   /* FLX CHECK 3 (18 Nov): w 0 with a D of 1e-12 made N - 1e-12 = N exactly: b[N] undefined, one NaN sample */
   const double i = std::floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1;
   if (D < 2) return rdf(b, N, i) + (rdf(b, N, j) - rdf(b, N, i)) * f;
   const double y0 = rdf(b, N, truthy(i) ? i - 1 : N - 1), y1 = rdf(b, N, i), y2 = rdf(b, N, j), y3 = rdf(b, N, j + 1 >= N ? 0 : j + 1);
@@ -255,7 +263,7 @@ void FlexCore::run(float* L, float* R, int n, const FlexDp* dp, const ClkTr& tr)
   const int N = N_; float* bL = bL_.get(); float* bR = bR_.get();
   const float* bp = tr.bp; const double spb = clk_spb(c_, bp, tr.bpn, n); const bool live = bp && tr.bpn > 1;
   // WAITS FOR ITS COMMAND (owner, 3 Nov): STARTS ON FLX (dp.wait) plays nothing until an FLX sets a pattern or an FXO switches the slot on (tr.sw).
-  const int k = !dp ? 0 : tr.flx >= 0 ? (int)js_min(511, js_round(tr.flx)) : truthy(dp->wait) && !(tr.sw > 0.5) ? 0 : i32(dp->pat);
+  const int k = !dp ? 0 : tr.flx >= 0 ? (int)js_min(767, js_round(tr.flx)) : truthy(dp->wait) && !(tr.sw > 0.5) ? 0 : i32(dp->pat);
   const double mix = dp ? dp->mix : 0, fsk = 1 - js_exp(-1 / (sr_ * 0.015)), nyq = sr_ * 0.45;
   double* fs = fs_;
   const double XF = js_max(16, js_round(sr_ * (dp ? dp->xf : 5) / 1000)), gk = 1 - js_exp(-1 / (sr_ * 0.002));

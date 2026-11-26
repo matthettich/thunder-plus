@@ -159,6 +159,9 @@ static const ParamDef kCP_xfade[] = {{"mix", 0.5, 0.0, 1.0, 0.01}, {"curve", 0.0
 static const PortDef kCI_const[] = {{nullptr, nullptr}};
 static const PortDef kCO_const[] = {{"out", "cv"}};
 static const ParamDef kCP_const[] = {{"value", 0.0, -1.0, 1.0, 0.01}, {"fine", 0.0, -0.01, 0.01, 0.0001}};
+static const PortDef kCI_knob[] = {{nullptr, nullptr}};
+static const PortDef kCO_knob[] = {{"out", "cv"}};
+static const ParamDef kCP_knob[] = {{"n", 1.0, 1.0, 8.0, 1.0}, {"value", 0.0, 0.0, 1.0, 0.01}, {"min", 0.0, -1.0, 1.0, 0.01}, {"max", 1.0, -1.0, 1.0, 0.01}};
 static const PortDef kCI_steps[] = {{"clock", "gate"}, {"reset", "gate"}};
 static const PortDef kCO_steps[] = {{"out", "cv"}, {"gate", "gate"}};
 static const ParamDef kCP_steps[] = {{"div", 3.0, 0.0, 9.0, 1.0}, {"len", 8.0, 1.0, 8.0, 1.0}, {"glide", 0.0, 0.0, 1.0, 0.01}, {"depth", 1.0, 0.0, 1.0, 0.01}, {"s1", 0.0, -1.0, 1.0, 0.01}, {"s2", 0.0, -1.0, 1.0, 0.01}, {"s3", 0.0, -1.0, 1.0, 0.01}, {"s4", 0.0, -1.0, 1.0, 0.01}, {"s5", 0.0, -1.0, 1.0, 0.01}, {"s6", 0.0, -1.0, 1.0, 0.01}, {"s7", 0.0, -1.0, 1.0, 0.01}, {"s8", 0.0, -1.0, 1.0, 0.01}};
@@ -309,6 +312,12 @@ static const ParamDef kCP_buscomp[] = {{"thresh", -12.0, -40.0, 0.0, 0.1}, {"rat
 static const PortDef kCI_glue[] = {{"in", "audio"}, {"inR", "audio"}, {"sc", "audio"}};
 static const PortDef kCO_glue[] = {{"out", "audio"}, {"outR", "audio"}};
 static const ParamDef kCP_glue[] = {{"thresh", -15.0, -40.0, 0.0, 0.1}, {"ratio", 2.0, 1.0, 10.0, 0.1}, {"attack", 0.01, 0.0001, 0.03, 0.0001}, {"release", 0.3, 0.05, 1.5, 0.01}, {"auto", 1.0, 0.0, 1.0, 1.0}, {"knee", 8.0, 0.0, 18.0, 0.1}, {"range", 20.0, 1.0, 40.0, 0.5}, {"makeup", 0.0, 0.0, 20.0, 0.1}, {"clip", 0.0, 0.0, 1.0, 1.0}, {"schpf", 0.0, 0.0, 4.0, 1.0}, {"sck", 0.0, 0.0, 136.0, 1.0}, {"mix", 1.0, 0.0, 1.0, 0.01}};
+static const PortDef kCI_send[] = {{"in", "audio"}, {"inR", "audio"}};
+static const PortDef kCO_send[] = {{nullptr, nullptr}};
+static const ParamDef kCP_send[] = {{"lab", 1.0, 0.0, 8.0, 1.0}};
+static const PortDef kCI_recv[] = {{nullptr, nullptr}};
+static const PortDef kCO_recv[] = {{"out", "audio"}, {"outR", "audio"}};
+static const ParamDef kCP_recv[] = {{"lab", 1.0, 0.0, 8.0, 1.0}};
 static const PortDef kCI_ptube[] = {{"in", "audio"}, {"inR", "audio"}};
 static const PortDef kCO_ptube[] = {{"out", "audio"}, {"outR", "audio"}};
 static const ParamDef kCP_ptube[] = {{"mode", 1.0, 0.0, 5.0, 1.0}, {"drive", 12.0, 0.0, 36.0, 0.036}, {"bias", 0.0, -100.0, 100.0, 0.2}, {"sag", 25.0, 0.0, 100.0, 0.1}, {"voltage", 100.0, 0.0, 100.0, 0.1}, {"stages", 1.0, 1.0, 3.0, 1.0}, {"focus", 0.0, 0.0, 3.0, 1.0}, {"low_cut", 0.0, 0.0, 1.0, 0.001}, {"tone", 0.0, -100.0, 100.0, 0.2}, {"high_cut", 1.0, 0.0, 1.0, 0.001}, {"mix", 100.0, 0.0, 100.0, 0.1}, {"out_gain", 0.0, -24.0, 24.0, 0.048}, {"auto_gain", 1.0, 0.0, 1.0, 1.0}, {"oversampling", 2.0, 0.0, 3.0, 1.0}};
@@ -489,6 +498,7 @@ static const WInfo kCInfo[] = {
   {"switch", 1, 0, 3, kCI_switch, 1, kCO_switch, 2, kCP_switch},
   {"xfade", 1, 0, 3, kCI_xfade, 1, kCO_xfade, 2, kCP_xfade},
   {"const", 1, 0, 0, kCI_const, 1, kCO_const, 2, kCP_const},
+  {"knob", 1, 0, 0, kCI_knob, 1, kCO_knob, 4, kCP_knob},
   {"steps", 0, 0, 2, kCI_steps, 2, kCO_steps, 12, kCP_steps},
   {"clock", 0, 0, 1, kCI_clock, 3, kCO_clock, 4, kCP_clock},
   {"clkmul", 1, 0, 2, kCI_clkmul, 1, kCO_clkmul, 2, kCP_clkmul},
@@ -539,6 +549,8 @@ static const WInfo kCInfo[] = {
   {"pump", 0, 0, 2, kCI_pump, 2, kCO_pump, 4, kCP_pump},
   {"buscomp", 0, kWF_Show, 3, kCI_buscomp, 2, kCO_buscomp, 8, kCP_buscomp},
   {"glue", 0, kWF_Show, 3, kCI_glue, 2, kCO_glue, 12, kCP_glue},
+  {"send", 0, kWF_Text, 2, kCI_send, 0, kCO_send, 1, kCP_send},
+  {"recv", 0, kWF_Text, 0, kCI_recv, 2, kCO_recv, 1, kCP_recv},
   {"ptube", 0, kWF_Effect | kWF_Destroy, 2, kCI_ptube, 2, kCO_ptube, 14, kCP_ptube},
   {"psnap", 0, kWF_Effect | kWF_Destroy, 2, kCI_psnap, 2, kCO_psnap, 13, kCP_psnap},
   {"pgate", 0, kWF_Effect | kWF_Destroy, 2, kCI_pgate, 2, kCO_pgate, 47, kCP_pgate},
@@ -557,8 +569,8 @@ static const WInfo kCInfo[] = {
   {"morph", 0, kWF_Show, 4, kCI_morph, 2, kCO_morph, 7, kCP_morph},
   {"vcf", 0, 0, 3, kCI_vcf, 2, kCO_vcf, 3, kCP_vcf},
   {"vca", 0, 0, 3, kCI_vca, 2, kCO_vca, 1, kCP_vca},
-  {"mixer", 0, 0, 16, kCI_mixer, 1, kCO_mixer, 18, kCP_mixer},
-  {"smixer", 0, 0, 32, kCI_smixer, 2, kCO_smixer, 34, kCP_smixer},
+  {"mixer", 0, kWF_Show, 16, kCI_mixer, 1, kCO_mixer, 18, kCP_mixer},
+  {"smixer", 0, kWF_Show, 32, kCI_smixer, 2, kCO_smixer, 34, kCP_smixer},
   {"eq", 0, kWF_Effect | kWF_Destroy, 2, kCI_eq, 2, kCO_eq, 8, kCP_eq},
   {"comp", 0, kWF_Effect | kWF_Show | kWF_Destroy, 2, kCI_comp, 2, kCO_comp, 5, kCP_comp},
   {"saturation", 0, kWF_Effect | kWF_Destroy, 2, kCI_saturation, 2, kCO_saturation, 4, kCP_saturation},
@@ -582,4 +594,4 @@ static const WInfo kCInfo[] = {
   {"resample", 0, 0, 2, kCI_resample, 2, kCO_resample, 4, kCP_resample},
   {"chainOut", 0, 0, 2, kCI_chainOut, 0, kCO_chainOut, 2, kCP_chainOut},
 };
-static const int kCInfoCount = 145;
+static const int kCInfoCount = 148;

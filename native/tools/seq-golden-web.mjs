@@ -121,7 +121,7 @@ function diffOps(a, b) {
 const ph = (S, row, t) => { const c = S.chains[S.song[row][t]]; return c ? c[0][0] : -1; };   // the first phrase of the chain at (row, track)
 const FXN = n => ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
   'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC',
-  'LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD'].indexOf(n);
+  'LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8','FLZ'].indexOf(n);
 const setCmd = (S, pid, y, col, name, v) => { const r = S.phrases[pid][y]; r[6 + 2 * col] = FXN(name); r[7 + 2 * col] = v; };
 const setNote = (S, pid, y, n) => { S.phrases[pid][y][0] = n; if (S.phrases[pid][y][5] < 0) S.phrases[pid][y][5] = 0; };
 // variants of ELECTRO (base edits)

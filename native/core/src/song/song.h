@@ -27,8 +27,8 @@ constexpr int kRW = 12;              // ints per phrase row: 4 note columns, vol
 constexpr int kFX0 = 6;              // first command column
 constexpr int kChainRows = 16;       // entries per chain: [phrase, transpose]
 constexpr int kNI = 64;              // instruments
-constexpr int kFxcCount = 81;        // FXC.length: a command index at or past it is dropped
-constexpr int kKnownBuild = 616;     // BUILD of the page this core was ported from
+constexpr int kFxcCount = 90;        // FXC.length: a command index at or past it is dropped
+constexpr int kKnownBuild = 684;     // BUILD of the page this core was ported from
 
 struct SongMix { int vol = 224, trim = 128, pan = 128; bool mute = false, solo = false; int col = 0; };
 

@@ -39,6 +39,7 @@ ChainsEngine::ChainsEngine(double sampleRate, const EngineOptions& o, Host* host
   if (!host_) { ownHost_.reset(new Host()); host_ = ownHost_.get(); }
   busesL_.reset(new float[(size_t)kChannels * kBlock]()); busesR_.reset(new float[(size_t)kChannels * kBlock]());
   for (double& b : bsw_) b = -1;
+  for (float& k : knobs_) k = -1.f;
   busMap_.reserve(kMaxFeeds);   // C1: setBusMap is called from the audio side by ChainsHost::commit: it must never allocate (and never holds more than kMaxFeeds: the node reads no more)
   for (int16_t& t : tapMap_) t = -1;
   takes_.reset(new TakeQ());
@@ -51,7 +52,7 @@ void ChainsEngine::bindCtx() {
   c.sr = valid_ ? sr_ : 48000; c.key = &ChainsEngine::keyCb; c.keyUser = this; c.host = host_;
   c.busesL = busesL_.get(); c.busesR = busesR_.get(); c.bw = bw_; c.bwl = bwl_; c.nbw = &nbw_;
   for (int n = 0; n < kSends; n++) c.sendOut[n] = sendOut_ + (size_t)n * kBlock;
-  c.zero = zero_; c.takeUser = this;
+  c.zero = zero_; c.takeUser = this; c.knobs = knobs_;
   c.onTake = [](void* user, const ResampleTake& t) { ChainsEngine* e = static_cast<ChainsEngine*>(user); if (!e->takes_->push(t)) { e->stats_.droppedTakes++; resample_release(t); } };   /* queue full: the buffers are marked free in place (Resample::release only clears a flag): nothing is freed here */
 }
 void ChainsEngine::dispose() { p_.reset(newPatch(valid_ ? sr_ : 48000, host_)); curA_.store(p_.get(), std::memory_order_release); }
@@ -135,6 +136,7 @@ void ChainsEngine::setParam(std::string_view id, std::string_view name, double v
   ModNode* m = nullptr; for (auto& up : p_->mods) if (up->id == id) { m = up.get(); break; }   // (a linear search: no std::string made, so this allocates nothing on the audio thread)
   if (!m) return;
   const int k = waves::wparam(*m->wi, name); if (k >= 0) { m->base[(size_t)k] = v; waves::detail::repin(*m); }
+  if (name == "lab" && (m->wi->type == std::string_view("send") || m->wi->type == std::string_view("recv"))) { p_->compile(); p_->sync(true); prepareDerived(*p_); }   // SEND / RECEIVE: another label, another cable set (the JS recompiles; this allocates on the calling thread)
   if (name == "_byp") m->bypP = v;
   else if (name == "_bn") { m->bnP = v; prepareDerived(*p_); }
   else if (name == "track") prepareDerived(*p_);
@@ -142,6 +144,7 @@ void ChainsEngine::setParam(std::string_view id, std::string_view name, double v
 void ChainsEngine::setText(std::string_view id, std::string_view text) {
   ModNode* m = p_->find(std::string(id)); if (!m || !(m->wi->flags & waves::kWF_Text)) return;
   m->text.resize(waves::kMaxText); const int n = waves::detail::toU16(text, m->text.data(), waves::kMaxText); m->text.resize((size_t)n); m->textLen = n;
+  if (m->wi->type == std::string_view("send") || m->wi->type == std::string_view("recv")) { p_->compile(); p_->sync(true); prepareDerived(*p_); }   // SEND / RECEIVE: the text is the label (lab 0)
 }
 void ChainsEngine::setTransport(const Transport& t) { const bool was = transport_.playing; transport_ = t; if (!was && transport_.playing) transport_.startN = (transport_.startN != transport_.startN || transport_.startN == 0 ? 0 : transport_.startN) + 1; }
 void ChainsEngine::setTelemetry(bool on) { telemetryOn_ = on; }
@@ -350,6 +353,7 @@ bool ChainsNode::p1(const NodeIn& in, NodeOut& out, int /*n*/, int a, int len) {
   ChainsEngine& e = eng_;
   auto off = [&](const float* p) -> const float* { return p ? p + a : nullptr; };
   if (in.byp) for (int k = 1; k <= kBypSwitches; k++) e.setBypassSwitch(k, in.byp[k - 1]);
+  if (in.kn) for (int k = 1; k <= kKnobs; k++) e.setBypassSwitch(kBypSwitches + k, in.kn[k - 1]);   // PATCH KNOBS: KN1-KN8 (the node's k1..k8, read each block)
   // this track's input into the engine's per-track buffers (the slots filled last block are cleared first)
   for (int j = 0; j < ntw_; j++) { std::memset(tmpL_.get() + (size_t)tw_[j] * kBlock, 0, sizeof(float) * kBlock); std::memset(tmpR_.get() + (size_t)tw_[j] * kBlock, 0, sizeof(float) * kBlock); }
   ntw_ = 0;
