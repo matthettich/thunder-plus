@@ -8762,7 +8762,7 @@ let ctx = null, master = null;
    Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
 const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
 const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
-  s.src = 'thunder-core-client.js?v=5';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.src = 'thunder-core-client.js?v=6';   // bump with the ?v= in sw.js OPTIONAL when the file changes
   s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}, ncSongHost())); } catch(e){ tpLog('native core client: attach failed', e); } };
   s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
   document.head.appendChild(s); };
@@ -24990,6 +24990,8 @@ const ncSongHost = () => ({
   restore:async (text, name) => { try { await backupNow(true); } catch(e){} return await loadProjText(text, name, {dirty:true}); },
   // M5 (effect meters): the page's METERS rule, and the page's own fxDynIn for the shell's fx.dyn reports
   meterHold:() => meterHold(), fxDynIn:(n, list) => fxDynIn(n, list),
+  // M5 (chains meters): the tracks the visible chains screen shows (Track In / Chain Out modules' tracks), and the shell's ch.lvl peaks for the screen's meters
+  chWant:() => chNativeWant(), chLvlIn:(t, i, o) => chNativeIn(t, i, o),
   // The shell's engine cannot play this PLAY: the old engine does, from the top of tStart (o._nf keeps the native engine from being asked again)
   fallback:(mode, o) => { try { tStop(true); } catch(e){} tStart(mode, Object.assign({}, o, {_nf:true})); },
   // The shell stopped (a song's end, a fatal error, headphones pulled): the transport shows stopped
@@ -27290,7 +27292,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 681;
+const BUILD = 682;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -35990,8 +35992,24 @@ function cpuMeter(){
 idleTick(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500, () => view !== 'tracker' && !document.hidden, 2000);   // BATTERY: the tracker's own frame loop updates it there
 // chains screen meters: sample each routed track's chains return and push it into the frame.
 // Runs on its own timer (the tracker frame loop is off while the chains screen is open).
+/* NATIVE CORE (M5, chains meters): while the shell's engine plays, the screen's levels come from its ch.lvl (the client calls chNativeIn), for the tracks chNativeWant names; a reading older than 400 ms shows silent (as the FX bar's). */
+const ncChLv = {};
+function chNativeWant(){
+  if (!NCON() || !tp.nc || view !== 'chains' || document.hidden) return [];
+  const o = new Set();
+  for (const m of ((S.chainPatch && S.chainPatch.modules) || [])) if (m && (m.type === 'chainOut' || m.type === 'trackIn')){ const k = int(m.params && m.params.track, 1); if (k >= 1 && k <= NT && k <= 32) o.add(k - 1); }
+  return [...o];
+}
+function chNativeIn(t, i, o){ ncChLv[t] = {i, o, t:performance.now()}; }
+function chNativeFeed(){
+  const out = new Array(NT).fill(0), inp = new Array(NT).fill(0), now = performance.now();
+  for (const k in ncChLv){ const v = ncChLv[k]; if (k < NT && now - v.t <= 400){ out[k] = v.o; inp[k] = v.i; } }
+  const api = chApi(); if (api && api.meters) api.meters({ peaks:out, peaksIn:inp });
+}
 idleTick(() => {
-  if (view !== 'chains' || document.hidden || !rt || !CH.frame) return;
+  if (view !== 'chains' || document.hidden || !CH.frame) return;
+  if (NCON() && tp.nc){ chNativeFeed(); return; }
+  if (!rt) return;
   const out = new Array(NT).fill(0), inp = new Array(NT).fill(0);
   let any = false;
   const peak = (an, buf) => { an.getFloatTimeDomainData(buf); let p = 0; for (let i = 0; i < buf.length; i++){ const a = Math.abs(buf[i]); if (a > p) p = a; } return p; };
@@ -37765,6 +37783,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
+  [682, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the \u2026chains screen\u2019s track in / out level meters now move with the sound (the engine reports them while that screen is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
   [680, '25 Nov', ['Behind the scenes: with the native engine playing, the FX bar and FX screen can now ask it for each effect slot\'s level and for the compressors\' reduction (the page asks for one track at a time, and nothing while METERS is off).', 'Nothing changes while the native engine is off.']],
   [679, '25 Nov', ['Behind the scenes: with the native engine playing, a fader, mute, solo, pan, an effect knob, the master settings, the latency mode and a …chains slider now reach the sound at once, as one small message each (the whole song still follows a moment later).', 'Nothing changes while the native engine is off.']],
   [678, '25 Nov', ['Behind the scenes: with the native engine on, the page can now publish the song, send its pad renders, kit list, variations and chop data (copies, with a memory limit), and press PLAY and STOP on it. A song it cannot play goes back to the old engine with a short message.', 'Nothing changes while the native engine is off.']],
