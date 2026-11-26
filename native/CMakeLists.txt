@@ -7,6 +7,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(THUNDER_BUILD_TESTS "Build and register the C++ tests" ON)
+# H6: the desktop shell library's own tests (native/desktop/tests), so that a shell job can run them without building every core test. Follows THUNDER_BUILD_TESTS unless set.
+option(THUNDER_BUILD_DESKTOP_TESTS "Build and register the desktop shell library's tests" ${THUNDER_BUILD_TESTS})
 # The LXR drum-synth module (U04) is GPL-3.0-only: ON for the owner's own builds, OFF for a closed build (nothing of it is configured, compiled or linked; the core does not
 # mention it: core/include/thunder/lxr_seam.h). See native/lxr/LICENSES.md. Not on MSVC (the firmware is GNU C): there the module is simply absent, as in a closed build.
 option(THUNDER_WITH_LXR "Build the optional LXR module (GPL-3.0-only; ON for the owner's own builds, OFF for a closed build)" ON)
@@ -40,5 +42,8 @@ add_subdirectory(tools/thunder-render)   # U09: the offline song renderer
 if(THUNDER_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
+endif()
+if(THUNDER_BUILD_DESKTOP_TESTS)
+  enable_testing()
 endif()
 add_subdirectory(desktop)   # H6: the desktop shells (WebView2 / WKWebView): a platform-neutral library and its tests everywhere; the shell executables only with -DTHUNDER_DESKTOP_SHELL=ON
