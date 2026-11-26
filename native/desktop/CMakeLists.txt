@@ -128,7 +128,7 @@ if(THUNDER_DESKTOP_SHELL)
     tpd_bundle_web(ThunderPlus "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>/Resources/web")
     # H7: the audio input needs NSMicrophoneUsageDescription in Info.plist (macOS asks the person the first time an input opens; without the key the open is refused). PlistBuddy runs after the plist is written.
     add_custom_command(TARGET ThunderPlus POST_BUILD
-      COMMAND sh -c "P='$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>/Info.plist'; /usr/libexec/PlistBuddy -c 'Delete :NSMicrophoneUsageDescription' \"$P\" >/dev/null 2>&1; /usr/libexec/PlistBuddy -c 'Add :NSMicrophoneUsageDescription string Thunder Plus records from your audio interface when you use Record a sample.' \"$P\""
-      COMMENT "Info.plist: NSMicrophoneUsageDescription")
+      COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/mac/add_mic_key.sh" "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>"
+      COMMENT "Info.plist: NSMicrophoneUsageDescription" VERBATIM)
   endif()
 endif()
