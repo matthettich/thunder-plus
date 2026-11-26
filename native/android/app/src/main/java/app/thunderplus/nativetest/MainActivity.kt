@@ -146,6 +146,14 @@ class MainActivity : Activity() {
 
     private fun buildOverlay(): View {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(235, 0, 0, 0)); setPadding(8, 4, 8, 4) }
+        // SCREENOFF-NOTES 3: the dark debug panel (its big "ready" line, the buttons) sat over the bottom of the page and over the keyboard's field. It now starts COLLAPSED to one small handle; the handle opens it, Hide closes it.
+        val handle = Button(this).apply { text = "Debug panel"; isAllCaps = false; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); setPadding(12, 0, 12, 0); minHeight = 0; minimumHeight = 0; alpha = 0.55f
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.END } }
+        fun setCollapsed(c: Boolean) {
+            for (i in 0 until col.childCount) { val v = col.getChildAt(i); if (v !== handle) v.visibility = if (c) View.GONE else View.VISIBLE }
+            col.setBackgroundColor(if (c) Color.TRANSPARENT else Color.argb(235, 0, 0, 0)); handle.text = if (c) "Debug panel" else "Hide panel"
+        }
+        handle.setOnClickListener { setCollapsed(col.getChildAt(1)?.visibility == View.VISIBLE) }
         fun row(vararg v: View) = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; v.forEach { addView(it) } }
         val runRow = row(*ThunderHost.RUN_LABELS.map { l ->
             btn("$l 5 min") { off({ ThunderHost.startRun(this, l) }) { ok -> if (!ok) Toast.makeText(this, "Audio did not start", Toast.LENGTH_LONG).show() } }
@@ -155,7 +163,7 @@ class MainActivity : Activity() {
             btn("COPY RESULTS") { copyResults() },
             btn("Bridge test") { webView.loadUrl(base + "bridge-test.html") },
             btn("App") { webView.loadUrl(base + "index.html") },
-            btn("Hide") { val v = if (readout.visibility == View.VISIBLE) View.GONE else View.VISIBLE; readout.visibility = v; runLines.visibility = v; midiLine.visibility = v; resultsBox.visibility = if (v == View.GONE) View.GONE else resultsBox.visibility })
+            btn("Hide") { setCollapsed(true) })
         // U36 T9 DEBUG (no live song host yet): MIDI out test = two bars of notes + MIDI clock to port A through the real scheduler / pump / sink; "MIDI A: next" picks the device.
         val midiRow = row(
             btn("MIDI out test") { off({ MidiPorts.get(this).runTest(this) }) { midiLine.text = it } },
@@ -182,8 +190,9 @@ class MainActivity : Activity() {
         readout = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f) }
         runLines = TextView(this).apply { setTextColor(Color.LTGRAY); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f) }
         resultsBox = TextView(this).apply { setTextColor(Color.YELLOW); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); setTextIsSelectable(true); visibility = View.GONE }
-        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine); col.addView(liveRow); col.addView(liveLine); col.addView(updRow)
+        col.addView(handle); col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine); col.addView(liveRow); col.addView(liveLine); col.addView(updRow)
         col.addView(android.widget.ScrollView(this).apply { addView(resultsBox); layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (120 * resources.displayMetrics.density).toInt()) })
+        setCollapsed(true)
         return col
     }
 
