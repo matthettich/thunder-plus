@@ -109,7 +109,8 @@ class MainActivity : Activity() {
         bridge = Bridge(this, webView)
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = loader.shouldInterceptRequest(request.url)
-            override fun onPageFinished(view: WebView, url: String) { bridge.attach() }
+            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) { bridge.pageStarted() }
+            override fun onPageFinished(view: WebView, url: String) { bridge.attach("pageFinished") }
         }
         bridge.install()
         SongFiles.attach(this)            // N2 H3: the folder pickers answer to this activity
@@ -229,6 +230,7 @@ class MainActivity : Activity() {
             if (r != null) sb.append("  ").append(r.numbers).append("\n  cross-check (core clock events): ").append(r.crossCheck).append('\n')
         }
         sb.append("\nnative live engine (H1c): ").append(LiveEngine.gate.line()).append('\n')
+        sb.append("\n").append(LiveEngine.statusText()).append('\n')
         val text = sb.toString()
         resultsBox.text = text; resultsBox.visibility = View.VISIBLE
         try {

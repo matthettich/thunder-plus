@@ -67,3 +67,14 @@ What the report shows: after each STOP, `1 s after STOP: level -39.3 dB` (first)
 ## F1 parity
 
 CI "Core (wasm, wasi-sdk)" failed in `parity.sh u02`, last step (the whole suite in the tree copy with the CMake-built wasm). Not the wasm: with the CMake wasm built locally (sizes equal to CI's) the whole suite is 1960 pass, 0 fail. The two failures were `native-client-inert (b)` and `patch-knobs-waves "core/seq-core.js is current"`, both beta tests that run `tools/make-core.mjs --check`, which needs acorn; the workflow installed acorn only after the u02 step (core.test.js skips without acorn, the new beta tests do not). Fix: the acorn install step now runs before parity u02 (native.yml). parity-u02.sh now prints the failing test names of a failed run. The built wasm bytes still differ from the committed ones (INFO, as before); no dsp/ source differs between native and beta.
+
+## Hello fixes (26 Nov)
+
+Cause list: `/home/claude/reports/HELLO-ROOTCAUSE.md` (the page's native client never got `on`; panel "native live engine: off"). Shell changes, Kotlin lifecycle only (no C++, no Oboe/AAudio callback, no `native/core`):
+
+- **Port earlier.** The shim (`thunder_bridge.js`) posts `thunderPortAsk.postMessage('port')` once at document start, after its `message` listener is registered; `Bridge.install` registers that listener (main frame only) and it calls `attach("ask")`. `onPageFinished` stays as the fallback (`attach("pageFinished")`). `PortGate` (LiveDiag.kt, JVM-tested) allows one attach per page load (`onPageStarted` opens a generation), so a port the page uses is never closed and replaced.
+- **Say why.** `LiveEngine.lastStartError` is set in `startOnWorker` (nativeStart rc, "a shutdown came first", exception text). `LiveBridge.hello` replies `{t:'reply', id, v:1, err:'live engine did not start: <reason>', ok:false}`; an exception anywhere in `hello` also yields an err reply with its text.
+- **Stale state.** `startOnWorker`: `up` true and `active` false now runs `nativeShutdown`, sets `up = false` and starts again in the same call. The `shutdowns` generation checks (A1/A2) are unchanged and run after that cleanup.
+- **Show it.** `LiveEngine.statusText` (also when off) adds: hello count, time since last hello, its result, `lastStartError`, and whether/how the port was handed over this load (ask / pageFinished). COPY RESULTS includes it.
+- Tests: `HelloDiagTest` (PortGate once-per-load, HelloLog lines).
+- Unverified on a device; CI compiles it.
