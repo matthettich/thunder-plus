@@ -155,7 +155,12 @@ int main() {
       if (f != qf) { qf = f; stage = 0; }
       if (rank < stage) order = false; stage = rank;   // within one quantum: METERS, FXLVL, CHLVL, MASTERM
     }
-    CHECK(gapless, "one gapless seq order"); CHECK(order, "METERS, FXLVL, CHLVL, MASTERM in a quantum"); CHECK(cnt[1] > 20 && cnt[2] > 20 && cnt[3] > 20 && cnt[4] > 20, "all four kinds came (%d %d %d %d)", cnt[1], cnt[2], cnt[3], cnt[4]);
+    CHECK(gapless, "one gapless seq order"); CHECK(order, "METERS, FXLVL, CHLVL, MASTERM in a quantum"); 
+#ifdef THUNDER_HAVE_TFX
+    CHECK(cnt[1] > 20 && cnt[2] > 20 && cnt[3] > 20 && cnt[4] > 20, "all four kinds came (%d %d %d %d)", cnt[1], cnt[2], cnt[3], cnt[4]);
+#else   // no effects library (MSVC, the closed build): no FXLVL, as live_meters2
+    CHECK(cnt[1] > 20 && cnt[2] == 0 && cnt[3] > 20 && cnt[4] > 20, "METERS, CHLVL, MASTERM came, no FXLVL without the effects library (%d %d %d %d)", cnt[1], cnt[2], cnt[3], cnt[4]);
+#endif
     H->setTestTap(nullptr, nullptr);
   }
   std::printf("live_masterm: %d checks, %d failed\n", g_checks, g_fail);
