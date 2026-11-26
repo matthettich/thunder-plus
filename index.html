@@ -8770,7 +8770,7 @@ let ctx = null, master = null;
    Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
 const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
 const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
-  s.src = 'thunder-core-client.js?v=7';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.src = 'thunder-core-client.js?v=8';   // bump with the ?v= in sw.js OPTIONAL when the file changes
   s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}, ncSongHost())); } catch(e){ tpLog('native core client: attach failed', e); } };
   s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
   document.head.appendChild(s); };
@@ -27524,7 +27524,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 684;
+const BUILD = 685;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38014,6 +38014,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [685, '26 Nov', ['Behind the scenes: in the Mac and Windows desktop app\u2019s native shell, Settings \u203a Audio now picks the output and input device, the buffer and the device\u2019s own sample rates, and shows the latency; Record a sample records every input of the interface; Settings \u203a MIDI lists the shell\u2019s ports and plays notes in.', 'Nothing changes in the Electron app, the website or the Android app.']],
   [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
   [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
   [683, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the master panel\u2019s IN / OUT LUFS, compressor and limiter reduction, suppressor bars and true-peak now move with the sound (the engine reports them while the panel is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
