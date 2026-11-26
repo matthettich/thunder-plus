@@ -197,9 +197,10 @@ jobs:
           sh native/core/third_party/fetch.sh "$T/probe-deps" && sh native/core/third_party/prepare.sh "$T/probe-deps" "$T/probe-up"; echo "fetch+prepare rc=$?"
           echo "--- the layout of the upstream 12-bit bit-fields under the MS ABI (what B2 is about; prepare.sh no longer relies on it)"
           printf '#include <cstdint>\n#include <cstdio>\nstruct A { int16_t l:12; int16_t r:12; } __attribute__((packed));\nstruct B { int16_t odd:12; int16_t even:12; } __attribute__((packed));\nint main(){ std::printf("unpatched sizeof A=%%zu B=%%zu (3 on gcc/clang Linux)\\n", sizeof(A), sizeof(B)); }\n' > probe_layout.cpp
-          clang-cl /nologo probe_layout.cpp /Fe:probe_layout.exe && ./probe_layout.exe
+          VSCL=$(find "/c/Program Files/Microsoft Visual Studio" -ipath "*Llvm/x64/bin/clang-cl.exe" 2>/dev/null | head -1); echo "VS clang-cl: $VSCL"; "$VSCL" --version
+          "$VSCL" /nologo probe_layout.cpp /Fe:probe_layout.exe && ./probe_layout.exe
           exit 0
-      - run: cmake -S native -B build -G "Visual Studio 17 2022" -A x64 -T ClangCL
+      - run: cmake -S native -B build -A x64 -T ClangCL
       - name: Build
         run: cmake --build build --config Release -j 4 -- /v:n
       - name: Check the dsp objects (CRT /MD, exceptions, flags clang-cl dropped)
