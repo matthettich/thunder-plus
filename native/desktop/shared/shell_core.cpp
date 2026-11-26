@@ -1,6 +1,12 @@
 #include "shell_core.h"
 
+#include <chrono>
+#include <cstdio>
+
 #include "audio_out.h"
+#ifndef TPD_NO_MIDI
+#include "midi_manager.h"
+#endif
 #include "rt/json.h"
 #include "text_util.h"
 
@@ -19,7 +25,30 @@ ShellCore::ShellCore(IPlatform* plat, Options opt)
         return c; }()) {
   AudioOutFactory f = opt_.nullAudio || !opt_.audio ? AudioOutFactory([] { return makeNullAudioOut(); }) : opt_.audio;
   host_.reset(new LiveHost(std::move(f)));
-  session_.reset(new BridgeSession(*host_, [this](const std::string& j) { toPage(j); }, &recovery_));
+  SessionIo io;
+  const bool real = !opt_.nullAudio && opt_.audio;   // the null output has no device list, no input and no MIDI
+  io.devices = real && opt_.devices ? opt_.devices : makeNullEnumerator();
+  settings_.reset(new AudioSettingsStore(under(opt_.dataDir, "audio")));
+  io.settings = settings_.get();
+  io.devWatchMs = real ? opt_.devWatchMs : 0;
+  if (real && opt_.input) { input_.reset(new InputCapture(opt_.input, [this](const std::string& j) { toPage(j); })); io.input = input_.get(); }
+#ifndef TPD_NO_MIDI
+  if (real && opt_.midi) {
+    std::shared_ptr<MidiBackend> be = opt_.midi();
+    if (be) { midi_ = std::make_shared<MidiManager>(std::move(be), [this](const std::string& j) { toPage(j); }); host_->setMidi(midi_.get()); io.midi = midi_.get(); }
+  }
+#endif
+  session_.reset(new BridgeSession(*host_, [this](const std::string& j) { toPage(j); }, &recovery_, io));
+  if (!opt_.a5LogPath.empty()) {
+    a5_ = std::thread([this] {
+      for (;;) {
+        { std::unique_lock<std::mutex> lk(a5m_); if (a5cv_.wait_for(lk, std::chrono::seconds(10), [&] { return a5stop_; })) return; }
+        if (!host_->active()) continue;
+        std::FILE* f = std::fopen(opt_.a5LogPath.c_str(), "ab");
+        if (f) { const std::string l = "{" + host_->rtSnapshotJson() + "}\n"; std::fwrite(l.data(), 1, l.size(), f); std::fclose(f); }
+      }
+    });
+  }
 }
 
 ShellCore::~ShellCore() { shutdown(); }
@@ -27,6 +56,10 @@ ShellCore::~ShellCore() { shutdown(); }
 bool ShellCore::shutdown(int timeoutMs) {
   api_.stopIo();   // the IO worker emits through toPage: it ends before anything it uses
   if (session_ && !session_->shutdown(timeoutMs)) return false;   // the worker is inside a call on the host: the host must not be torn down under it
+  { std::lock_guard<std::mutex> g(a5m_); a5stop_ = true; }
+  a5cv_.notify_all();
+  if (a5_.joinable()) a5_.join();
+  if (input_) input_->close();
   if (host_) host_->shutdown();
   return true;
 }

@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "host_clock.h"
 #include "rt/json.h"
 #include "text_util.h"
 
@@ -25,10 +26,13 @@ std::string num(double v) { char b[64]; std::snprintf(b, sizeof b, "%.3f", v); r
 std::string strList(const std::vector<std::string>& v) { std::string o = "["; for (size_t i = 0; i < v.size(); i++) { if (i) o += ","; o += jsonQuote(v[i]); } return o + "]"; }
 }  // namespace
 
-BridgeSession::BridgeSession(LiveHost& host, Emit emit, RecoveryStore* recovery) : host_(host), emit_(std::move(emit)), rec_(recovery) { worker_ = std::thread([this] { worker(); }); }
+BridgeSession::BridgeSession(LiveHost& host, Emit emit, RecoveryStore* recovery, SessionIo io) : host_(host), io_(std::move(io)), emit_(std::move(emit)), rec_(recovery) { worker_ = std::thread([this] { worker(); }); }
 BridgeSession::~BridgeSession() { if (abandoned_) { if (worker_.joinable()) worker_.detach(); } else shutdown(); }
 
 bool BridgeSession::shutdown(int timeoutMs) {
+  { std::lock_guard<std::mutex> g(wm_); watchStop_ = true; }
+  wcv_.notify_all();
+  if (watch_.joinable()) watch_.join();
   std::thread p;
   { std::lock_guard<std::mutex> g(pm_); closing_ = true; pumpStop_ = true; p = std::move(pump_); }   // L-1: no late hello can start a pump after this
   pcv_.notify_all();
@@ -101,6 +105,7 @@ void BridgeSession::run(const std::string& raw) {
       return;
     }
     const std::string type = typeOf(raw);
+    if (type == "dev.fallback") { devFallback(); return; }   // the hot-plug watcher's request (internal; harmless from a page: it acts only on a device that is really gone)
     if (type == "put.header") { const std::string e = puts_.header(raw); if (!e.empty()) err("put", e); return; }
     Translation tr = translate(raw);
     switch (tr.kind) {
@@ -113,7 +118,8 @@ void BridgeSession::run(const std::string& raw) {
 
 void BridgeSession::execute(const Call& c, const std::string& type) {
   // The engine is down (engine.reset in progress): the page gets an error and, for an ask, an error reply
-  if (!host_.active() && c.op != Op::RecoveryPut && c.op != Op::RecoveryGet && c.op != Op::RecoveryDrop && c.op != Op::Hello && c.op != Op::EngineReset && c.op != Op::BufFree && c.op != Op::Lxp && c.op != Op::MidiCfg) {
+  if (!host_.active() && c.op != Op::RecoveryPut && c.op != Op::RecoveryGet && c.op != Op::RecoveryDrop && c.op != Op::Hello && c.op != Op::EngineReset && c.op != Op::BufFree && c.op != Op::Lxp && c.op != Op::MidiCfg && c.op != Op::DevList && c.op != Op::DevOpen && c.op != Op::RtReset && c.op != Op::RtSnapshot &&
+      c.op != Op::RecArm && c.op != Op::RecStart && c.op != Op::RecStop && c.op != Op::Take && c.op != Op::TakeFree) {
     const std::string msg = "the live engine is down; the page re-sends its state after {t:'engine',up:true}";
     err(type, msg);
     if (c.op == Op::SongLoad) reply(idOfTail(c.raw), "\"ok\":false,\"err\":" + jsonQuote(msg));
@@ -124,7 +130,8 @@ void BridgeSession::execute(const Call& c, const std::string& type) {
   switch (c.op) {
     case Op::Hello: hello(c); break;
     case Op::MidiCfg:
-      err("midi.cfg", "MIDI is H7 (not in the H6 shell skeleton)");
+      if (io_.midi) { const std::string bad = io_.midi->applyCfg(c.outs, c.clockOut, c.gear); if (!bad.empty()) err("midi.cfg", bad); }
+      else err("midi.cfg", "this shell has no MIDI (hello.caps.midi is false)");
       if (c.clockIn != clockFollow_.load()) { clockFollow_ = c.clockIn; if (host_.active()) { tpa::FitResult fr; std::string j; host_.fit(lastRev_, fitFlags(), &fr, &j); emit(j); } }
       break;
     case Op::SongLoad: {
@@ -156,7 +163,7 @@ void BridgeSession::execute(const Call& c, const std::string& type) {
     case Op::PdcSet: { const int m = c.mode; check("pdc.set", host_.call([=](thunder_live* L) { return thunder_live_pdc_set(L, m); }, 10000)); break; }
     case Op::EngineReset: engineReset(); break;
     case Op::Play: check(type, host_.play(c.mode, c.row, c.track, c.sect, c.phrase, c.hasLoop, c.y0, c.y1, at, c.hasSeed, c.seed, c.pdc, c.onlyBits, c.hasOnly)); break;
-    case Op::Stop: check(type, host_.call([=](thunder_live* L) { return thunder_live_stop(L, at); })); break;
+    case Op::Stop: check(type, host_.stop(at)); break;   // H7: also the MIDI clock boxes' transport flag
     case Op::Hold: check(type, host_.call([=](thunder_live* L) { return thunder_live_hold(L, at); })); break;
     case Op::Bpm: { const double v = c.v; check(type, host_.call([=](thunder_live* L) { return thunder_live_bpm(L, v, at); })); break; }
     case Op::Loop: { const int h = c.hasLoop, a = c.y0, b = c.y1; check(type, host_.call([=](thunder_live* L) { return thunder_live_loop(L, h, a, b, at); })); break; }
@@ -194,6 +201,13 @@ void BridgeSession::execute(const Call& c, const std::string& type) {
       if (c.id >= 0) reply(c.id, fxValuesBody(rc)); else check(type, rc);
       break;
     }
+    case Op::DevList: devList(c.id); break;
+    case Op::DevOpen: devOpen(c); break;
+    case Op::RecArm: case Op::RecStart: case Op::RecStop: recOp(c); break;
+    case Op::Take: takeFetch(c); break;
+    case Op::TakeFree: if (io_.input) io_.input->freeTake(c.bufId); break;
+    case Op::RtReset: host_.rtReset(); break;
+    case Op::RtSnapshot: reply(c.id, "\"ok\":true," + host_.rtSnapshotJson()); break;
     case Op::RecoveryPut: if (rec_) rec_->put(c.raw, (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); break;   // no reply
     case Op::RecoveryGet: reply(c.id, rec_ ? rec_->getBody() : std::string("\"ok\":false,\"error\":\"there is no recovery copy\"")); break;
     case Op::RecoveryDrop: if (rec_) rec_->drop(); reply(c.id, "\"ok\":true"); break;
@@ -217,9 +231,14 @@ void BridgeSession::hello(const Call& h) {
     return;
   }
   std::string e;
+  if (!host_.active()) {   // H7: the saved choice (audio.json) is the first output; the page's own dev.open follows after hello and rebuilds only when it differs
+    if (io_.settings) { const AudioSettings sv = io_.settings->load(); AudioConfig c; c.outId = sv.out; c.sampleRate = sv.sr; c.bufferFrames = sv.buf; host_.setAudioConfig(c); wantedOut_ = sv.out; wantedIn_ = sv.in; }
+    else wantedOut_ = host_.audioConfig().outId;
+  }
   if (host_.start(true, &e) < 0) { err("hello", "the live engine did not start: " + e); reply(h.id, "\"err\":" + jsonQuote("live engine did not start: " + e)); return; }
   flag_ = true;
   startPump();
+  if (io_.input && !io_.input->isOpen() && !wantedIn_.empty()) { AudioInConfig ic; ic.inId = wantedIn_; ic.sampleRate = (int)host_.sampleRate(); std::string ie; if (io_.input->open(ic, &ie)) inCfg_ = ic; }
   const uint32_t caps = host_.liveCaps();
   int outLat = 0; long long padBudget = (long long)128 << 20;
   { thunder::JsonDoc d; const std::string st = host_.statusJson(); if (d.parse(st)) outLat = (int)d.root().num("outLat", 0); }
@@ -228,11 +247,15 @@ void BridgeSession::hello(const Call& h) {
   char b[512];
   std::snprintf(b, sizeof b, "\"v\":1,\"core\":\"h6-live\",\"sampleRate\":%.0f,\"sr\":%.0f,\"outLat\":%d,\"host\":\"desktop\",\"maxPadBytes\":%lld,\"maxSongBytes\":%lld,\"live\":true,", sr, sr, outLat, padBudget, (long long)16 << 20);
   std::string body = b;
-  body += std::string("\"caps\":{\"nativeAudio\":true,\"midi\":false,\"link\":false,\"plugins\":false,\"inputs\":false,\"render\":false,\"files\":false,\"live\":true,\"meters2\":") + ((caps & 0x400) ? "true" : "false") + ",\"fxValues\":" + ((caps & 0x800) ? "true" : "false") +
+  body += std::string("\"caps\":{\"nativeAudio\":true,\"midi\":") + ((io_.midi && io_.midi->running()) ? "true" : "false") + ",\"link\":false,\"plugins\":false,\"inputs\":" + (io_.input ? "true" : "false") + ",\"devices\":true,\"rt\":true,\"render\":false,\"files\":false,\"live\":true,\"meters2\":" + ((caps & 0x400) ? "true" : "false") + ",\"fxValues\":" + ((caps & 0x800) ? "true" : "false") +
           ",\"recoveryPut\":" + (rec_ && rec_->enabled() ? "true" : "false") + ",\"chains\":" + (host_.chainsOn() ? "true" : "false") +
           ",\"sf\":" + ((caps & 8) ? "true" : "false") + ",\"engines\":" + strList(engineList(LiveHost::hasLxr())) + ",\"fx\":[\"tfx\",\"pump\",\"modfx\",\"master\"],\"abi\":1,\"liveCaps\":" + std::to_string(caps) + "}";
+  body += "," + audioBody();
   reply(h.id, body);
   announce();
+  if (io_.midi) io_.midi->publish();   // the page learns the MIDI ports right after the hello (the Android shell does the same)
+  devEvents(true);
+  if (io_.devices && io_.devWatchMs > 0) { std::lock_guard<std::mutex> g(wm_); if (!watch_.joinable() && !watchStop_) watch_ = std::thread([this] { devWatch(); }); }
 }
 
 // after hello: a recovery copy from last time is announced once (the page asks "Restore unsaved changes?")
@@ -266,20 +289,185 @@ void BridgeSession::pump() {
 }
 
 // CORE-BRIDGE 7 G13: stop, destroy, create. The page re-sends song, kit and pads when it sees {t:'engine', up:true}.
-void BridgeSession::engineReset() {
+void BridgeSession::engineReset() { std::string e; rebuild(host_.audioConfig(), &e); }
+
+// H7: the same with another output (dev.open, a lost device): the audio configuration is set between the destroy and the create.
+bool BridgeSession::rebuild(const AudioConfig& cfg, std::string* errOut) {
   emit("{\"t\":\"engine\",\"up\":false}");
   const bool was = flag_.load();
   host_.shutdown();
   puts_.clear();
+  host_.setAudioConfig(cfg);
   std::string e;
   if (host_.start(true, &e) < 0) {   // C-2: a definite answer: the engine is down for good until the next reset / hello; the page falls back to its own engine and says so
     const std::string m = "the live engine did not restart: " + e;
     emit("{\"t\":\"engine\",\"up\":false,\"error\":" + jsonQuote(m) + "}");
     err("engine.reset", m, true);
-    return;
+    if (errOut) *errOut = m;
+    return false;
   }
   flag_ = was;
   emit("{\"t\":\"engine\",\"up\":true,\"sr\":" + std::to_string((long long)host_.sampleRate()) + "}");
+  return true;
+}
+
+// ---- H7: audio devices, the input, takes ------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// The fields every dev reply carries: what is open now.
+std::string BridgeSession::audioBody() {
+  const LiveHost::AudioInfo a = host_.audioInfo();
+  const double sr = a.sampleRate;
+  char b[160];
+  std::snprintf(b, sizeof b, "\"sr\":%.0f,\"buf\":%d,\"latOut\":%d", sr, a.periodFrames, a.latencyFrames);
+  std::string o = std::string("\"audio\":{\"open\":") + (a.open ? "true" : "false") + ",\"name\":" + jsonQuote(a.name) + ",\"id\":" + jsonQuote(a.id) + "," + (a.open ? b : "\"sr\":0,\"buf\":0,\"latOut\":0") + "}";
+  if (io_.input && io_.input->isOpen()) {
+    const AudioInInfo i = io_.input->info();
+    o += ",\"input\":{\"open\":true,\"name\":" + jsonQuote(i.name) + ",\"id\":" + jsonQuote(i.id) + ",\"channels\":" + std::to_string(i.channels) + ",\"sr\":" + std::to_string((long long)i.sampleRate) + ",\"buf\":" + std::to_string(i.periodFrames) + ",\"latIn\":" + std::to_string(i.latencyFrames) + "}";
+  } else o += ",\"input\":{\"open\":false}";
+  return o;
+}
+
+void BridgeSession::devList(int id) {
+  const auto devs = io_.devices ? io_.devices->list() : makeNullEnumerator()->list();
+  const AudioConfig c = host_.audioConfig();
+  reply(id, "\"ok\":true,\"devices\":" + audioDevicesJson(devs) + ",\"out\":" + jsonQuote(wantedOut_.empty() ? c.outId : wantedOut_) + ",\"in\":" + jsonQuote(wantedIn_) + "," + audioBody());
+}
+
+// An open input that goes away (or is replaced) while a take runs: the take is ended and kept (the page gets a `rec.done` event with the partial take), then the input closes.
+void BridgeSession::closeInputKeepTake(const char* why) {
+  if (!io_.input) return;
+  if (io_.input->recording()) {
+    std::string e; const int tid = io_.input->stop(&e);
+    if (tid >= 0) { auto t = io_.input->take(tid); if (t) emit("{\"t\":\"rec.done\",\"take\":" + std::to_string(tid) + ",\"partial\":true,\"why\":" + jsonQuote(why) + ",\"frames\":" + std::to_string((long long)t->frames) + ",\"sr\":" + std::to_string((long long)t->sr) + ",\"nch\":" + std::to_string(t->channels) + "}"); }
+  }
+  io_.input->close();
+}
+
+void BridgeSession::devOpen(const Call& c) {
+  auto fail = [&](const std::string& m) { err("dev.open", m); reply(c.id, "\"ok\":false,\"error\":" + jsonQuote(m) + ",\"err\":" + jsonQuote(m)); };
+  DevOpenRequest r; r.out = c.devOut; r.in = c.devIn; r.hasIn = c.hasIn; r.sr = c.devSr; r.buf = c.devBuf;
+  std::string e;
+  if (!validateDevOpen(r, &e)) { fail(e); return; }
+  AudioConfig want; want.outId = r.out; want.sampleRate = r.sr; want.bufferFrames = r.buf;
+  bool rebuilt = false;
+  if (!(host_.active() && host_.audioConfig() == want)) {
+    if (!rebuild(want, &e)) { reply(c.id, "\"ok\":false,\"error\":" + jsonQuote(e) + ",\"err\":" + jsonQuote(e)); return; }
+    rebuilt = true;
+  }
+  wantedOut_ = r.out;
+  const LiveHost::OpenNote note = host_.openNote();
+  std::string inErr;
+  if (io_.input && c.hasIn) {
+    wantedIn_ = r.in;
+    if (r.in.empty()) { closeInputKeepTake("the input was closed"); inCfg_ = AudioInConfig(); }
+    else {
+      AudioInConfig ic; ic.inId = r.in; ic.sampleRate = (int)host_.sampleRate(); ic.bufferFrames = r.buf;
+      const bool same = io_.input->isOpen() && inCfg_.inId == ic.inId && inCfg_.sampleRate == ic.sampleRate && inCfg_.bufferFrames == ic.bufferFrames && !io_.input->lost();
+      if (!same) { closeInputKeepTake("the input changed"); if (io_.input->open(ic, &inErr)) inCfg_ = ic; else { inCfg_ = AudioInConfig(); err("dev.open", "the input did not open: " + inErr); } }
+    }
+  }   // an input is only opened when the page names one
+  if (io_.settings) { AudioSettings sv; sv.out = r.out; sv.in = wantedIn_; sv.sr = r.sr; sv.buf = r.buf; io_.settings->save(sv); }
+  std::string body = std::string("\"ok\":true,\"rebuilt\":") + (rebuilt ? "true" : "false") + ",\"fellBack\":" + (note.fellBack ? "true" : "false") + ",\"requested\":" + jsonQuote(note.requested) + "," + audioBody();
+  if (!inErr.empty()) body += ",\"inError\":" + jsonQuote(inErr);
+  reply(c.id, body);
+}
+
+void BridgeSession::recOp(const Call& c) {
+  auto fail = [&](const std::string& m) { reply(c.id, "\"ok\":false,\"error\":" + jsonQuote(m) + ",\"err\":" + jsonQuote(m)); };
+  if (!io_.input) { fail("this shell has no audio input (hello.caps.inputs is false)"); return; }
+  std::string e;
+  if (c.op == Op::RecArm) {
+    if (!io_.input->arm(c.ins, &e)) { fail(e); return; }
+    const AudioInInfo i = io_.input->info();
+    reply(c.id, "\"ok\":true,\"nch\":" + std::to_string(c.ins.size()) + ",\"inputs\":" + std::to_string(i.channels) + ",\"sr\":" + std::to_string((long long)i.sampleRate) + ",\"latIn\":" + std::to_string(i.latencyFrames));
+  } else if (c.op == Op::RecStart) {
+    if (!io_.input->start(&e)) { fail(e); return; }
+    reply(c.id, "\"ok\":true,\"hostNs\":" + std::to_string((long long)hostNowNs()));
+  } else {
+    const int tid = io_.input->stop(&e);
+    if (tid < 0) { fail(e); return; }
+    auto t = io_.input->take(tid);
+    reply(c.id, "\"ok\":true,\"take\":" + std::to_string(tid) + ",\"frames\":" + std::to_string((long long)(t ? t->frames : 0)) + ",\"sr\":" + std::to_string((long long)(t ? t->sr : 0)) + ",\"nch\":" + std::to_string(t ? t->channels : 0) +
+                 ",\"hostNs0\":" + std::to_string((long long)(t ? t->hostNs0 : 0)) + ",\"latencyFrames\":" + std::to_string(t ? t->latencyFrames : 0) + ",\"gaps\":" + std::to_string((long long)(t ? t->gaps : 0)) + ",\"full\":" + ((t && t->full) ? "true" : "false") + ",\"dropped\":" + std::to_string((unsigned long long)io_.input->dropped()));
+  }
+}
+
+// `take {take, ch?, off?, n?}`: chunks of base64 float32 as `take.chunk` events {rid, c, off, b}, then the reply {ok, sr, nch, frames, hostNs0, latencyFrames}. At most 64 MiB per call.
+void BridgeSession::takeFetch(const Call& c) {
+  auto fail = [&](const std::string& m) { reply(c.id, "\"ok\":false,\"error\":" + jsonQuote(m) + ",\"err\":" + jsonQuote(m)); };
+  if (!io_.input) { fail("this shell has no audio input"); return; }
+  auto t = io_.input->take(c.bufId);
+  if (!t) { fail("no take with id " + std::to_string(c.bufId)); return; }
+  int c0 = 0, c1 = t->channels;
+  c0 = c.takeCh >= 0 ? c.takeCh : 0; c1 = c.takeCh >= 0 ? c.takeCh + 1 : t->channels;
+  if (c0 >= t->channels) { fail("take: the take has " + std::to_string(t->channels) + " channels"); return; }
+  const int64_t off = c.takeOff < 0 ? 0 : c.takeOff, total = t->frames;
+  if (off > total) { fail("take: off is past the end"); return; }
+  const int64_t n = (c.takeN < 0 || off + c.takeN > total) ? total - off : c.takeN;
+  if ((int64_t)(c1 - c0) * n * 4 > ((int64_t)64 << 20)) { fail("take: at most 64 MiB per call: ask one channel (ch) or a range (off, n)"); return; }
+  const int64_t piece = 262144;
+  for (int ch = c0; ch < c1; ch++) {
+    const std::vector<float>& d = t->data[(size_t)ch];
+    for (int64_t o = 0; o < n; o += piece) {
+      const int64_t m = std::min<int64_t>(piece, n - o);
+      std::string b64 = base64Encode(reinterpret_cast<const uint8_t*>(d.data() + off + o), (size_t)m * 4);
+      emit("{\"t\":\"take.chunk\",\"rid\":" + std::to_string(c.id) + ",\"c\":" + std::to_string(ch - c0) + ",\"off\":" + std::to_string((long long)o) + ",\"b\":\"" + b64 + "\"}");
+    }
+  }
+  reply(c.id, "\"ok\":true,\"sr\":" + std::to_string((long long)t->sr) + ",\"nch\":" + std::to_string(c1 - c0) + ",\"frames\":" + std::to_string((long long)n) + ",\"hostNs0\":" + std::to_string((long long)t->hostNs0) + ",\"latencyFrames\":" + std::to_string(t->latencyFrames));
+}
+
+// After hello: what the saved choice could not give. A device that is gone is said once; the default plays and the page decides whether to forget the choice.
+void BridgeSession::devEvents(bool initial) {
+  (void)initial;
+  const LiveHost::OpenNote n = host_.openNote();
+  if (n.fellBack) emit("{\"t\":\"dev\",\"kind\":\"lost\",\"which\":\"out\",\"id\":" + jsonQuote(n.requested) + ",\"fellBack\":true,\"name\":" + jsonQuote(n.actualName) + "}");
+  if (io_.input && !wantedIn_.empty() && !io_.input->isOpen()) emit("{\"t\":\"dev\",\"kind\":\"lost\",\"which\":\"in\",\"id\":" + jsonQuote(wantedIn_) + "}");
+}
+
+// Hot-plug, the page's way of life: the watcher (its own thread) lists the devices, tells the page when the list changed and asks the worker (a `dev.fallback` message) to act when the open output or input is gone.
+void BridgeSession::devWatch() {
+  bool first = true; bool wantedBackSent = false;
+  for (;;) {
+    { std::unique_lock<std::mutex> lk(wm_); if (wcv_.wait_for(lk, std::chrono::milliseconds(io_.devWatchMs), [&] { return watchStop_; })) return; }
+    if (!io_.devices) continue;
+    const auto devs = io_.devices->list();
+    const std::string js = audioDevicesJson(devs);
+    if (js != lastDevList_) { if (!first) emit("{\"t\":\"dev\",\"kind\":\"changed\",\"devices\":" + js + "}"); lastDevList_ = js; }
+    first = false;
+    const LiveHost::AudioInfo a = host_.audioInfo();
+    bool gone = false;
+    auto hasOut = [&](const std::string& id) { for (const auto& d : devs) if (d.outId == id && d.outputs > 0) return true; return false; };
+    auto hasIn = [&](const std::string& id) { for (const auto& d : devs) if (d.inId == id && d.inputs > 0) return true; return false; };
+    if (flag_.load() && a.open && (a.lost || (!a.id.empty() && !hasOut(a.id)))) gone = true;
+    if (io_.input && io_.input->isOpen() && (io_.input->lost() || (!inCfg_.inId.empty() && !hasIn(inCfg_.inId)))) gone = true;
+    if (gone) { std::string m = "{\"t\":\"dev.fallback\"}"; post(m); }
+    // the wanted output came back while another plays: said once, never switched (a switch would stop the music)
+    const bool backNow = a.open && !wantedOut_.empty() && a.id != wantedOut_ && hasOut(wantedOut_);
+    if (backNow && !wantedBackSent) { emit("{\"t\":\"dev\",\"kind\":\"changed\",\"wantedBack\":\"out\",\"id\":" + jsonQuote(wantedOut_) + "}"); wantedBackSent = true; }
+    if (!backNow) wantedBackSent = false;
+  }
+}
+
+// On the worker: act on a lost output or input. The output falls back to the system default (the page is told: `dev` lost, `device` stream stopped, then the engine events of the rebuild, then `dev` reopened);
+// the input is closed (a running take ends and is kept).
+void BridgeSession::devFallback() {
+  const auto devs = io_.devices ? io_.devices->list() : makeNullEnumerator()->list();
+  auto hasOut = [&](const std::string& id) { for (const auto& d : devs) if (d.outId == id && d.outputs > 0) return true; return false; };
+  auto hasIn = [&](const std::string& id) { for (const auto& d : devs) if (d.inId == id && d.inputs > 0) return true; return false; };
+  if (io_.input && io_.input->isOpen() && (io_.input->lost() || (!inCfg_.inId.empty() && !hasIn(inCfg_.inId)))) {
+    const std::string id = inCfg_.inId;
+    closeInputKeepTake("the input device went away");
+    emit("{\"t\":\"dev\",\"kind\":\"lost\",\"which\":\"in\",\"id\":" + jsonQuote(id) + "}");
+  }
+  const LiveHost::AudioInfo a = host_.audioInfo();
+  if (flag_.load() && a.open && (a.lost || (!a.id.empty() && !hasOut(a.id)))) {
+    emit("{\"t\":\"dev\",\"kind\":\"lost\",\"which\":\"out\",\"id\":" + jsonQuote(a.id) + ",\"name\":" + jsonQuote(a.name) + "}");
+    AudioConfig c = host_.audioConfig(); c.outId.clear(); c.bufferFrames = 0;   // the system default; the old rate is asked again (converted if the new device runs at another)
+    emit("{\"t\":\"device\",\"reason\":\"stream\",\"stopped\":true}");
+    std::string e;
+    if (rebuild(c, &e)) { const LiveHost::AudioInfo b = host_.audioInfo(); emit("{\"t\":\"dev\",\"kind\":\"reopened\",\"which\":\"out\",\"name\":" + jsonQuote(b.name) + ",\"sr\":" + std::to_string((long long)b.sampleRate) + ",\"buf\":" + std::to_string(b.periodFrames) + ",\"fellBack\":true}"); }
+  }
 }
 
 }  // namespace tpd

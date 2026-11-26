@@ -13,7 +13,9 @@
 #include <string>
 #include <thread>
 
+#include "audio_devices.h"
 #include "bridge_translator.h"
+#include "input_capture.h"
 #include "live_host.h"
 #include "put_store.h"
 #include "recovery_store.h"
@@ -27,11 +29,20 @@ constexpr size_t kMaxOtherBytes = (size_t)64 << 20;  // any other JSON message (
 constexpr size_t kMaxQueueMsgs = 8192;               // the worker's queue: messages ...
 constexpr size_t kMaxQueueBytes = (size_t)256 << 20; // ... and bytes; a full queue refuses (an err, an error reply for an ask)
 
+// H7: the audio / MIDI parts the shell gives the session (all optional: a session without them, as the H6 tests make, answers dev.list with the null device, has no input and caps.midi false).
+struct SessionIo {
+  std::shared_ptr<AudioEnumerator> devices;     // dev.list, hot-plug; null: the null device only
+  const AudioSettingsStore* settings = nullptr; // the saved choice (audio.json); null: not kept
+  InputCapture* input = nullptr;                // the audio input and its takes; null: caps.inputs false, rec.* refused
+  MidiControl* midi = nullptr;                  // null: caps.midi false (the host must have been given the same manager with setMidi)
+  int devWatchMs = 1000;                        // how often the hot-plug watcher looks (tests make it short; 0: no watcher)
+};
+
 class BridgeSession {
  public:
   using Emit = std::function<void(const std::string& lines)>;
   // `recovery`: the recovery copy (null or not enabled: caps.recoveryPut is false and recovery.* answer "no recovery copy").
-  BridgeSession(LiveHost& host, Emit emit, RecoveryStore* recovery = nullptr);
+  BridgeSession(LiveHost& host, Emit emit, RecoveryStore* recovery = nullptr, SessionIo io = SessionIo());
   ~BridgeSession();
   // A page message. Returns at once; the work runs on the worker in order. false: refused (over its limit, or the queue is full): the page has been told.
   bool post(const std::string& msg);
@@ -49,6 +60,17 @@ class BridgeSession {
   void execute(const Call& c, const std::string& type);
   void hello(const Call& c);
   void engineReset();
+  // H7
+  bool rebuild(const AudioConfig& cfg, std::string* err);   // devMu_ held: stop, new output config, start; the engine events; the input is kept
+  void devOpen(const Call& c);
+  void devList(int id);
+  void recOp(const Call& c);
+  void takeFetch(const Call& c);
+  void devWatch();
+  void devEvents(bool initial);
+  void devFallback();
+  std::string audioBody();
+  void closeInputKeepTake(const char* why);
   void emit(const std::string& json) { emit_(json); }
   void err(const std::string& where, const std::string& msg, bool fatal = false);
   void reply(int id, const std::string& fields);
@@ -58,6 +80,7 @@ class BridgeSession {
   int fitFlags() const { return (lxpActive_ ? 1 : 0) | (clockFollow_ ? 2 : 0); }
 
   LiveHost& host_;
+  SessionIo io_;
   Emit emit_;
   RecoveryStore* rec_;
   PutStore puts_;
@@ -69,6 +92,11 @@ class BridgeSession {
   std::thread worker_;
   std::mutex pm_; std::condition_variable pcv_; bool pumpRun_ = false, pumpStop_ = false, closing_ = false;
   std::thread pump_;
+  // H7
+  std::string wantedOut_, wantedIn_;            // what the page chose (kept when a device is gone and the default plays: it is reported, not forgotten)
+  AudioInConfig inCfg_;
+  std::string lastDevList_;
+  std::thread watch_; std::mutex wm_; std::condition_variable wcv_; bool watchStop_ = false;
 };
 
 }  // namespace tpd

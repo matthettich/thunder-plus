@@ -21,6 +21,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_
 find_package(Threads REQUIRED)
 add_library(thunder_desktop_shared STATIC
   shared/app_scheme.cpp shared/put_store.cpp shared/bridge_translator.cpp shared/live_host.cpp shared/bridge_session.cpp shared/desktop_api.cpp shared/text_util.cpp shared/audio_null.cpp shared/shell_core.cpp shared/recovery_store.cpp
+  shared/audio_devices.cpp shared/input_capture.cpp shared/midi_registry.cpp
   ${TPA_CPP}/live_engine.cpp ${TPA_CPP}/live_events.cpp ${TPA_CPP}/songfit.cpp ${TPA_CPP}/pad_filler.cpp)
 # UBSan's vptr check cannot work across the -fno-rtti core: the shared_ptr control blocks the core makes (Song, SeqSession) are released in code built WITH rtti (this library, its tests), and the check calls them
 # "not a _Sp_counted_base" (a false positive: the Core (Linux, sanitizers) job, desktop_live_host and desktop_session). Off for this library and its tests, as for test_seq_takeover and the other tests that hold a Seq.
@@ -40,8 +41,23 @@ if(MSVC)
   target_compile_options(thunder_desktop_shared PRIVATE /EHsc /utf-8)
 endif()
 
+# H7: desktop MIDI = the Android shell's plain-C++ MIDI host (midi_out.cpp / midi_in.cpp, compiled in place) behind shared/midi_manager.cpp. They use POSIX (sched.h, nanosleep): MSVC (Windows) has no MIDI until its
+# own half of H7 (TPD_NO_MIDI: the session and the shell core compile without it).
+if(MSVC)
+  target_compile_definitions(thunder_desktop_shared PUBLIC TPD_NO_MIDI)
+else()
+  target_sources(thunder_desktop_shared PRIVATE shared/midi_manager.cpp ${TPA_CPP}/midi_out.cpp ${TPA_CPP}/midi_in.cpp)
+  if(APPLE)   # midi_out.cpp sleeps with clock_nanosleep(TIMER_ABSTIME), which macOS lacks: shared/apple_shim.h supplies it on the host clock
+    set_source_files_properties(${TPA_CPP}/midi_out.cpp PROPERTIES COMPILE_OPTIONS "-include;${CMAKE_CURRENT_SOURCE_DIR}/shared/apple_shim.h")
+  endif()
+endif()
+
 if(THUNDER_BUILD_DESKTOP_TESTS)
-  foreach(t app_scheme translator put_store desktop_api live_host session shell_core)
+  set(TPD_TESTS app_scheme translator put_store desktop_api live_host session shell_core audio_devices midi_registry input_capture audio_session)
+  if(NOT MSVC)
+    list(APPEND TPD_TESTS midi_manager)
+  endif()
+  foreach(t ${TPD_TESTS})
     add_executable(test_desktop_${t} tests/test_${t}.cpp)
     target_link_libraries(test_desktop_${t} PRIVATE thunder_desktop_shared)
     target_compile_definitions(test_desktop_${t} PRIVATE TPD_REPO="${TPD_REPO}")
@@ -56,6 +72,11 @@ endif()
 if(THUNDER_DESKTOP_SHELL)
   set(MA_DIR "${TPD_REPO}/io/vendor/miniaudio")
   add_library(thunder_desktop_audio STATIC shared/audio_miniaudio.cpp shared/miniaudio_impl.c)
+  if(APPLE)
+    target_sources(thunder_desktop_audio PRIVATE shared/midi_coremidi.cpp)
+    target_compile_options(thunder_desktop_audio PRIVATE -Wno-deprecated-declarations)   # MIDIReadProc / MIDIInputPortCreate: the plain-C API (no blocks) is the one this file uses
+    target_link_libraries(thunder_desktop_audio PUBLIC "-framework CoreMIDI")
+  endif()
   target_include_directories(thunder_desktop_audio PUBLIC shared ${MA_DIR})
   target_link_libraries(thunder_desktop_audio PUBLIC thunder_desktop_shared)
   target_compile_definitions(thunder_desktop_audio PUBLIC MA_NO_DECODING MA_NO_ENCODING MA_NO_GENERATION MA_ENABLE_ONLY_SPECIFIC_BACKENDS)
@@ -105,5 +126,9 @@ if(THUNDER_DESKTOP_SHELL)
     set_target_properties(ThunderPlus PROPERTIES OUTPUT_NAME "Thunder Plus" MACOSX_BUNDLE_BUNDLE_NAME "Thunder Plus" MACOSX_BUNDLE_GUI_IDENTIFIER "com.matthettich.thunderplus.native"
       MACOSX_BUNDLE_SHORT_VERSION_STRING "${THUNDER_APP_VERSION}" MACOSX_BUNDLE_BUNDLE_VERSION "${THUNDER_APP_VERSION}" MACOSX_BUNDLE_INFO_STRING "Thunder Plus (native shell, unsigned)")
     tpd_bundle_web(ThunderPlus "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>/Resources/web")
+    # H7: the audio input needs NSMicrophoneUsageDescription in Info.plist (macOS asks the person the first time an input opens; without the key the open is refused). PlistBuddy runs after the plist is written.
+    add_custom_command(TARGET ThunderPlus POST_BUILD
+      COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/mac/add_mic_key.sh" "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>"
+      COMMENT "Info.plist: NSMicrophoneUsageDescription" VERBATIM)
   endif()
 endif()

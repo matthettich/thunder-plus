@@ -1,8 +1,7 @@
 // H6: the PURE translation of the page's CORE-BRIDGE v1 messages (docs/port/CORE-BRIDGE.md sections 3 and 7) into calls on the live host. A C++ port of the Android shell's
 // BridgeTranslator.kt (native/android/.../BridgeTranslator.kt), whose header comment is the shell's reading of the contract; the desktop shell follows it message for message so that both shells
 // behave alike. DUPLICATION, noted in docs/port/H6-NOTES.md: ~150 lines of rules in Kotlin and here; when one changes the other follows (tests/test_translator.cpp mirrors LiveBridgeTest).
-// No platform type, no thread, no I/O. Differences from the Android translator, all on purpose: dev.list / dev.open and midi.cfg answer "H7" (audio devices and MIDI are the next task), and
-// the shell's `caps` say so.
+// No platform type, no thread, no I/O. Differences from the Android translator, all on purpose: dev.list / dev.open, rec.arm / rec.start / rec.stop, take / take.free and rt.reset / rt.snapshot are real here (H7); the Android shell has none of them.
 #ifndef TPD_BRIDGE_TRANSLATOR_H
 #define TPD_BRIDGE_TRANSLATOR_H
 
@@ -18,7 +17,8 @@ constexpr int64_t kNow = -1;   // THUNDER_LIVE_NOW as the translator uses it: ab
 
 enum class Op {
   SongLoad, KitLoad, Play, Stop, Hold, Bpm, Loop, Lead, Perf, MixSet, FxPlan, FxCommit, FxParam, MasterConfig, ChainEdit, MetersWant, PadsCommit, PadChop, PdcSet, EngineReset,
-  BufUse, BufFree, Hello, MidiCfg, Lxp, MetersSet, FxValues, RecoveryPut, RecoveryGet, RecoveryDrop
+  BufUse, BufFree, Hello, MidiCfg, Lxp, MetersSet, FxValues, RecoveryPut, RecoveryGet, RecoveryDrop,
+  DevList, DevOpen, RecArm, RecStart, RecStop, Take, TakeFree, RtReset, RtSnapshot   // H7
 };
 
 // One flat record for every call: only the fields of its `op` are meaningful.
@@ -41,6 +41,8 @@ struct Call {
   std::vector<std::string> outs; bool clockOut[4] = {false, false, false, false}; double gear[4] = {0, 0, 0, 0}; bool clockIn = false;
   // Lxp
   int st = 0;
+  // H7: DevOpen (out "" = the system default, in "" with hasIn = close the input, sr / buf 0 = leave as is), RecArm (0-based input channels), Take / TakeFree use bufId as the take id
+  std::string devOut, devIn; bool hasIn = false; int devSr = 0, devBuf = 0; std::vector<int> ins; int takeCh = -1; int64_t takeOff = -1, takeN = -1;
   // MetersSet (M4): kinds = THUNDER_LIVE_MK_* bits, fxTracks = bit t (0..31) a track's effects, bit 32 the master's. FxValues: track, slot, kind (1 pump, 2 mod), vals, id (an ask when >= 0). RecoveryPut: raw = the project text.
   int kinds = 0; uint64_t fxTracks = 0, chainsTracks = 0; int fxKind = 1; std::vector<double> vals;   // chainsTracks (M3): bit t (0..31) a track's chains node
 };

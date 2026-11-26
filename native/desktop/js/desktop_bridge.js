@@ -53,7 +53,35 @@
         }
       });
     },
-    take: function () { return Promise.reject(new Error('take: not in the H6 shell skeleton (renders and recordings come with H7)')); }
+    /* take(id[, {ch, off, n}]) (H7): the result of a recording (rec.stop answers with the take id). The shell sends `take.chunk` events {rid, ch, off, n, b} (base64 of little-endian float32) and then the
+       reply {ok, sr, ch, frames}. At most 64 MiB per call (the shell says so otherwise): ask a channel (`ch`) or a range (`off`, `n` in frames) at a time for a big take. Resolves {sr, ch, frames, data: Float32Array[]}
+       (`data` holds the asked channels in order). Release it with send({t:'take.free', take:id}). */
+    take: function (id, o) {
+      o = o || {};
+      return new Promise(function (res, rej) {
+        var rid = nextId++, parts = [];
+        var onChunk = function (m) { if (m.rid === rid) parts.push(m); };
+        tc.on('take.chunk', onChunk);
+        var msg = { t: 'take', take: id, id: rid };
+        if (o.ch != null) msg.ch = o.ch;
+        if (o.off != null) msg.off = o.off;
+        if (o.n != null) msg.n = o.n;
+        pending[rid] = { to: setTimeout(function () { delete pending[rid]; tc.off('take.chunk', onChunk); rej(new Error('take timeout')); }, 120000), res: function (r) {
+          tc.off('take.chunk', onChunk);
+          if (!r.ok) { rej(new Error(r.error || r.err || 'take refused')); return; }
+          var nch = r.nch, n = r.frames, data = [];
+          for (var c = 0; c < nch; c++) data.push(new Float32Array(n));
+          for (var i = 0; i < parts.length; i++) {
+            var p = parts[i], bin = atob(p.b), u = new Uint8Array(bin.length);
+            for (var k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+            var f = new Float32Array(u.buffer, 0, u.length >> 2);
+            if (p.c >= 0 && p.c < nch) data[p.c].set(f, p.off);
+          }
+          res({ sr: r.sr, ch: nch, frames: n, data: data, hostNs0: r.hostNs0, latencyFrames: r.latencyFrames });
+        } };
+        post(JSON.stringify(msg));
+      });
+    }
   };
   window.thunderCore = tc;
 

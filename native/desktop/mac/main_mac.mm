@@ -1,6 +1,6 @@
 // H6: the Mac shell. A minimal Cocoa app: one NSWindow with a WKWebView that loads app://thunder/index.html (served by a WKURLSchemeHandler from the bundled web/ folder), the page bridges in
 // shell_core.h (window.thunderCore, window.thunderDesktop), audio through the core's live host and miniaudio (Core Audio). UNSIGNED (the owner has no Apple Developer membership; H8 signs).
-// Options: --selftest (run the page's selftest, print the verdict, exit 0 / 1), --null-audio (no sound device), --web <dir> (a web folder to serve instead of the bundled one).
+// Options: --selftest (run the page's selftest, print the verdict, exit 0 / 1), --null-audio (no sound device), --web <dir> (a web folder to serve instead of the bundled one), --a5-log <file> (H7: the A5 clock-drift logger, a snapshot every 10 s).
 // NOT HERE (H8): the real Mac menu, .thunder file association (application:openFile: is wired), single instance, updater. A minimal menu (Quit, Edit, Window) is here so the keys work.
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
@@ -13,6 +13,7 @@
 
 #include "app_scheme.h"
 #include "audio_out.h"
+#include "midi_backend.h"
 #include "bootstrap_js.h"
 #include "shell_core.h"
 #include "text_util.h"
@@ -87,7 +88,7 @@ class MacPlatform : public tpd::IPlatform {
 @implementation TPDApp {
   NSWindow* _win; WKWebView* _web; TPDScheme* _scheme; NSTimer* _timer;
   std::unique_ptr<MacPlatform> _plat; std::unique_ptr<tpd::ShellCore> _core;
-  bool _selftest, _nullAudio, _selfTestStarted, _devtools; std::string _webDir; std::string _pendingOpen;
+  bool _selftest, _nullAudio, _selfTestStarted, _devtools; std::string _webDir; std::string _pendingOpen; std::string _a5Log;
 }
 - (instancetype)init {
   if ((self = [super init])) {
@@ -96,6 +97,7 @@ class MacPlatform : public tpd::IPlatform {
       if ([args[i] isEqualToString:@"--selftest"]) _selftest = true;
       else if ([args[i] isEqualToString:@"--null-audio"]) _nullAudio = true;
       else if ([args[i] isEqualToString:@"--devtools"]) _devtools = true;
+      else if ([args[i] isEqualToString:@"--a5-log"] && i + 1 < args.count) _a5Log = S(args[++i]);   // H7: the clock-drift logger's snapshot every 10 s into this file (WORKPLAN H7's 30-minute gate)
       else if ([args[i] isEqualToString:@"--web"] && i + 1 < args.count) _webDir = S(args[++i]);
       else if ([args[i] hasSuffix:@".thunder"]) _pendingOpen = S(args[i]);
     }
@@ -106,6 +108,8 @@ class MacPlatform : public tpd::IPlatform {
 - (void)applicationDidFinishLaunching:(NSNotification*)n {
   _plat.reset(new MacPlatform()); _plat->selftest = _selftest;
   tpd::ShellCore::Options o; o.nullAudio = _nullAudio; o.version = THUNDER_APP_VERSION; o.audio = [] { return tpd::makeMiniaudioOut(); };
+  o.devices = tpd::makeMiniaudioEnumerator(); o.input = [] { return tpd::makeMiniaudioIn(); }; o.midi = [] { return tpd::makeCoreMidiBackend(); };   // H7: device list, every input channel, CoreMIDI (the backend is made on the main thread: CoreMIDI delivers hot-plug notifications on its run loop)
+  o.a5LogPath = _a5Log;
   TPDApp* me = self;
   o.requestFlush = [me] { dispatch_async(dispatch_get_main_queue(), ^{ [me flushToPage]; }); };
   o.deliver = [me](const std::string& text) { [me runInPage:"window.__thunderRecv(" + tpd::jsonQuote(text) + ")"]; };
