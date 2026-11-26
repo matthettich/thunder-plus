@@ -73,11 +73,11 @@ test('(a) the Settings value "Native core (test)" is listed only where window.th
 // ---- (b) source guards -----------------------------------------------------------------------------------------------------------
 test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 of N2-PAGE-CLIENT 4.3 (and the two media-session guards), PC2 adds 7, 8 (two), 9, 10 (two); a new NCON() / tp.nc use needs a row there and a change here', () => {
   const at = re => (src.split('\n').map((l, i) => re.test(l) ? i + 1 : 0).filter(Boolean));
-  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 17, 'NCON() occurrences: padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2); mfSet, the OUT bar drag, pdcSet, thunderChains.param (PC4); fxDynNodeOf (M5)');
+  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 19, 'NCON() occurrences: padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2); mfSet, the OUT bar drag, pdcSet, thunderChains.param (PC4); fxDynNodeOf (M5)');
   assert.equal((src.match(/\bNC\(\)/g) || []).length, 18, 'NC() occurrences: padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16); coreBuf, coreKit, coreKitCheck, setSong, setKit, newKit (PC2); mfSet, the OUT bar drag, pdcSet, param (PC4)');
-  assert.equal((src.match(/\btp\.nc\b/g) || []).length, 12, 'tp.nc: perfPush, perfFill (15), corePost (16), tStop x2 (5), msMeta x2 (code and comment) and bgPlay (the one media session), the ncSongHost comment');
+  assert.equal((src.match(/\btp\.nc\b/g) || []).length, 14, 'tp.nc: perfPush, perfFill (15), corePost (16), tStop x2 (5), msMeta x2 (code and comment) and bgPlay (the one media session), the ncSongHost comment');
   for (const [re, fn] of [[/^function perfPush\(\)/, 'perfPush'], [/^function perfFill\(/, 'perfFill'], [/^const corePost = /, 'corePost'], [/^\s*if \(tp\.nc\)\{ tp\.nc = false;/, 'tStop'], [/const ms = navigator\.mediaSession; if \(!ms \|\| !bgOn/, 'msMeta'], [/^\s*if \(on && tp\.nc\) return;/, 'bgPlay']]) assert.equal(at(re).length, 1, fn);
-  assert.equal(at(/\btp\.nc\b/).length, 10, 'tp.nc on ten lines (M5: fxDynNodeOf) (the tp literal and begin() say nc: without the tp. prefix)');
+  assert.equal(at(/\btp\.nc\b/).length, 12, 'tp.nc on twelve lines (M5: fxDynNodeOf, chains and master meters) (the tp literal and begin() say nc: without the tp. prefix)');
   for (const fn of ['coreBuf', 'coreKit', 'coreKitCheck', 'coreVar']) assert.ok(new RegExp('NCON\\(\\)[^\\n]*', 'm').test(cut(new RegExp('function ' + fn + '\\([^\\n]*(\\n[^\\n]*)?', 'm'), fn)), fn + ' has its branch');
   assert.equal((src.match(/\bncPadApi\b/g) || []).length, 8, 'ncPadApi: its definition, the five PC2 calls (coreVar does not need it), and PC3\'s padApi line (typeof test and call)');
   assert.equal((src.match(/\bloadClient\b/g) || []).length, 2, 'loadClient: its declaration and its one call site');
@@ -102,7 +102,7 @@ test('(b) __thunderClient appears only inside the loader block; thunder-core-cli
   assert.ok(start > 0 && endIdx > start);
   lines.forEach((l, i) => {
     if (l.includes('__thunderClient')) assert.ok(i >= start && i <= endIdx, 'line ' + (i + 1) + ' mentions __thunderClient outside the loader: ' + l.slice(0, 80));
-    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=6';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
+    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=7';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
   });
   assert.equal(lines.filter(l => /^\s*s\.src = /.test(l) && l.includes('thunder-core-client.js')).length, 1);
 });
@@ -127,7 +127,7 @@ test('(c) switch off, no thunderCore: the call site does not call loadClient; no
 test('(c) with the shell or the native pick the loader makes one script for the client file, and not a second time', () => {
   for (const o of [{ thunderCore: {} }, { core: 'native' }]) {
     const sb = rig(o); run(sb, LOADER + CALL + ';'); assert.equal(sb.__log.creates.join(), 'script');
-    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=6'); assert.equal(sb.__log.appended.length, 1);
+    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=7'); assert.equal(sb.__log.appended.length, 1);
     sb.__thunderClient = {}; run(sb, 'loadClient()'); assert.equal(sb.__log.creates.length, 1, 'already loaded: nothing more');
   }
 });
@@ -162,8 +162,8 @@ test('client: defines only window.__thunderClient, and loading it twice keeps th
 test('sw.js: the client is an OPTIONAL entry (a missing file cannot fail the install), the file exists, and BUILD matches the cache', () => {
   const fs = require('fs'), path = require('path');
   const opt = (sw.match(/const OPTIONAL = \[([^\]]*)\]/) || [])[1] || '', files = (sw.match(/const FILES = \[[\s\S]*?\];/) || [])[0] || '';
-  assert.ok(opt.includes("'./thunder-core-client.js?v=6'")); assert.ok(!files.includes('thunder-core-client.js'));
+  assert.ok(opt.includes("'./thunder-core-client.js?v=7'")); assert.ok(!files.includes('thunder-core-client.js'));
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'thunder-core-client.js')));
-  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=6'"), 'the page and the service worker name the same URL');
+  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=7'"), 'the page and the service worker name the same URL');
   const b = src.match(/const BUILD = (\d+);/)[1]; assert.ok(sw.includes("'thunderplus-v" + b + "'"));
 });
