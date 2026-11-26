@@ -28,10 +28,15 @@ bool go(const Cfg& c, Run& o) {
   CHECK(H.song(chlvlSong()) == 0, "song");
   H->setTestTap(chTapFn, &o.tap);
   CHECK(H->play(playOpts(THUNDER_LIVE_NOW)) == 0, "play");
-  if (c.fx) { const std::string a = "[{\"type\":\"tape\",\"on\":true},{\"type\":\"comp\",\"on\":true}]"; CHECK(H->fxPlan(0, (const uint8_t*)a.data(), a.size(), 120) == 0 && H->fxCommit(0, -1) == 0, "fx plan"); }
-  if (c.apply) CHECK(H->metersSet(c.sp) == 0, "spec");
   int64_t fr = 0; int done = 0;
   auto drain = [&] { for (auto& r : H.poll()) o.recs.push_back(std::move(r)); };
+  if (c.fx) {   // the play's own plans (the song has no effects: an empty chain for every track) are committed when the play STARTS, which may be a quantum or more after play() (live.h: a held-back adopt). A plan made after play() but
+                // committed before that start would be replaced by the song's empty one, so: run until the play has started (state no longer IDLE; this short song may already be ENDED), then plan (the same on every compiler / platform).
+    for (int i = 0; i < 64 && stats(H.h).state == THUNDER_LIVE_STATE_IDLE; i++) { H.run(o.l, o.r, 128, 128, fr); drain(); }
+    CHECK(stats(H.h).state != THUNDER_LIVE_STATE_IDLE, "the play has started before the effects are planned (state %d)", (int)stats(H.h).state);
+    const std::string a = "[{\"type\":\"tape\",\"on\":true},{\"type\":\"comp\",\"on\":true}]"; CHECK(H->fxPlan(0, (const uint8_t*)a.data(), a.size(), 120) == 0 && H->fxCommit(0, -1) == 0, "fx plan");
+  }
+  if (c.apply) CHECK(H->metersSet(c.sp) == 0, "spec");
   while (done < c.quanta) {
     int step = std::min(16, c.quanta - done);
     if (c.at >= 0 && done < c.at) step = std::min(step, c.at - done);
