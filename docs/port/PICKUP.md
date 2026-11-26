@@ -30,7 +30,19 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (25 Nov, 09:40): the state for a new chat. Everything below this section is history, newest first.
+## START HERE (25 Nov, 19:00): for a new chat. Read this section only; everything below is history.
+**Merged today into `native`:** the whole N2 stack (#312, #313, #315, #316, #322 = H3 + H4 + H5 + ANR fix + pad removal + every verifier fix; #317..#319 closed as merged through #322), P3b #320, PC0 docs #326, **M1 #329** (FXLVL / FXDYN, `thunder_live_meters_set`). **Into `beta`:** PC1 #321, PC2 + PC3 #325, PC4 #327, M5-half #330 (build 680). **About 90%.**
+**Open:** **PP #328** `n1/pp-pump-params` (instant pump / modular knob values; native + M1 merged in, head b3313a89; read and accepted; merge when CI is green; the EQ's phase / lin_quality and a linear-phase EQ are refused and ride in the song).
+**The owner has a test APK** (debug key, run 45720173488 artifact `thunder-plus-android-beta-apk`) and the Owner's to-do in HANDOVER.md (on `beta`) says how to install it and to run `native/tests/ANDROID-CHECKLIST.md`. His results drive the next fixes. Signing secrets: his, this afternoon; after them run the Native workflow with `release` ticked from `native`.
+**Next, in order (Opus manages, Sonnet builds; Fable reads audio-thread code and the page's PLAY / meters paths):**
+1. **M4 (shell):** decode FXLVL / FXDYN into `fx.lvl` / `fx.dyn` (type string via `thunder_fx_type_name`), `meters.want` → `thunder_live_meters_set` (one `fx_tracks` mask; `kinds` FXLVL if `fx` non-empty, FXDYN if `dyn` non-empty; the page sends one track per list), `hello.caps.meters2`; JNI + BridgeTranslator `fx.values {tr, slot, kind:'pump'|'mod', v:[...]}` → `thunder_live_fx_values` (after PP merges).
+2. **Page:** PC4's diff sends `fx.values` for pump / mod slots while playing (needs `host.fxSlot` to return the values list; the page's `pumpPv` / `mp` mapping); the "Restore unsaved changes" prompt (`recovery`, `recovery.get`, `recovery.drop` in N2-NOTES; NOTE the copy is the `song.load` S, not the project text or the kit: add a `recovery.put {project}` from the page every ~10 s while dirty, or restore from S).
+3. **M3** chains in / out peaks, **M2** master meters (Fable reads both), **M6** CORE-BRIDGE 7.2.
+4. **PC5** (playhead, the 70-float meters view, `meterRt` stub, the `ctx === null` audit: Fable reads), then the pad flashes / dogs and the click.
+5. Windows / Mac shells (N4).
+**Owner's open choices:** none blocking. **Merge rule for stacked branches** (learned today): never `checkout --ours` a file both sides touched; `git checkout -m FILE` and keep both; grep for markers before committing; GitHub squash-merges a PR whose base moved without a re-merge when the files are disjoint.
+
+## START HERE of 25 Nov, 09:40 (now history)
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at the newest START HERE."
 
 **The owner's rules:** as the 00:50 section below (Fable for audio-thread reads, Opus otherwise, say when to switch; delegate to Sonnet; decide and tell him).
