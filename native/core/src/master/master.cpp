@@ -278,6 +278,7 @@ class Loudness {
     }
   }
   bool quiet() const { for (int c = 0; c < 2; c++) for (int k = 0; k < 2; k++) if (!dead4(st_[c][k])) return false; return true; }
+  void reset() { for (int c = 0; c < 2; c++) for (int k = 0; k < 2; k++) st_[c][k] = Biq{}; cnt_ = 0; hi_ = 0; filled_ = 0; acc_ = 0; for (double& h : hist_) h = 0; }   // scalars and fixed arrays only (audio thread)
   void skip(int n) { while (n > 0) { const int t = std::min(n, blk_ - cnt_); cnt_ += t; n -= t; if (cnt_ >= blk_) block(); } }
   double shortTerm() const {
     if (!filled_) return -INFINITY;
@@ -335,6 +336,13 @@ int MasterProcessor::latency() const { return latencySup() + latencyLim(); }
 bool MasterProcessor::popMeter(MasterMeter* out) {
   if (qn_ == 0) return false;
   *out = q_[qh_]; qh_ = (qh_ + 1) % kMeterQueue; qn_--; return true;
+}
+
+void MasterProcessor::setMeters(bool on) {
+  if (on == meters_) return;
+  meters_ = on;
+  qh_ = 0; qn_ = 0; inPk_ = 0; outPk_ = 0; tpMax_ = 0; compGr_ = 0; nq_ = 0; lim_->grMin = 1; comp_->detMax = -200;   // (an edge either way: nothing of the other state stays to be read)
+  if (on) { inLu_->reset(); outLu_->reset(); }   // lead's read (M2 Q1): the loudness window starts empty at `on` (it was not run while off: no 3 s of an older part of the song). Only the meters and the silence shortcut's quiet() read it; the audio does not
 }
 
 bool MasterProcessor::process(float* L, float* R, int frames) {
