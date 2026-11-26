@@ -1,6 +1,9 @@
 // MSVC only (force-included into the Android shell's plain-C++ files, which call clock_gettime(CLOCK_MONOTONIC)). Not on any other platform.
 #pragma once
 #ifdef _MSC_VER
+#ifndef __attribute__
+#define __attribute__(x)   /* live_events.cpp declares its printf helper with GNU format(printf): no meaning on MSVC */
+#endif
 #include <time.h>
 #ifndef NOMINMAX
 #define NOMINMAX
