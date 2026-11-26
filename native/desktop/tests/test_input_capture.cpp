@@ -9,13 +9,14 @@
 #include "rt/json.h"
 
 using namespace tpd;
+static bool g_closed = false;   // the capture owns (and frees) the input on close, so the test cannot look at the object afterwards
 struct FakeIn : AudioIn {
-  Callback cb = nullptr; void* user = nullptr; int ch = 28; double sr = 48000; int lat = 96; bool openOk = true; std::atomic<bool> lostFlag{false}; bool closed = false; AudioInConfig seen;
+  Callback cb = nullptr; void* user = nullptr; int ch = 28; double sr = 48000; int lat = 96; bool openOk = true; std::atomic<bool> lostFlag{false}; AudioInConfig seen;
   bool open(const AudioInConfig& c, Callback f, void* u, AudioInInfo* info, std::string* err) override {
     seen = c; if (!openOk) { if (err) *err = "no such input"; return false; }
     cb = f; user = u; info->channels = ch; info->sampleRate = sr; info->latencyFrames = lat; info->periodFrames = 128; info->name = "Fake 28"; info->id = c.inId; return true; }
   bool start(std::string*) override { return true; }
-  void close() override { closed = true; }
+  void close() override { g_closed = true; }
   bool lost() const override { return lostFlag.load(); }
   // one callback: sample (frame i, channel c) = c + (i % 1000) / 1000 / 10  (channel in the integer part so every channel is told apart)
   void feed(int frames, int64_t first) { std::vector<float> b((size_t)frames * (size_t)ch); for (int i = 0; i < frames; i++) for (int c = 0; c < ch; c++) b[(size_t)i * ch + c] = (float)c + (float)((first + i) % 1000) / 10000.f; cb(user, b.data(), frames, ch, 1000); }
@@ -59,7 +60,7 @@ int main() {
 
   fi->lostFlag = true; CHECK(ic.lost(), "a device that stops by itself is reported lost");
   fi->lostFlag = false;
-  FakeIn* old = fi; ic.close(); CHECK(!ic.isOpen() && old->closed, "close stops the device"); ic.close();   // twice is fine
+  g_closed = false; ic.close(); CHECK(!ic.isOpen() && g_closed, "close stops the device"); ic.close();   // twice is fine
 
   // the capture thread at the real callback rate: 28 channels, 128-frame callbacks every 2.67 ms for two seconds, nothing dropped, the take whole
   CHECK(ic.open({"", 48000, 0}, &e) && ic.arm({0, 1}, &e) && ic.start(&e), "reopen");
