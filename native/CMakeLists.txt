@@ -41,3 +41,4 @@ if(THUNDER_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+add_subdirectory(desktop)   # H6: the desktop shells (WebView2 / WKWebView): a platform-neutral library and its tests everywhere; the shell executables only with -DTHUNDER_DESKTOP_SHELL=ON
