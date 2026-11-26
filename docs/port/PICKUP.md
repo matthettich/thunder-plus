@@ -30,6 +30,19 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
+## START HERE (26 Nov, 10:45): FABLE REVIEW OF H7 #342. Read this section, then the 06:45 one below it.
+**Done this morning:** the Electron file-access fix (S-1) is build 684 on `beta` (#340), merged to `main` (#341), and released as desktop **v1.3.15** (run 45865888087, 11 assets).
+**H7 (Mac desktop audio + MIDI) = PR #342**, `n4/h7-mac-audio-midi`, head 1381259 (notes `docs/port/H7-NOTES.md`, CORE-BRIDGE section 8). `native/core` is untouched. macOS shell CI was green at report time; check the rest.
+**The Fable review, read every line of these real-time paths:**
+- Audio thread: `LiveHost::audioCb`, `MidiManager::audioBlock` (it calls the existing `tpa::MidiHost::audioBlockLive`), `MaOut::data`, `MaIn::data`, `InputCapture::onCapture` (ring push only).
+- CoreMIDI read proc: `CoreMidi::read` (only `MidiRxRing::push`).
+- miniaudio notification thread: `MaOut::notify`, `MaIn::notify` (atomics only).
+- Also judge: decision 7 (MIDI clock map = callback start + latency: a constant offset up to one buffer), decision 10 (input on its own clock, so long takes drift against the output: acceptable for now?), decision 13 (sender QoS, not RT priority), loose ends (`rtlog_reset` race as Android; `MidiManager::rescan` holds `mu_` across a blocking call), and `shared/apple_shim.h` force-included for the Android `midi_out.cpp`.
+- Fix what's needed on the branch (merge, never rebase), then merge when CI is green.
+**Untested without hardware:** CoreAudio / CoreMIDI, unplug behaviour, latency, the Cranborne's 28 inputs, the mic prompt, the 30-minute A5 gate at 128 / 256, CoreMIDI loopback jitter. These become owner punch-list items (Mac).
+**Gap:** the page-side client for the desktop shell's audio / MIDI messages does not exist yet (Settings › Audio and MIDI in the page still speak the Electron channels). Plan it as **PC7** after the review.
+**After the review (Opus):** PC7, W-TFX (plan; Fable judges), H8, H9.
+
 ## START HERE (26 Nov, 06:45): for a new chat. Read this section only; everything below is history.
 **Merged overnight:** into `native`: M4 #332 (Android shell meters / fx.values / recovery.put), M3 + M2 #336 (chains in / out + master meters, read and accepted by Fable; #334 closed as included), M6 #338 (CORE-BRIDGE 7.2), H6 #339 (desktop shell skeleton: WebView2 + WKWebView, all 31 channels answer, verifier round fixed). Into `beta`: PC6 #333 (681), M5b #335 (682), M5c #337 (683): all behind the native switch, not on `main`.
 **The meters stage is complete** (M1..M6). Effects, chains and master meters, instant pump / modular knobs and the restore prompt all work end to end on the Android beta once the owner tests a new APK.
