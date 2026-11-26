@@ -53,6 +53,7 @@ static const char* const kLxrCases[] = {
   "kit_4_lxcym",
   "kit_5_lxhat",
   "kit_6_lxhat",
+  "song_BETA-TESTING-ELECTRO_6_lxsnare",
   "song_ELECTRO_5_lxsnare",
   "song_ELECTRO_6_lxsnare",
   "lo_lxdrum",
@@ -819,4 +820,4 @@ static const char* const kLxrCases[] = {
   "open_lxhat_0.4",
   "open_lxhat_long",
 };
-static const int kLxrCaseN = 818;
+static const int kLxrCaseN = 819;
