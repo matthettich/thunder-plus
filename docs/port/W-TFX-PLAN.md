@@ -115,3 +115,16 @@ Why: one compiler for all platforms' upstream DSP (B9 is the only risk class tha
 3. If B2 shows the MS bit-field layout is 4 bytes under clang-cl: accept a host-only `prepare.sh` patch (explicit 3-byte store/load) for Beads' 12-bit items?
 4. Enable pe + mods (Plaits, Elements, Marbles, Tides) in the same unit (my plan: yes, second commit) or tfx only?
 5. W-PUMP right after (same switch), before Windows H7 audio ships?
+
+## 7. The lead's judgement (Fable, 26 Nov): APPROVED, option (c) staged, with five corrections
+
+Answers: Q1 yes ((c) staged, (a) the fallback, (b) rejected). Q2 keep the cl.exe job for good. Q3 see correction 2. Q4 yes, pe + mods in the same unit as a second commit. Q5 yes: W-PUMP directly after, before any Windows build is called testable (no pump = no MASTER).
+
+Corrections the builder must follow:
+1. **B9 does not vanish under clang-cl.** When clang targets the Microsoft ABI it evaluates call arguments RIGHT TO LEFT (the wasm, Linux and Mac clang builds go left to right). Any upstream call whose arguments have side effects (random draws, stateful `Process()` / `Next()` calls) can therefore differ on Windows only. The Beads case is safe (prepare.sh sequences the three draws in statements). The gate is `fx` / `padfx` / `modfx` and the pe hashes: a case that passes on Mac and fails on Windows is this until shown otherwise. Fix = a host-neutral prepare.sh patch that sequences the draws in the wasm's order (as the Beads one), reported to the lead with before / after figures. Never a wider gate.
+2. **B2: expect 4 bytes.** Under the MS ABI a bit-field does not share a storage unit across `int16_t` boundaries, and `packed` does not change that, so `l:12; r:12` is 2 x int16. First find out whether any hosted Beads path uses the 12-bit items at all (`fx_beads.cc` / `padfx_mi.cc`: the quality setting). If none does: `test_dsp_layout` records the size and the notes say so; no patch. If one does: the explicit 3-byte store / load patch in prepare.sh (all hosts, so every platform runs the same code; it must give identical `fx` figures on Linux first).
+3. **CRT:** the dsp directory blanks `CMAKE_CXX_FLAGS_<cfg>`. With CMake >= 3.15 policy (we require 3.20) `/MD` comes from `MSVC_RUNTIME_LIBRARY`, not from those flags, so it survives; verify in the first build log that every dsp object has `/MD` and that `/EHsc` (from `CMAKE_CXX_FLAGS`) is present for the tfx group. A LNK2038 mismatch means this went wrong.
+4. **Exceptions:** mirror the other hosts exactly: tfx with exceptions, mods / pe as they are on Linux unless clang-cl needs otherwise. No `/EHs-c-` anywhere (unchanged from the plan).
+5. **The probe (step 1) runs on a normal, non-draft PR** (CI runs only on PRs; a draft cannot be un-drafted through REST).
+
+Also: the notes must list, per effect, the Windows `fx` figure beside Linux and Mac; and HANDOVER's build instructions for the owner's Windows PC get the line "Visual Studio Installer > C++ Clang tools for Windows" when the desktop job moves to `-T ClangCL`.
