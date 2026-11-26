@@ -527,6 +527,14 @@ target_include_directories(test_fxzero PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../co
 add_test(NAME fxzero COMMAND test_fxzero)
 set_tests_properties(fxzero PROPERTIES SKIP_RETURN_CODE 77)
 
+# W-TFX (B2): Beads' 12-bit delay items are 3 bytes on every host build (prepare.sh packs them explicitly; clang-cl's bit-field layout would give 4). Headers come from the prepared upstream tree.
+if(TARGET thunder_dsp_tfx)
+  add_executable(test_dsp_layout test_dsp_layout.cpp)
+  target_include_directories(test_dsp_layout PRIVATE ${CMAKE_BINARY_DIR}/upstream/eurorack)
+  target_compile_definitions(test_dsp_layout PRIVATE TEST $<$<BOOL:${MSVC}>:_USE_MATH_DEFINES>)
+  add_test(NAME dsp_layout COMMAND test_dsp_layout)
+endif()
+
 # U18: the pump effects as slot kinds of the track-effect host against the worklet itself (tools/pump-dump.mjs: 80 cases + pumpLatencyOf of every type; needs Node and acorn, and the
 # repo's shipped pump/pump.wasm). No SKIP_RETURN_CODE for a missing reference: a fixture that cannot run FAILS. Only where pump itself is not built (MSVC: pump's wasm build needs clang
 # or gcc) the test says "not run" (exit 77), as test_fx does where there is no DSP library. parity-u18.sh also runs it against a pump.wasm built from the pin.

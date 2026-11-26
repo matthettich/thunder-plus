@@ -94,6 +94,11 @@ size_t ndiff(const std::vector<float>& a, const std::vector<float>& b) {
 }  // namespace
 
 int main() {
+#ifdef THUNDER_HAVE_TFX
+  std::printf("TFX: yes\n");   // W-TFX: CI greps this line for the Windows clang-cl job (no effects library = the plans below are not made)
+#else
+  std::printf("TFX: no\n");
+#endif
   CHECK((thunder_live_caps() & THUNDER_LIVE_CAP_METERS2) != 0, "CAP_METERS2 is set");
   const uint64_t T0 = 1ull << 0, T1 = 1ull << 1, TM = 1ull << 32;
 
