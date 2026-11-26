@@ -249,7 +249,9 @@ dsp_group(${T} tides OPTS ${OPT_MOD} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/mods
   ${E}/tides2/poly_slope_generator.cc ${E}/tides2/ramp/ramp_extractor.cc ${E}/tides2/resources.cc)
 
 # ------------------------------------------------------------------------------------ thunder-dsp (dsp/build.sh)
-dsp_lib(thunder_dsp_w)
+if(NOT DSP_CLANGCL)   # W-TFX: wasm-only on clang-cl (see dsp_group)
+  dsp_lib(thunder_dsp_w)
+endif()
 set(T thunder_dsp_w)
 set(PLAITS_NAMES algorithms additive_engine bass_drum_engine chiptune_engine chord_bank chord_engine dx_units fm_engine grain_engine
   hi_hat_engine lpc_speech_synth lpc_speech_synth_controller lpc_speech_synth_phonemes lpc_speech_synth_words modal_engine modal_voice
