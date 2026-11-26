@@ -63,7 +63,7 @@
     detach: function () {
       for (var i = 0; i < offs.length; i++) { try { offs[i](); } catch (e) { /* ignore */ } }
       offs = []; NC.on = false; NC.sr = 0;
-      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset(); mtrReset(); MTR.views = {}; MTR.wanted.fx = []; MTR.wanted.dyn = [];
+      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset(); mtrReset(); MTR.views = {}; MTR.wanted.fx = []; MTR.wanted.dyn = []; rcvStop();
     },
 
     // ---- PC3: the song -------------------------------------------------------------------------------------------------------------------
@@ -301,6 +301,7 @@
     var on = function (t, fn) { tc.on(t, fn); offs.push(function () { if (typeof tc.off === 'function') tc.off(t, fn); }); };
     on('clock', function (m) { lastClock = nowMs(); lost = false; if (m && m.sr && m.sr !== NC.sr && m.sr > 0) { /* a rate change arrives with engine / device events: handled there */ } });
     if (meters2()) { on('fx.lvl', onFxLvl); on('fx.dyn', onFxDyn); }   // M5: only with caps.meters2
+    on('recovery', onRecovery); rcvStart();   // PC6: the shell holds a copy of unsaved work from last time; the puts of this time
     on('song', function (m) { if (m && m.rev != null) songHeard = m.rev; });
     on('fit', function (m) {   // the shell's verdict again (after kit.load, after lxp): for the song last sent
       if (!m || !verdict || m.rev !== verdict.rev) return;
@@ -625,26 +626,51 @@
   var MIX_KEYS = ['vol', 'trim', 'pan', 'mute', 'solo'];   // the order of a track's signature row; the shell's MIX_KEYS also has 'out' (the master's); 'send' is refused: it rides in the song text
   var CHAIN_ROUTED = { trackIn: 1, chainOut: 1, scin: 1, scout: 1 };   // chain_edit answers E_ARG for these modules (their params move the bus plan): they go with the song
   var CHAIN_NAMES = { track: 1, src: 1, pre: 1 };                       // the same, by parameter name (the page re-routes tracks and taps for these)
-  var L = { sent: null, pdc: null, t: 0, ops: new Map(), poke: false };
-  function liveReset() { L.sent = null; L.pdc = null; L.ops.clear(); L.poke = false; clearTimeout(L.t); L.t = 0; }
+  var L = { sent: null, pdc: null, t: 0, ops: new Map(), poke: false, gen: 0, refused: {}, retry: {} };   // PC6: gen / refused / retry belong to fx.values (see fxvSend)
+  function liveReset() { L.sent = null; L.pdc = null; L.ops.clear(); L.poke = false; clearTimeout(L.t); L.t = 0; L.gen++; L.refused = {}; L.retry = {}; }
   function liveSoon() { if (L.t || !playSent || !L.sent) return; L.t = setTimeout(liveFlush, LIVE_MS); }
   function fin(x) { return typeof x === 'number' && isFinite(x); }
   function lvl(x) { x = +x; return isFinite(x) ? Math.max(0, Math.min(255, x)) : null; }
+
+  // PC6: fx.values (PP: thunder_live_fx_values). `hello.caps.fxValues` is the shell's switch (the PP / PICKUP notes define no name for it: this is the one the page looks for).
+  function fxvOn() { return !!(NC.on && NC.caps && NC.caps.fxValues); }
+  var FXV_MS = 2000;          // how long a reply to fx.values is waited for; none = the shell does not take it
+  function sameVals(a, b) { if (a === b) return true; if (!a || !b || a.length !== b.length) return false; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+  /** One slot's whole value list to the core, as an ask: the reply {ok:true}, or {ok:false, error} when the core refuses (an EQ's phase / lin_quality, a linear-phase EQ, n not the planned count: PP "rides in the song").
+   *  A refusal is silent: the slot is marked and its knobs go with the whole song (which carries every change anyway) until the baseline changes (next accepted song, a new plan for the track).
+   *  {ok:false, busy:true} (or error 'busy': the core's ring of 16 was full) is not a refusal: the same list is sent again at the next tick. A timeout or a rejected ask counts as a refusal. */
+  function fxvSend(t, k, kind, v) {
+    var key = t + ':' + k; if (L.refused[key]) return;
+    var m = { t: 'fx.values', tr: t, slot: k, kind: kind, v: v }, g = L.gen;
+    if (!tc || typeof tc.ask !== 'function') { send(m); return; }
+    var p; try { p = tc.ask(m, FXV_MS); } catch (e) { L.refused[key] = 1; return; }
+    Promise.resolve(p).then(function (r) {
+      if (g !== L.gen || !r || r.ok !== false) return;
+      if (r.busy || r.error === 'busy') { L.retry[key] = 1; liveSoon(); return; }
+      L.refused[key] = 1; delete L.retry[key];
+    }, function () { if (g === L.gen) L.refused[key] = 1; });
+  }
 
   // One track's (or the master's) effect list: `raw` is what fx.plan would carry (plus the tempo the tempo-locked effects are mapped for), `str` the structure (which slots, which effect, on / off),
   // `p` the 12 mapped values of each ordinary slot. A pump or modular slot has no fx.set (live.h): its parameters ride in the song, its on / type / position in fx.plan.
   function fxEntry(A, bpm, prev) {
     var raw = bpm + '|' + JSON.stringify(A || null);
     if (prev && prev.raw === raw) return prev;
-    var e = { raw: raw, str: '', p: [], pump: false }, sr = NC.sr;
+    var e = { raw: raw, str: '', p: [], v: [], kd: [], pump: false }, sr = NC.sr, wantV = fxvOn();
     if (A && A.length) for (var k = 0; k < A.length; k++) {
       var f = A[k], info = f && host.fxSlot ? host.fxSlot(f, sr, bpm) : null;
-      if (!f) { e.str += '-,'; e.p.push(null); continue; }
-      if (!info) { e.str += k + ':?' + f.type + ',';  e.p.push(null); continue; }   // an effect the page does not know either: only its type is a structure
+      if (!f) { e.str += '-,'; e.p.push(null); e.v.push(null); e.kd.push(''); continue; }
+      if (!info) { e.str += k + ':?' + f.type + ',';  e.p.push(null); e.v.push(null); e.kd.push(''); continue; }   // an effect the page does not know either: only its type is a structure
       e.str += k + ':' + f.type + ':' + (f.on ? 1 : 0) + ':' + info.kind + ',';
       if (info.kind === 'pump') e.pump = true;
       var p = null; if (info.kind === 'fx' && info.p && info.p.length === 12) { p = info.p.slice(); for (var q = 0; q < 12; q++) if (!fin(p[q])) { p = null; break; } }   // a value the shell would refuse: the song carries it
       e.p.push(p);
+      // PC6: a pump or modular slot's whole value list (fx.values); only with caps.fxValues. A list the core would refuse (a non-finite value, none at all) is left to the song.
+      var v = null;
+      if (wantV && (info.kind === 'pump' || info.kind === 'mod') && info.v && info.v.length) {
+        v = []; for (var j = 0; j < info.v.length; j++) { var x = +info.v[j]; if (!isFinite(x)) { v = null; break; } v.push(info.kind === 'pump' ? Math.fround(x) : x); }   // pump values are float32 on the control side (PP), a modular value is a double
+      }
+      e.v.push(v); e.kd.push(info.kind);
     }
     return e;
   }
@@ -662,7 +688,7 @@
   // The shell accepted this song (ok verdict): it is what the core holds. Edits made since the snapshot go out at once.
   function liveAccepted(v) {
     if (v.live || !v.snap || v.snap.ref !== host.S()) return;   // once per song: a later `fit` event for the same song must not put an older baseline back
-    v.live = true; L.sent = v.snap; L.ops.clear();
+    v.live = true; L.sent = v.snap; L.ops.clear(); L.refused = {}; L.retry = {};   // PC6: a new song is a new plan: the core may take what it refused (an EQ made minimum-phase)
     if (playSent && NC.on && hasMods(v.snap)) L.poke = true;   // live.h pdc_set: "the page calls it after a song_publish that changes the chains patch" (sent whenever a song with chains is accepted mid-play)
     liveSoon();
   }
@@ -691,13 +717,19 @@
     for (var t = 0; t <= 32; t++) {
       var c = cur.fx[t], w = o.fx[t]; if (!c || !w || c === w) continue;
       var A = t < 32 ? S.tfx && S.tfx[t] : S.mfx, bpm = +S.bpm > 0 ? +S.bpm : 120;
-      if (c.str !== w.str) { send({ t: 'fx.plan', tr: t, slots: A || [], bpm: bpm }); if (c.pump || w.pump) L.poke = true; }
+      if (c.str !== w.str) { send({ t: 'fx.plan', tr: t, slots: A || [], bpm: bpm }); if (c.pump || w.pump) L.poke = true; for (var rk in L.refused) if (rk.indexOf(t + ':') === 0) delete L.refused[rk]; }
       else for (var k = 0; k < c.p.length; k++) {   // (a slot whose values could not be sent, now or before, is left to the song)
         var np = c.p[k], op = w.p[k]; if (!np || !op) continue;
         for (var q = 0; q < 12; q++) if (np[q] !== op[q]) { send({ t: 'fx.set', tr: t, slot: k, p: np }); break; }
       }
+      if (c.str === w.str) for (var k2 = 0; k2 < c.v.length; k2++) {   // PC6: a pump / modular slot's knobs, the whole list of that slot
+        var nv = c.v[k2], ov = w.v[k2]; if (!nv || !ov || c.kd[k2] !== w.kd[k2] || sameVals(nv, ov)) continue;
+        fxvSend(t, k2, c.kd[k2], nv);
+      }
       o.fx[t] = c; if (n) n.fx[t] = c;
     }
+    // PC6: lists the core answered 'busy' for are sent again (the current list of that slot, from the baseline just brought up to date)
+    for (var rk2 in L.retry) { delete L.retry[rk2]; var ix = rk2.indexOf(':'), rt = +rk2.slice(0, ix), rs = +rk2.slice(ix + 1), re = o.fx[rt]; if (re && re.v[rs]) fxvSend(rt, rs, re.kd[rs], re.v[rs]); }
     // the master chain (mastering and the safety limiter)
     if (cur.mst !== o.mst || cur.safety !== o.safety) {
       if (cur.mst) send({ t: 'master.config', mst: S.mst, safety: cur.safety });
@@ -793,6 +825,70 @@
       list.push([slot, slot + ':' + f.type, [+e[2] || 0, +e[3] || 0, +e[4] || 0]]);
     }
     if (list.length && typeof host.fxDynIn === 'function') try { host.fxDynIn(v, list); } catch (e) { log('native core client: fxDynIn failed', e); }
+  }
+
+  /* ---- PC6: the shell's recovery copy (N2-NOTES H5: `recovery`, `recovery.get`, `recovery.drop`; and the new `recovery.put`, docs/plans/PC6-NOTES.md).
+     The shell keeps what the page last gave it when the app is swiped away with unsaved work. Today that copy is the last `song.load` message (the engine snapshot, NOT the project text and not the kit).
+     So: while the song is unsaved (host.dirty()) the page hands the shell its project text every ~10 s (`recovery.put {project}`, fire and forget, only with caps.recoveryPut and only when the text changed).
+     On start-up the shell says `recovery {title, time, file}` once per hello when it holds a copy: the page asks "Restore unsaved changes?" (Restore / Discard). Restore loads the project text (the page's own
+     put; a copy that is only the song.load message restores the song alone: the kit and sample audio, presets and impulse responses are NOT in it); both answers end in `recovery.drop`.
+     No put is sent while a copy waits for the answer (it would overwrite the copy the person is deciding about); a prompt closed without an answer keeps the copy and the hold for the session. ---- */
+  var RCV_MS = 10000;         // the put interval
+  var RCV_MAX = 24e6;         // characters: a project with more is not put (a bridge message that size would hold the page); the shell's own song.load copy stays
+  var RCV_COST = 40;          // the next put waits at least this many times the last one's cost (a big project is not stringified every 10 s on a slow phone)
+  var RV = { t: 0, last: '', hold: false, asked: false, cost: 0, big: false };
+  function rcvPutOn() { return !!(NC.on && NC.caps && NC.caps.recoveryPut && host && typeof host.projText === 'function' && typeof host.dirty === 'function'); }
+  function rcvTick() {
+    RV.t = 0; if (!NC.on || !rcvPutOn()) return;
+    var wait = RCV_MS;
+    if (rcvPutOn() && !RV.hold && !down()) {
+      try {
+        if (host.dirty()) {
+          var t0 = nowMs(), text = host.projText(); RV.cost = nowMs() - t0;
+          if (typeof text === 'string' && text && text !== RV.last) {
+            if (text.length > RCV_MAX) { if (!RV.big) { RV.big = true; log('native core client: project too big for recovery.put (' + text.length + ' characters)'); } }
+            else { RV.big = false; RV.last = text; send({ t: 'recovery.put', project: text }); }
+          }
+        } else RV.last = '';   // saved: the next unsaved change puts again
+      } catch (e) { log('native core client: recovery.put failed', e); }
+      wait = Math.max(RCV_MS, RV.cost * RCV_COST);
+    }
+    RV.t = setTimeout(rcvTick, wait);
+  }
+  function rcvStart() { if (!RV.t && rcvPutOn()) RV.t = setTimeout(rcvTick, RCV_MS); }   // (no timer at all without caps.recoveryPut: nothing to put, and nothing keeps a test process alive)
+  function rcvStop() { clearTimeout(RV.t); RV.t = 0; RV.last = ''; RV.hold = false; RV.asked = false; }
+  function ago(ms) { var m = Math.round((Date.now() - ms) / 60000); return !(m >= 0) ? '' : m < 1 ? 'just now' : m < 90 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; }
+  /** The copy as a project text for the page's loader: the page's own put, or (only the song.load message) the song wrapped as a project, which has no kit. */
+  function rcvProject(text) {
+    var j; try { j = JSON.parse(text); } catch (e) { return null; }
+    if (!j || typeof j !== 'object') return null;
+    if (j.app === 'thunder-project' && j.song) return { text: text, full: true };
+    if (j.t === 'song.load' && j.S && typeof j.S === 'object') return { text: JSON.stringify({ app: 'thunder-project', v: 1, song: j.S }), full: false };
+    return null;
+  }
+  function onRecovery(m) {
+    if (!NC.on || !m || RV.asked) return;
+    RV.asked = true; RV.hold = true;   // from now on the shell's copy is being decided: no put
+    var title = m.title ? String(m.title).slice(0, 60) : (m.file ? String(m.file).split(/[\\/]/).pop() : 'your song'), when = +m.time > 0 ? ago(+m.time) : '';
+    var go = function () { rcvAsk(title, when); };
+    setTimeout(go, 1200);   // let the page finish starting before a question appears on it
+  }
+  function rcvAsk(title, when) {
+    if (!NC.on || typeof host.askRestore !== 'function' || typeof host.restore !== 'function') { RV.asked = false; RV.hold = false; return; }
+    Promise.resolve().then(function () { return host.askRestore(title, when); }).then(function (i) {
+      if (i === 1) return drop();                   // Discard
+      if (i !== 0) { return; }                       // closed without an answer: the copy stays (asked again at the next start); no put this session so as not to replace it
+      return tc.ask({ t: 'recovery.get' }, ASK_MS).then(function (r) {
+        var pr = r && r.ok ? rcvProject(r.text) : null;
+        if (!pr) { host.toast('The unsaved changes could not be read back.', 4000); return; }   // the copy stays
+        return Promise.resolve(host.restore(pr.text, title)).then(function (ok) {
+          if (!ok) return;   // the page refused or the person said no (Save changes? asked first): the copy stays
+          if (!pr.full) host.toast('Restored the song. Its kit and sample audio are not in the recovery copy: check them.', 6000);
+          return drop();
+        });
+      });
+    }).catch(function (e) { log('native core client: recovery restore failed', e); });
+    function drop() { return Promise.resolve(tc.ask({ t: 'recovery.drop' }, ASK_MS)).then(function () { RV.hold = false; RV.last = ''; }, function () { RV.hold = false; }); }
   }
 
   window.__thunderClient = NC;
