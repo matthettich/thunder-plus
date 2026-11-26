@@ -34,6 +34,11 @@
   var failed = null;         // {ref}: the engine died while playing this song; the next PLAY of it uses the old engine (until the engine is rebuilt)
   var toasted = null, warned = null, resumeNote = false, errN = 0;   // once per song (the S object): the fallback message, the fit warnings
 
+  // DIAG-1: what the playback report's `native:` line and Settings > Audio > Sequencer say (page start = host.now() 0)
+  var D = { attachAt: -1, helloAt: -1, replyAt: -1, bridgeAt: -1, tries: 0, asking: false, retryT: 0, lastPlay: '', lastRefusal: '' };
+  function plog(s) { try { if (host && host.pbLog) host.pbLog('native engine: ' + s); } catch (e) { /* ignore */ } try { if (host && host.nativeChanged) host.nativeChanged(); } catch (e) { /* ignore */ } }
+  function ms(t) { return t < 0 ? 'never' : Math.round(t) + ' ms'; }
+
   function log() {
     try { if (host && host.tpLog) host.tpLog.apply(null, arguments); } catch (e) { /* the log must never throw */ }
   }
@@ -53,16 +58,28 @@
     attach: function (hostApi) {
       host = hostApi || {};
       tc = window.thunderCore || null;
+      D.attachAt = nowMs();
       if (!tc || typeof tc.ask !== 'function') return settle(off('no window.thunderCore'));
-      NC.ready = tc.ask({ t: 'hello', v: BRIDGE_V, live: true, app: typeof host.build === 'function' ? host.build() : 0 }, HELLO_MS)
-        .then(onHello, function (e) { return off('hello failed: ' + (e && e.message ? e.message : e)); })
-        .then(settle);
+      // the shim posts {t:'bridge', up:true} when the shell hands over its port; a hello that timed out before that is asked again then (it was queued behind the port)
+      try { var onBridge = function (m) { if (m && m.up === false) return; D.bridgeAt = nowMs(); if (!NC.on && !D.asking) { plog('bridge up at ' + ms(D.bridgeAt) + ' while off (' + NC.reason + '): asking hello again'); askHello(); } }; tc.on('bridge', onBridge); offs.push(function () { if (typeof tc.off === 'function') tc.off('bridge', onBridge); }); } catch (e) { /* ignore */ }
+      NC.ready = askHello().then(settle);
       return NC.ready;
     },
+    /** DIAG-1: one line for the playback report header and Settings. */
+    diag: function () {
+      var w = window.thunderCore, v = verdict;
+      return 'native: thunderCore ' + (w ? 'yes host=' + w.host : 'no') + ' · client loaded yes · on ' + (NC.on ? 'yes' : 'no') + (NC.on ? '' : ' · reason ' + (NC.reason || (D.asking ? 'hello not answered yet' : 'none yet')))
+        + ' · hostName ' + (NC.hostName || '-') + ' · sr ' + (NC.sr || '-') + ' · core ' + (NC.core || '-')
+        + ' · hello sent ' + ms(D.helloAt) + ' (' + D.tries + 'x), reply ' + (D.replyAt < 0 ? 'no reply' : 'at ' + ms(D.replyAt)) + ', bridge up ' + (D.bridgeAt < 0 ? 'not seen' : 'at ' + ms(D.bridgeAt))
+        + ' · last clock ' + (lastClock ? Math.round(nowMs() - lastClock) + ' ms ago' : 'never')
+        + ' · last verdict ' + (!v ? 'none' : v.pending ? 'pending' : v.ok ? 'ok' : v.reasons.join(' / ')) + (D.lastRefusal ? ' · last refusal ' + D.lastRefusal : '') + (D.lastPlay ? ' · last PLAY ' + D.lastPlay : '');
+    },
+    /** DIAG-1: why this PLAY is not native (client off): the text for the PLAY line. */
+    why: function () { return NC.on ? '' : (NC.reason || (D.asking ? 'the hello to the shell is not answered yet' : 'no hello yet')); },
 
     detach: function () {
       for (var i = 0; i < offs.length; i++) { try { offs[i](); } catch (e) { /* ignore */ } }
-      offs = []; NC.on = false; NC.sr = 0;
+      offs = []; NC.on = false; NC.sr = 0; clearTimeout(D.retryT); D.asking = false;
       clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset(); mtrReset(); MTR.views = {}; MTR.wanted.fx = []; MTR.wanted.dyn = []; rcvStop(); h7Reset();
     },
 
@@ -77,11 +94,12 @@
     // ---- PC3: the transport --------------------------------------------------------------------------------------------------------------
     /** Decided once per PLAY, before anything sounds (4.6). true = the native engine takes this PLAY (start() follows); false = the old engine plays it. */
     can: function (mode, o) {
-      if (!NC.on || !tc) return false;
+      if (!NC.on || !tc) { D.lastPlay = 'page (client off: ' + NC.why() + ')'; return false; }
       if (o && (o.page || o._nf || o.rz || o._warm)) return false;   // the page asked for its own engine (hand-over, the fallback itself): not ours, no message
-      if (!wanted()) return false;
+      if (!wanted()) { D.lastPlay = 'page (Sequencer setting is Page / not wanted)'; plog('PLAY ' + mode + ': page engine, the Sequencer setting does not ask for native'); return false; }
       var why = refusal(mode, o);
-      if (why) { fallbackNote(why); return false; }
+      if (why) { D.lastRefusal = why; D.lastPlay = 'page (' + why + ')'; fallbackNote(why); return false; }
+      D.lastPlay = 'native'; plog('PLAY ' + mode + ': the native engine takes it');
       return true;
     },
 
@@ -350,7 +368,7 @@
 
   function off(why) {
     NC.on = false; NC.sr = 0; NC.reason = why;
-    log('native core client: off (' + why + ')');
+    log('native core client: off (' + why + ')'); plog('off (' + why + ') at ' + ms(nowMs()));
     return false;
   }
 
@@ -359,8 +377,20 @@
   function num(x, lo, hi, dflt) { x = +x; return isFinite(x) && x >= lo && x <= hi ? x : dflt; }
 
   // The reply is {t:'reply', id, v, core, caps, sr?, outLat?, host?, maxPadBytes?, maxSongBytes?} (G1 fields are additive).
+  // The hello ask, with its bookkeeping. One in flight at a time; after a failure one timed retry (the bridge event retries too).
+  function askHello() {
+    if (D.asking) return NC.ready || Promise.resolve(false);
+    D.asking = true; D.tries++; D.helloAt = nowMs();
+    return tc.ask({ t: 'hello', v: BRIDGE_V, live: true, app: typeof host.build === 'function' ? host.build() : 0 }, HELLO_MS)
+      .then(function (r) { D.asking = false; D.replyAt = nowMs(); return onHello(r); }, function (e) {
+        D.asking = false; var ok = off('hello failed: ' + (e && e.message ? e.message : e));
+        if (D.tries < 3) { clearTimeout(D.retryT); D.retryT = setTimeout(function () { if (!NC.on && !D.asking && tc) askHello(); }, 3000); }
+        return ok; });
+  }
+
   function onHello(r) {
     if (!r || typeof r !== 'object') return off('empty hello reply');
+    if (r.err && r.v == null) return off('the shell refused the hello: ' + r.err);
     if (r.v !== BRIDGE_V) return off('bridge version ' + r.v + ' (this page speaks ' + BRIDGE_V + ')');
     var caps = r.caps || (tc && tc.caps) || null;
     if (!caps || !caps.nativeAudio) return off('shell has no native audio');
@@ -372,7 +402,7 @@
     NC.maxPadBytes = num(r.maxPadBytes, 0, 1e12, 0); NC.maxSongBytes = num(r.maxSongBytes, 0, 1e12, 0);
     NC.reason = ''; NC.on = true; engineUp = true; lost = false; lastClock = 0;
     h7Hello(r);   // PC7: the audio / input bodies of the hello reply (an Android shell has none: nothing happens)
-    log('native core client: on (' + NC.hostName + ', ' + sr + ' Hz, core ' + NC.core + ')');
+    log('native core client: on (' + NC.hostName + ', ' + sr + ' Hz, core ' + NC.core + ')'); plog('on (' + NC.hostName + ', ' + sr + ' Hz, core ' + NC.core + ') at ' + ms(nowMs()) + ', hello answered after ' + ms(D.replyAt - D.helloAt));
     // Pads rendered before the handshake used the page's guess: render them again at the engine's rate, once (design 4.2 step 4).
     try { if (typeof host.prerender === 'function') host.prerender(); } catch (e) { log('native core client: prerender after hello failed', e); }
     try { subscribe(); } catch (e) { log('native core client: subscribe failed', e); }
