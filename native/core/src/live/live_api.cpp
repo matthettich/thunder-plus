@@ -74,6 +74,7 @@ uint32_t thunder_live_caps(void) {
 #ifdef THUNDER_HAVE_TFX
   c |= THUNDER_LIVE_CAP_EFFECTS;
 #endif
+  c |= THUNDER_LIVE_CAP_METERS2;   /* M1 */
   return c;
 }
 
@@ -225,6 +226,24 @@ int thunder_live_poll(thunder_live* L, void* buf, int cap) {
   return L->h->poll(buf, cap);   // (CONSUMER: allocates nothing; it still works on a dead handle, so that the records posted before the failure can be read)
 }
 int thunder_live_meters_want(thunder_live* L, double rate_hz) { return ctl(L, [&](LiveHost& h) { return h.meters(rate_hz); }); }
+/* M1 */ int thunder_live_meters_set(thunder_live* L, const thunder_live_meters_spec* spec) {
+  if (!L) return THUNDER_LIVE_E_ARG;
+  if (!spec) return THUNDER_LIVE_E_ARG;
+  thunder_live_meters_spec sp;
+  if (abiCopyIn(spec, &sp, sizeof sp) != 0) return THUNDER_LIVE_E_ARG;
+  return ctl(L, [&](LiveHost& h) { return h.metersSet(sp); });
+}
+/* M1: the page's type string of a core effect type id: the table the plan reader uses, reversed (fx_key_of for the wasm / JS-core effects, "p" + the pump name, the MODFX key). */
+const char* thunder_fx_type_name(int type_id) {
+  using namespace thunder;
+  if (fx_is_pump(type_id)) {
+    struct Names { char n[kPumpTypes][16]; Names() { for (int pt = 0; pt < kPumpTypes; pt++) { const char* k = fx_pump_key(pt); std::snprintf(n[pt], sizeof n[pt], "p%s", k ? k : ""); } } };
+    static const Names names;   // the page's pump type is "p" + the pump name (FxHost::entryFromSlot); built once (thread-safe static), on the first call: not for the audio thread
+    return names.n[type_id - kPumpT0];
+  }
+  if (fx_is_mod(type_id)) return fx_mod_key(type_id);
+  return fx_key_of(type_id);
+}
 
 // ---- 9. TEST ONLY ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

@@ -33,6 +33,8 @@ LIVE_SA(ev_song_size, sizeof(thunder_live_ev_song) == 24);
 LIVE_SA(ev_pads_size, sizeof(thunder_live_ev_pads) == 24);
 LIVE_SA(ev_error_size, sizeof(thunder_live_ev_error) == 32);
 LIVE_SA(ev_late_size, sizeof(thunder_live_ev_late) == 40);
+LIVE_SA(ev_fxlvl_size, sizeof(thunder_live_ev_fxlvl) == 56);   /* M1 */
+LIVE_SA(ev_fxdyn_size, sizeof(thunder_live_ev_fxdyn) == 152 && sizeof(thunder_live_ev_fxdyn_ent) == 16 && THUNDER_LIVE_EV_MAX >= sizeof(thunder_live_ev_fxdyn));   /* M1 */
 /* every record is a multiple of 8 and fits the poll slot; the longest (ROWS with 33 entries) is 24 + 33 * 8 = 288 */
 LIVE_SA(ev_max_holds_meters, THUNDER_LIVE_EV_MAX >= sizeof(thunder_live_ev_meters));
 LIVE_SA(ev_max_holds_rows, THUNDER_LIVE_EV_MAX >= sizeof(thunder_live_ev_rows) + 33 * sizeof(thunder_live_ev_rowent));
