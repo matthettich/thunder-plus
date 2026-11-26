@@ -29,6 +29,7 @@ namespace thunder {
 static_assert(sizeof(thunder_live_ev_head) == 16 && sizeof(thunder_live_ev_clock) == 48 && sizeof(thunder_live_ev_pos) == 32 && sizeof(thunder_live_ev_rows) == 24 && sizeof(thunder_live_ev_rowent) == 8
               && sizeof(thunder_live_ev_state) == 24 && sizeof(thunder_live_ev_song) == 24 && sizeof(thunder_live_ev_pads) == 24 && sizeof(thunder_live_ev_error) == 32 && sizeof(thunder_live_ev_late) == 40
               && sizeof(thunder_live_ev_meters) == 304, "the record layouts of live.h (the same on wasm32 and 64-bit)");
+/* M1 */ static_assert(sizeof(thunder_live_ev_fxlvl) == 56 && sizeof(thunder_live_ev_fxdyn_ent) == 16 && sizeof(thunder_live_ev_fxdyn) == 152 && sizeof(thunder_live_ev_fxdyn) <= THUNDER_LIVE_EV_MAX && sizeof(thunder_live_ev_fxlvl) % 8 == 0 && sizeof(thunder_live_ev_fxdyn) % 8 == 0, "the M1 record layouts of live.h (METERS-DESIGN 4.1)");
 
 namespace {
 // stats.* of the audio side, in pub_[]: the audio thread stores each once a quantum (relaxed), any thread loads (relaxed)
@@ -722,6 +723,14 @@ int LiveHost::meters(double rateHz) {
   if (!finite(rateHz) || rateHz < 0 || rateHz > 30) return THUNDER_LIVE_E_ARG;
   LiveCmd c; c.type = LiveCmdType::Meters; c.x = rateHz; return push(c);   // applied at the top of the next quantum
 }
+/* M1 */ int LiveHost::metersSet(const thunder_live_meters_spec& sp) {   // CONTROL
+  if (!(flags_ & THUNDER_LIVE_F_METERS) || !meterBank_) return THUNDER_LIVE_E_STATE;
+  const uint32_t known = THUNDER_LIVE_MK_FXLVL | THUNDER_LIVE_MK_FXDYN | THUNDER_LIVE_MK_CHLVL | THUNDER_LIVE_MK_MASTERM;
+  if ((sp.kinds & ~known) != 0 || (sp.fx_tracks >> (THUNDER_LIVE_MASTER + 1)) != 0) return THUNDER_LIVE_E_ARG;
+  if (!finite(sp.rate_hz) || sp.rate_hz < 0 || sp.rate_hz > 30 || !finite(sp.chains_hz) || sp.chains_hz < 0 || sp.chains_hz > 30) return THUNDER_LIVE_E_ARG;
+  LiveCmd c; c.type = LiveCmdType::MetersSet; c.x = sp.rate_hz; c.y = sp.chains_hz; c.i0 = (int32_t)sp.kinds; c.i64a = (int64_t)sp.fx_tracks;
+  return push(c);   // applied at the top of the next quantum; a full ring is E_BUSY and nothing changed
+}
 
 // =========================================================================================================================================================================================================
 // CONTROL: events, stats, test
@@ -960,6 +969,7 @@ void LiveHost::applyOne(const LiveCmd& c, int64_t qStart) {
     case LiveCmdType::Meters:
       if (meterBank_) { if (c.x > 0) { meterBank_->setRate(c.x); metersOn_ = true; } else metersOn_ = false; }
       break;
+    case LiveCmdType::MetersSet: applyMetersSet(c); break;   // M1
   }
 }
 
@@ -1085,6 +1095,56 @@ void LiveHost::postMeters() {
     std::memcpy(e.a, me.a, sizeof e.a);
     std::memcpy(&e.reserved[0], &me.seq, 4);                           // the bank's own count (the head's seq is the ring's order: poll merges by it)
     post(&e, sizeof e);
+  }
+}
+
+/* M1: AUDIO, step 1 (the top of a quantum). The replacement state of a MetersSet command. METERS: as LiveCmd::Meters. The watched effects hosts get setLevels / setTelemetry true and every other host false, but a host whose
+   state does not change is left alone (setLevels restarts the 12-block window). A host that becomes watched has the post it held from an earlier watching dropped, so the first record is a fresh one. No allocation, no lock. */
+void LiveHost::applyMetersSet(const LiveCmd& c) {
+  if (meterBank_) { if (c.x > 0) { meterBank_->setRate(c.x); metersOn_ = true; } else metersOn_ = false; }
+  const uint32_t kinds = (uint32_t)c.i0; const uint64_t tr = (uint64_t)c.i64a;
+  const uint64_t wl = fxBank_ && (kinds & THUNDER_LIVE_MK_FXLVL) ? tr : 0, wd = fxBank_ && (kinds & THUNDER_LIVE_MK_FXDYN) ? tr : 0;
+  if (fxBank_) {
+    for (int t = 0; t <= kSongNT; t++) {
+      const uint64_t b = (uint64_t)1 << t; FxHost& h = fxBank_->host(t);
+      if ((wl & b) != (fxLvlWatch_ & b)) { h.setLevels((wl & b) != 0); if (wl & b) { float drop[8]; h.popLevels(drop); } }
+      if ((wd & b) != (fxDynWatch_ & b)) { h.setTelemetry((wd & b) != 0); if (wd & b) { FxDyn drop[kFxSlots]; h.popDyn(drop, kFxSlots); } }
+    }
+  }
+  fxLvlWatch_ = wl; fxDynWatch_ = wd;
+}
+
+/* M1: AUDIO, step 9 after postMeters. For each WATCHED host (and only those: nothing is popped, nothing computed, for the others) FxHost::popLevels / popDyn hand over what process() posted this quantum (every 12th
+   block); a record is built on the stack from the copy and posted on the big ring. No new maths. A full ring drops the newest record and counts it (post). qEnd: the engine frame at the end of the quantum. */
+void LiveHost::postFxMeters(int64_t qEnd) {
+  if (!fxBank_ || (fxLvlWatch_ | fxDynWatch_) == 0) return;
+  for (int t = 0; t <= kSongNT; t++) {
+    const uint64_t b = (uint64_t)1 << t;
+    if (!((fxLvlWatch_ | fxDynWatch_) & b)) continue;
+    FxHost& h = fxBank_->host(t);
+    if (fxLvlWatch_ & b) {
+      float lv[8];
+      if (h.popLevels(lv)) {
+        thunder_live_ev_fxlvl e; std::memset(&e, 0, sizeof e);
+        e.h.type = THUNDER_LIVE_EV_FXLVL; e.h.f = qEnd; e.track = t;
+        for (int i = 0, n = h.chainSize(); i < n; i++) { const FxEntry* en = h.chainEntry(i); if (en && en->slot >= 0 && en->slot < 8) e.slots |= 1u << en->slot; }
+        for (int k = 0; k < 8; k++) e.lvl[k] = (e.slots >> k) & 1u ? lv[k] : 0.f;
+        post(&e, sizeof e);
+      }
+    }
+    if (fxDynWatch_ & b) {
+      FxDyn d[kFxSlots];
+      const int n = h.popDyn(d, kFxSlots);
+      if (n > 0) {
+        thunder_live_ev_fxdyn e; std::memset(&e, 0, sizeof e);
+        e.h.type = THUNDER_LIVE_EV_FXDYN; e.h.f = qEnd; e.track = (int16_t)t; e.n = (int16_t)n;
+        for (int i = 0; i < n; i++) {
+          int type = -1; for (int k = 0, m = h.chainSize(); k < m; k++) { const FxEntry* en = h.chainEntry(k); if (en && en->slot == d[i].slot) { type = en->t; break; } }
+          thunder_live_ev_fxdyn_ent& x = e.ent[i]; x.slot = (int16_t)d[i].slot; x.type = (int16_t)type; x.red_db = d[i].v[0]; x.in_db = d[i].v[1]; x.out_db = d[i].v[2];
+        }
+        post(&e, sizeof e);
+      }
+    }
   }
 }
 
@@ -1284,6 +1344,7 @@ void LiveHost::afterBlock(int64_t qStart) {
     midiLateLast_[0] = mLate[0]; midiLateLast_[1] = mLate[1]; midiLateLast_[2] = mLate[2];
   }
   postMeters();
+  postFxMeters(qStart + kLiveQuantum);   // M1
   publish();
   state_.store(stateA_, std::memory_order_release);
 }

@@ -140,6 +140,7 @@ extern "C" {
 #define THUNDER_LIVE_CAP_TAKE 16u         /* thunder_live_pad_take is available (PadsHost::setPadTake, built in P2; set by P5 in every build) */
 #define THUNDER_LIVE_CAP_CHAINS 0x200u    /* F_CHAINS exists and thunder_live_chain_edit works (bit 9: set by P5 / C2 in every build; bits 5..8 are CAP_ENGINES) */
 #define THUNDER_LIVE_CAP_ENGINES 0x1E0u   /* bits 5..8: live engines built: bass 1<<5, vox 1<<6, acid 1<<7, mach 1<<8 (THUNDER_RENDER_LIVE_x kind k: bit 4 + k). NONE is set by P5: pad_live answers E_UNSUPPORTED (pad_live_clear: 0 for a pad in range); a live pad stays on the SAMPLER route (ruling D8) */
+/* M1 */ #define THUNDER_LIVE_CAP_METERS2 0x400u   /* bit 10: thunder_live_meters_set, thunder_fx_type_name and the FXLVL / FXDYN records exist (METERS-DESIGN 5a; set in every build; needs F_METERS to be used) */
 
 typedef struct thunder_live thunder_live;
 
@@ -648,6 +649,30 @@ typedef struct thunder_live_ev_late {     /* 40 bytes: the late / lost counters,
   uint32_t midi_may_hang;
 } thunder_live_ev_late;
 
+/* M1 (METERS-DESIGN 4.1 / 5a): the effect level and dynamics records. Types 11 and 12; EV_MAX is unchanged (the largest is 152). Only with F_METERS | F_EFFECTS and thunder_live_meters_set (below) watching the track:
+   nothing is posted, and nothing is computed, for a track that is not watched. Both go on the big ring, in step 9 after the METERS record of the same quantum, as FxHost's own every-12th-block post (about 31 a second at 48 kHz).
+   f = the frame at the end of the quantum that posted them. A full ring refuses the newest and counts it (stats.evt_dropped), as for METERS. */
+#define THUNDER_LIVE_EV_FXLVL 11
+#define THUNDER_LIVE_EV_FXDYN 12
+typedef struct thunder_live_ev_fxlvl {    /* 56 bytes. The track's effects: the peak out of each slot since the last post, linear, max(abs L, abs R) (FxHost::popLevels: the page's {lvl}) */
+  thunder_live_ev_head h;
+  int32_t track;                          /* 0 .. 31 tracks, 32 (THUNDER_LIVE_MASTER) the master's effects */
+  uint32_t slots;                         /* bit k: the chain has a slot k (lvl[k] is its peak; a slot that was off all the time reads 0). The other lvl[] entries are 0 */
+  float lvl[8];
+} thunder_live_ev_fxlvl;
+typedef struct thunder_live_ev_fxdyn_ent {   /* 16 bytes */
+  int16_t slot;                           /* the slot number 0 .. 7 */
+  int16_t type;                           /* the core's effect type id of that slot now (FxEntry::t; thunder_fx_type_name turns it into the page's type string): the page drops a report whose type is not its slot's */
+  float red_db, in_db, out_db;            /* the worklet's own numbers: [reduction dB, level in dB, peak out dB]; -180 for silence (FxDyn::v) */
+} thunder_live_ev_fxdyn_ent;
+typedef struct thunder_live_ev_fxdyn {    /* 152 bytes. One post of a track's dynamics slots (comp / limiter-like slots and pump COMP, LIMIT, BAND); only when the track has one */
+  thunder_live_ev_head h;
+  int16_t track;                          /* as FXLVL */
+  int16_t n;                              /* 1 .. 8 entries follow in ent[]; the unused tail is zero */
+  int32_t reserved;                       /* 0 */
+  thunder_live_ev_fxdyn_ent ent[8];
+} thunder_live_ev_fxdyn;
+
 /* ANY thread, once before audio: the host's output latency in frames and its underrun count; the next CLOCK records carry them (core.h thunder_host_stats). */
 void thunder_live_host_stats(thunder_live* L, int out_latency_frames, int underruns);
 
@@ -658,6 +683,29 @@ int thunder_live_poll(thunder_live* L, void* buf, int cap);
 /* CONTROL. Switches METERS records on (rate_hz > 0, <= 30: MeterBank::setRate) or off (0). Needs F_METERS (else E_STATE). Queued: applied at the top of a quantum. Meters are the page's graph replacement
    (ruling D15): peak and rms per track and the master, windows of 512 / 1024 samples (meter.h). E_ARG: rate NaN, negative or above 30. E_BUSY. */
 int thunder_live_meters_want(thunder_live* L, double rate_hz);
+
+/* M1: CONTROL. The whole metering subscription as one REPLACEMENT state (METERS-DESIGN 4.2 / 5a): the page may re-send it at any time (after hello, after an engine restart); what it leaves out is switched off.
+   `size` first (the ABI rule of the other structs). rate_hz: METERS exactly as thunder_live_meters_want (0 off, > 0 and <= 30 on). kinds: THUNDER_LIVE_MK_* bits; CHLVL and MASTERM are reserved now (accepted, they post
+   nothing yet). fx_tracks: bit t (0 .. 31) watches track t's effects, bit 32 the master's; with THUNDER_LIVE_MK_FXLVL the watched hosts post FXLVL, with THUNDER_LIVE_MK_FXDYN FXDYN (no cap on the number of
+   tracks: the page asks for one). chains_hz: reserved for CHLVL (0 .. 30). Applied at the top of the next quantum (a NEW command: thunder_live_meters_want alone is unchanged and may still be used alone;
+   the later of the two calls wins for the METERS rate). Needs F_METERS (E_STATE otherwise); without F_EFFECTS the FX kinds simply post nothing. E_ARG: NULL, size < 4, a field past our struct that is not zero,
+   unknown kinds bits, fx_tracks above bit 32, a rate or chains_hz that is NaN, negative or above 30. E_BUSY: the command ring is full, nothing changed. */
+#define THUNDER_LIVE_MK_FXLVL 1u
+#define THUNDER_LIVE_MK_FXDYN 2u
+#define THUNDER_LIVE_MK_CHLVL 4u      /* reserved (M3) */
+#define THUNDER_LIVE_MK_MASTERM 8u    /* reserved (M2) */
+typedef struct thunder_live_meters_spec {
+  uint32_t size;
+  uint32_t kinds;               /* THUNDER_LIVE_MK_* */
+  double rate_hz;               /* METERS: 0 off, <= 30 */
+  uint64_t fx_tracks;           /* bit t: track t's effects (0 .. 31), bit 32: the master's */
+  double chains_hz;             /* reserved for CHLVL */
+} thunder_live_meters_spec;
+int thunder_live_meters_set(thunder_live* L, const thunder_live_meters_spec* spec);
+
+/* M1: ANY (no handle). The page's type string of a core effect type id (FxEntry::t, thunder_live_ev_fxdyn_ent::type): "comp", "reverb", "flex", a pump effect as the page writes it ("p" + its name: "pcomp"), a MODFX
+   effect by its key. NULL for an id the core has no name for. The pointer is to a static string (valid for the life of the process; the first call may build the pump names: do not call it on the audio thread). */
+const char* thunder_fx_type_name(int type_id);
 
 /* ---- 9. TEST ONLY ------------------------------------------------------------------------------------------------------------------------------------------ */
 

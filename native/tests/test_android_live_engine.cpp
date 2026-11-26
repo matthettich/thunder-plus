@@ -216,6 +216,14 @@ int main() {
   CHECK(nonfinite.load() == 0, "non-finite samples: %d", nonfinite.load());
   CHECK(peak.load() > 0.02f, "the song is silent: peak %.4f", (double)peak.load());
   CHECK(ss.find("\"seqDropped\":0") != std::string::npos, "sequencer dropped events");
+#ifdef THUNDER_LIVE_F_CHAINS
+  { // C2b: with F_CHAINS the host runs ELECTRO's chain: a node exists, nothing was refused and no block failed
+    CHECK(E.chainsOn(), "the host was created with F_CHAINS");
+    const size_t k = ss.find("\"chainsNodes\":"); const int nodes = k == std::string::npos ? -1 : std::atoi(ss.c_str() + k + 14);
+    std::printf("chains: nodes %d  %s\n", nodes, k == std::string::npos ? "" : ss.c_str() + k);
+    CHECK(nodes > 0, "ELECTRO's chain has a node: chainsNodes %d", nodes);
+    CHECK(ss.find("\"chainsRefused\":0") != std::string::npos && ss.find("\"chainsFailed\":0") != std::string::npos, "a chain plan was refused or a block failed"); }
+#endif
   CHECK(st.find("\"fatal\":0") != std::string::npos, "a fatal error record");
   { const std::string ev = E.drainEvents(); std::printf("events: %zu bytes, dropped %zu\n", ev.size(), E.eventsDropped());
     for (const char* t : {"clock", "pos", "meters", "state", "song"}) CHECK(ev.find(std::string("\"t\":\"") + t + "\"") != std::string::npos, "no %s event in the drained queue", t);
@@ -236,6 +244,27 @@ int main() {
     for (int i = 0; i < 200 && !idle; i++) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); idle = E.statusJson().find("\"state\":0") != std::string::npos; }
     CHECK(idle, "after Stop the state must read 0 (IDLE): %s", E.statusJson().c_str()); }
   CHECK(stateOfRecord(THUNDER_LIVE_ST_PLAYING) == 1 && stateOfRecord(THUNDER_LIVE_ST_STOPPED) == 0 && stateOfRecord(THUNDER_LIVE_ST_ENDED) == 2, "stateOfRecord");
+  // verify B4 (25 Nov): stopThreads completes the queued tasks (-1000) BEFORE it joins the poller. A tick hook (the poller thread) waits in call() on a task queued behind a slow one that the control thread never pops
+  // once it leaves its loop; before the fix stopThreads joined the poller first and waited out the hook's timeout (3.5 s here).
+  { LiveEngine E2; LiveEngine::Config c2; c2.sampleRate = 48000; c2.maxBlock = 256; std::string e2;
+    CHECK(E2.create(c2, &e2), "create E2: %s", e2.c_str());
+    std::atomic<bool> hookOn{false}, hookQueued{false}; std::atomic<int> hookRc{12345};
+    E2.setTickHook([&] { if (hookOn.load() && !hookQueued.exchange(true)) hookRc = E2.call([](thunder_live*) { return 0; }, 3000); });
+    E2.startThreads();
+    std::thread slowT([&] { E2.call([](thunder_live*) { std::this_thread::sleep_for(std::chrono::milliseconds(700)); return 0; }, 5000); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    hookOn = true;
+    for (int i = 0; i < 100 && !hookQueued.load(); i++) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));   // the hook's task is queued behind the slow one
+    CHECK(hookQueued.load() && hookRc.load() == 12345, "the hook is waiting in call()");
+    const auto t0 = std::chrono::steady_clock::now();
+    E2.stopThreads();
+    const long long ms = (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+    slowT.join();
+    std::printf("B4: stopThreads with a hook waiting in call(): %lld ms, the hook got %d\n", ms, hookRc.load());
+    CHECK(ms < 1500, "stopThreads waited %lld ms: the queue must be drained before the poller join", ms);
+    CHECK(hookRc.load() == -1000, "the hook's task completes with -1000, got %d", hookRc.load());
+    E2.destroy(); }
   // fix B (lead's read 25 Nov): LiveEngine::call distinguishes a timeout BEFORE the task started (-1000: dropped, fn never runs) from one while it RUNS (-1001: unknown, it may still apply)
   { std::atomic<bool> ranSlow{false}, ranQueued{false};
     std::thread slow([&] { int r = E.call([&](thunder_live*) { std::this_thread::sleep_for(std::chrono::milliseconds(1200)); ranSlow = true; return 0; }, 100); CHECK(r == -1001, "timeout while RUNNING must be -1001, got %d", r); });

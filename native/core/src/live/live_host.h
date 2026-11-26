@@ -54,6 +54,7 @@ enum class LiveCmdType : uint8_t {
   MixSet,       // i0 = track, i1 = key (MixKey as int), i2 = Send's index (always 0), x = value, y = ramp frames; at = when
   FxCommit,     // i0 = track; p = FxPlan* (ownership to the audio side; the plan comes back through fxBack_ after the commit)
   Meters,       // x = rate Hz (0: off)
+  /* M1 */ MetersSet,    // x = METERS rate Hz (0: off), y = chains_hz (reserved), i0 = kinds (THUNDER_LIVE_MK_*), i64a = fx_tracks (bit t, 32 = master): the whole metering subscription, a replacement state
   ChainsCommit, // p = ChainsPlan* (ownership goes to the audio side; the plan comes back through chBack_ after the commit); at = NOW always: it never waits in pend_
 };
 struct LiveCmd {
@@ -237,6 +238,7 @@ class LiveHost {
   int midiLead(double seconds);                      // thunder_midi_set_lead (0.005 .. 1.2: the cap went from 0.5 s to 1.2 s in P4, ruling D6); E_STATE without F_MIDI, E_ARG out of range, E_BUSY when the midi command ring is full
   int64_t midiDrain(thunder_midi_msg* out, int64_t cap);   // thunder_live_midi_drain: thunder_midi_drain (CONSUMER, one thread); E_STATE without F_MIDI
   int meters(double rateHz);                         // LiveCmd::Meters: MeterBank::setRate (meter.h:44)
+  /* M1 */ int metersSet(const thunder_live_meters_spec& sp);   // LiveCmd::MetersSet (CONTROL): validates (E_STATE without F_METERS, E_ARG), queues; applied at the top of the next quantum
   void hostStats(int outLatencyFrames, int underruns) { outLat_.store(outLatencyFrames, std::memory_order_relaxed); under_.store(underruns, std::memory_order_relaxed); }   // ANY thread
   int poll(void* buf, int cap);                      // CONSUMER: pops evRing_ and copies whole records
   int dumpStep(char* json, int cap);                 // TEST: pops dumpHeads_ / dumpEvs_, writes the golden's JSON (tests/golden/seq-*.json format)
@@ -291,6 +293,8 @@ class LiveHost {
   void clearWaiting(int64_t qStart);                          // a stop / a started play: the waiting list is cleared; an FxCommit in it is committed first (its plan must not be lost)
   int64_t latencyFrames() const;                              // the output's lateness behind the song: master chain + PDC trim + master pump effects (SongRenderer::latencyFrames)
   void postMeters();                                          // step 9: the bank's events as METERS records
+  /* M1 */ void applyMetersSet(const LiveCmd& c);                // AUDIO, step 1: setLevels / setTelemetry on the hosts whose watching changed; METERS rate as `meters`
+  /* M1 */ void postFxMeters(int64_t qEnd);                       // AUDIO, step 9 after postMeters: FXLVL / FXDYN for the watched hosts only (a copy of FxHost's own post; no pop for an unwatched host)
   // ---- C2: the chains host (audio) ----
   void commitChains(ChainsPlan* p);                                    // AUDIO: ChainsHost::commit + the whole-patch count (V3a)
   void applyChainParams(uint32_t n);                                    // step 1, after the commands (and after a stalled play has started): drain chainParams_ into ChainsHost::param
@@ -400,6 +404,7 @@ class LiveHost {
   std::unique_ptr<MasterChain> mchain_;              // F_MASTER (chain.h)
   std::unique_ptr<MeterBank> meterBank_;             // F_METERS (meter.h)
   bool metersOn_ = false;                            // AUDIO: thunder_live_meters_want switched the bank on (it is fed and advanced only then)
+  /* M1 */ uint64_t fxLvlWatch_ = 0, fxDynWatch_ = 0;           // AUDIO: bit t (32 = master) set by the last MetersSet: the hosts that have setLevels / setTelemetry on and are popped in step 9
   PdcPlan pdcCur_; PdcMode pdcMode_ = PdcMode::Auto; bool pdcHave_ = false;   // AUDIO: the PDC plan in force (the play's or pdc_set's); re-applied with playing = false at a stop
   int64_t playQ_ = -1;                               // AUDIO: the engine frame of the quantum a play started in (applyPdc: the 10 ms glide applies in that quantum only)
   uint64_t pdcOrd_ = 0, masterOrd_ = 0;              // AUDIO: the ordinals of the PDC / master configuration in force (a published message older than a play's own is ignored)

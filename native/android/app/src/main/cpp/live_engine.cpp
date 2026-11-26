@@ -55,7 +55,12 @@ void LiveEngine::stopThreads() {
   { std::lock_guard<std::mutex> g(qm_); }
   qcv_.notify_all();
   if (control_.joinable()) control_.join();
+  drainQueue();   // B4: BEFORE the poller join: the poller's state / tick hook may be waiting in call() on a task the control thread never popped
   if (poller_.joinable()) poller_.join();
+  drainQueue();
+}
+
+void LiveEngine::drainQueue() {
   std::lock_guard<std::mutex> g(qm_);
   for (auto& t : q_) { std::lock_guard<std::mutex> g2(t->m); t->done = true; t->rc = -1000; t->cv.notify_all(); }
   q_.clear();
@@ -74,6 +79,7 @@ void LiveEngine::render(float* out, int frames, int64_t wallNs) {
   if (!L_ || l_.empty()) { std::memset(out, 0, sizeof(float) * 2 * (size_t)frames); return; }
   float* const l = l_.data(); float* const r = r_.data();
   const int mb = cfg_.maxBlock;
+  cbFrame_.store(frame0_, std::memory_order_relaxed); cbNs_.store(wallNs, std::memory_order_relaxed);
   int done = 0;
   while (done < frames) {
     int n = frames - done; if (n > mb) n = mb;
@@ -144,6 +150,8 @@ void LiveEngine::pollLoop() {
       const int n = thunder_live_poll(L_, buf, (int)sizeof buf);
       if (n <= 0) break;
       any = true;
+      int hookState = -1;
+      {   // the lock covers the parse only: the state hook (H2: the MIDI transport flag) runs after it, because it waits for the control thread
       std::lock_guard<std::mutex> g(sm_);
       int off = 0;
       while (off + (int)sizeof(thunder_live_ev_head) <= n) {
@@ -157,8 +165,8 @@ void LiveEngine::pollLoop() {
         switch (h.type) {
           case THUNDER_LIVE_EV_CLOCK: { thunder_live_ev_clock c; if (h.bytes < sizeof c) break; std::memcpy(&c, p, sizeof c); st_.clockF = c.h.f; st_.voices = c.voices; st_.under = c.under; st_.outLat = c.out_lat; break; }
           case THUNDER_LIVE_EV_POS: { thunder_live_ev_pos q; if (h.bytes < sizeof q) break; std::memcpy(&q, p, sizeof q); st_.row = q.row; st_.step = q.step; st_.bpm = q.bpm10 / 10.0; break; }
-          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; if (h.bytes < sizeof s) break; std::memcpy(&s, p, sizeof s); st_.state = stateOfRecord(s.state); break; }
-          case THUNDER_LIVE_EV_HELD: st_.state = THUNDER_LIVE_STATE_HELD; break;
+          case THUNDER_LIVE_EV_STATE: { thunder_live_ev_state s; if (h.bytes < sizeof s) break; std::memcpy(&s, p, sizeof s); st_.state = stateOfRecord(s.state); hookState = st_.state; break; }   // the hook, like everything above the poller, speaks THUNDER_LIVE_STATE_* (F3)
+          case THUNDER_LIVE_EV_HELD: st_.state = THUNDER_LIVE_STATE_HELD; hookState = st_.state; break;
           case THUNDER_LIVE_EV_SONG: { thunder_live_ev_song s; if (h.bytes < sizeof s) break; std::memcpy(&s, p, sizeof s); st_.songRev = s.rev; break; }
           case THUNDER_LIVE_EV_PADS: { thunder_live_ev_pads s; if (h.bytes < sizeof s) break; std::memcpy(&s, p, sizeof s); st_.padsId = s.id; break; }
           case THUNDER_LIVE_EV_METERS: { thunder_live_ev_meters m; if (h.bytes < sizeof m) break; std::memcpy(&m, p, sizeof m); st_.masterPk[0] = m.a[66]; st_.masterPk[1] = m.a[68]; break; }
@@ -171,9 +179,11 @@ void LiveEngine::pollLoop() {
         }
         off += h.bytes;
       }
+      }
+      if (hookState >= 0 && stateHook_) stateHook_(hookState);
     }
     const int64_t now = monoNs();
-    if (now - lastHs > 100000000LL) { lastHs = now; thunder_live_host_stats(L_, outLat_.load(std::memory_order_relaxed), under_.load(std::memory_order_relaxed)); }
+    if (now - lastHs > 100000000LL) { lastHs = now; if (tickHook_) tickHook_(); thunder_live_host_stats(L_, outLat_.load(std::memory_order_relaxed), under_.load(std::memory_order_relaxed)); }
     if (!any) std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
@@ -207,7 +217,16 @@ std::string LiveEngine::statsJson() {
     "\"notesPlayed\":%d,\"notesLate\":%d,\"notesNoPad\":%d,\"notesVarMissing\":%d,\"cmdBusy\":%u,\"cmdLate\":%u,\"evtDropped\":%u}",
     s.state, (long long)s.frames, (unsigned long long)s.quanta, (unsigned long long)s.calls, (unsigned long long)s.steps, (unsigned long long)s.seq_dropped, (unsigned long long)s.runner_skips,
     (unsigned long long)s.pad_bytes_held, (unsigned long long)s.pad_budget, s.latency_frames, s.voices, s.peak_voices, s.notes_played, s.notes_late, s.notes_no_pad, s.notes_var_missing, s.cmd_busy, s.cmd_late, s.evt_dropped);
-  return b;
+  std::string out = b;
+#ifdef THUNDER_LIVE_F_CHAINS
+  if (chainsOn_ && !out.empty() && out.back() == '}') {   // the chains host's counters (C2): nodes > 0 means a song's chain is running
+    char x[220];
+    std::snprintf(x, sizeof x, ",\"chainsNodes\":%u,\"chainsPlans\":%u,\"chainsRefused\":%u,\"chainsOver\":%u,\"chainsFailed\":%llu,\"chainsBlocks\":%llu}",
+      s.chains_nodes, s.chains_plans, s.chains_refused, s.chains_over_budget, (unsigned long long)s.chains_failed_blocks, (unsigned long long)s.chains_blocks);
+    out.pop_back(); out += x;
+  }
+#endif
+  return out;
 }
 
 }  // namespace tpa
