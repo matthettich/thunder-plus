@@ -15,6 +15,14 @@ Built on `native` d75762f (M1 #329 and PP #328 merged). Touches only `native/` a
 - An `E_BUSY` from `meters_set` or `fx_values` is reported, not retried: the page re-sends the whole meters state on its next change (and on `engine up`), and `fx.values` is followed by the next knob move. (If PC4 turns out to need a retry on busy, add it in `LiveBridge`.)
 - The `fx.values` message is NOT an `ask`; a refusal has no reply id, only the `err` event.
 
+## Follow-up (coordinator, 26 Nov): PC6 page side (#333)
+- **fx.values is an ASK.** With an id the shell replies `{ok:true}` on rc 0, `{ok:false, busy:true, error:'busy'}` on E_BUSY, `{ok:false, error:'rc N (...)'}` otherwise (also when the translator refuses it, when the engine is down). Without an id: the err event as before. Every translator refusal reply now also carries `ok:false, error` (additive). `FXV_MAX` is 512 (a pump slot carries up to 280).
+- **`recovery.put {project}`** (no reply, on the recovery thread, never the main or audio thread): written at once, atomically (temp file then rename, sidecar last) to `recovery.put.thunder` + `recovery.put.json` in filesDir, beside the `song.load` copy (`recovery.thunder`, written only on swipe-away as before). Not stored when not a string, empty, or above 24,000,000 chars (the page's `RCV_MAX`). Title / file in the sidecar come from the tracker.
+- **`recovery.get`** returns the put text when a put exists, else the `song.load` copy, with `source:'put'|'song.load'` (the page decides by the text itself: `app:'thunder-project'` = full restore; the field is informational). `recovery.announce` / the `recovery` event use the put's meta when there is one.
+- **`recovery.drop`** deletes both copies. **A successful `file.save` / `file.saveAs`** (`Recovery.onSaved`) also deletes the put: it is older than the save. The swipe-away writer is unchanged and cannot clobber a put (separate files). Known gap: if the person undoes back to a clean state without saving, an old put stays and is offered at the next start (the page does not tell the shell).
+- `hello.caps.recoveryPut: true`.
+- Tests: `BridgeTranslatorTest` (`fxValuesAskCarriesItsId`, `fxValuesReplies`), `SaveSafetyTest` (put stored and preferred, atomic, drop / saved, half-written put ignored, message rules and cap, tracker info). Kotlin: CI only.
+
 ## Tests
 - Kotlin `BridgeTranslatorTest`: `metersWantEffectLists` (the page's exact messages, all-off, master as 32 and `"m"`, union mask, clamp, dedupe, refusals, `id` in the refusal) and `fxValues` (pump / mod, master, `at`, nine refusals, 257 values). **Kotlin does not run here: first compile is CI.**
 - C++ `test_android_live_events` (new ctest `android_live_events`, no engine): fx.lvl and fx.dyn JSON exact strings, sanitising, bad track, short record, unknown type, n clamp, 8-entry line.

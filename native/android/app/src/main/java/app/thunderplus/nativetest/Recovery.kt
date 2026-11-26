@@ -29,6 +29,9 @@ class RecoveryTracker {
     /** `file.save` / `file.saveAs` succeeded: what the page last sent is saved. */
     @Synchronized fun onSaved(file: String?) { if (file != null) this.file = file; baseline = last; expectBaseline = false }
 
+    /** The title and file the page last had (for a put's sidecar). */
+    @Synchronized fun info(): Pair<String, String?> = Pair(title, file)
+
     /** What a swipe-away must keep, or null when there is nothing or nothing unsaved. A song.load that differs only in its rev counts as unsaved: a spare copy is harmless. */
     @Synchronized fun unsaved(): Snapshot? {
         val l = last ?: return null
@@ -58,10 +61,43 @@ class RecoveryStore(private val dir: File) {
         } catch (e: Exception) { t.delete(); m.delete(); return false }
     }
 
-    /** null when there is no (complete) recovery copy. */
-    fun meta(): Meta? = try { if (side.isFile && textFile.isFile) decodeMeta(side.readText()) else null } catch (e: Exception) { null }
-    fun text(): ByteArray? = try { if (meta() != null) textFile.readBytes() else null } catch (e: Exception) { null }
-    fun drop() { side.delete(); textFile.delete() }
+    // M4 / PC6: the page's own project text (`recovery.put {project}`), written as it arrives (an Android kill gives no swipe callback). Same commit order: text temp -> rename, sidecar last.
+    private val putText get() = File(dir, "recovery.put.thunder")
+    private val putSide get() = File(dir, "recovery.put.json")
+
+    /** Atomic: temp files, then renames (the sidecar last). false when it could not be stored (the older copy stays). */
+    fun writePut(text: ByteArray, title: String, file: String?, now: Long): Boolean {
+        val t = File(dir, "recovery.put.thunder.tmp"); val m = File(dir, "recovery.put.json.tmp")
+        try {
+            if (!dir.isDirectory && !dir.mkdirs()) return false
+            t.writeBytes(text)
+            if (t.length() != text.size.toLong()) { t.delete(); return false }
+            m.writeText(encodeMeta(Meta(title, now, file)))
+            if (!t.renameTo(putText)) { putText.delete(); if (!t.renameTo(putText)) { t.delete(); m.delete(); return false } }
+            if (!m.renameTo(putSide)) { putSide.delete(); if (!m.renameTo(putSide)) { m.delete(); return false } }
+            return true
+        } catch (e: Exception) { t.delete(); m.delete(); return false }
+    }
+    fun hasPut(): Boolean = putSide.isFile && putText.isFile
+    private fun putMeta(): Meta? = try { if (hasPut()) decodeMeta(putSide.readText()) else null } catch (e: Exception) { null }
+
+    /** null when there is no (complete) recovery copy. The page's put, when there is one, comes before the song.load copy. */
+    fun meta(): Meta? = putMeta() ?: try { if (side.isFile && textFile.isFile) decodeMeta(side.readText()) else null } catch (e: Exception) { null }
+    fun text(): ByteArray? = try { if (putMeta() != null) putText.readBytes() else if (meta() != null) textFile.readBytes() else null } catch (e: Exception) { null }
+    /** "put" (the page's project text), "song.load" (the last song message), or null. */
+    fun source(): String? = if (putMeta() != null) "put" else if (meta() != null) "song.load" else null
+    /** Deletes both copies. */
+    fun drop() { side.delete(); textFile.delete(); dropPut() }
+    /** The put only (the song was saved: what the page last put is no longer unsaved work). */
+    fun dropPut() { putSide.delete(); putText.delete() }
+
+    /** The reply to `recovery.get {id}`: `source` says which copy `text` is ("put" or "song.load"). */
+    fun getReply(id: Int): JSONObject {
+        val r = JSONObject().put("t", "reply").put("id", id)
+        val m = meta(); val b = text(); val src = source()
+        if (m == null || b == null || src == null) return r.put("ok", false).put("error", "there is no recovery copy")
+        return r.put("ok", true).put("title", m.title).put("time", m.time).put("file", m.file ?: JSONObject.NULL).put("source", src).put("text", String(b, Charsets.UTF_8))
+    }
 
     companion object {
         fun encodeMeta(m: Meta): String = JSONObject().put("title", m.title).put("time", m.time).also { if (m.file != null) it.put("file", m.file) }.toString()
@@ -77,6 +113,11 @@ object Recovery {
     val tracker = RecoveryTracker()
     private val io = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "thunder-recovery").also { t -> t.isDaemon = true } }
     private fun store(ctx: Context) = RecoveryStore(ctx.filesDir)
+    /** The page's own limit (RCV_MAX): a longer project text is not stored; the song.load copy stays. */
+    const val PUT_MAX_CHARS = 24_000_000
+
+    /** `file.save` / `file.saveAs` succeeded: the tracker's baseline moves, and the page's last put (older than the save) is deleted. */
+    fun onSaved(ctx: Context, key: String?) { tracker.onSaved(key); io.execute { try { store(ctx).dropPut() } catch (t: Throwable) { Log.i(TAG, "onSaved: $t") } } }
 
     /** ThunderService.onTaskRemoved (off the main thread): keep what was not saved. Never throws. */
     fun saveForTaskRemoved(ctx: Context) {
@@ -88,20 +129,27 @@ object Recovery {
         io.execute { try { store(ctx).meta()?.let { for (l in ThunderHost.listeners) l(RecoveryStore.event(it)) } } catch (t: Throwable) { Log.i(TAG, "announce: $t") } }
     }
 
-    /** `recovery.get {id}` -> `{t:'reply', id, ok, title, time, file, text}`; `recovery.drop {id}` -> `{t:'reply', id, ok}`. */
+    /** The project text of a `recovery.put` message, or null: not a string, empty, or above the page's cap (the song.load copy stays then). */
+    fun putText(j: JSONObject): String? = (j.opt("project") as? String)?.takeIf { it.isNotEmpty() && it.length <= PUT_MAX_CHARS }
+
+    /** `recovery.put {project}`: stored now, off the main and audio threads (this runs on the recovery thread). Over the cap, not a string, or a failed write: ignored, the older copy stays. */
+    private fun put(s: RecoveryStore, j: JSONObject) {
+        val p = putText(j) ?: return
+        val (title, file) = tracker.info()
+        if (!s.writePut(p.toByteArray(Charsets.UTF_8), title, file, System.currentTimeMillis())) Log.i(TAG, "recovery.put not written")
+    }
+
+    /** `recovery.get {id}` -> `{t:'reply', id, ok, title, time, file, source:'put'|'song.load', text}`; `recovery.drop {id}` -> `{t:'reply', id, ok}`. */
     fun handle(ctx: Context, raw: String) {
         io.execute {
             try {
                 val j = JSONObject(raw); val id = j.optInt("id", -1)
                 val s = store(ctx)
-                val r = JSONObject().put("t", "reply").put("id", id)
+                var r = JSONObject().put("t", "reply").put("id", id)
                 when (j.optString("t")) {
-                    "recovery.get" -> {
-                        val m = s.meta(); val b = s.text()
-                        if (m == null || b == null) r.put("ok", false).put("error", "there is no recovery copy")
-                        else r.put("ok", true).put("title", m.title).put("time", m.time).put("file", m.file ?: JSONObject.NULL).put("text", String(b, Charsets.UTF_8))
-                    }
+                    "recovery.get" -> r = s.getReply(id)
                     "recovery.drop" -> { s.drop(); r.put("ok", true) }
+                    "recovery.put" -> { put(s, j); return@execute }   // no reply
                     else -> return@execute
                 }
                 if (id >= 0) for (l in ThunderHost.listeners) l(r.toString())

@@ -22,7 +22,7 @@ import org.json.JSONObject
 //   * M4: meters.want {rate, fx:[tracks], dyn:[tracks], chains?, master?, trim?} (any of fx / dyn / chains / master / trim present) -> thunder_live_meters_set, a REPLACEMENT state: rate_hz as above, ONE fx_tracks mask (the union of the
 //     fx and dyn lists: tracks 0..31, 32 or "m" = the master's effects), kinds FXLVL (1) if `fx` is non-empty, FXDYN (2) if `dyn` is non-empty. The page sends one track per list. A track outside 0..32 refuses the message.
 //     chains / master / trim are read and ignored until M3 / M2 / M7 (the core accepts the bits and posts nothing for them yet). The core has no cap on watched tracks (METERS-DESIGN 5a ruling 3), so the shell adds none.
-//   * M4 (PP): fx.values {tr, slot, kind:'pump'|'mod', v:[numbers], at?} -> thunder_live_fx_values (the whole value list of a pump or a modular slot, instant). A refusal by the core (the EQ's phase / lin_quality, a linear-phase EQ, a wrong count) is an err event.
+//   * M4 (PP): fx.values {tr, slot, kind:'pump'|'mod', v:[numbers], at?} -> thunder_live_fx_values (the whole value list of a pump or a modular slot, instant). With an id (an ask, PC6) the reply is {ok:true} / {ok:false, busy:true} / {ok:false, error}; without one a refusal is an err event.
 //   * put (header + ArrayBuffer messages, see PutStore) then buf.use {id, pad, layer, kind:'pad'|'var', ii, vk: 'm3' | 'g1' (kind letter + number: the page's key, G4)} -> thunder_live_pad_take / thunder_live_var_set; pads become audible at pads.commit (no automatic publish). buf.free {id}.
 //     kinds 'sample', 'ir', 'wt', 'sf': err event (they are inputs of the core's pad render, which the page does not ask for here; 'sf' is E_UNSUPPORTED).
 //   * hello (ask) {live:true} -> the live engine starts (if it did not) and the reply carries caps; without `live` the N0 test core answers as before (Bridge.kt).
@@ -57,8 +57,8 @@ object BridgeTranslator {
         /** M4: meters.want with effect lists. [kinds]: THUNDER_LIVE_MK_* bits ([MK_FXLVL], [MK_FXDYN]); [fxTracks]: bit t (0..31), bit 32 the master's. */
         data class MetersSet(val hz: Double, val kinds: Int, val fxTracks: Long) : LiveCall()
         /** M4 (PP): [kind] 1 = pump, 2 = mod (THUNDER_LIVE_FXV_*). */
-        class FxValues(val track: Int, val slot: Int, val kind: Int, val v: DoubleArray, val at: Long) : LiveCall() {
-            override fun equals(other: Any?) = other is FxValues && track == other.track && slot == other.slot && kind == other.kind && v.contentEquals(other.v) && at == other.at
+        class FxValues(val track: Int, val slot: Int, val kind: Int, val v: DoubleArray, val at: Long, val id: Int = -1) : LiveCall() {
+            override fun equals(other: Any?) = other is FxValues && track == other.track && slot == other.slot && kind == other.kind && v.contentEquals(other.v) && at == other.at && id == other.id
             override fun hashCode() = (((track * 31 + slot) * 31 + kind) * 31 + v.contentHashCode()) * 31 + at.hashCode()
         }
         data class PadsCommit(val n: Int) : LiveCall()
@@ -99,6 +99,13 @@ object BridgeTranslator {
 
     /** The message's type without parsing the whole text (a song.load is a megabyte): the "t" member near the front, which JSON.stringify of {t: ..} writes first. */
     fun typeOf(raw: String): String? = Regex("\"t\"\\s*:\\s*\"([^\"]*)\"").find(raw.take(256))?.groupValues?.get(1)
+
+    /** The reply body to an fx.values ASK (PC6): {ok:true}; {ok:false, busy:true, error:'busy'} for E_BUSY (-8); {ok:false, error:'rc N ...'} for anything else. */
+    fun fxValuesReply(rc: Int): JSONObject = when (rc) {
+        0 -> JSONObject().put("ok", true)
+        -8 -> JSONObject().put("ok", false).put("busy", true).put("error", "busy")
+        else -> JSONObject().put("ok", false).put("error", "rc $rc" + when (rc) { -1 -> " (refused: not a hosted slot of that kind, a wrong value count, or a value the core keeps in the song)"; -2 -> " (not allowed now)"; -9 -> " (not supported by this build)"; else -> "" })
+    }
 
     private fun at(j: JSONObject): Long = if (j.has("at") && !j.isNull("at")) j.optDouble("at", -1.0).toLong() else NOW
     private fun num(j: JSONObject, vararg keys: String): Double? { for (k in keys) if (j.has(k) && !j.isNull(k)) { val v = j.optDouble(k, Double.NaN); if (!v.isNaN()) return v } ; return null }
@@ -204,7 +211,7 @@ object BridgeTranslator {
                 if (a.length() == 0 || a.length() > FXV_MAX) return refuse("fx.values: v must hold 1..$FXV_MAX numbers")
                 val d = DoubleArray(a.length()) { val x = a.opt(it); if (x is Number) x.toDouble() else Double.NaN }
                 if (d.any { it.isNaN() || it.isInfinite() }) return refuse("fx.values: a value is not a number")
-                call(LiveCall.FxValues(tr, slot, kind, d, at(j)))
+                call(LiveCall.FxValues(tr, slot, kind, d, at(j), id))
             }
             "buf.use" -> {
                 val kind = j.optString("kind", "pad")

@@ -151,6 +151,25 @@ class BridgeTranslatorTest {
         assertEquals(280, c.v.size)
     }
 
+    @Test fun fxValuesAskCarriesItsId() {
+        assertEquals(LiveCall.FxValues(1, 0, 1, doubleArrayOf(1.0), -1L, 17), call("{\"t\":\"fx.values\",\"id\":17,\"tr\":1,\"slot\":0,\"kind\":\"pump\",\"v\":[1]}"))
+        assertEquals(17, (call("{\"t\":\"fx.values\",\"id\":17,\"tr\":1,\"slot\":0,\"kind\":\"pump\",\"v\":[1]}") as LiveCall.FxValues).id)
+        assertEquals(-1, (call("{\"t\":\"fx.values\",\"tr\":1,\"slot\":0,\"kind\":\"pump\",\"v\":[1]}") as LiveCall.FxValues).id)
+        val big = (0 until 280).joinToString(",")
+        assertTrue(call("{\"t\":\"fx.values\",\"id\":2,\"tr\":1,\"slot\":0,\"kind\":\"pump\",\"v\":[$big]}") is LiveCall.FxValues)
+        assertEquals(2, refused("{\"t\":\"fx.values\",\"id\":2,\"tr\":1,\"slot\":9,\"kind\":\"pump\",\"v\":[1]}").replyId)   // a refusal of an ask carries its id
+    }
+
+    @Test fun fxValuesReplies() {
+        assertEquals(true, BridgeTranslator.fxValuesReply(0).getBoolean("ok"))
+        val busy = BridgeTranslator.fxValuesReply(-8)
+        assertEquals(false, busy.getBoolean("ok")); assertEquals(true, busy.getBoolean("busy"))
+        val arg = BridgeTranslator.fxValuesReply(-1)
+        assertEquals(false, arg.getBoolean("ok")); assertTrue(arg.getString("error").startsWith("rc -1")); assertTrue(!arg.has("busy"))
+        assertTrue(BridgeTranslator.fxValuesReply(-2).getString("error").startsWith("rc -2"))
+        assertTrue(BridgeTranslator.fxValuesReply(-9).getString("error").startsWith("rc -9"))
+    }
+
     @Test fun bufUse() {
         assertEquals(LiveCall.BufUse(4, 9, 0, "pad", 0, 'g'.code, 0), call("{\"t\":\"buf.use\",\"id\":4,\"pad\":9,\"kind\":\"pad\"}"))
         assertEquals(LiveCall.BufUse(-1, 9, 0, "pad", 0, 'g'.code, 0, 0), call("{\"t\":\"buf.use\",\"id\":-1,\"pad\":9,\"kind\":\"pad\",\"frames\":0}"))
