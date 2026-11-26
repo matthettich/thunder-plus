@@ -11,10 +11,18 @@
 namespace tpd {
 
 // THE CAPTURE THREAD'S CALLBACK. A ring push and a counter: no lock, no allocation, no system call, no log (the clock is read by the OS layer before it calls).
+// The stream's frame-0 time is the Electron helper's rule (io/src/thunder_io.cc OnCapture; F-review of H7): a callback at `hostNs` delivers frames that END there, so frame 0 was at
+// hostNs - (f0 + frames) / rate if this callback was on time. A late callback only makes that figure later, so the LOWER envelope is kept, let up by 100 ppm of the elapsed time so it follows a
+// device clock that runs slower than the host's. One buffer of bias and the long-take drift of a fixed start time are both gone.
 void InputCapture::onCapture(void* user, const float* data, int frames, int channels, int64_t hostNs) {
   InputCapture* s = static_cast<InputCapture*>(user);
   const uint64_t f0 = s->frame_.load(std::memory_order_relaxed);
-  if (s->startNs_.load(std::memory_order_relaxed) == 0) s->startNs_.store(hostNs, std::memory_order_relaxed);
+  if (frames > 0 && s->rate_ > 0) {
+    const int64_t measured = hostNs - (int64_t)((double)(f0 + (uint64_t)frames) * 1e9 / s->rate_);
+    if (!s->stamped_) { s->startNs_.store(measured, std::memory_order_release); s->stamped_ = true; }
+    else { const int64_t est = s->startNs_.load(std::memory_order_relaxed) + (hostNs - s->lastNs_) / 10000; s->startNs_.store(measured < est ? measured : est, std::memory_order_release); }
+    s->lastNs_ = hostNs;
+  }
   if (channels == (int)s->ring_.channels()) { if (!s->ring_.put(f0, data, (uint32_t)frames)) s->dropped_.fetch_add((uint64_t)frames, std::memory_order_relaxed); }
   s->frame_.store(f0 + (uint64_t)frames, std::memory_order_relaxed);
 }
@@ -31,6 +39,7 @@ bool InputCapture::open(const AudioInConfig& cfg, std::string* err) {
   struct Probe { InputCapture* s; } probe{this};
   if (!in->open(cfg, &InputCapture::onCapture, this, &inf, &e)) { if (err) *err = e.empty() ? "the input did not open" : e; return false; }
   if (inf.channels <= 0 || inf.sampleRate <= 0 || !ring_.init((uint32_t)inf.channels, (size_t)inf.sampleRate)) { in->close(); if (err) *err = "could not set up the input buffer"; return false; }
+  rate_ = inf.sampleRate; stamped_ = false; lastNs_ = 0;   // read by the capture thread only, which starts below
   std::string se;
   if (!in->start(&se)) { in->close(); ring_.free_(); if (err) *err = se.empty() ? "the input did not start" : se; return false; }
   info_ = inf; in_ = std::move(in);
@@ -82,7 +91,7 @@ int InputCapture::stop(std::string* err) {
   std::lock_guard<std::mutex> g(m_);
   if (!recording_ || !cur_) { if (err) *err = "rec.stop: no take is running"; return -1; }
   recording_ = false;
-  const int64_t startNs = startNs_.load(std::memory_order_relaxed);
+  const int64_t startNs = curFrame0_ == UINT64_MAX ? startNs_.load(std::memory_order_acquire) : curStartNs_;   // the stream's frame-0 time as it stood when the take began
   const double lat = (double)cur_->latencyFrames;
   const uint64_t f0 = curFrame0_ == UINT64_MAX ? 0 : curFrame0_;
   cur_->hostNs0 = startNs + (int64_t)(((double)f0 - lat) * 1e9 / (info_.sampleRate > 0 ? info_.sampleRate : 48000.0));
@@ -125,7 +134,7 @@ void InputCapture::drain() {
           peaks_[k] = pk;
         }
         if (recording_ && cur_) {
-          if (curFrame0_ == UINT64_MAX) curFrame0_ = f0;
+          if (curFrame0_ == UINT64_MAX) { curFrame0_ = f0; curStartNs_ = startNs_.load(std::memory_order_acquire); }
           const int64_t bytes = (cur_->frames + (int64_t)got) * (int64_t)chans_.size() * 4;
           if (bytes > kMaxTakeBytes) { takeFull_ = true; }
           else {

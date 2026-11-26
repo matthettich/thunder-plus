@@ -19,7 +19,7 @@ struct FakeIn : AudioIn {
   void close() override { g_closed = true; }
   bool lost() const override { return lostFlag.load(); }
   // one callback: sample (frame i, channel c) = c + (i % 1000) / 1000 / 10  (channel in the integer part so every channel is told apart)
-  void feed(int frames, int64_t first) { std::vector<float> b((size_t)frames * (size_t)ch); for (int i = 0; i < frames; i++) for (int c = 0; c < ch; c++) b[(size_t)i * ch + c] = (float)c + (float)((first + i) % 1000) / 10000.f; cb(user, b.data(), frames, ch, 1000); }
+  void feed(int frames, int64_t first) { std::vector<float> b((size_t)frames * (size_t)ch); for (int i = 0; i < frames; i++) for (int c = 0; c < ch; c++) b[(size_t)i * ch + c] = (float)c + (float)((first + i) % 1000) / 10000.f; cb(user, b.data(), frames, ch, 1000 + (int64_t)((double)(first + frames) * 1e9 / 48000.0)); }   // an on-time callback: its frames END at its time, frame 0 at 1000 ns
 };
 static void waitFor(InputCapture& ic, uint32_t zero) { for (int i = 0; i < 500 && ic.availableFrames() > zero; i++) std::this_thread::sleep_for(std::chrono::milliseconds(2)); }
 
@@ -42,7 +42,7 @@ int main() {
   bool right = t != nullptr;
   if (t) for (int i = 0; i < 5120 && right; i++) { right = std::fabs(t->data[0][i] - (0.f + (float)(i % 1000) / 10000.f)) < 1e-6 && std::fabs(t->data[1][i] - (17.f + (float)(i % 1000) / 10000.f)) < 1e-6 && std::fabs(t->data[2][i] - (27.f + (float)(i % 1000) / 10000.f)) < 1e-6; }
   CHECK(right, "every sample of channels 0, 17 and 27 is the right one (no channel mix-up, no shift)");
-  // the host time of the take's first frame: the capture start (1000 ns, the fake's callback time) + frame / rate - the latency (96 frames = 2 ms)
+  // the host time of the take's first frame: the stream's frame 0 (1000 ns: each fake callback comes at the END of its frames, so a start taken from the first callback would be 128 frames late) + frame / rate - the latency (96 frames = 2 ms)
   CHECK(t && std::llabs(t->hostNs0 - (1000 - (int64_t)(96.0 * 1e9 / 48000.0))) < 1000, "hostNs0 = start - input latency: %lld", t ? (long long)t->hostNs0 : 0);
   auto pk = ic.readPeaks(); CHECK(pk.size() == 3 && pk[0] > 0.f && pk[2] > 26.9f, "meters: one peak per armed channel");
   CHECK(ic.stop(&e) < 0 && e.find("no take") != std::string::npos, "stop without a take");

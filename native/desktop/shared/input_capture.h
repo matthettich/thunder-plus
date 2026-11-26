@@ -72,7 +72,9 @@ class InputCapture {
   AudioInInfo info_;
   InputRing ring_;
   std::atomic<uint64_t> frame_{0};        // the capture thread's frame counter (device frames since open)
-  std::atomic<int64_t> startNs_{0};       // host time of the first callback
+  std::atomic<int64_t> startNs_{0};       // host time of the stream's frame 0: the lower envelope over the callbacks (the helper's rule: input_capture.cpp onCapture)
+  double rate_ = 0; bool stamped_ = false; int64_t lastNs_ = 0;   // capture thread only (rate_ is set before the stream starts)
+  int64_t curStartNs_ = 0;                // startNs_ when the take's first frame was seen (m_)
   std::atomic<uint64_t> dropped_{0};
   std::thread th_; std::atomic<bool> run_{false};
   std::vector<int> chans_;
