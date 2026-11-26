@@ -376,6 +376,7 @@
     // Pads rendered before the handshake used the page's guess: render them again at the engine's rate, once (design 4.2 step 4).
     try { if (typeof host.prerender === 'function') host.prerender(); } catch (e) { log('native core client: prerender after hello failed', e); }
     try { subscribe(); } catch (e) { log('native core client: subscribe failed', e); }
+    try { if (typeof host.h7Ready === 'function') host.h7Ready(); } catch (e) { log('native core client: h7Ready failed', e); }   // PC7: Settings > Audio / MIDI may now show the shell's devices
     // the kit first (the shell answers a song with `pending` until it has a kit), then the song
     try { var pa = typeof host.padApi === 'function' ? host.padApi() : null; if (pa && typeof NC.kit === 'function') NC.kit(pa); } catch (e) { log('native core client: kit after hello failed', e); }
     try { if (host.songVer) NC.edit(); } catch (e) { /* ignore */ }   // the song goes once, so the first PLAY already has its verdict

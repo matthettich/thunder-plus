@@ -453,7 +453,7 @@ body:not(.nowv) .wvMobNote{display:none}
 /* AUDIO & MIDI tidy (menu audit, 2 Nov): labels on one line, Test sound beside Output, Reset as a small button whose note is
    its tooltip, smaller port delay boxes */
 :is(#pAudio,#pMidi) :is(.segrow,.audrow)>span:first-child{width:96px; white-space:nowrap}
-#pAudio .audrow select#audOut{flex-basis:150px}
+#pAudio .audrow select#audOut, #pAudio #audNat .audrow select{flex-basis:150px}
 #pAudio .btnrow:has(#audReset) > .lbl{display:none}
 #pAudio :is(#audReset, #audReport, #audDefaults){min-height:30px; padding:0 10px; font-size:var(--fs-3)}   /* (MENU PASS 2: the same size as Test sound) */
 :is(#pAudio,#pMidi) .audrow .mlat input{width:52px}
@@ -3314,6 +3314,14 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="audrow" id="audOutRow" title="Where everything plays: the synth, the tracker and previews"><span>Output</span><select id="audOut" aria-label="Audio output device"><option value="">System default</option></select>
         <button class="sm" id="audNames" hidden>Show names</button><button class="sm" id="audTest" title="Plays a short beep through the output">Test</button></div>
       <div class="audrow" title="The overall volume after the tracker’s master"><span>Level</span><input type="range" id="audLvl" min="0" max="100" step="1" aria-label="Output level"><output id="audLvlV"></output></div>
+      <div id="audNat" hidden>
+        <h3>Desktop audio device</h3>
+        <div class="audrow" title="The interface the desktop app plays through. System default follows the computer’s choice"><span>Output</span><select id="naOut" aria-label="Desktop audio output device"></select></div>
+        <div class="audrow" title="The interface the desktop app records from (Record a sample, takes). None closes the input and the microphone"><span>Input</span><select id="naIn" aria-label="Desktop audio input device"></select></div>
+        <div class="audrow" title="Only the rates this device runs at, or Device (its own current rate). Any other rate would be converted, which makes the timing uneven"><span>Rate</span><select id="naRate" aria-label="Sample rate (the device’s own rates)"></select></div>
+        <div class="audrow" title="Frames per audio callback. Device keeps the interface’s own buffer. Smaller answers faster; larger is safer"><span>Buffer</span><select id="naBuf" aria-label="Audio buffer size"></select></div>
+        <div class="audrow"><span class="lbl" id="naStat" style="flex:1 1 auto"></span><button class="sm" id="naStats" title="Copies the audio thread’s timing figures (callbacks, drift, worst callback, overruns) to paste into a bug report">Copy audio stats</button></div>
+      </div>
       <h3>Engine</h3>
       <div class="segrow" title="Lowest answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Changes when audio restarts"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow" title="Device uses the output’s own rate. Changes when audio restarts"><span>Rate</span><div class="seg" id="segARate"></div></div>
@@ -8907,6 +8915,11 @@ function renderAsync(v, sr, hold, stages){
   });
 }
 const padSR = () => NCON() ? NC().sr : ctx ? ctx.sampleRate : srGuess;
+/* PC7: the client, or null. natDev() / natIn() / natMidi(): the desktop shell says it has audio devices / an input / MIDI (hello caps); null on Electron, on the website and on a shell that does not. */
+const natC = () => NCON() ? NC() : null;
+const natDev = () => { const c = natC(); return c && c.devOn && c.devOn() ? c : null; };
+const natIn = () => { const c = natC(); return c && c.inOn && c.inOn() ? c : null; };
+const natMidi = () => { const c = natC(); return c && c.midiOn && c.midiOn() ? c : null; };
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
 /* LN TEMPO START */
 /* TEMPO AND LINES (build 658): a pad with a lines-mode envelope follows the song's tempo, but not at once. While BPM or LPB keep changing
@@ -15883,6 +15896,7 @@ function heardLat(){
 let audDevs = [];
 function audStatus(){
   const st = $('audStat'); if (!st) return;
+  if (natDev()){ natAudSync(); return; }   // (PC7: the desktop shell's device, not the page's own context)
   if (!ctx){ st.textContent = 'Audio turns on when you play the first sound.'; return; }
   const ms = v => Math.round(v * 1000);
   st.textContent = `${(ctx.sampleRate / 1000).toFixed(ctx.sampleRate % 1000 ? 1 : 0)} kHz · latency ${ms(ctx.baseLatency || 0)} ms` +
@@ -15902,7 +15916,7 @@ async function audRefresh(){
   $('audNames').hidden = !sinkOk || !audDevs.length || audDevs.every(d => d.label);
   if (!sinkOk) $('audOutRow').title = 'This browser can’t pick the output. On Android, use the system’s media output switcher or plug in the interface. On a computer, Chrome, Edge and the desktop app can choose it here.';
   $('audLvl').value = aset.vol; audLvlShow();
-  updLat(); updARate(); updPdc(); audRestartRow(); audStatus();
+  updLat(); updARate(); updPdc(); audRestartRow(); audStatus(); natAudSync();
 }
 function audLvlShow(){ const v = aset.vol; $('audLvlV').textContent = v <= 0 ? '−∞ dB' : (20 * Math.log10(v / 100)).toFixed(1) + ' dB'; }
 function audRestartRow(){ $('audRestartRow').hidden = !((ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)) || NOWK !== !!aset.noWk); }
@@ -15931,6 +15945,83 @@ $('audLvl').addEventListener('input', e => {
   if (master) master.gain.setTargetAtTime(aset.vol / 100, ctx.currentTime, 0.02);
 });
 $('audLvl').addEventListener('change', asetSave);
+
+/* ===== NATIVE DESKTOP AUDIO DEVICES (PC7; docs/plans/PC7-NOTES.md): Settings > Audio in the desktop shell speaks dev.list / dev.open / the `dev` events instead of the page's own AudioContext ===========
+   Only with the client on and hello.caps.devices (natDev()). The shell holds the truth (audio.json): the page asks dev.list, shows it, and sends dev.open when a row changes. It sends NOTHING at start-up (the shell opened its saved choice
+   at hello). Output, input, buffer (0 = the device's own, else 64..1024) and rate: ONLY the output device's own `rates` or Device (0), never another one (the F-review: a rate the device does not run is resampled, with bursty callbacks and
+   MIDI jitter up to a buffer). The page's own Output / Latency / Rate rows are hidden then: they configure the browser's context, which a native PLAY does not use. */
+const naFmt = (v, u) => v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + ' k' + (u || '') : v + (u || '');
+function natAudSync(){
+  const C = natDev(), blk = $('audNat'); if (!blk) return;
+  blk.hidden = !C;
+  for (const el of [$('audOutRow'), $('segLat').parentElement, $('segARate').parentElement]) if (el) el.hidden = !!C;
+  if (!C) return;
+  const st = C.devState(), devs = st.devices || [];
+  const fill = (sel, opts, v) => { if (!sel) return; if (document.activeElement === sel && sel.options.length === opts.length) return;   // (an open list is not rebuilt under the hand)
+    sel.innerHTML = ''; for (const [val, txt] of opts) sel.append(new Option(txt, val)); sel.value = opts.some(o => String(o[0]) === String(v)) ? String(v) : String(opts[0][0]); };
+  const outs = devs.filter(d => d.outId && d.outputs > 0), ins = devs.filter(d => d.inId && d.inputs > 0);
+  const oOpts = [['', 'System default']].concat(outs.map(d => [d.outId, d.name + ' (' + d.outputs + ' out)']));
+  if (st.wantOut && !outs.some(d => d.outId === st.wantOut)) oOpts.push([st.wantOut, 'Saved device (not connected)']);
+  fill($('naOut'), oOpts, st.wantOut);
+  const iOpts = [['', 'None']].concat(ins.map(d => [d.inId, d.name + ' (' + d.inputs + ' in)']));
+  if (st.wantIn && !ins.some(d => d.inId === st.wantIn)) iOpts.push([st.wantIn, 'Saved device (not connected)']);
+  fill($('naIn'), iOpts, st.wantIn);
+  const rates = C.devRates($('naOut').value), want = +aset.natSr || 0;
+  fill($('naRate'), [[0, 'Device']].concat(rates.map(r => [r, naFmt(r, 'Hz')])), rates.includes(want) ? want : 0);
+  fill($('naBuf'), [[0, 'Device']].concat(C.bufSizes().map(b => [b, b + ' frames'])), +aset.natBuf || 0);
+  // the line: what is open now, and the latency the shell reports
+  const a = st.audio, i = st.input, ms = (f, sr) => sr > 0 ? Math.round(f / sr * 1000 * 10) / 10 : 0; let t;
+  if (!a || !a.open) t = 'No output is open.';
+  else t = `${a.name || 'Output'} · ${naFmt(a.sr, 'Hz')} · buffer ${a.buf} frames` + (a.latOut > 0 ? ` · output latency ${ms(a.latOut, a.sr)} ms (${a.latOut} frames)` : '');
+  if (i && i.open) t += ` · in: ${i.name || 'Input'}, ${i.channels} ch` + (i.latIn > 0 ? `, latency ${ms(i.latIn, i.sr || (a && a.sr))} ms` : '');
+  $('naStat').textContent = t; const as = $('audStat'); if (as) as.textContent = t;
+}
+let natAudBusy = false;
+async function natAudApply(inId){
+  const C = natDev(); if (!C || natAudBusy) return; natAudBusy = true;
+  const slow = inId ? setTimeout(() => toast('Opening the input… if macOS asks for the microphone, allow it.', 6000), 2500) : 0;
+  try {
+    const out = $('naOut').value, sr = +$('naRate').value || 0, buf = +$('naBuf').value || 0;
+    aset.natSr = sr; aset.natBuf = buf; asetSave();
+    const cfg = {out, sr, buf}, ist = C.devState().input;
+    if (inId != null) cfg.in = inId; else if (ist && ist.open) cfg.in = $('naIn').value;   // (an open input is sent again: the shell reopens it at the engine's new rate or buffer)
+    const r = await C.devOpen(cfg);
+    if (!r.ok) toastErr('Could not open the audio device: ' + (r.error || r.err || 'no answer'), 6000);
+    else {
+      if (r.fellBack) toastErr('That output is not available: playing through the system default.', 5000);
+      else if (r.rebuilt) toast('Audio restarted on ' + ((r.audio && r.audio.name) || 'the device') + '.', 2500);
+      if (r.inError) toastErr('The input did not open: ' + r.inError, 6000);
+    }
+  } finally { clearTimeout(slow); natAudBusy = false; natAudSync(); }
+}
+$('naOut').addEventListener('change', () => natAudApply());
+$('naIn').addEventListener('change', e => natAudApply(e.target.value));
+$('naRate').addEventListener('change', () => natAudApply());
+$('naBuf').addEventListener('change', () => natAudApply());
+$('naStats').addEventListener('click', async () => {
+  const C = natDev(); if (!C || !C.rtOn()) return toast('This shell has no audio statistics.');
+  const r = await C.rtSnapshot(); if (!r) return toast('The shell did not answer.');
+  const txt = JSON.stringify(r, null, 1);
+  try { await navigator.clipboard.writeText(txt); toast('Audio stats copied.'); } catch(e){ tpLog('native audio stats', txt); toast('Audio stats are in the playback report.'); }
+});
+// the shell's own news: the list changed, a device was lost (the default plays), the engine reopened, the wanted device is back
+function natAudEvent(m){
+  const C = natDev(); if (!C) return; const st = C.devState(), devs = st.devices || [];
+  const nm = (id, key) => { const d = devs.find(x => x[key] === id); return d ? d.name : ''; };
+  if (m.kind === 'lost'){
+    if (m.which === 'out') toastErr('The audio output ' + (m.name || nm(m.id, 'outId') || '') + ' was unplugged' + (m.fellBack ? ': playing through the system default' : '') + '.', 6000);
+    else if (m.which === 'in') toastErr('The audio input ' + (nm(m.id, 'inId') || '') + ' was unplugged.', 5000);
+  } else if (m.kind === 'reopened') toast('Audio is playing through ' + (m.name || 'the new device') + '.', 3500);
+  else if (m.kind === 'changed' && m.wantedBack === 'out') toast((nm(m.id, 'outId') || 'Your audio output') + ' is back. Pick it in Settings › Audio to switch to it.', 6000);
+  natAudSync();
+}
+let natInit = null;
+function natAudInit(){   // the client calls this once the shell's hello is answered and it has subscribed (host.h7Ready)
+  const C = natDev(); if (!C || natInit === C) return; natInit = C;
+  C.listen('dev', natAudEvent);
+  natAudSync();
+  if (natMidi() && (midi.want || midi.on) && !midi.access) connectMidi();   // (the start-up connect ran before the shell answered)
+}
 const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
 // LATENCY COMPENSATION (owner, 1 Nov): this device's choice (AUTO by default since build 615); the live player re-times at once.
 // (3 Nov, ports table pass: a switch, not an Off / On pair; makeCk is makeSeg for one checkbox.)
@@ -16696,6 +16787,9 @@ async function rcdOpen1(){
   // the window can close (rcdClose) while this waits on macOS or the helper; what this open then made is undone, not left half-open
   const gen = RCD.gen | 0, gone = () => (RCD.gen | 0) !== gen;
   audio(); try { if (ctx.state !== 'running') await ctx.resume(); } catch(e){}
+  // NATIVE DESKTOP SHELL INPUT (PC7): every channel of the interface through thunderCore (rec.arm / rec.start / rec.stop / take); a take comes whole after Stop
+  if (natIn()){ const okN = await rcdOpenNat(); if (gone()){ rcdCloseIo(); RCD.node = null; return false; }
+    if (okN) return true; RCD.note = 'Native input failed: ' + (RCD.ioWhy || 'it didn’t open') + '.'; toastErr(RCD.note, 6000); return false; }
   // NATIVE INPUT (desktop app, INPUT ENGINE Auto): every channel of the interface, through the helper; the browser's input otherwise
   if (IOAPI && aset.inEngine !== 'browser'){
     try {
@@ -16857,7 +16951,7 @@ async function rcdStart(){
   if (RCD.on || RCD.sync) return;
   if (!(await rcdOpen())) return;
   RCD.chunks = []; RCD.take = null; RCD.undo = [];
-  if (rcdSet.mode === 'free'){ RCD.on = true; RCD.t0w = ctx.currentTime; rcdGo('go'); RCD.clkF = null; rcdUi(); return; }
+  if (rcdSet.mode === 'free' || (RCD.io && RCD.io.nat)){ if (rcdSet.mode !== 'free') toastOnce('nat-pat', 'On the desktop app’s native input a take runs from Record to Stop; it is not cut at pattern edges yet.', 6000); RCD.on = true; RCD.t0w = ctx.currentTime; rcdGo('go'); RCD.clkF = null; rcdUi(); return; }
   // PATTERN: armed; the next pattern edge starts it. Stopped: play from the cursor's song row (its top is the edge).
   const playing = tp.on && tp.mode === 'song'; if (tp.on && !playing) tStop(true);   // (before arming: tStop ends an armed take)
   const R = RCD.sync = {phase:'armed', pats:rcdSet.pats | 0, n:0, row:null, st:null, stopReq:false};
@@ -16875,8 +16969,9 @@ function rcdStop(){
 function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) rcdGo('stop'); RCD.on = false; RCD.chunks = []; RCD.clkF = null; rcdClk(); }
 function rcdTake(t, how, beats, pats){
   if (!t){ toast('Nothing was recorded.'); rcdUi(); return; }
-  if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('Take is silent: check the input is picked and turned up', 5000);
-  RCD.take = {data:t.data, data2:t.data2, sr:ctx.sampleRate, how, beats, pats}; RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; rcdUi();
+  const tsr = RCD.natSr || ctx.sampleRate; RCD.natSr = 0;   // (PC7: a native take has the engine's rate, not the page's context's)
+  if (sePeak({data:t.data, data2:t.data2, sr:tsr}).peak < 1e-4) toast('Take is silent: check the input is picked and turned up', 5000);
+  RCD.take = {data:t.data, data2:t.data2, sr:tsr, how, beats, pats}; RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; rcdUi();
 }
 /* MEASURE GEAR DELAY (owner, 7 Nov: MIDI notes sounded early against the engines, "different on every stop and start"; on
    Electron). Settings › MIDI › Measure… plays a loud click through the master and, 250 ms later, a MIDI note on the port, again
@@ -16896,6 +16991,7 @@ function mltOnset(x, a, b, sr){   // the first frame in [a, b) above half the wi
 async function midiLatRun(p, ch, note, n){
   const say0 = MLT.say, say = t => { try { if (say0) say0(t); } catch(e){} };   // (the panel that started this run: a reopened one isn't told about it, CodeRabbit)
   if (!midiOut(p)) throw new Error('no port');
+  if (natIn()) throw new Error('Measure needs timed input, which the desktop app’s native input does not give yet');   // (PC7: a native take has no timestamps against the song)
   if (!RCD.io && !RCD.stream) say('Opening the input… (the first time can take a few seconds)');
   if (!(await rcdOpen())) throw new Error('no input');
   const sr = ctx.sampleRate, buf = ctx.createBuffer(1, Math.round(sr * 0.004), sr), d = buf.getChannelData(0);
@@ -17111,7 +17207,8 @@ function rcdDrawWave(){
 // RATE NOTE (owner, 8 Nov: "Sample-rate mismatch: saw no window"): rcdOpen1 sets RCD.note, a small status line inside the window that
 // fillIn clears again when the window is reopened over a still-open input. So the rate message is worked out here from the open input, shown
 // as that line whenever there is no other note, and as a toast once per device + rate pair (again only when the rates change).
-function rcdRateMsg(){ const o = RCD.io && RCD.io.opened, dr = o ? o.deviceRate | 0 : 0, ar = ctx ? ctx.sampleRate | 0 : 0;
+function rcdRateMsg(){ if (RCD.io && RCD.io.nat) return null;   // (PC7: the shell opens the input at the engine's rate)
+  const o = RCD.io && RCD.io.opened, dr = o ? o.deviceRate | 0 : 0, ar = ctx ? ctx.sampleRate | 0 : 0;
   return dr && ar && dr !== ar ? { key: RCD.io.dev.inId + ':' + dr + '>' + ar, msg: `${RCD.io.dev.name} is ${dr / 1000} kHz, the app ${ar / 1000} kHz: the take is converted. Match them (Settings › Audio › Rate) for a clean take.` } : null; }
 function rcdUi(){
   const rm = rcdRateMsg(); if (rm && RCD.rateToast !== rm.key){ RCD.rateToast = rm.key; toast(rm.msg, 8000); }
@@ -17187,7 +17284,14 @@ async function rcdPanel(pad, opts){
   // INPUT: labels only show once the browser has been allowed an input; the list is read again after Record opens one.
   // With the native engine it lists the helper's devices (value = the helper's input id, kept as rcdSet.ioDev)
   const inSel = el('select'); fillIn = async () => { const tok = ++fillTok; nat = false; let L = null;
-    if (IOAPI && !E && aset.inEngine !== 'browser'){
+    if (natIn() && !E){   // PC7: the desktop shell's own devices (same fields as the helper's: inId, name, inputs)
+      natDevs = (natIn().devState().devices || []).filter(d => d.inId && d.inputs > 0);
+      if (natDevs.length){ inSel.textContent = ''; natDevs.forEach(d => inSel.append(new Option(`${d.name} (native, ${d.inputs} input${d.inputs === 1 ? '' : 's'})`, d.inId)));
+        const pick = natInDev(); inSel.value = pick ? pick.inId : natDevs[0].inId; nat = true; RCD.note = ''; fillCh(); if (RCD.ui && RCD.ui.rec) rcdUi();
+        if (!RCD.on && !RCD.sync && RCD.ui) rcdOpen().then(() => { if (RCD.ui && RCD.ui.rec) rcdUi(); });   // (meters at once, as the helper's)
+        return; }
+      RCD.note = 'No native input found: using the browser’s input';
+    } else if (IOAPI && !E && aset.inEngine !== 'browser'){
       if (await iohReady()){
         if (tok !== fillTok) return;
         natDevs = IOH.devices.filter(d => d.inId && d.inputs > 0);
@@ -17653,7 +17757,7 @@ try { const m = JSON.parse(localStorage.getItem(MKEY) || 'null');
 } catch(e){}
 // outId / clkOut (port A) and lat (port A's delay) are still written for an older copy of the app on this device.
 const saveMidi = () => { try { localStorage.setItem(MKEY, JSON.stringify({notes:midi.notes, cc:midi.cc, vel:midi.vel, want:midi.on, outIds:midi.outIds, clk:midi.clk,
-  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lats[0], lats:midi.lats, inId:midi.inId, inCh:midi.inCh, clkId:midi.clkId, keys:midi.keys, names:midi.names})); } catch(e){} };
+  outId:midi.outIds[0], clkOut:midi.clk[0], clkIn:midi.clkIn, lat:midi.lats[0], lats:midi.lats, inId:midi.inId, inCh:midi.inCh, clkId:midi.clkId, keys:midi.keys, names:midi.names})); } catch(e){} try { midiCfgPush(); } catch(e){} };
 function midiStatus(msg){ $('midiStat').textContent = msg; }
 const ccName = k => { const [ch, n] = k.split(':'); return 'CC ' + n + (+ch ? ' ch ' + (+ch + 1) : ''); };
 const rowLabel = id => { const e = document.getElementById(id), r = e && e.closest('.row'), l = r && r.querySelector('label'); return l ? l.textContent : id; };
@@ -17828,10 +17932,14 @@ let midiConnecting = null;
 function connectMidi(){ if (!midiConnecting) midiConnecting = connectMidi1().finally(() => { midiConnecting = null; }); return midiConnecting; }
 // ENGINE CHANGED MID-CONNECT (review): the connect in flight belongs to the old engine; once it's in, it is dropped and the new one connects
 function midiAccessDrop(){ const a = midi.access; midi.access = null; if (!a) return;
-  try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){} if (a.native) nmClose(); }
+  try { a.onstatechange = null; a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){} if (a.ncore) ncMidiClose(a); else if (a.native) nmClose(); }
 async function connectMidi1(){
-  if (midi.access && !!midi.access.native !== nmWanted()){ try { moRelease(); } catch(e){} midiAccessDrop(); }
+  if (midi.access && (midi.access.ncore ? !natMidi() : !!midi.access.native !== nmWanted())){ try { moRelease(); } catch(e){} midiAccessDrop(); }
   if (midi.access){ hookInputs(); return; }
+  // NATIVE DESKTOP SHELL MIDI (PC7): the shell's own ports (CoreMIDI), the page's access looking like the helper's; notes in come as midi.in events, the four port letters go as midi.cfg
+  if (natMidi()){ const acc = await ncMidiConnect();
+    if (acc){ await midiRemap(acc); midi.access = acc; midi.on = true; saveMidi(); hookInputs(); renderPads();
+      $('bMidiOn').textContent = 'Connected'; $('bMidiOn').classList.add('on'); acc.onstatechange = hookInputs; return; } }
   // NATIVE MIDI (desktop app, Settings › MIDI › Engine Native): the helper's ports, notes sent at their exact time from its own
   // thread and taken back on STOP; Web MIDI when the helper or its MIDI isn't there
   if (nmWanted()){ const acc = await nmConnect();
@@ -18531,7 +18639,7 @@ if (LINKAPI && $('segLink')){
    MessagePort comes back as a window message ({thunderIo:true}, ports[0]). Its first message is the hello ({op:'hello',
    available, version | why}); then {op:'devices', id} lists the interface's inputs. The website has no IOAPI: nothing here runs
    and no row is drawn. Nothing records through it yet: iohUse() is for the recorder to ask. */
-const IOAPI = (window.thunderDesktop && window.thunderDesktop.io) || null;
+const IOAPI = (!window.thunderCore && window.thunderDesktop && window.thunderDesktop.io) || null;   // (PC7: the native desktop shell has thunderDesktop.io too, but its helper is replaced by thunderCore's dev.* / rec.* / midi.*: the Electron helper path is for Electron only)
 const IOH = {state:'off', why:'', version:'', devices:[], port:null};   // state: off | starting | ready | unavailable
 let iohSeq = 0, iohPend = new Map(), iohGo = null, iohHelloT = 0;
 const iohUse = () => !!IOAPI && aset.inEngine !== 'browser' && IOH.state === 'ready';
@@ -18672,6 +18780,38 @@ function nmLost(){
 function nmClose(){ const acc = NM.acc; if (!acc) return; NM.acc = null; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null;
   nmPost({op:'midiClear', port:0}); for (const m of [acc.outputs, acc.inputs]) for (const x of m.values()) nmPost({op:'midiClose', port:x.port});
   NM.byPort.clear(); }
+/* ===== NATIVE DESKTOP SHELL MIDI (PC7; docs/plans/PC7-NOTES.md): the shell's CoreMIDI ports through thunderCore, looking like the helper's access to the rest of the page =====
+   midi.access becomes {native:true, ncore:true, outputs, inputs, onstatechange}. Inputs: the shell's `midi.ports` list (ids 'n:<name>', a port token each); a `midi.in` event {port, bytes, ts} goes to that input's onmidimessage
+   (ts: the shell's own stamp on the page's clock, the client's lower envelope). Outputs: the shell plays a SONG's MIDI itself (the core's scheduler, native PLAY), so an output here is the letter's cable for midi.cfg only: the
+   page cannot send a message to it (no raw MIDI-out message exists in the bridge yet), its send() drops and says so once. The four letters, the clock boxes, Gear delay and clock in go to the shell as midi.cfg from saveMidi(). */
+const NMC = {byPort:new Map(), off:[], dropped:false};
+async function ncMidiConnect(){
+  const C = natMidi(); if (!C) return null;
+  for (let t = 0; t < 30 && !C.midiState().heard; t++) await new Promise(r => setTimeout(r, 50));   // (the shell sends the ports right after hello; at most 1.5 s)
+  const acc = {native:true, ncore:true, outputs:new Map(), inputs:new Map(), onstatechange:null};
+  const fill = () => {   // the lists again, keeping the objects of ports that are still there (their handlers stay)
+    const st = C.midiState(), seen = new Set();
+    for (const d of st.devs){ const id = String(d.id); seen.add(id);
+      if (!acc.outputs.has(id)) acc.outputs.set(id, {id, name:String(d.name || id), native:true, type:'output',
+        send(){ if (!NMC.dropped){ NMC.dropped = true; tpLog('native MIDI out', 'the desktop shell plays a song’s MIDI itself; hand-played MIDI out is not sent yet'); } }, clear(){} }); }
+    for (const id of [...acc.outputs.keys()]) if (!seen.has(id)) acc.outputs.delete(id);
+    NMC.byPort.clear(); const seenI = new Set();
+    for (const d of st.ins){ const id = String(d.id); seenI.add(id); let inp = acc.inputs.get(id);
+      if (!inp) acc.inputs.set(id, inp = {id, name:String(d.name || id), native:true, type:'input', onmidimessage:null});
+      inp.port = d.port; NMC.byPort.set(d.port, inp); }
+    for (const id of [...acc.inputs.keys()]) if (!seenI.has(id)) acc.inputs.delete(id);
+  };
+  fill();
+  NMC.off.push(C.listen('midi.in', m => { const inp = NMC.byPort.get(m.port);
+    if (inp && inp.onmidimessage) try { inp.onmidimessage({data:Uint8Array.from(m.bytes), timeStamp:m.ts}); } catch(e){ tpLog('MIDI in', e); } }));
+  NMC.off.push(C.listen('midi.ports', async m => { if (midi.access !== acc) return;
+    if (m.changed){ fill(); try { await midiRemap(acc); } catch(e){} if (acc.onstatechange) try { acc.onstatechange(); } catch(e){} }
+    const el = $('midiStat'); if (el){ const t = el.textContent.replace(/ · \d+ late$/, ''); el.textContent = m.late > 0 && / · native$/.test(t) ? t + ' · ' + m.late + ' late' : t; } }));
+  return acc;
+}
+function ncMidiClose(a){ for (const f of NMC.off.splice(0)) try { f(); } catch(e){} NMC.byPort.clear(); if (a){ try { a.inputs.forEach(i => { i.onmidimessage = null; }); } catch(e){} } }
+// midi.cfg: the page's four letters (saveMidi calls this after every change; the client sends only when it differs from what the shell holds)
+function midiCfgPush(){ if (!midi.access || !midi.access.ncore) return; const C = natMidi(); if (C) C.midiCfg({outs:midi.outIds, clockOut:midi.clk, gearDelay:midi.lats, clockIn:midi.clkIn}); }
 // Saved port choices (Settings › MIDI › Ports, Notes in, Clock from) in the other engine's ids, mapped by name: Web MIDI ids by
 // the names remembered for them (midi.names; read from Web MIDI once when missing), native ids by their own name
 function midiNames(acc){ try { acc.outputs.forEach(o => { midi.names[o.id] = o.name || ''; }); acc.inputs.forEach(i => { midi.names[i.id] = i.name || ''; }); } catch(e){} }
@@ -18799,7 +18939,81 @@ async function rcdOpenIo(rec, mon){
   RCD.io = io;
   return true;
 }
+/* ===== NATIVE DESKTOP SHELL INPUT, recorder side (PC7; docs/plans/PC7-NOTES.md) =====
+   The shell records on its own (rec.arm the channels, rec.start, rec.stop, then `take` fetches them) and sends no live audio, so the recorder gets the take whole after Stop, as the browser worklet would have handed it: RCD.io is a stand-in
+   with the fields the recorder reads (dev, opened, D, node.port for the pick), RCD.node a stand-in for the recorder worklet ('go' / 'stop'). Meters come from the shell's `rec` events (peaks of the armed channels).
+   FREE takes only: no song position comes with a native PLAY yet (PC5), so PATTERN mode records like FREE. The take's rate is the engine's (RCD.natSr). No monitor (the shell has no input monitor). */
+function natInDev(){
+  const C = natIn(); if (!C) return null; const st = C.devState(), D = (st.devices || []).filter(d => d.inId && d.inputs > 0); if (!D.length) return null;
+  return D.find(d => rcdSet.ioDev && d.inId === rcdSet.ioDev) || D.find(d => d.inId === st.wantIn) || D.find(d => d.isDefaultIn) || D.reduce((a, b) => (b.inputs > a.inputs ? b : a));
+}
+function natArm(nat, pick){   // the picked pair (or channel) is what is armed: its peaks are the meters, its frames the take
+  nat.q = nat.q.then(async () => {
+    if (RCD.io !== nat || RCD.on || RCD.sync) return;
+    const n = nat.opened.channels, a = Math.max(0, Math.min(n - 1, pick[0] | 0)), b = Math.max(0, Math.min(n - 1, pick[1] | 0)), chs = a === b ? [a] : [a, b];
+    if (nat.chs && nat.chs.join() === chs.join() && nat.sel[0] === a && nat.sel[1] === b) return;
+    const r = await natIn().recArm(chs);
+    if (!r.ok){ RCD.ioWhy = 'arming inputs ' + chs.map(c => c + 1).join('+') + ': ' + (r.error || 'no answer'); toastErr(RCD.ioWhy, 5000); return; }
+    nat.chs = chs; nat.sel = [a, b];
+  });
+}
+async function natFinish(nat, id, info){   // the take, from rec.stop (id null) or from the shell's own rec.done; delivered to the recorder as the worklet would
+  const C = natIn(); let r = info;
+  const done = () => rcdMsg({done:true});
+  if (!C){ done(); return; }
+  if (id == null){
+    if (!nat.running){ done(); return; }
+    r = await C.recStop(); nat.running = false;
+    if (!r.ok){ toastErr('The take could not be ended: ' + (r.error || 'no answer'), 6000); done(); return; }
+    id = r.take;
+  } else nat.running = false;
+  const frames = (r && r.frames) | 0;
+  if (frames < 1){ C.recFree(id); done(); return; }
+  const got = await C.recTake(id, (nat.chs || [0]).map((c, k) => k), frames); C.recFree(id);
+  if (!got.ok){ toastErr('The take could not be read: ' + (got.error || ''), 6000); done(); return; }
+  const idx = c => (nat.chs || [0]).indexOf(c), L = got.data[idx(nat.sel[0])] || got.data[0], R = got.data[idx(nat.sel[1])] || L;
+  RCD.natSr = got.sr || (r && r.sr) | 0 || nat.sr; RCD.firstF = 0;
+  rcdMsg({f0:0, ch:[L, R], done:true});
+}
+async function rcdOpenNat(){
+  RCD.ioWhy = ''; const C = natIn(); if (!C){ RCD.ioWhy = 'the desktop app’s audio input isn’t available'; return false; }
+  const dev = natInDev(); if (!dev){ RCD.ioWhy = 'no input device found'; return false; }
+  let st = C.devState();
+  if (!(st.input && st.input.open && st.wantIn === dev.inId)){
+    // OPENING WAITS FOR macOS (the helper's lesson): the first open of an input can sit on the microphone prompt
+    const slow = setTimeout(() => toast('Opening ' + dev.name + '… if macOS asks for the microphone, allow it.', 6000), 2500);
+    const r = await C.devOpen({in:dev.inId}); clearTimeout(slow); st = C.devState();
+    if (!r.ok || !(st.input && st.input.open)){ RCD.ioWhy = dev.name + ' wouldn’t open: ' + (r.inError || r.error || r.err || 'no answer'); return false; }
+  }
+  const inp = st.input, nch = inp.channels | 0; if (nch < 1){ RCD.ioWhy = dev.name + ' has no input channels'; return false; }
+  const nat = {nat:true, dev, D:0, q:Promise.resolve(), off:[], running:false, chs:null, sel:[0, 1], sr:inp.sr | 0,
+    opened:{channels:nch, deviceRate:inp.sr | 0, latencyMs:inp.sr > 0 ? (inp.latIn || 0) / inp.sr * 1000 : 0}};
+  nat.node = {port:{postMessage:m => { if (m && m.pick) natArm(nat, m.pick); }, onmessage:null}, disconnect(){}};   // (the input worklet's place: the pick)
+  const rec = {port:{postMessage:m => {   // (the recorder worklet's place: go / stop)
+    if (m === 'go') nat.q = nat.q.then(async () => { const r = await natIn().recStart();
+      if (!r.ok){ RCD.on = false; RCD.sync = null; toastErr('Recording did not start: ' + (r.error || 'no answer'), 6000); rcdUi(); return; } nat.running = true; nat.startNs = r.hostNs; });
+    else if (m === 'stop') nat.q = nat.q.then(() => natFinish(nat, null, null)); }, onmessage:null}, disconnect(){}};
+  Object.assign(RCD, {node:rec, mon:null, ctx, inLat:0, io:nat, nch});
+  nat.off.push(C.listen('rec', m => { if (RCD.io !== nat) return; const pk = m.pk || [], g = c => { const k = (nat.chs || []).indexOf(c); return k >= 0 && pk[k] > 0 ? Math.min(1, pk[k]) : 0; };
+    rcdMsg({pk:[g(nat.sel[0]), g(nat.sel[1])]});
+    if (RCD.on && (m.full || (nat.sr && m.frames >= SMP_MAX * nat.sr))){ toast(m.full ? 'The take is full: stopped.' : `Stopped at ${SMP_MAX} s, the longest a sample can be.`); rcdStop(); } }));
+  // THE INPUT WENT AWAY: the shell ended a running take itself (rec.done, partial): it is kept, then the input is closed
+  nat.off.push(C.listen('rec.done', m => { if (RCD.io !== nat || !m || m.take == null) return;
+    if (!(RCD.on || RCD.sync)){ natIn() && natIn().recFree(m.take); return; }
+    RCD.clkF = rcdFreeSecs(); RCD.on = false; RCD.onDone = () => rcdTake(rcdCollect(), 'free', 0, 0);
+    nat.q = nat.q.then(() => natFinish(nat, m.take, m));
+    toast('Audio input lost' + (m.why ? ' (' + m.why + ')' : '') + ': the take so far is kept', 6000);
+    rcdCloseIo(); const fin = () => { if (RCD.on || RCD.sync || RCD.onDone) return void setTimeout(fin, 100); if (!RCD.io) rcdClose(); rcdUi(); }; fin(); }));
+  nat.off.push(C.listen('dev', m => { if (m.kind !== 'lost' || m.which !== 'in' || RCD.io !== nat) return;
+    nat.q = nat.q.then(() => { if (RCD.io === nat && !RCD.on && !RCD.sync){ toast('Audio input lost'); rcdCloseIo(); rcdClose(); rcdUi(); } }); }));
+  rcdRoute(); await nat.q;   // arms the picked inputs (a failed arm says why and leaves RCD.ioWhy)
+  if (!nat.chs){ const why = RCD.ioWhy || 'the inputs could not be armed'; rcdCloseIo(); Object.assign(RCD, {node:null}); RCD.ioWhy = why; return false; }
+  rcdSet.nchs = rcdSet.nchs && typeof rcdSet.nchs === 'object' ? rcdSet.nchs : {}; rcdSet.nchs['io:' + dev.inId] = nch; rcdSave();
+  RCD.note = ''; if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh();
+  return true;
+}
 function rcdCloseIo(){ const io = RCD.io; if (!io) return; RCD.io = null; clearInterval(io.tick); IOH.onIn = IOH.onGone = null;
+  if (io.nat){ for (const f of io.off.splice(0)) try { f(); } catch(e){} return; }   // (PC7: the shell keeps its input open: that is Settings > Audio's choice, not the recorder window's)
   try { io.node.port.onmessage = null; io.node.disconnect(); } catch(e){} iohAsk({op:'close'}); }
 // The recorder starts or stops: the native input's anchor holds still while a take records
 function rcdGo(m){ if (RCD.node) RCD.node.port.postMessage(m); if (RCD.io) RCD.io.node.port.postMessage({rec:m === 'go'}); rcdMonSet(); }
@@ -24999,6 +25213,9 @@ const ncSongHost = () => ({
   dirty:() => projDirty, projText:() => projText(),
   askRestore:(title, when) => askPick({title:'Restore unsaved changes?', body:'The app was closed with unsaved changes to \u201c' + title + '\u201d' + (when ? ' (' + when + ')' : '') + '. Restore them? Discard throws them away.'}, ['Restore', 'Discard']),
   restore:async (text, name) => { try { await backupNow(true); } catch(e){} return await loadProjText(text, name, {dirty:true}); },
+  // PC7 (the shell's MIDI): the four ports as Settings > MIDI holds them, for midi.cfg (sent again when the engine comes back up)
+  h7Ready:() => natAudInit(),
+  midiCfg:() => ({outs:midi.outIds.slice(), clockOut:midi.clk.slice(), gearDelay:midi.lats.slice(), clockIn:!!midi.clkIn}),
   // M5 (effect meters): the page's METERS rule, and the page's own fxDynIn for the shell's fx.dyn reports
   meterHold:() => meterHold(), fxDynIn:(n, list) => fxDynIn(n, list),
   // M5 (chains meters): the tracks the visible chains screen shows (Track In / Chain Out modules' tracks), and the shell's ch.lvl peaks for the screen's meters
