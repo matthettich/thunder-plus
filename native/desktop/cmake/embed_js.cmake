@@ -1,0 +1,10 @@
+# Embeds a text file as a C byte array: cmake -DIN=<file> -DOUT=<header> -DNAME=<symbol> -P embed_js.cmake  (configure-time use: include() this file and call tpd_embed()).
+function(tpd_embed in out name)
+  file(READ "${in}" hex HEX)
+  string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," bytes "${hex}")
+  string(LENGTH "${hex}" hexlen)
+  math(EXPR len "${hexlen} / 2")
+  file(WRITE "${out}.tmp" "// generated from ${in} by native/desktop/cmake/embed_js.cmake: do not edit\n#pragma once\nstatic const unsigned char ${name}[] = {${bytes}0};\nstatic const unsigned long ${name}_len = ${len};\n")
+  execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different "${out}.tmp" "${out}")
+  file(REMOVE "${out}.tmp")
+endfunction()

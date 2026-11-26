@@ -1,0 +1,134 @@
+# NATIVE PORT, N4 H6: the desktop shells (WebView2 on Windows, WKWebView on the Mac). Branch `native` only (WORKPLAN docs/port/WORKPLAN.md); the existing Native workflow
+# builds the shell library's tests on Linux; this one builds the two shell executables, runs the library's tests there, and runs each shell's --selftest (every thunderDesktop
+# channel answers, thunderCore says hello, the page loads from app://thunder/). UNSIGNED builds as artifacts (the owner has no Apple Developer membership; H8 signs).
+name: Native desktop
+
+on:
+  push:
+    branches: [native]
+    paths: ['native/desktop/**', 'native/CMakeLists.txt', 'native/core/include/**', 'native/core/src/**', 'native/core/third_party/**', 'native/android/app/src/main/cpp/**', '.github/workflows/native-desktop.yml']
+  pull_request:
+    branches: [native]
+    paths: ['native/desktop/**', 'native/CMakeLists.txt', 'native/core/include/**', 'native/core/src/**', 'native/core/third_party/**', 'native/android/app/src/main/cpp/**', '.github/workflows/native-desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-desktop-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # pinned: the WebView2 SDK (NuGet Microsoft.Web.WebView2; headers + WebView2Loader.dll). Its licence is BSD-3-Clause-like for the SDK, redistribution of the loader DLL is allowed (docs/port/IF-SOLD.md).
+  WEBVIEW2_VERSION: 1.0.2739.15
+
+jobs:
+  windows:
+    name: Desktop shell (Windows x64, WebView2)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4   # the core's configure step fetches its pinned sources with the same tools as the Core (Windows) job
+        with: { node-version: 22 }
+      - name: WebView2 SDK (pinned NuGet package)
+        shell: pwsh
+        run: |
+          nuget install Microsoft.Web.WebView2 -Version $env:WEBVIEW2_VERSION -OutputDirectory "$env:RUNNER_TEMP\wv2" -NonInteractive
+          $dir = Join-Path $env:RUNNER_TEMP "wv2\Microsoft.Web.WebView2.$env:WEBVIEW2_VERSION"
+          if (-not (Test-Path "$dir\build\native\include\WebView2.h")) { throw "WebView2.h not found in $dir" }
+          "WEBVIEW2_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Get-ChildItem "$dir\build\native\x64"
+      - name: Configure
+        shell: pwsh
+        run: cmake -S native -B build -A x64 -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_WEBVIEW2_DIR=$env:WEBVIEW2_DIR" "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}"
+      - name: Build the shell and the library tests
+        run: cmake --build build --config Release -j 3 --target thunder_desktop_win test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core
+      - name: Library tests
+        run: ctest --test-dir build -C Release --output-on-failure -R desktop_
+      - name: Shell selftest (every channel answers; null audio device)
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path "build\desktop\Release\Thunder Plus.exe"
+          $rep = Join-Path $PWD "selftest.txt"
+          $p = Start-Process -FilePath $exe -ArgumentList "--selftest","--null-audio","--report","`"$rep`"" -PassThru
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); Write-Host "selftest timed out"; if (Test-Path $rep) { Get-Content $rep }; exit 2 }
+          if (Test-Path $rep) { Get-Content $rep } else { Write-Host "no report file" }
+          exit $p.ExitCode
+      # The UI sweep of the top-bar and right-click menus (tests/sweep/menus.mjs), driven over the DevTools Protocol into the SHELL's WebView2 (native/desktop/tests/sweep/ui-lib-shell.mjs replaces
+      # the sweep's own Chrome). First runs report without failing the job (continue-on-error): read the log, then make it a gate.
+      - name: Menus sweep inside the shell (WebView2 over CDP)
+        id: sweep
+        continue-on-error: true
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          npm i --no-save --no-audit --no-fund playwright-core@1.49.1
+          $exe = Resolve-Path "build\desktop\Release\Thunder Plus.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--null-audio","--cdp-port","9222" -PassThru
+          $up = $false
+          for ($i = 0; $i -lt 60 -and -not $up; $i++) { try { Invoke-WebRequest "http://127.0.0.1:9222/json/version" -UseBasicParsing | Out-Null; $up = $true } catch { Start-Sleep -Seconds 1 } }
+          if (-not $up) { Write-Host "the shell did not open its DevTools port"; $p.Kill(); exit 2 }
+          $env:TPD_CDP = "http://127.0.0.1:9222"
+          $env:SWEEP_LIVE = "1"
+          node --import ./native/desktop/tests/sweep/register.mjs tests/sweep/menus.mjs 2>&1 | Tee-Object -FilePath menus-sweep-windows.txt
+          $code = $LASTEXITCODE
+          try { $p.Kill() } catch {}
+          exit $code
+      - name: Package (unsigned)
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          if (Test-Path menus-sweep-windows.txt) { New-Item -ItemType Directory -Force out | Out-Null; Copy-Item menus-sweep-windows.txt out\menus-sweep-windows.txt }
+          New-Item -ItemType Directory -Force out | Out-Null
+          if (Test-Path "build\desktop\Release\Thunder Plus.exe") { Compress-Archive -Path "build\desktop\Release\*" -DestinationPath "out\thunder-plus-windows-x64-unsigned.zip" }
+          if (Test-Path selftest.txt) { Copy-Item selftest.txt out\selftest-windows.txt }
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: thunder-plus-desktop-windows-x64-unsigned
+          path: out/
+          retention-days: 14
+
+  macos:
+    name: Desktop shell (macOS arm64, WKWebView)
+    runs-on: macos-latest
+    timeout-minutes: 90   # the core builds in ~40 minutes on this runner; arm64 only here (one architecture, half the time)
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install gnu-sed   # native/core/third_party/prepare.sh needs GNU sed
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Configure
+        run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}"
+      - name: Build the shell and the library tests
+        run: cmake --build build -j3 --target ThunderPlus test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core
+      - name: Library tests
+        run: ctest --test-dir build --output-on-failure -R desktop_
+      - name: "Ad-hoc signature (no Developer ID; this only makes the bundle coherent, H8 signs and notarises)"
+        run: codesign --force --deep --sign - "build/desktop/Thunder Plus.app" && codesign -dv "build/desktop/Thunder Plus.app" 2>&1 | head -5
+      - name: Shell selftest (every channel answers; null audio device)
+        timeout-minutes: 5
+        run: |
+          APP="build/desktop/Thunder Plus.app/Contents/MacOS/Thunder Plus"
+          ls -l "$APP" "build/desktop/Thunder Plus.app/Contents/Resources/web" | head -20
+          set +e
+          "$APP" --selftest --null-audio 2>&1 | tee selftest-macos.txt &
+          PID=$!
+          ( sleep 150; pkill -f "Thunder Plus.app/Contents/MacOS" ) &
+          wait $PID
+          grep -q "^SELFTEST PASS" selftest-macos.txt
+      - name: Package (unsigned; right-click Open the first time)
+        if: ${{ always() }}
+        run: |
+          mkdir -p out
+          if [ -d "build/desktop/Thunder Plus.app" ]; then ditto -c -k --keepParent "build/desktop/Thunder Plus.app" out/thunder-plus-macos-arm64-unsigned.zip; fi
+          if [ -f selftest-macos.txt ]; then cp selftest-macos.txt out/; fi
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: thunder-plus-desktop-macos-arm64-unsigned
+          path: out/
+          retention-days: 14
