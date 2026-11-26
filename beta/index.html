@@ -26896,6 +26896,8 @@ async function openRecent(){
   if (k < 0) return; const e = recentL[k];
   if (!await okToLeave('opening ' + e.name)) return;
   if (e.path && DESK){ const r = await DESK.read(e.path); if (r && r.text != null) return loadProjText(r.text, r.name, {path:r.path, file:true});
+    /* the desktop shell only opens paths you chose or opened with it (build 684): a file from before that was kept stays on the list, and Open picks it again */
+    if (r && r.error && /^not allowed/.test(r.error)) return toastErr('Couldn’t open ' + e.name + ' from the list this time. Use Open to pick it once; after that it opens from here.', 6000);
     recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + (r && r.error ? ': ' + r.error : '') + '. It was taken off the list.', 5000); }
   if (e.h){ if (!await fsPerm(e.h, false)) return toastErr('The browser didn’t allow opening ' + e.name + '.');
     try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
@@ -27305,7 +27307,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 683;
+const BUILD = 684;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37795,6 +37797,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
   [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
   [683, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the master panel\u2019s IN / OUT LUFS, compressor and limiter reduction, suppressor bars and true-peak now move with the sound (the engine reports them while the panel is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
   [682, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the \u2026chains screen\u2019s track in / out level meters now move with the sound (the engine reports them while that screen is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
