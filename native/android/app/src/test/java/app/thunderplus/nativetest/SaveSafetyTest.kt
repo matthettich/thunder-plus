@@ -123,4 +123,55 @@ class SaveSafetyTest {
         File(d, "recovery.json").writeText("not json")
         assertNull(st.meta())
     }
+
+    // M4 / PC6: recovery.put
+    @Test fun putIsStoredAtOnceAndPreferredOverTheSongLoadCopy() {
+        val d = tmp(); val st = RecoveryStore(d)
+        assertFalse(st.getReply(3).getBoolean("ok"))
+        assertTrue(st.write(RecoveryTracker.Snapshot("{\"t\":\"song.load\"}".toByteArray(), "Old", null), 1L))
+        var r = st.getReply(4)
+        assertTrue(r.getBoolean("ok")); assertEquals("song.load", r.getString("source")); assertEquals("{\"t\":\"song.load\"}", r.getString("text")); assertEquals(4, r.getInt("id")); assertEquals("reply", r.getString("t"))
+        assertTrue(st.writePut("{\"app\":\"thunder-project\",\"s\":\"é☃\"}".toByteArray(Charsets.UTF_8), "Put", "content://x/2", 99L))
+        assertTrue(st.hasPut())
+        r = st.getReply(5)
+        assertEquals("put", r.getString("source")); assertEquals("{\"app\":\"thunder-project\",\"s\":\"é☃\"}", r.getString("text")); assertEquals("Put", r.getString("title")); assertEquals(99L, r.getLong("time")); assertEquals("content://x/2", r.getString("file"))
+        assertEquals("put", st.source())
+        assertTrue(st.writePut("v2".toByteArray(), "Put", null, 100L))                    // a newer put replaces the older
+        assertEquals("v2", st.getReply(6).getString("text"))
+        assertTrue(File(d, "recovery.put.thunder.tmp").exists().not() && File(d, "recovery.put.json.tmp").exists().not())   // atomic: no temp file left
+    }
+
+    @Test fun savedDropsOnlyThePutAndDropDeletesBoth() {
+        val d = tmp(); val st = RecoveryStore(d)
+        st.write(RecoveryTracker.Snapshot(b("S"), "T", null), 1L); st.writePut(b("P"), "T", null, 2L)
+        st.dropPut()
+        assertFalse(st.hasPut()); assertEquals("song.load", st.source())
+        st.writePut(b("P"), "T", null, 3L)
+        st.drop()
+        assertNull(st.meta()); assertNull(st.text()); assertNull(st.source()); assertFalse(st.hasPut()); assertFalse(File(d, "recovery.thunder").exists())
+    }
+
+    @Test fun halfWrittenPutIsIgnored() {
+        val d = tmp(); val st = RecoveryStore(d)
+        File(d, "recovery.put.thunder").writeText("x")        // no sidecar: not committed
+        assertFalse(st.hasPut()); assertNull(st.meta())
+        st.write(RecoveryTracker.Snapshot(b("S"), "T", null), 1L)
+        assertEquals("song.load", st.source())
+    }
+
+    @Test fun putMessageRules() {
+        fun j(s: String) = org.json.JSONObject(s)
+        assertEquals("{\"app\":1}", Recovery.putText(j("{\"t\":\"recovery.put\",\"project\":\"{\\\"app\\\":1}\"}")))
+        assertNull(Recovery.putText(j("{\"t\":\"recovery.put\"}")))
+        assertNull(Recovery.putText(j("{\"t\":\"recovery.put\",\"project\":\"\"}")))
+        assertNull(Recovery.putText(j("{\"t\":\"recovery.put\",\"project\":{\"a\":1}}")))
+        val edge = "x".repeat(Recovery.PUT_MAX_CHARS)
+        assertNotNull(Recovery.putText(org.json.JSONObject().put("project", edge)))
+        assertNull(Recovery.putText(org.json.JSONObject().put("project", edge + "x")))
+    }
+
+    @Test fun trackerInfoForTheSidecar() {
+        val t = RecoveryTracker(); t.onHello(); t.onSongLoad(b("A"), "Title"); t.onOpened("content://f")
+        assertEquals(Pair("Title", "content://f"), t.info())
+    }
 }
