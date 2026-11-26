@@ -129,7 +129,7 @@ jobs:
           node-version: '22'
       # F1: acorn first: beta's suite (native-client-inert, patch-knobs-waves) runs tools/make-core.mjs --check, which needs it; parity u02 runs the whole suite.
       - name: acorn (the reference tools)
-        run: npm i --no-save --no-audit --no-fund acorn@8
+        run: npm i --no-save --no-audit --no-fund acorn@8 acorn-walk@8
       - name: Parity u02 (goldens through the CMake wasm)
         run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u02 "$RUNNER_TEMP/u02-wasm"
       # U03 gate: pump-synth golden + every test that loads the pump wasm, through the CMake-built pump.wasm / pump-synth.wasm
