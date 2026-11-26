@@ -188,7 +188,26 @@ void FxHost::psetPump(double at, int slot, const float* pv, int n) {
   if (nqp_ >= kPumpQueue) { qpDropped_++; return; }
   if (n > kPumpMaxParams) n = kPumpMaxParams;
   int i = nqp_; while (i > 0 && qp_[i - 1].at > at) { qp_[i] = qp_[i - 1]; i--; }
-  qp_[i].at = at; qp_[i].slot = slot; qp_[i].n = n; std::memcpy(qp_[i].pv, pv, sizeof(float) * (size_t)n); nqp_++;
+  qp_[i].at = at; qp_[i].slot = slot; qp_[i].n = n; std::memcpy(qp_[i].pv, pv, sizeof(float) * (size_t)n); qp_[i].rt = false; nqp_++;
+}
+/* PP: thunder_live_fx_values for a pump slot (see fxhost.h). The values go to the slot's chain entry and to the slot (applyEntry: its list, `dirty`: pumpRun commits them to the plugin at the next block, pump_commit
+   allocates nothing). A RESTING slot (rs 1) is the one case that would allocate: applyEntry would set `pch` and pumpRest would wake it with a FRESH plugin instance (renew: pump_new). Nothing is audible from a
+   resting slot (OFF by its own setting: its output is the delay line), so its stored list takes the values and nothing else happens; the next time it runs (switched on: a plan, or an FXO) it is made with them. */
+void FxHost::psetPumpRt(double at, int slot, const float* pv, int n) {
+  if (nqp_ >= kPumpQueue) { qpDropped_++; return; }
+  if (n > kPumpMaxParams) n = kPumpMaxParams;
+  int i = nqp_; while (i > 0 && qp_[i - 1].at > at) { qp_[i] = qp_[i - 1]; i--; }
+  qp_[i].at = at; qp_[i].slot = slot; qp_[i].n = n; std::memcpy(qp_[i].pv, pv, sizeof(float) * (size_t)n); qp_[i].rt = true; nqp_++;
+}
+void FxHost::applyPumpRt(int slot, const float* pv, int n) {
+  for (int i = 0; i < nChain_ && i < nSlots_; i++) if (chain_[i].slot == slot) {
+    if (!fx_is_pump(chain_[i].t) || !slots_[i].pu) return;
+    if (n > kPumpMaxParams) n = kPumpMaxParams;
+    chain_[i].npv = n; std::memcpy(chain_[i].pv, pv, sizeof(float) * (size_t)n);
+    PumpSlot& u = *slots_[i].pu;
+    if (u.rs == 1) { u.npv = n; std::memcpy(u.pv, pv, sizeof(float) * (size_t)n); return; }   // resting: store only (see above)
+    applyEntry(slots_[i], chain_[i]); pumpUp(); idle_ = 0; return;
+  }
 }
 void FxHost::applyPumpPset(int slot, const float* pv, int n) {   // onmessage {pset:{slot, pv}}: the chain's entry for the slot gets pv, then set(chain) again
   for (int i = 0; i < nChain_; i++) if (chain_[i].slot == slot) { chain_[i].npv = n; std::memcpy(chain_[i].pv, pv, sizeof(float) * (size_t)n); }

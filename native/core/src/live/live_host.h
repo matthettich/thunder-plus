@@ -75,6 +75,9 @@ constexpr int kLiveQuantum = kRenderQuantum;                   // 128
 
 // fx_param does not fit a LiveCmd (12 doubles): its own ring, drained in step 1 in the same pass as the commands (a param with `at` goes into FxHost::psetAt, which keeps its own 256-entry queue by time).
 struct LiveFxParam { int32_t track = 0, slot = 0; int64_t at = -1; double p[12] = {0}; };
+/* PP: thunder_live_fx_values. One fixed-size record (copied, ~1.2 KB: a pump slot's value list is up to 280 floats): the pump values as float32 (what the plugin takes), the modular ones as doubles (what FxEntry::mp holds). */
+constexpr uint32_t kLiveFxValuesRing = THUNDER_LIVE_FXVALUES_RING;   // 16
+struct LiveFxValues { int32_t track = 0, slot = 0, kind = 0, n = 0; int64_t at = -1; float pv[kPumpMaxParams] = {0}; double mp[kModMaxParams] = {0}; };
 
 // The chains host's parameter edits (C2 R8): one record per `param` op, in its own ring, drained at step 1 AFTER the commands (a param sent after a commit meets the new patch). id / name are NUL-terminated and fit
 // (the control side judges: an id or a name that does not fit is not representable). Every node gets every record (ChainsHost::param).
@@ -216,6 +219,8 @@ class LiveHost {
   int fxCommit(int track, int64_t at);
   // fxParam(): pushes a LiveFxParam on fxParams_; the audio side calls FxHost::psetAt(at / sr, slot, p12) (fxhost.h:135).
   int fxParam(int track, int slot, const double* p12, int64_t at);
+  // PP: fxValues(): judged against ppKind_ (the last planned chain), pushed on fxValues_; the audio side calls FxHost::psetPumpRt / psetModRt (fxhost.h) at the top of the quantum, after the commands (docs/port/PP-NOTES.md).
+  int fxValues(int track, int slot, int kind, const double* v, int n, int64_t at);
   // masterConfig(): master_chain_from_song(Json mst, limiter) (chain.h:36) into a LiveMasterMsg on masterSlot_; the audio side calls MasterChain::configure (chain.h:44) at step 2. NOT BUILT: configure is "allocation-free, states kept"
   // but SongRenderer only calls it before the first block (render.h:128), a latency change has no PDC / output-delay path, and the quantum buffer's latency report would jump. Returns E_UNSUPPORTED until P3 builds it.
   int masterConfig(const uint8_t* mst, size_t n, bool safety);
@@ -283,6 +288,7 @@ class LiveHost {
   void setMasterHook();                                       // Mixer::setMasterFx: the hook is on while the master chain exists or the master effects host has slots (SongRenderer::setEffects / setMasterChain)
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);   // SongRenderer::masterHook
   void applyPdc(int64_t qStart, bool nowGlide);               // pdc_apply(mix, pdcCur_, ...) at the mixer's time
+  void applyFxValues(int64_t qStart, uint32_t n);                        // PP: step 1, right after applyFxParams: drain fxValues_ (at most the n records of the pre-loop snapshot) into FxHost::psetPumpRt / psetModRt
   void applyFxParams(int64_t qStart, uint32_t n);                        // step 1: drain fxParams_ into FxHost::psetAt (after the commands, so a param sent after a commit meets the new chain)
   void clearWaiting(int64_t qStart);                          // a stop / a started play: the waiting list is cleared; an FxCommit in it is committed first (its plan must not be lost)
   int64_t latencyFrames() const;                              // the output's lateness behind the song: master chain + PDC trim + master pump effects (SongRenderer::latencyFrames)
@@ -329,6 +335,11 @@ class LiveHost {
   bool chainsPlanned_ = false;                       // C2 CONTROL: a plan that makes nodes was ever handed over (R3 (a))
   FxPlan* stagedFx_[kSongNT + 1] = {nullptr};        // fxPlan() staged, fxCommit() moved to the ring
   int fxOut_ = 0;                                    // P3: FxCommit commands issued and their plans not yet collected (fxBack_ holds 64)
+  /* PP CONTROL: the kind and value count of each slot of each track's (and the master's) LAST PLANNED chain, by the slot number: 0 none / tfx / core, THUNDER_LIVE_FXV_PUMP, THUNDER_LIVE_FXV_MOD. Written by ppNote (fxPlan, play), read by fxValues. */
+  struct PpSlot { int16_t kind = 0, n = 0; bool locked = false; uint8_t nfix = 0; int16_t fixI[4] = {0}; float fixV[4] = {0}; };   // locked: the slot rides in the song (fx_pump_live_locked); fix*: the planned values of the indices that do (fx_pump_live_fixed)
+  PpSlot ppKind_[kSongNT + 1][kFxSlots];
+  void ppNote(int track, const FxPlan* p);
+  LiveFxValues fxvScratch_;                          // PP AUDIO: the record being applied (a member: 1.2 KB stays off the audio stack)
   PdcSlot ctlPdc_[kSongNT][kFxSlots]; int ctlPdcN_[kSongNT] = {0};   // P3: the pump slots of each track's LAST PLANNED chain (what pdc_plan reads; FxPlan::entry, not the audio thread's chain_)
   void (*testCmdSeam_)(void*) = nullptr; void* testCmdSeamUser_ = nullptr;
   void (*testFxSeam_)(void*) = nullptr; void* testFxSeamUser_ = nullptr;   // TEST ONLY (P3b)
@@ -360,6 +371,7 @@ class LiveHost {
   // ---- CONTROL -> AUDIO (single producer, single consumer; Spsc / SnapSlot orders: release on publish, acquire on adopt) ----
   Spsc<LiveCmd, kLiveCmdRing> cmds_;                 // control pushes, audio pops
   Spsc<LiveFxParam, kLiveFxParamRing> fxParams_;     // control pushes, audio pops
+  Spsc<LiveFxValues, kLiveFxValuesRing> fxValues_;    // PP: control pushes, audio pops
   SnapSlot<SongSnap> songSlot_;                      // control: SeqSession::publish; audio: seq_adopt; control: collect()
   SnapSlot<LiveBusMsg> busSlot_;                     // plain adopt()
   SnapSlot<LivePdcMsg> pdcSlot_;

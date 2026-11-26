@@ -244,18 +244,33 @@ void FxHost::kill() { dead_flag_ = true; }
 void FxHost::psetAt(double at, int slot, const double* p12) {
   if (nq_ >= kFxQueue) { qDropped_++; return; }
   int i = nq_; while (i > 0 && q_[i - 1].at > at) { q_[i] = q_[i - 1]; i--; }
-  q_[i].at = at; q_[i].slot = slot; q_[i].n = 12; for (int k = 0; k < 12; k++) q_[i].p[k] = p12[k]; nq_++;
+  q_[i].at = at; q_[i].slot = slot; q_[i].n = 12; for (int k = 0; k < 12; k++) q_[i].p[k] = p12[k]; q_[i].rt = false; nq_++;
 }
 void FxHost::psetMod(double at, int slot, const double* mp, int n) {
   if (nq_ >= kFxQueue) { qDropped_++; return; }
   if (n > kModMaxParams) n = kModMaxParams;
   int i = nq_; while (i > 0 && q_[i - 1].at > at) { q_[i] = q_[i - 1]; i--; }
-  q_[i].at = at; q_[i].slot = slot; q_[i].n = n; for (int k = 0; k < n; k++) q_[i].p[k] = mp[k]; nq_++;
+  q_[i].at = at; q_[i].slot = slot; q_[i].n = n; for (int k = 0; k < n; k++) q_[i].p[k] = mp[k]; q_[i].rt = false; nq_++;
 }
 void FxHost::applyPset(int slot, const double* p12, int n) {   // onmessage {pset}: the chain's entry for the slot gets p (or mp: a MODFX slot), then set(chain) again
   for (int i = 0; i < nChain_; i++) if (chain_[i].slot == slot) { if (fx_is_mod(chain_[i].t)) { for (int k = 0; k < n && k < chain_[i].nmp; k++) chain_[i].mp[k] = p12[k]; } else for (int k = 0; k < 12 && k < n; k++) chain_[i].p[k] = p12[k]; }
   for (int i = 0; i < nSlots_; i++) applyEntry(slots_[i], chain_[i]);
   pumpUp(); idle_ = 0;
+}
+/* PP: the knobs of thunder_live_fx_values (audio thread, between blocks; allocates nothing, takes no lock). Both write ONLY the slot with this number, and only when the chain in force holds a MODFX
+   (applyModRt) / a pump (applyPumpRt) slot there: a slot of another kind is left as it is. Neither calls set(chain) for the other slots (applyPset / applyPumpPset do; the result is the same, this does less). */
+void FxHost::psetModRt(double at, int slot, const double* mp, int n) {
+  if (nq_ >= kFxQueue) { qDropped_++; return; }
+  if (n > kModMaxParams) n = kModMaxParams;
+  int i = nq_; while (i > 0 && q_[i - 1].at > at) { q_[i] = q_[i - 1]; i--; }
+  q_[i].at = at; q_[i].slot = slot; q_[i].n = n; for (int k = 0; k < n; k++) q_[i].p[k] = mp[k]; q_[i].rt = true; nq_++;
+}
+void FxHost::applyModRt(int slot, const double* mp, int n) {
+  for (int i = 0; i < nChain_ && i < nSlots_; i++) if (chain_[i].slot == slot) {
+    if (!fx_is_mod(chain_[i].t)) return;
+    for (int k = 0; k < n && k < chain_[i].nmp; k++) chain_[i].mp[k] = mp[k];
+    applyEntry(slots_[i], chain_[i]); idle_ = 0; return;   // fx_mod_set: the module's values from the entry (a copy into a double array)
+  }
 }
 void FxHost::lane(int k, double v, double at) { if (k >= 0 && k < 11) lanes_[k]->set(v, at); }
 void FxHost::reset(double at) { for (int k = 0; k < 11; k++) { lanes_[k]->cancel(at); lanes_[k]->set(-1, at); } }
@@ -345,8 +360,8 @@ bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn
   // U18: this block's pump work happens inside the gate (fxpump.cpp, REAL-TIME RULES); while the control thread is making an instance the pump slots pass the sound
   PumpGate gate(nPump_ > 0); pumpOk_ = nPump_ > 0 && gate.ok; if (nPump_ > 0 && !gate.ok) gated_++;
   t0_ = t0; nPtelTmp_ = 0;
-  if (nqp_ > 0) { const double due = t0 + 64 / sr_; while (nqp_ > 0 && qp_[0].at <= due) { Qp q = qp_[0]; for (int i = 1; i < nqp_; i++) qp_[i - 1] = qp_[i]; nqp_--; applyPumpPset(q.slot, q.pv, q.n); } }   // FXV of a pump slot at its time
-  if (nq_ > 0) { const double due = t0 + 64 / sr_; while (nq_ > 0 && q_[0].at <= due) { Q q = q_[0]; for (int i = 1; i < nq_; i++) q_[i - 1] = q_[i]; nq_--; applyPset(q.slot, q.p, q.n); } }   // THUNDER CORE: FXV at its time
+  if (nqp_ > 0) { const double due = t0 + 64 / sr_; while (nqp_ > 0 && qp_[0].at <= due) { Qp q = qp_[0]; for (int i = 1; i < nqp_; i++) qp_[i - 1] = qp_[i]; nqp_--; if (q.rt) applyPumpRt(q.slot, q.pv, q.n); else applyPumpPset(q.slot, q.pv, q.n); } }   // FXV of a pump slot at its time
+  if (nq_ > 0) { const double due = t0 + 64 / sr_; while (nq_ > 0 && q_[0].at <= due) { Q q = q_[0]; for (int i = 1; i < nq_; i++) q_[i - 1] = q_[i]; nq_--; if (q.rt) applyModRt(q.slot, q.p, q.n); else applyPset(q.slot, q.p, q.n); } }   // THUNDER CORE: FXV at its time
   float* L = Lb_; float* R = Rb_;
   const bool rest = restAt_ > 0 && t0 >= restAt_;
   float ip = 0; bool bad = false;

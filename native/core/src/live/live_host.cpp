@@ -425,6 +425,7 @@ int LiveHost::play(const thunder_live_play_opts& o) {
     try {
       modfx::SeedCounter seeds;
       plan->fx[kSongNT] = fxBank_->host(kSongNT).planFromSong(songCur_->mfx, songCur_->bpm, 0, &seeds);
+      ppNote(kSongNT, plan->fx[kSongNT]);   // PP
       for (int t = 0; t < kSongNT && !bad; t++) { plan->fx[t] = fxBank_->host(t).planFromSong(songCur_->tfx.at((size_t)t), songCur_->bpm, 0, &seeds); noteFxPlanned(t, plan->fx[t]); }
     } catch (...) { bad = true; }
     if (bad) { unwindFx(); chainsAbandon(cw); sess->rollback(); delete plan; delete bm; return THUNDER_LIVE_E_MEMORY; }
@@ -491,6 +492,7 @@ int LiveHost::mixSet(int track, int key, double value, double ramp, int64_t at) 
 
 // P3: effects, master chain, PDC, meters (control side). The plans are made here (objects are made on the control thread: Fx::operator new is malloc), committed by the audio side at a quantum's top and come back through fxBack_.
 void LiveHost::noteFxPlanned(int track, const FxPlan* p) {
+  ppNote(track, p);   // PP (the master too: the next line leaves it out)
   if (track < 0 || track >= kSongNT) return;
   int n = 0;
   if (p) for (int i = 0; i < p->size(); i++) { const FxEntry& e = p->entry(i); const bool pump = fx_is_pump(e.t); ctlPdc_[track][n++] = PdcSlot{track, e.slot, e.on, pump && e.bi >= 0, pump ? e.lat : 0.0}; }   // FxHost::slotBypass / slotLatency, read from the entry
@@ -543,6 +545,34 @@ int LiveHost::fxParam(int track, int slot, const double* p12, int64_t at) {
   LiveFxParam fp; fp.track = track; fp.slot = slot; fp.at = at;
   for (int i = 0; i < 12; i++) { if (!finite(p12[i])) return THUNDER_LIVE_E_ARG; fp.p[i] = p12[i]; }
   if (!fxParams_.push(fp)) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }
+  return THUNDER_LIVE_OK;
+}
+// PP: thunder_live_fx_values (control side).
+void LiveHost::ppNote(int track, const FxPlan* p) {
+  if (track < 0 || track > kSongNT) return;
+  for (int i = 0; i < kFxSlots; i++) ppKind_[track][i] = PpSlot();
+  if (p) for (int i = 0; i < p->size(); i++) {
+    const FxEntry& e = p->entry(i); if (e.slot < 0 || e.slot >= kFxSlots) continue;
+    if (fx_is_pump(e.t)) { ppKind_[track][e.slot].kind = THUNDER_LIVE_FXV_PUMP; ppKind_[track][e.slot].n = (int16_t)e.npv;
+      PpSlot& s = ppKind_[track][e.slot]; s.locked = fx_pump_live_locked(e.t - kPumpT0, e.pv, e.npv);
+      for (int j = 0; j < e.npv && s.nfix < 4; j++) if (fx_pump_live_fixed(e.t - kPumpT0, j)) { s.fixI[s.nfix] = (int16_t)j; s.fixV[s.nfix] = e.pv[j]; s.nfix++; } }
+    else if (fx_is_mod(e.t)) { ppKind_[track][e.slot].kind = THUNDER_LIVE_FXV_MOD; ppKind_[track][e.slot].n = (int16_t)e.nmp; }
+  }
+}
+int LiveHost::fxValues(int track, int slot, int kind, const double* v, int n, int64_t at) {
+  if (!(flags_ & THUNDER_LIVE_F_EFFECTS) || !fxBank_) return THUNDER_LIVE_E_STATE;
+  if (track < 0 || track > THUNDER_LIVE_MASTER || slot < 0 || slot >= kFxSlots || !v || at > kMaxHostFrame) return THUNDER_LIVE_E_ARG;
+  if (kind != THUNDER_LIVE_FXV_PUMP && kind != THUNDER_LIVE_FXV_MOD) return THUNDER_LIVE_E_ARG;
+  const PpSlot& k = ppKind_[track][slot];
+  if (k.kind != kind || n <= 0 || n != k.n) return THUNDER_LIVE_E_ARG;   // not a hosted slot of that kind in the last planned chain, or not the planned count
+  if (k.locked) return THUNDER_LIVE_E_ARG;   // rides in the song (fx_pump_live_locked)
+  for (int j = 0; j < k.nfix; j++) if ((float)v[k.fixI[j]] != k.fixV[j]) return THUNDER_LIVE_E_ARG;   // a value that rides in the song, changed (fx_pump_live_fixed)
+  LiveFxValues r; r.track = track; r.slot = slot; r.kind = kind; r.n = n; r.at = at;
+  for (int i = 0; i < n; i++) {
+    if (!finite(v[i])) return THUNDER_LIVE_E_ARG;
+    if (kind == THUNDER_LIVE_FXV_PUMP) { const float f = (float)v[i]; if (!std::isfinite(f)) return THUNDER_LIVE_E_ARG; r.pv[i] = f; } else r.mp[i] = v[i];
+  }
+  if (!fxValues_.push(r)) { cmdBusy_.fetch_add(1, std::memory_order_relaxed); return THUNDER_LIVE_E_BUSY; }
   return THUNDER_LIVE_OK;
 }
 int LiveHost::masterConfig(const uint8_t* mst, size_t n, bool safety) {
@@ -825,12 +855,14 @@ void LiveHost::quantum() {
   const double t0 = (double)qStart / sr_;
   // 1. APPLY COMMANDS
   const uint32_t nChainParams = chainParams_.avail();   // C2 L1: the snapshot of the edit ring BEFORE the command loop
+  const uint32_t nFxValues = fxValues_.avail();         // PP: the same snapshot for thunder_live_fx_values
   const uint32_t nFxParams = fxParams_.avail();         // P3b: the same snapshot for the effects parameters (a record pushed after a commit that the loop did not see waits for the next quantum)
   retryStalledPlay(qStart);
   if (clearPend_) { clearPend_ = false; clearWaiting(qStart); }   // (a stalled play that started now)
   applyCommands(qStart, qStart + kLiveQuantum);
   if (testFxSeam_) testFxSeam_(testFxSeamUser_);   // TEST ONLY (null in a product): between the command loop and the effects drain
   applyFxParams(qStart, nFxParams);
+  applyFxValues(qStart, nFxValues);                      // PP
   if (testCmdSeam_) testCmdSeam_(testCmdSeamUser_);   // TEST ONLY (null in a product)
   if (!stalledPlay_) applyChainParams(nChainParams);   // after the commands: a param sent after a commit meets the new patch. NOT while a play waits for its snapshot: its plan is not committed yet (a param applied now would be lost under the swap)
   // 2. ADOPT: seq_adopt, then seqGone() if the Seq was dropped, then PadsHost::beginQuantum(players, runner's Seq) every quantum
@@ -1032,6 +1064,15 @@ void LiveHost::applyFxParams(int64_t qStart, uint32_t n) {   // at most the `n` 
     if (!fxBank_) continue;
     const double now = (double)qStart / sr_, at = fp.at < 0 || fp.at - off_ < qStart ? now : (double)(fp.at - off_) / sr_;
     fxBank_->host(fp.track).psetAt(at, fp.slot, fp.p);   // FXV's queue (FxHost::psetAt): applied by the first block that starts within 64 samples of `at`
+  }
+}
+void LiveHost::applyFxValues(int64_t qStart, uint32_t n) {   // PP: at most the `n` records that were in the ring before the command loop (as applyFxParams)
+  LiveFxValues& r = fxvScratch_;
+  while (n-- && fxValues_.pop(r)) {
+    if (!fxBank_ || r.track < 0 || r.track > kSongNT) continue;
+    const double now = (double)qStart / sr_, at = r.at < 0 || r.at - off_ < qStart ? now : (double)(r.at - off_) / sr_;
+    FxHost& H = fxBank_->host(r.track);
+    if (r.kind == THUNDER_LIVE_FXV_PUMP) H.psetPumpRt(at, r.slot, r.pv, r.n); else H.psetModRt(at, r.slot, r.mp, r.n);   // the host's queues; applied by the first block that starts within 64 samples of `at`
   }
 }
 void LiveHost::clearWaiting(int64_t qStart) {

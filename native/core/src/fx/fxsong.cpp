@@ -46,6 +46,18 @@ static double u8(double v) { return v == 128 ? 0.5 : (v < 0 ? 0 : v > 255 ? 255 
 
 // ---- tables -------------------------------------------------------------------------------------------------------------------------------
 const char* fx_pump_param_name(int pt, int i) { return pt >= 0 && pt < kPumpTypes && i >= 0 && i < kPumpParamN[pt] ? kPumpParams[pt][i].s : nullptr; }
+bool fx_pump_live_locked(int pt, const float* pv, int n) {
+  if (pt != 0) return false;
+  for (int i = 0; i < n && i < kPumpParamN[0]; i++) if (!std::strcmp(kPumpParams[0][i].s, "phase")) return pv[i] != 0.f;
+  return false;
+}
+bool fx_pump_live_fixed(int pt, int i) {   // PP (see fxhost.h): the table of parameters that ride in the song
+  static const char* const kEq[] = {"phase", "lin_quality"};
+  if (pt != 0) return false;
+  const char* n = fx_pump_param_name(pt, i); if (!n) return false;
+  for (const char* q : kEq) if (!std::strcmp(n, q)) return true;
+  return false;
+}
 int fx_mod_index(std::string_view key) { for (int i = 0; i < kModDefN; i++) if (key == kModDefs[i].key) return kModT0 + i; return -1; }
 const char* fx_mod_key(int id) { return id >= kModT0 && id < kModT0 + kModDefN ? kModDefs[id - kModT0].key : nullptr; }
 int fx_mod_param_count(int id) { return id >= kModT0 && id < kModT0 + kModDefN ? kModDefs[id - kModT0].n : 0; }
