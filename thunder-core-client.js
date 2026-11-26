@@ -1,6 +1,6 @@
 /* thunder-core-client.js: the page's client of window.thunderCore (docs/port/N2-PAGE-CLIENT.md, docs/port/CORE-BRIDGE.md).
    PC1 = the loader's target and the `hello` handshake. PC2 = pads (put / buf.use / buf.free / pads.commit / pad.chop, kit.load, the pad memory budget). PC3 = the song and the transport: publish the whole song (song.load, debounced),
-   PLAY / STOP / HOLD / bpm / loop / perf, can() and the fallback to the old engine, engine down / up, device stopped. PC4 = live edits: while a native PLAY runs, one small message per changed thing (mixer, effects, master, PDC, chains parameter), the whole song still follows. Events for the playhead and meters are PC5.
+   PLAY / STOP / HOLD / bpm / loop / perf, can() and the fallback to the old engine, engine down / up, device stopped. PC4 = live edits: while a native PLAY runs, one small message per changed thing (mixer, effects, master, PDC, chains parameter), the whole song still follows. Events for the playhead and meters are PC5. PC7 = the desktop shell's audio devices, the input / takes and MIDI (hello.caps.devices / inputs / midi; docs/plans/PC7-NOTES.md).
    With `on` false (no shell, switch off) nothing here runs; with `on` true the page reacts only where index.html has an NCON() / tp.nc branch.
    Loaded by index.html's loadClient() only when window.thunderCore exists or Settings > Audio > Sequencer is "Native core (test)".
    A classic script: no import, one global (window.__thunderClient). It reads the page only through the object attach() is given. */
@@ -63,7 +63,7 @@
     detach: function () {
       for (var i = 0; i < offs.length; i++) { try { offs[i](); } catch (e) { /* ignore */ } }
       offs = []; NC.on = false; NC.sr = 0;
-      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset(); mtrReset(); MTR.views = {}; MTR.wanted.fx = []; MTR.wanted.dyn = []; rcvStop();
+      clearTimeout(publishT); clearInterval(watchT); clearTimeout(leadT); publishT = 0; watchT = 0; leadT = 0; playTok++; playSent = false; active = false; liveReset(); mtrReset(); MTR.views = {}; MTR.wanted.fx = []; MTR.wanted.dyn = []; rcvStop(); h7Reset();
     },
 
     // ---- PC3: the song -------------------------------------------------------------------------------------------------------------------
@@ -301,6 +301,7 @@
     var on = function (t, fn) { tc.on(t, fn); offs.push(function () { if (typeof tc.off === 'function') tc.off(t, fn); }); };
     on('clock', function (m) { lastClock = nowMs(); lost = false; if (m && m.sr && m.sr !== NC.sr && m.sr > 0) { /* a rate change arrives with engine / device events: handled there */ } });
     if (meters2()) { on('fx.lvl', onFxLvl); on('fx.dyn', onFxDyn); on('ch.lvl', onChLvl); on('master.lvl', onMstLvl); }   // M5: only with caps.meters2
+    h7Subscribe(on);   // PC7: dev / rec / rec.done / midi.ports / midi.in, only for the caps the shell says
     on('recovery', onRecovery); rcvStart();   // PC6: the shell holds a copy of unsaved work from last time; the puts of this time
     on('song', function (m) { if (m && m.rev != null) songHeard = m.rev; });
     on('fit', function (m) {   // the shell's verdict again (after kit.load, after lxp): for the song last sent
@@ -322,6 +323,7 @@
         return; }
       if (m.up === true) {   // rebuilt (engine.reset, a device change): the song goes again (PC2 re-sends the kit and pads itself on this event)
         engineUp = true; lost = false; lastClock = nowMs(); lxpSent = 0; verdict = null; sentRef = null; inflight = null; failed = null; liveReset();   // PC4: a rebuilt core holds nothing: the baseline is unknown until its song is accepted
+        h7EngineUp();   // PC7: the shell's MIDI manager is rebuilt with the engine: the ports config goes again
         MTR.sent = null; mtrNote(true);   // M5: nor does it hold the meter wish: the whole state again (all off, no PLAY runs)
         var rate = m.sr && m.sr > 0 && m.sr !== NC.sr; if (rate) NC.sr = m.sr;
         if (rate) { try { host.prerender && host.prerender(); } catch (e) { /* ignore */ } }
@@ -369,6 +371,7 @@
     NC.hostName = String(r.host || (tc && tc.host) || '');
     NC.maxPadBytes = num(r.maxPadBytes, 0, 1e12, 0); NC.maxSongBytes = num(r.maxSongBytes, 0, 1e12, 0);
     NC.reason = ''; NC.on = true; engineUp = true; lost = false; lastClock = 0;
+    h7Hello(r);   // PC7: the audio / input bodies of the hello reply (an Android shell has none: nothing happens)
     log('native core client: on (' + NC.hostName + ', ' + sr + ' Hz, core ' + NC.core + ')');
     // Pads rendered before the handshake used the page's guess: render them again at the engine's rate, once (design 4.2 step 4).
     try { if (typeof host.prerender === 'function') host.prerender(); } catch (e) { log('native core client: prerender after hello failed', e); }
@@ -914,6 +917,148 @@
     }).catch(function (e) { log('native core client: recovery restore failed', e); });
     function drop() { return Promise.resolve(tc.ask({ t: 'recovery.drop' }, ASK_MS)).then(function () { RV.hold = false; RV.last = ''; }, function () { RV.hold = false; }); }
   }
+
+  /* ---- PC7: the desktop shell's audio devices, input / takes and MIDI (H7; docs/port/H7-NOTES.md, CORE-BRIDGE 8). Everything is behind the hello caps:
+     devices -> dev.list / dev.open / the `dev` events, inputs -> rec.* / take, midi -> midi.cfg / midi.ports / midi.in, rt -> rt.*. An Android shell says none of them: no code here runs. ---- */
+  var DV = { devices: [], wantOut: '', wantIn: '', audio: null, input: null, listed: false };   // the shell's truth: the last dev.list / dev.open / hello bodies
+  var MI = { devs: [], ins: [], ports: [], late: 0, sent: 0, sig: '', cfg: '', off: null, offT: 0, heard: false };
+  var LS = {};   // listeners by event type
+  var LISTEN = { dev: 1, rec: 1, 'rec.done': 1, 'midi.ports': 1, 'midi.in': 1 };
+  var BUFS = [64, 128, 256, 512, 1024];   // what Settings offers for the buffer (the shell takes 0 or 16..8192)
+  function capOn(k) { return !!(NC.on && tc && NC.caps && NC.caps[k] === true); }
+  function emit7(t, m) { var a = LS[t]; if (!a) return; for (var i = 0; i < a.length; i++) { try { a[i](m); } catch (e) { log('native core client: ' + t + ' listener failed', e); } } }
+  function h7Hello(r) {
+    DV.devices = []; DV.listed = false; DV.wantOut = ''; DV.wantIn = ''; MI.sig = ''; MI.cfg = ''; MI.off = null; MI.heard = false;
+    DV.audio = r && r.audio && typeof r.audio === 'object' ? r.audio : null; DV.input = r && r.input && typeof r.input === 'object' ? r.input : null;
+    if (DV.audio && DV.audio.id != null) DV.wantOut = String(DV.audio.id);   // until dev.list says what was asked for
+    if (DV.input && DV.input.id != null && DV.input.open) DV.wantIn = String(DV.input.id);
+    if (DV.audio && DV.audio.latOut > 0) NC.outLat = DV.audio.latOut;
+  }
+  function h7Reset() { DV.devices = []; DV.listed = false; DV.audio = DV.input = null; MI.ins = []; MI.devs = []; MI.ports = []; MI.sig = ''; MI.cfg = ''; MI.off = null; MI.heard = false; LS = {}; }
+  function h7Subscribe(on) {
+    if (capOn('devices')) {
+      on('dev', onDev);
+      devList();   // the list for Settings > Audio (the hello reply carries the open device only)
+    }
+    if (capOn('inputs')) { on('rec', function (m) { emit7('rec', m); }); on('rec.done', function (m) { emit7('rec.done', m); }); }
+    if (capOn('midi')) { on('midi.ports', onMidiPorts); on('midi.in', onMidiIn); }
+  }
+  function h7EngineUp() { MI.cfg = ''; if (capOn('midi') && host && typeof host.midiCfg === 'function') { try { NC.midiCfg(host.midiCfg()); } catch (e) { /* ignore */ } } }
+
+  // devices
+  function takeList(r) {
+    if (!r) return;
+    if (Array.isArray(r.devices)) { DV.devices = r.devices; DV.listed = true; }
+    if (r.out != null) DV.wantOut = String(r.out); if (r.in != null) DV.wantIn = String(r.in);
+    if (r.audio && typeof r.audio === 'object') { DV.audio = r.audio; if (r.audio.latOut > 0) NC.outLat = r.audio.latOut; }
+    if (r.input && typeof r.input === 'object') DV.input = r.input;
+  }
+  function devList() {
+    if (!capOn('devices')) return Promise.resolve(null);
+    return tc.ask({ t: 'dev.list' }, ASK_MS).then(function (r) { if (r && r.ok) { takeList(r); emit7('dev', { kind: 'list' }); } return r; }, function (e) { log('native core client: dev.list failed', e); return null; });
+  }
+  function onDev(m) {
+    if (!m) return;
+    if (m.kind === 'changed' && Array.isArray(m.devices)) { DV.devices = m.devices; DV.listed = true; }
+    if (m.kind === 'lost' && m.which === 'in') DV.input = { open: false };   // the choice (wantIn) stays: the shell keeps it saved
+    if (m.kind === 'reopened') { DV.audio = Object.assign({}, DV.audio || {}, { open: true, name: m.name != null ? m.name : (DV.audio && DV.audio.name), sr: m.sr || (DV.audio && DV.audio.sr), buf: m.buf != null ? m.buf : (DV.audio && DV.audio.buf) }); devList(); }
+    emit7('dev', m);
+  }
+  /** The rates a device really has (its own `rates` list). The rule of the F-review: Settings offers these or 0 (the device's default), never another one. outId '' = the system default output. */
+  function devRates(outId) {
+    var d = null, i;
+    for (i = 0; i < DV.devices.length; i++) { var x = DV.devices[i]; if (outId ? x.outId === outId : (x.isDefaultOut && x.outId)) { d = x; break; } }
+    var r = d && Array.isArray(d.rates) ? d.rates : [], o = [];
+    for (i = 0; i < r.length; i++) if (isFinite(+r[i]) && +r[i] > 0 && o.indexOf(+r[i]) < 0) o.push(+r[i]);
+    return o.sort(function (a, b) { return a - b; });
+  }
+  /** dev.open. cfg {out, in, sr, buf}: out defaults to the one wanted now ('' = default), `in` is left out unless given (the input stays as it is), sr / buf default to the page's saved choice (aset.natSr / natBuf).
+   *  An sr that is not in the output device's own rates is sent as 0 (the shell's miniaudio would resample it, with bursty callbacks and MIDI jitter: the F-review's rule). Never rejects. */
+  function devOpen(cfg) {
+    cfg = cfg || {};
+    if (!capOn('devices')) return Promise.resolve({ ok: false, error: 'this shell has no audio devices' });
+    var a = host.aset || {}, out = cfg.out != null ? String(cfg.out) : DV.wantOut;
+    var sr = cfg.sr != null ? +cfg.sr : +a.natSr, buf = cfg.buf != null ? +cfg.buf : +a.natBuf;
+    if (!(sr > 0) || devRates(out).indexOf(sr) < 0) sr = 0;
+    buf = buf >= 16 && buf <= 8192 ? Math.round(buf) : 0;
+    var m = { t: 'dev.open', out: out, sr: sr, buf: buf };
+    if (cfg.in != null) m.in = String(cfg.in);
+    return tc.ask(m, 30000).then(function (r) {   // 30 s: the first open of an input can sit on the macOS microphone prompt
+      if (r && r.ok) { takeList(r); DV.wantOut = out; if (m.in != null) DV.wantIn = m.in; emit7('dev', { kind: 'opened', reply: r }); }
+      return r || { ok: false, error: 'no answer' };
+    }, function (e) { return { ok: false, error: 'the shell did not answer (' + (e && e.message ? e.message : e) + ')' }; });
+  }
+  function rtAsk(t) { return capOn('rt') ? tc.ask({ t: t }, ASK_MS).then(function (r) { return r; }, function () { return null; }) : Promise.resolve(null); }
+
+  // input, takes
+  function recAsk(m, ms) {
+    if (!capOn('inputs')) return Promise.resolve({ ok: false, error: 'this shell has no audio input' });
+    return tc.ask(m, ms || ASK_MS).then(function (r) { return r || { ok: false, error: 'no answer' }; }, function (e) { return { ok: false, error: 'the shell did not answer (' + (e && e.message ? e.message : e) + ')' }; });
+  }
+  /** The take's channels as Float32Arrays (c = the take's channel numbers, in order), at most 8M frames (32 MiB) a call: the shell refuses more than 64 MiB. Resolves {ok, sr, frames, data[], hostNs0, latencyFrames} or {ok:false, error}. */
+  function recTake(id, chans, frames) {
+    if (!capOn('inputs') || !tc || typeof tc.take !== 'function') return Promise.resolve({ ok: false, error: 'the page cannot fetch takes here' });
+    var STEP = 8 * 1024 * 1024, out = { ok: true, sr: 0, frames: frames, data: [], hostNs0: 0, latencyFrames: 0 }, jobs = [];
+    chans.forEach(function (c, k) { out.data[k] = new Float32Array(frames); });
+    var seq = Promise.resolve();
+    chans.forEach(function (c, k) {
+      for (var off = 0; off < frames; off += STEP) (function (off) {
+        seq = seq.then(function () { var n = Math.min(STEP, frames - off); return tc.take(id, { ch: c, off: off, n: n }).then(function (r) { if (r && r.data && r.data[0]) out.data[k].set(r.data[0].subarray(0, n), off); if (r) { out.sr = r.sr || out.sr; out.hostNs0 = r.hostNs0 || out.hostNs0; out.latencyFrames = r.latencyFrames || out.latencyFrames; } }); });
+      })(off);
+    });
+    return seq.then(function () { return out; }, function (e) { return { ok: false, error: String(e && e.message ? e.message : e) }; });
+  }
+
+  // MIDI
+  function onMidiPorts(m) {
+    if (!m) return;
+    MI.heard = true; MI.devs = Array.isArray(m.devs) ? m.devs : []; MI.ins = Array.isArray(m.ins) ? m.ins : []; MI.ports = Array.isArray(m.ports) ? m.ports : [];
+    MI.late = +m.late || 0; MI.sent = +m.sent || 0;
+    var sig = JSON.stringify([MI.devs, MI.ins]);   // late / sent move every 3 s: not a change of the ports
+    var changed = sig !== MI.sig; MI.sig = sig;
+    emit7('midi.ports', { changed: changed, devs: MI.devs, ins: MI.ins, ports: MI.ports, late: MI.late, sent: MI.sent });
+  }
+  // The shell stamps a message with its own clock (wallNs: the host clock, not performance.now()): the page's clock for it is that stamp plus the lowest arrival delay seen (a lower envelope, let up 100 ppm), so spacing is kept and the page's own jitter is not added.
+  function onMidiIn(m) {
+    if (!m || !Array.isArray(m.bytes) || !m.bytes.length) return;
+    var now = nowMs(), wall = +(m.wallNs != null ? m.wallNs : m.wall) / 1e6, ts = now;
+    if (isFinite(wall) && wall > 0) {
+      var cand = now - wall;
+      if (MI.off == null || cand < MI.off) MI.off = cand; else MI.off = Math.min(cand, MI.off + (now - MI.offT) * 1e-4);
+      MI.offT = now; ts = wall + MI.off;
+    }
+    emit7('midi.in', { port: m.port, bytes: m.bytes, ts: ts, f: m.f });
+  }
+
+  NC.devOn = function () { return capOn('devices'); };
+  NC.inOn = function () { return capOn('devices') && capOn('inputs'); };
+  NC.midiOn = function () { return capOn('midi'); };
+  NC.rtOn = function () { return capOn('rt'); };
+  NC.devState = function () { return DV; };
+  NC.devList = devList; NC.devOpen = devOpen; NC.devRates = devRates; NC.bufSizes = function () { return BUFS.slice(); };
+  NC.recArm = function (chs) { return recAsk({ t: 'rec.arm', ins: chs }); };
+  NC.recStart = function () { return recAsk({ t: 'rec.start' }); };
+  NC.recStop = function () { return recAsk({ t: 'rec.stop' }, 15000); };
+  NC.recTake = recTake;
+  NC.recFree = function (id) { if (capOn('inputs')) send({ t: 'take.free', take: id }); };
+  NC.rtSnapshot = function () { return rtAsk('rt.snapshot'); };
+  NC.rtReset = function () { if (capOn('rt')) send({ t: 'rt.reset' }); };
+  NC.midiState = function () { return MI; };
+  /** The page's four ports: {outs:[4 ids], clockOut:[4 bool], gearDelay:[4 ms], clockIn}. Sent when it differs from what the shell holds. */
+  NC.midiCfg = function (c) {
+    if (!capOn('midi') || !c) return false;
+    var outs = [], ck = [], gd = [], i;
+    for (i = 0; i < 4; i++) { outs.push(c.outs && typeof c.outs[i] === 'string' ? c.outs[i] : ''); ck.push(!!(c.clockOut && c.clockOut[i])); gd.push(Math.max(-50, Math.min(200, Math.round(+(c.gearDelay && c.gearDelay[i]) || 0)))); }
+    var m = { t: 'midi.cfg', outs: outs, clockOut: ck, gearDelay: gd, clockIn: !!c.clockIn }, sig = JSON.stringify(m);
+    if (sig === MI.cfg) return false;
+    MI.cfg = sig; send(m); return true;
+  };
+  /** Listen to 'dev', 'rec', 'rec.done', 'midi.ports' (changed, devs, ins, ports, late, sent) or 'midi.in' ({port, bytes, ts}); returns the function that stops it. */
+  NC.listen = function (t, fn) {
+    if (!LISTEN[t] || typeof fn !== 'function') return function () {};
+    (LS[t] = LS[t] || []).push(fn);
+    return function () { LS[t] = (LS[t] || []).filter(function (f) { return f !== fn; }); };
+  };
 
   window.__thunderClient = NC;
 })();
