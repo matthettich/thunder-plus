@@ -62,7 +62,7 @@ jobs:
       - name: Menus sweep inside the shell (WebView2 over CDP)
         id: sweep
         continue-on-error: true
-        timeout-minutes: 45
+        timeout-minutes: 15
         shell: pwsh
         run: |
           npm i --no-save --no-audit --no-fund playwright-core@1.49.1
