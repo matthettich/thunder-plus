@@ -139,9 +139,12 @@ int main() {
     Host H(opts(CF, 4096)); if (!H.h) return 1;
     std::string sg = chlvlSong(); sg.pop_back(); sg += "," + mstJson(true, false) + "}";
     CHECK(H.song(sg) == 0, "song"); ChTap tap; H->setTestTap(chTapFn, &tap); CHECK(H->play(playOpts(THUNDER_LIVE_NOW)) == 0, "play");
+    int64_t fr = 0; std::vector<std::vector<uint8_t>> recs; std::vector<float> l, r;
+    // the play's own (empty) effects plans are committed when the play STARTS, possibly a quantum after play(): plan the effects only once it has (else the song's plan can replace this one on some platforms)
+    for (int i = 0; i < 64 && stats(H.h).state == THUNDER_LIVE_STATE_IDLE; i++) { H.run(l, r, 128, 128, fr); for (auto& x : H.poll()) recs.push_back(std::move(x)); }
+    CHECK(stats(H.h).state != THUNDER_LIVE_STATE_IDLE, "the play has started before the effects are planned");
     const std::string fx = "[{\"type\":\"tape\",\"on\":true},{\"type\":\"comp\",\"on\":true}]"; CHECK(H->fxPlan(0, (const uint8_t*)fx.data(), fx.size(), 120) == 0 && H->fxCommit(0, -1) == 0, "fx plan");
     thunder_live_meters_spec s = spec(MK | THUNDER_LIVE_MK_FXLVL | THUNDER_LIVE_MK_CHLVL, 30); s.fx_tracks = 1; s.chains_tracks = 1; s.chains_hz = 30; CHECK(H->metersSet(s) == 0, "spec");
-    int64_t fr = 0; std::vector<std::vector<uint8_t>> recs; std::vector<float> l, r;
     for (int i = 0; i < 40; i++) { H.run(l, r, 128 * 16, 128, fr); for (auto& x : H.poll()) recs.push_back(std::move(x)); }
     uint32_t last = 0; bool gapless = true, order = true; int cnt[16] = {0}; int64_t qf = -1; int stage = 0;
     for (auto& x : recs) {
@@ -152,7 +155,12 @@ int main() {
       if (f != qf) { qf = f; stage = 0; }
       if (rank < stage) order = false; stage = rank;   // within one quantum: METERS, FXLVL, CHLVL, MASTERM
     }
-    CHECK(gapless, "one gapless seq order"); CHECK(order, "METERS, FXLVL, CHLVL, MASTERM in a quantum"); CHECK(cnt[1] > 20 && cnt[2] > 20 && cnt[3] > 20 && cnt[4] > 20, "all four kinds came (%d %d %d %d)", cnt[1], cnt[2], cnt[3], cnt[4]);
+    CHECK(gapless, "one gapless seq order"); CHECK(order, "METERS, FXLVL, CHLVL, MASTERM in a quantum"); 
+#ifdef THUNDER_HAVE_TFX
+    CHECK(cnt[1] > 20 && cnt[2] > 20 && cnt[3] > 20 && cnt[4] > 20, "all four kinds came (%d %d %d %d)", cnt[1], cnt[2], cnt[3], cnt[4]);
+#else   // no effects library (MSVC, the closed build): no FXLVL, as live_meters2
+    CHECK(cnt[1] > 20 && cnt[2] == 0 && cnt[3] > 20 && cnt[4] > 20, "METERS, CHLVL, MASTERM came, no FXLVL without the effects library (%d %d %d %d)", cnt[1], cnt[2], cnt[3], cnt[4]);
+#endif
     H->setTestTap(nullptr, nullptr);
   }
   std::printf("live_masterm: %d checks, %d failed\n", g_checks, g_fail);
