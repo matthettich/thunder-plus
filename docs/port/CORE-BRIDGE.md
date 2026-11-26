@@ -215,3 +215,7 @@ Section 7 and 7.1 stay as written. This sub-section is additive only: BRIDGE_V s
 - **Undo-to-clean leaves the put.** If the person undoes back to a clean state without saving, an old put stays on disk and is offered at the next start (the page does not tell the shell; it only stops sending).
 - **Union mask.** `fx` and `dyn` share one track mask (item 2): harmless for the page's one-track rule.
 - **Not metered, by ruling:** the chains `mods`, `shows`, `jacks`, `byp` and `load` (phase 2); the pump METER / LIMIT loudness read-outs (`FXPTEL`, phase 2); the TRIM light and the stereo focus-track pair (M7, optional); the safety limiter's reduction; the preview bus's effects.
+
+## 8. H7 additions (desktop audio and MIDI, additive)
+
+`dev.list`, `dev.open`, `rec.arm`, `rec.start`, `rec.stop`, `take` (+ `take.chunk` events), `take.free`, `rt.reset`, `rt.snapshot`, and the `dev`, `rec`, `rec.done`, `midi.ports`, `midi.in` events are real in the desktop shell (they are no longer refused with H7). `hello.caps.midi`, `inputs`, `devices` and `rt` are truthful. Field-level detail: `H7-NOTES.md`.
