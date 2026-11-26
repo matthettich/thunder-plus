@@ -8762,7 +8762,7 @@ let ctx = null, master = null;
    Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
 const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
 const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
-  s.src = 'thunder-core-client.js?v=6';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.src = 'thunder-core-client.js?v=7';   // bump with the ?v= in sw.js OPTIONAL when the file changes
   s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}, ncSongHost())); } catch(e){ tpLog('native core client: attach failed', e); } };
   s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
   document.head.appendChild(s); };
@@ -24795,7 +24795,18 @@ function mstDrop(m){
   try { m.output.disconnect(); } catch(e){}
 }
 // Live: rebuilt when the EQ's shape or the worklet's presence changes; otherwise values glide into place.
-let mstMeter = null;
+let mstMeter = null, mstMeterT = 0;
+/* NATIVE CORE (M5, master meters): while the shell's engine plays, mstMeter comes from its master.lvl (the client calls mstNativeIn) instead of the master worklet, and only while the master panel is open (mstNativeWant);
+   mstM() is what the panel and the CPU panel read: a record older than 600 ms is silent. With the native switch off it is mstMeter itself. */
+const MST_SILENT = {inPk:0, outPk:0, tp:0, inLu:-180, outLu:-180, comp:0, compIn:-200, lim:0, load:0, sup:null};
+function mstNativeWant(){
+  return NCON() && tp.nc && mwOpenNow && !document.hidden;
+}
+function mstNativeIn(o){ if (o && typeof o === 'object'){ mstMeter = o; mstMeterT = performance.now(); } }
+function mstM(){
+  if (!(NCON() && tp.nc)) return mstMeter;
+  return mstMeter && performance.now() - mstMeterT <= 600 ? mstMeter : MST_SILENT;
+}
 async function mstSync(){
   if (!rt || !ctx) return;
   const M = S.mst; let ok = true;
@@ -24992,6 +25003,8 @@ const ncSongHost = () => ({
   meterHold:() => meterHold(), fxDynIn:(n, list) => fxDynIn(n, list),
   // M5 (chains meters): the tracks the visible chains screen shows (Track In / Chain Out modules' tracks), and the shell's ch.lvl peaks for the screen's meters
   chWant:() => chNativeWant(), chLvlIn:(t, i, o) => chNativeIn(t, i, o),
+  // M5 (master meters): the master panel is open (asks for master.lvl), and the shell's master.lvl record
+  mstWant:() => mstNativeWant(), mstIn:o => mstNativeIn(o),
   // The shell's engine cannot play this PLAY: the old engine does, from the top of tStart (o._nf keeps the native engine from being asked again)
   fallback:(mode, o) => { try { tStop(true); } catch(e){} tStart(mode, Object.assign({}, o, {_nf:true})); },
   // The shell stopped (a song's end, a fatal error, headphones pulled): the transport shows stopped
@@ -27292,7 +27305,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 682;
+const BUILD = 683;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32841,7 +32854,7 @@ function mwSupDraw(){
   g.clearRect(0, 0, G.W, G.H);
   g.fillStyle = C.line; g.globalAlpha = .55; g.fillRect(0, 0, G.x(M.lo), G.H); g.fillRect(G.x(M.hi), 0, G.W - G.x(M.hi), G.H); g.globalAlpha = 1;
   mwSpectrum(g, G, C, -10, -100); mwGrid(g, G, C, false);
-  const red = mstMeter && !meterHold() && mstMeter.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
+  const mm = mstM(), red = mm && !meterHold() && mm.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
   g.strokeStyle = C.ink; g.lineWidth = 2 * G.dpr; for (const f of [M.lo, M.hi]){ const x = Math.round(G.x(f)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, G.H); g.stroke(); }
   g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.fillText('reduction ↓  · drag the lines to set the range', 6 * G.dpr, G.H - 18 * G.dpr);
 }
@@ -32860,7 +32873,7 @@ function mwSupDraw(){
 const mwComp = {lv:-200, gr:0, grHold:0, holdT:0, hist:new Float32Array(150), hi:0};
 function mwCompDraw(){
   const c = $('mwCompC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.comp, d1 = G.dpr;
-  const m = mstMeter, live = !!(m && M.on && S.mst.on && !meterHold() && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
+  const m = mstM(), live = !!(m && M.on && S.mst.on && !meterHold() && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
   // the readings, with ballistics (this runs ~30 times a second)
   const lvNow = live && Number.isFinite(m.compIn) ? m.compIn : -200, grNow = live ? Math.min(0, m.comp || 0) : 0;
   K.lv = lvNow > K.lv ? lvNow : Math.max(lvNow, K.lv - 0.7); K.gr = grNow < K.gr ? grNow : Math.min(0, K.gr + 0.6);
@@ -32922,7 +32935,7 @@ function mwLoop(){
     if (mwSel === 'eq') mwEqDraw(); else if (mwSel === 'sup') mwSupDraw(); else if (mwSel === 'comp') mwCompDraw(); else mwLimDraw(); })){ mwRaf = 0; return; }   // METERS: OFF while playing: readouts and curves painted without the levels, then parked (mtrWake at STOP)
   mwRaf = requestAnimationFrame(mwLoop);
   const now = performance.now(); if (!meterDue(now, mwLoop.t || 0, 33)) return; mwLoop.t = now;   // METERS: OFF holds it (the loop idles; mtrWake / the next frame at STOP)
-  const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
+  const m = mstM(), live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
   // chain readouts
   $('mwChain').querySelectorAll('.mwst').forEach(b => { const k = b.dataset.k, gr = b.querySelector('.gr');
     if (!live || !stageOn(k) || k === 'eq'){ gr.textContent = ''; return; }
@@ -35921,7 +35934,7 @@ function fxLoads(){
   rt.pl.buses.forEach((b, t) => { if (t < NT && b.fx) L.push([d2(t + 1), b.fx.load || 0]); });
   rt.pl.buses.forEach((b, t) => { if (t < NT && b.chn) L.push([d2(t + 1) + ' chn', b.chn.load || 0]); });
   if (rt.mfx) L.push(['MST', rt.mfx.load || 0]);
-  if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) L.push(['MST dyn', mstMeter.load]);
+  if (rt.mst && rt.mst.wk && mstM() && mstM().load) L.push(['MST dyn', mstM().load]);
   let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0;
   if (bl) L.push(['Bass', bl]);
   return L;
@@ -36090,7 +36103,7 @@ function cpuMeasured(){
   const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const tn = t => { const nm = S.mix && S.mix[t] && S.mix[t].nm; return 'Track ' + d2(t + 1) + (nm ? ' ' + nm : ''); }, parts = [];
   if (rt){ rt.pl.buses.forEach((b, t) => { if (t >= NT) return; if (b.fx && b.fx.load) parts.push({name:'Effects · ' + tn(t) + cpuFxTop(S.tfx[t], b.fx.sl, fxNameOf), v:b.fx.load}); if (b.chn && b.chn.load) parts.push({name:'Chains · ' + tn(t), v:b.chn.load}); });
-    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects' + cpuFxTop(S.mfx, rt.mfx.sl, fxNameOf), v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) parts.push({name:'Master dynamics', v:mstMeter.load}); }
+    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects' + cpuFxTop(S.mfx, rt.mfx.sl, fxNameOf), v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstM() && mstM().load) parts.push({name:'Master dynamics', v:mstM().load}); }
   let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0; if (bl) parts.push({name:'Bass voices', v:bl});
   const inMin = a => a.filter(t => now - (t.t || t) < 60000);
   const ev = inMin(PB.ev), stl = inMin(PB.stalls), dr = inMin(glitch.ts);
@@ -37783,6 +37796,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
+  [683, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the master panel\u2019s IN / OUT LUFS, compressor and limiter reduction, suppressor bars and true-peak now move with the sound (the engine reports them while the panel is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
   [682, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the \u2026chains screen\u2019s track in / out level meters now move with the sound (the engine reports them while that screen is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
   [680, '25 Nov', ['Behind the scenes: with the native engine playing, the FX bar and FX screen can now ask it for each effect slot\'s level and for the compressors\' reduction (the page asks for one track at a time, and nothing while METERS is off).', 'Nothing changes while the native engine is off.']],
   [679, '25 Nov', ['Behind the scenes: with the native engine playing, a fader, mute, solo, pan, an effect knob, the master settings, the latency mode and a …chains slider now reach the sound at once, as one small message each (the whole song still follows a moment later).', 'Nothing changes while the native engine is off.']],
