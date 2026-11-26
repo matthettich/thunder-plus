@@ -300,7 +300,7 @@
     if (!tc || typeof tc.on !== 'function') return;
     var on = function (t, fn) { tc.on(t, fn); offs.push(function () { if (typeof tc.off === 'function') tc.off(t, fn); }); };
     on('clock', function (m) { lastClock = nowMs(); lost = false; if (m && m.sr && m.sr !== NC.sr && m.sr > 0) { /* a rate change arrives with engine / device events: handled there */ } });
-    if (meters2()) { on('fx.lvl', onFxLvl); on('fx.dyn', onFxDyn); on('ch.lvl', onChLvl); }   // M5: only with caps.meters2
+    if (meters2()) { on('fx.lvl', onFxLvl); on('fx.dyn', onFxDyn); on('ch.lvl', onChLvl); on('master.lvl', onMstLvl); }   // M5: only with caps.meters2
     on('recovery', onRecovery); rcvStart();   // PC6: the shell holds a copy of unsaved work from last time; the puts of this time
     on('song', function (m) { if (m && m.rev != null) songHeard = m.rev; });
     on('fit', function (m) {   // the shell's verdict again (after kit.load, after lxp): for the song last sent
@@ -760,13 +760,13 @@
      `wanted` is the page's wish; what goes out is the wish only while a native PLAY runs and the page's meterHold() is false (else everything off). ONE meters.want, whole state, 100 ms after the last change. ---- */
   var METER_MS = 100;         // METERS-DESIGN 4.5: meters.want goes 100 ms after the last change
   var METER_RATE = 10;        // the 70-float METERS rate the shell asked for at hello (live_jni); not changed by this unit
-  var MTR = { wanted: { rate: METER_RATE, fx: [], dyn: [], master: false }, views: {}, t: 0, sig: null, sent: null, force: false };
+  var MTR = { wanted: { rate: METER_RATE, fx: [], dyn: [] }, views: {}, t: 0, sig: null, sent: null, force: false };
   function meters2() { return !!(NC.on && NC.caps && NC.caps.meters2); }
   function mtrHold() { try { return !!(host && host.meterHold && host.meterHold()); } catch (e) { return false; } }
   /** What goes out now: the wish, or everything off (METERS OFF while playing, nothing playing natively). */
   function mtrState() {
     var w = MTR.wanted, on = meters2() && playSent && !mtrHold();
-    return { t: 'meters.want', rate: w.rate, fx: on ? w.fx.slice() : [], dyn: on ? w.dyn.slice() : [], chains: on ? chainsWish() : [], master: on && !!w.master };
+    return { t: 'meters.want', rate: w.rate, fx: on ? w.fx.slice() : [], dyn: on ? w.dyn.slice() : [], chains: on ? chainsWish() : [], master: on && mstWish() };
   }
   /* M5 (second half): the tracks whose …chains in / out level the page shows right now (host.chWant(): the chains screen open and visible), as the shell's `chains:[tracks]` (0..31, each once, ascending); none otherwise. The page is asked at each look (100 ms timer and the 500 ms tick). */
   function chainsWish() {
@@ -774,6 +774,8 @@
     var o = [], seen = {}; if (l && typeof l.length === 'number') for (var i = 0; i < l.length; i++) { var t = l[i]; if (typeof t === 'number' && t >= 0 && t <= 31 && t === Math.floor(t) && !seen[t]) { seen[t] = 1; o.push(t); } }
     return o.sort(function (a, b) { return a - b; });
   }
+  /* M5 (master meters): true while the page shows the master panel (host.mstWant()); a missing hook or a throw means no. Only while a native PLAY runs and METERS is on, as the rest of the state. */
+  function mstWish() { try { return !!(host && typeof host.mstWant === 'function' && host.mstWant()); } catch (e) { return false; } }
   function mtrSig(m) { return m.rate + '|' + m.fx.join() + '|' + m.dyn.join() + '|c' + m.chains.join() + '|' + (m.master ? 1 : 0); }
   /** Something may have changed: when the state that would go out differs from the last one scheduled, (re)start the 100 ms timer. */
   function mtrNote(force) {
@@ -825,6 +827,16 @@
     if (!meters2() || !playSent || !m || !(m.tr >= 0 && m.tr <= 31) || m.tr !== Math.floor(m.tr)) return;
     var pk = function (a) { if (!a || typeof a.length !== 'number') return 0; var x = Math.max(+a[0] || 0, +a[1] || 0); return isFinite(x) && x > 0 ? x : 0; };
     if (typeof host.chLvlIn === 'function') try { host.chLvlIn(m.tr, pk(m['in']), pk(m.out)); } catch (e) { log('native core client: chLvlIn failed', e); }
+  }
+  /* master.lvl {inPk, outPk, tp (linear), inLu, outLu (LUFS, -180 = silence), comp, compIn (dB, -200 = compressor off), lim, load, sup: [48 dB]|null}: the field names of the master worklet's e.data.meter. Fed to the page through host.mstIn(obj), the page stamps the time
+     and keeps its own 600 ms age limit. Only with meters2 and while a native PLAY runs. Every number is checked: a bad one becomes the silent value (0; loudness -180; compIn -200), a bad sup becomes null (what the page shows with the suppressor off). */
+  function onMstLvl(m) {
+    if (!meters2() || !playSent || !m || typeof m !== 'object' || typeof host.mstIn !== 'function') return;
+    var n = function (x, d) { x = typeof x === 'number' ? x : NaN; return isFinite(x) ? x : d; };
+    var o = { inPk: Math.max(0, n(m.inPk, 0)), outPk: Math.max(0, n(m.outPk, 0)), tp: Math.max(0, n(m.tp, 0)), inLu: n(m.inLu, -180), outLu: n(m.outLu, -180),
+      comp: Math.min(0, n(m.comp, 0)), compIn: n(m.compIn, -200), lim: Math.min(0, n(m.lim, 0)), load: Math.max(0, n(m.load, 0)), sup: null };
+    var a = m.sup; if (a && typeof a.length === 'number' && a.length === 48) { var u = []; for (var i = 0; i < 48; i++) u.push(Math.max(0, n(a[i], 0))); o.sup = u; }
+    try { host.mstIn(o); } catch (e) { log('native core client: mstIn failed', e); }
   }
   function onFxDyn(m) {
     if (!meters2() || !m || !(m.tr >= 0 && m.tr <= 32) || !m.d || typeof m.d.length !== 'number') return;
