@@ -173,6 +173,13 @@ void ChainsHost::beginBlock(int64_t frame) {
   if (n) { std::memmove(ev_.get(), ev_.get() + n, sizeof(Ev) * (size_t)(nEv_ - n)); nEv_ -= n; }
 }
 
+// M3: running max(abs) of a stereo pair into two floats. `a > m` is false for a NaN, so a NaN never poisons the peak. Audio thread: no allocation, no branch on the data but the max.
+static inline void peakMax(const float* L, const float* R, int frames, float& mL, float& mR) {
+  float a = mL, b = mR;
+  for (int i = 0; i < frames; i++) { const float x = std::fabs(L[i]), y = std::fabs(R[i]); a = x > a ? x : a; b = y > b ? y : b; }
+  mL = a; mR = b;
+}
+
 void ChainsHost::hook(void* user, int track, float* L, float* R, int frames, double, const MixFeed* feeds, int nFeeds) {
   ChainsHost* h = static_cast<ChainsHost*>(user);
   if (track < 0 || track >= kSongNT) return;
@@ -180,12 +187,25 @@ void ChainsHost::hook(void* user, int track, float* L, float* R, int frames, dou
   const std::vector<int>& bm = nd->engine().busMap();
   const float* fp[2 * kMixFeedMax]; int nf = nFeeds < kMixFeedMax ? nFeeds : kMixFeedMax; if (nf < 0) nf = 0;
   for (int j = 0; j < nf; j++) { fp[2 * j] = feeds[j].L; fp[2 * j + 1] = feeds[j].R; if (j >= (int)bm.size() || bm[(size_t)j] != feeds[j].track) h->st_.feedMismatch++; }
+  const bool tap = (h->pkWatch_ >> track) & 1u;   // M3: only a watched track pays for the peak scans
+  if (tap) peakMax(L, R, frames, h->pk_[track][0], h->pk_[track][1]);
   chains::NodeIn in; in.inL = L; in.inR = R; in.feeds = nf ? fp : nullptr; in.nFeeds = nf;
   chains::NodeOut out; out.L = L; out.R = R;   // in place: p1 copies the input into its own buffers first and writes the output last
   const uint64_t f0 = nd->engine().stats().failedBlocks;
   nd->process(in, out, frames);
   h->st_.blocks++;
   if (nd->engine().stats().failedBlocks != f0) h->st_.failedBlocks++;   // the engine cleared its buses: the output above is silence
+  if (tap) peakMax(L, R, frames, h->pk_[track][2], h->pk_[track][3]);   // M3: the pair after the node (in place)
+}
+void ChainsHost::setPeakWatch(uint32_t mask) {
+  for (int t = 0; t < kSongNT; t++) if (((mask ^ pkWatch_) >> t) & 1u) for (int k = 0; k < 4; k++) pk_[t][k] = 0.f;   // an edge starts (or ends) from silence
+  pkWatch_ = mask;
+}
+bool ChainsHost::popPeaks(int t, float pk[4]) {
+  if (t < 0 || t >= kSongNT) return false;
+  if (!node_[t]) { for (int k = 0; k < 4; k++) pk_[t][k] = 0.f; return false; }   // lead's read: a node that went away leaves no old peak for the next one
+  for (int k = 0; k < 4; k++) { pk[k] = pk_[t][k]; pk_[t][k] = 0.f; }
+  return true;
 }
 
 }  // namespace thunder

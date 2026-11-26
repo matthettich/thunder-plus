@@ -4,6 +4,7 @@
 //   ROWS / HELD -> {t:"rows"|"held", f, evs:[{tr,row,cr,step,phrase}]}         (rows {f, evs}; held is an ADDITION: the exact-stop report)
 //   METERS -> {t:"meters", seq, at, a:[70 floats]}                              (CORE-BRIDGE 6.8, as fixed by U13)
 //   FXLVL  -> {t:"fx.lvl", seq, f, tr, a:[8]} (M4: linear peaks);  FXDYN -> {t:"fx.dyn", seq, f, tr, d:[[slot, "type", red, in, out], ...]} (M4: dB as the core gives them, -180 = silence; type = thunder_fx_type_name)
+//   CHLVL  -> {t:"ch.lvl", seq, f, tr, in:[l,r], out:[l,r]} (M3: linear peaks of the track's chains node, before and after it)
 //   SONG   -> {t:"song", rev, f}                                                (CORE-BRIDGE 6.3: the audio thread reads snapshot `rev` from frame f)
 //   ERROR  -> {t:"err", where, msg, code, fatal, value, f}                      (CORE-BRIDGE 4: err {where, msg, fatal})
 //   ADDITIONS the page may ignore (unknown types are ignored: CORE-BRIDGE 2): STATE -> {t:"state", state:"playing"|"stopped"|"ended", arg, f}; PADS -> {t:"pads", id, f}; LATE -> {t:"late", ...}; fit -> songfit.h.

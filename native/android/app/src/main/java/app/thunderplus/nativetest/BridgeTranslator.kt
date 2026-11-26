@@ -21,7 +21,8 @@ import org.json.JSONObject
 //   * meters.want {rate} -> thunder_live_meters_want (rate 0: off; > 30 is clamped to 30).
 //   * M4: meters.want {rate, fx:[tracks], dyn:[tracks], chains?, master?, trim?} (any of fx / dyn / chains / master / trim present) -> thunder_live_meters_set, a REPLACEMENT state: rate_hz as above, ONE fx_tracks mask (the union of the
 //     fx and dyn lists: tracks 0..31, 32 or "m" = the master's effects), kinds FXLVL (1) if `fx` is non-empty, FXDYN (2) if `dyn` is non-empty. The page sends one track per list. A track outside 0..32 refuses the message.
-//     chains / master / trim are read and ignored until M3 / M2 / M7 (the core accepts the bits and posts nothing for them yet). The core has no cap on watched tracks (METERS-DESIGN 5a ruling 3), so the shell adds none.
+//     M3: `chains:[tracks]` (0..31; 32 / "m" refuse the message) -> kind CHLVL (4) if non-empty and its OWN mask (chains_tracks: the chains screen's track need not be the FX bar's); a bare `chains:true` / `false` (the page's
+//     M5 first half sends a boolean) names no track: ignored. M2: `master:true` -> kind MASTERM (8) (the mastering processor's meters; no mask: the master is one; `false` / null: off; any other type refuses the message). trim is read and ignored until M7. The core has no cap on watched tracks (METERS-DESIGN 5a ruling 3), so the shell adds none.
 //   * M4 (PP): fx.values {tr, slot, kind:'pump'|'mod', v:[numbers], at?} -> thunder_live_fx_values (the whole value list of a pump or a modular slot, instant). With an id (an ask, PC6) the reply is {ok:true} / {ok:false, busy:true} / {ok:false, error}; without one a refusal is an err event.
 //   * put (header + ArrayBuffer messages, see PutStore) then buf.use {id, pad, layer, kind:'pad'|'var', ii, vk: 'm3' | 'g1' (kind letter + number: the page's key, G4)} -> thunder_live_pad_take / thunder_live_var_set; pads become audible at pads.commit (no automatic publish). buf.free {id}.
 //     kinds 'sample', 'ir', 'wt', 'sf': err event (they are inputs of the core's pad render, which the page does not ask for here; 'sf' is E_UNSUPPORTED).
@@ -31,6 +32,8 @@ object BridgeTranslator {
     const val NOW = -1L
     const val MK_FXLVL = 1
     const val MK_FXDYN = 2
+    const val MK_CHLVL = 4
+    const val MK_MASTERM = 8
     const val FXV_PUMP = 1
     const val FXV_MOD = 2
     /** The most values one fx.values may carry (a pump plugin's parameter list or a module's controls: far below this; the core checks the exact count). */
@@ -54,8 +57,8 @@ object BridgeTranslator {
         class MasterConfig(val mstJson: ByteArray, val safety: Int) : LiveCall()
         class ChainEdit(val opsJson: ByteArray, val at: Long) : LiveCall()
         data class MetersWant(val hz: Double) : LiveCall()
-        /** M4: meters.want with effect lists. [kinds]: THUNDER_LIVE_MK_* bits ([MK_FXLVL], [MK_FXDYN]); [fxTracks]: bit t (0..31), bit 32 the master's. */
-        data class MetersSet(val hz: Double, val kinds: Int, val fxTracks: Long) : LiveCall()
+        /** M4: meters.want with effect lists. [kinds]: THUNDER_LIVE_MK_* bits ([MK_FXLVL], [MK_FXDYN], M3 [MK_CHLVL], M2 [MK_MASTERM]); [fxTracks]: bit t (0..31), bit 32 the master's. M3: [chainsTracks]: bit t (0..31) a track's chains in / out peaks (used with [MK_CHLVL]). */
+        data class MetersSet(val hz: Double, val kinds: Int, val fxTracks: Long, val chainsTracks: Long = 0L) : LiveCall()
         /** M4 (PP): [kind] 1 = pump, 2 = mod (THUNDER_LIVE_FXV_*). */
         class FxValues(val track: Int, val slot: Int, val kind: Int, val v: DoubleArray, val at: Long, val id: Int = -1) : LiveCall() {
             override fun equals(other: Any?) = other is FxValues && track == other.track && slot == other.slot && kind == other.kind && v.contentEquals(other.v) && at == other.at && id == other.id
@@ -201,7 +204,20 @@ object BridgeTranslator {
                     for (i in 0 until a.length()) { val tr = track(a.opt(i)) ?: return refuse("meters.want: $key has a bad track (0..32 or 'm')"); mask = mask or (1L shl tr) }
                     if (a.length() > 0) kinds = kinds or kind
                 }
-                call(LiveCall.MetersSet(hz, kinds, mask))
+                var chMask = 0L
+                if (j.has("chains") && !j.isNull("chains")) {
+                    val ca = j.opt("chains")
+                    if (ca is JSONArray) {
+                        for (i in 0 until ca.length()) { val tr = track(ca.opt(i)) ?: return refuse("meters.want: chains has a bad track (0..31)"); if (tr > 31) return refuse("meters.want: chains has a bad track (0..31)"); chMask = chMask or (1L shl tr) }
+                        if (ca.length() > 0) kinds = kinds or MK_CHLVL
+                    } else if (ca !is Boolean) return refuse("meters.want: chains must be an array of tracks (or a boolean, ignored)")
+                }
+                if (j.has("master") && !j.isNull("master")) {
+                    val mv = j.opt("master")
+                    if (mv !is Boolean) return refuse("meters.want: master must be a boolean")
+                    if (mv) kinds = kinds or MK_MASTERM
+                }
+                call(LiveCall.MetersSet(hz, kinds, mask, chMask))
             }
             "fx.values" -> {
                 val tr = track(j.opt("tr")) ?: return refuse("fx.values: bad tr")

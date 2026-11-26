@@ -138,6 +138,13 @@ class ChainsHost {
   // The mixer's hook (Mixer::setChain): the bus's feeds -> NodeIn.feeds in bus-map order, ChainsNode::process in place on the track's pair.
   static void hook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
 
+  // M3 (METERS-DESIGN CHLVL): THE LEVEL TAP of a watched track. AUDIO THREAD for all three. setPeakWatch(mask): bit t = the hook of track t keeps the running peak of its IN (the pair as the hook got it: after TRIM)
+  // and OUT (the pair after the node) since the last popPeaks; a track that is watched with no change keeps its running peak, a track that becomes watched starts from 0, one that stops is zeroed. A mask of 0 (the
+  // default, and every offline host): the hook does not touch a sample for the tap (one branch). popPeaks(t, pk): pk = {inL, inR, outL, outR} linear, then the running peak is reset; false (and pk untouched) when the
+  // track has no node now. No allocation, no lock: fixed arrays, written and read by the audio thread alone.
+  void setPeakWatch(uint32_t mask);
+  bool popPeaks(int t, float pk[4]);
+  bool hasNode(int t) const { return t >= 0 && t < kSongNT && node_[t] != nullptr; }   // AUDIO THREAD
   ChainsHostStats stats() const { return st_; }              // ONE-thread hosts only (a copy of fields both threads write): see LIVE
   ChainsHostStats audioStats() const;                         // AUDIO THREAD: the audio side's fields (the control side's are zero)
   ChainsHostStats ctlStats() const;                           // CONTROL THREAD: the control side's fields (the audio side's are zero)
@@ -168,6 +175,7 @@ class ChainsHost {
   int nNodes_ = 0;                                 // audio side: nodes now
   bool inFlight_ = false;                          // control side
   std::unique_ptr<Ev[]> ev_; int nEv_ = 0;   // on the heap (made with the host, control side): a host on a 1 MB stack (MSVC) must not hold 160 KB of events
+  uint32_t pkWatch_ = 0; float pk_[kSongNT][4] = {};   // M3, AUDIO: the tapped tracks and their running peaks {inL, inR, outL, outR}
   ChainsHostStats st_;
 };
 

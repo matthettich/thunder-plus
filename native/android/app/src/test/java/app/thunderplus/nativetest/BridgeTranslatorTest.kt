@@ -118,8 +118,25 @@ class BridgeTranslatorTest {
         // the master's effects: 32 or "m"; different tracks in the two lists: one mask holds both
         assertEquals(LiveCall.MetersSet(10.0, 3, (1L shl 32) or (1L shl 2)), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[32],\"dyn\":[\"m\",2]}"))
         // the rate keeps its clamp; chains / master / trim are read and ignored for now
-        assertEquals(LiveCall.MetersSet(30.0, 0, 0L), call("{\"t\":\"meters.want\",\"rate\":99,\"chains\":true,\"master\":true,\"trim\":true}"))
+        assertEquals(LiveCall.MetersSet(30.0, 8, 0L), call("{\"t\":\"meters.want\",\"rate\":99,\"chains\":true,\"master\":true,\"trim\":true}"))
         assertEquals(LiveCall.MetersSet(0.0, 1, 1L), call("{\"t\":\"meters.want\",\"rate\":0,\"fx\":[0]}"))
+        // M3: chains:[tracks] -> kind CHLVL (4) and its OWN mask; a boolean names no track and is ignored; chains tracks are 0..31
+        assertEquals(LiveCall.MetersSet(10.0, 4, 0L, 1L shl 2), call("{\"t\":\"meters.want\",\"rate\":10,\"chains\":[2]}"))
+        assertEquals(LiveCall.MetersSet(10.0, 5, 1L shl 3, 1L shl 9), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[3],\"chains\":[9]}"))
+        assertEquals(LiveCall.MetersSet(10.0, 7, 1L shl 3, (1L shl 9) or (1L shl 31)), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[3],\"dyn\":[3],\"chains\":[9,31,9]}"))
+        assertEquals(LiveCall.MetersSet(10.0, 0, 0L, 0L), call("{\"t\":\"meters.want\",\"rate\":10,\"chains\":[]}"))
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"chains\":[32]}").where)
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"chains\":[\"m\"]}").where)
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"chains\":[-1]}").where)
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"chains\":3}").where)
+        // M2: master:true -> kind MASTERM (8), no mask; false / null / absent: off; it combines with the other kinds; a non-boolean refuses the message
+        assertEquals(LiveCall.MetersSet(10.0, 8, 0L), call("{\"t\":\"meters.want\",\"rate\":10,\"master\":true}"))
+        assertEquals(LiveCall.MetersSet(10.0, 0, 0L), call("{\"t\":\"meters.want\",\"rate\":10,\"master\":false}"))
+        assertEquals(LiveCall.MetersSet(10.0, 0, 0L), call("{\"t\":\"meters.want\",\"rate\":10,\"master\":null}"))
+        assertEquals(LiveCall.MetersSet(10.0, 15, 1L shl 3, 1L shl 9), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[3],\"dyn\":[3],\"chains\":[9],\"master\":true}"))
+        assertEquals(LiveCall.MetersSet(10.0, 9, 1L shl 3), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[3],\"master\":true}"))
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"master\":1}").where)
+        assertEquals("meters.want", refused("{\"t\":\"meters.want\",\"rate\":10,\"master\":\"yes\"}").where)
         // a repeated track is one bit
         assertEquals(LiveCall.MetersSet(10.0, 1, 1L shl 7), call("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[7,7]}"))
         // refusals: a track out of range, not a number, a list that is not an array; no rate

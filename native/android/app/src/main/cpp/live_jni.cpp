@@ -589,10 +589,10 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFxParam(
   return eng->call([=](thunder_live* L) { return thunder_live_fx_param(L, track, slot, v->data(), at); });
 }
 // M4: meters.want with the effect lists -> thunder_live_meters_set (a REPLACEMENT state; live.h M1). kinds = THUNDER_LIVE_MK_* bits, fxTracks: bit t (0..31) a track's effects, bit 32 the master's.
-JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMetersSet(JNIEnv*, jobject, jdouble hz, jint kinds, jlong fxTracks) {
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMetersSet(JNIEnv*, jobject, jdouble hz, jint kinds, jlong fxTracks, jlong chainsTracks) {
   auto eng = g.eng.get(); if (!eng) return -2;
   thunder_live_meters_spec sp; std::memset(&sp, 0, sizeof sp);
-  sp.size = sizeof sp; sp.kinds = (uint32_t)kinds; sp.rate_hz = hz; sp.fx_tracks = (uint64_t)fxTracks; sp.chains_hz = 0;
+  sp.size = sizeof sp; sp.kinds = (uint32_t)kinds; sp.rate_hz = hz; sp.fx_tracks = (uint64_t)fxTracks; sp.chains_hz = 0; sp.chains_tracks = (uint64_t)chainsTracks;   // M3: chains_hz 0 = the core's 16 a second
   return eng->call([=](thunder_live* L) { return thunder_live_meters_set(L, &sp); });
 }
 // PP: fx.values {tr, slot, kind: 1 pump | 2 mod, v:[..]} -> thunder_live_fx_values (instant knob values of a pump or a modular slot). Refusals (E_ARG: the EQ's phase / lin_quality, a linear-phase EQ, a wrong count; E_STATE; E_BUSY) are returned as codes, never thrown.

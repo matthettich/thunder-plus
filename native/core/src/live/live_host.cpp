@@ -29,6 +29,8 @@ namespace thunder {
 static_assert(sizeof(thunder_live_ev_head) == 16 && sizeof(thunder_live_ev_clock) == 48 && sizeof(thunder_live_ev_pos) == 32 && sizeof(thunder_live_ev_rows) == 24 && sizeof(thunder_live_ev_rowent) == 8
               && sizeof(thunder_live_ev_state) == 24 && sizeof(thunder_live_ev_song) == 24 && sizeof(thunder_live_ev_pads) == 24 && sizeof(thunder_live_ev_error) == 32 && sizeof(thunder_live_ev_late) == 40
               && sizeof(thunder_live_ev_meters) == 304, "the record layouts of live.h (the same on wasm32 and 64-bit)");
+/* M3 */ static_assert(sizeof(thunder_live_ev_chlvl) == 40 && sizeof(thunder_live_ev_chlvl) % 8 == 0, "the M3 record layout of live.h");
+/* M2 */ static_assert(sizeof(thunder_live_ev_masterm) == 248 && sizeof(thunder_live_ev_masterm) % 8 == 0 && sizeof(thunder_live_ev_masterm) <= THUNDER_LIVE_EV_MAX, "the M2 record layout of live.h (METERS-DESIGN 4.1)");
 /* M1 */ static_assert(sizeof(thunder_live_ev_fxlvl) == 56 && sizeof(thunder_live_ev_fxdyn_ent) == 16 && sizeof(thunder_live_ev_fxdyn) == 152 && sizeof(thunder_live_ev_fxdyn) <= THUNDER_LIVE_EV_MAX && sizeof(thunder_live_ev_fxlvl) % 8 == 0 && sizeof(thunder_live_ev_fxdyn) % 8 == 0, "the M1 record layouts of live.h (METERS-DESIGN 4.1)");
 
 namespace {
@@ -725,10 +727,11 @@ int LiveHost::meters(double rateHz) {
 }
 /* M1 */ int LiveHost::metersSet(const thunder_live_meters_spec& sp) {   // CONTROL
   if (!(flags_ & THUNDER_LIVE_F_METERS) || !meterBank_) return THUNDER_LIVE_E_STATE;
+  if (sp.chains_tracks >> 32) return THUNDER_LIVE_E_ARG;   // M3: bit t 0..31
   const uint32_t known = THUNDER_LIVE_MK_FXLVL | THUNDER_LIVE_MK_FXDYN | THUNDER_LIVE_MK_CHLVL | THUNDER_LIVE_MK_MASTERM;
   if ((sp.kinds & ~known) != 0 || (sp.fx_tracks >> (THUNDER_LIVE_MASTER + 1)) != 0) return THUNDER_LIVE_E_ARG;
   if (!finite(sp.rate_hz) || sp.rate_hz < 0 || sp.rate_hz > 30 || !finite(sp.chains_hz) || sp.chains_hz < 0 || sp.chains_hz > 30) return THUNDER_LIVE_E_ARG;
-  LiveCmd c; c.type = LiveCmdType::MetersSet; c.x = sp.rate_hz; c.y = sp.chains_hz; c.i0 = (int32_t)sp.kinds; c.i64a = (int64_t)sp.fx_tracks;
+  LiveCmd c; c.type = LiveCmdType::MetersSet; c.x = sp.rate_hz; c.y = (sp.chains_hz > 0 && sp.chains_hz < 1) ? 1.0 : sp.chains_hz /* lead's read: never a rate so small that sr / hz overflows llround on the audio thread */; c.i0 = (int32_t)sp.kinds; c.i64a = (int64_t)sp.fx_tracks; c.i1 = (int32_t)(uint32_t)sp.chains_tracks;
   return push(c);   // applied at the top of the next quantum; a full ring is E_BUSY and nothing changed
 }
 
@@ -1112,6 +1115,20 @@ void LiveHost::applyMetersSet(const LiveCmd& c) {
     }
   }
   fxLvlWatch_ = wl; fxDynWatch_ = wd;
+  /* M3: the chains peaks. Watched = the CHLVL kind AND the host has a chains host. setPeakWatch zeroes the running peaks of a track whose watching changes (an identical re-send changes nothing, so the pacing and
+     the running peaks go on); a changed set restarts the pacing, so the first record comes at the next quantum. chains_hz 0 = 16 a second. */
+  if (chains_) {
+    const uint32_t wc = (kinds & THUNDER_LIVE_MK_CHLVL) ? (uint32_t)c.i1 : 0u;
+    if (wc != chWatch_) { chains_->setPeakWatch(wc); nextChAt_ = 0; }
+    chWatch_ = wc;
+  }
+  chHz_ = c.y > 0 ? c.y : 16.0;
+  /* M2: the master's meters. The mastering processor's meter state is built with it; this only flips its flag (on an EDGE: an identical re-send leaves the running meters alone). Nothing allocates or resets a filter. */
+  if (mchain_) {
+    const bool wm = (kinds & THUNDER_LIVE_MK_MASTERM) != 0;
+    if (wm != mstWatch_) mchain_->mastering().setMeters(wm);
+    mstWatch_ = wm;
+  }
 }
 
 /* M1: AUDIO, step 9 after postMeters. For each WATCHED host (and only those: nothing is popped, nothing computed, for the others) FxHost::popLevels / popDyn hand over what process() posted this quantum (every 12th
@@ -1145,6 +1162,41 @@ void LiveHost::postFxMeters(int64_t qEnd) {
         post(&e, sizeof e);
       }
     }
+  }
+}
+
+/* M3: AUDIO, step 9 after postFxMeters. Only while a track is watched (chWatch_ != 0): at most once per 1 / chains_hz seconds (paced in whole quanta against the engine frame), for each watched track that HAS a chains node
+   the running peaks the hook kept (ChainsHost::popPeaks, which also resets them) go into a 40-byte record built on the stack and posted on the big ring. A watched track with no node posts nothing; nothing is popped,
+   nothing is computed (the hook's scan is on only for the watched bits) for the others. A full ring drops the newest and counts it (post). qEnd: the engine frame at the end of the quantum. */
+void LiveHost::postChainsMeters(int64_t qEnd) {
+  if (!chains_ || chWatch_ == 0 || qEnd < nextChAt_) return;
+  nextChAt_ = qEnd + (int64_t)std::llround(sr_ / chHz_);
+  for (int t = 0; t < kSongNT; t++) {
+    if (!((chWatch_ >> t) & 1u)) continue;
+    float pk[4];
+    if (!chains_->popPeaks(t, pk)) continue;
+    thunder_live_ev_chlvl e; std::memset(&e, 0, sizeof e);
+    e.h.type = THUNDER_LIVE_EV_CHLVL; e.h.f = qEnd; e.track = t;
+    e.in[0] = pk[0]; e.in[1] = pk[1]; e.out[0] = pk[2]; e.out[1] = pk[3];
+    post(&e, sizeof e);
+  }
+}
+
+/* M2: AUDIO, step 9 after postChainsMeters. Only while MASTERM is watched (mstWatch_): every message the mastering processor queued (MasterProcessor::popMeter, about 20 a second; at most one per quantum is made, the loop is bounded by the
+   queue's depth) becomes a 248-byte record built on the stack and posted on the big ring. The values are the processor's own; only a non-finite number is replaced so that the JSON never needs an infinity (loudness -180, compIn -200,
+   the rest 0). Unwatched: one bool test. A full ring drops the newest and counts it (post). qEnd: the engine frame at the end of the quantum. */
+void LiveHost::postMasterMeters(int64_t qEnd) {
+  if (!mstWatch_ || !mchain_) return;
+  MasterMeter m;
+  for (int n = 0; n < MasterProcessor::kMeterQueue && mchain_->mastering().popMeter(&m); n++) {
+    auto fin = [](double x, float dflt) { const float f = (float)x; return std::isfinite(f) ? f : dflt; };
+    auto lu = [&](double x) { const float v = fin(x, -180.f); return v < -180.f ? -180.f : v; };
+    thunder_live_ev_masterm e; std::memset(&e, 0, sizeof e);
+    e.h.type = THUNDER_LIVE_EV_MASTERM; e.h.f = qEnd;
+    e.in_pk = fin(m.inPk, 0.f); e.out_pk = fin(m.outPk, 0.f); e.tp = fin(m.tp, 0.f); e.in_lu = lu(m.inLu); e.out_lu = lu(m.outLu);
+    e.comp = fin(m.comp, 0.f); e.comp_in = fin(m.compIn, -200.f); e.lim = fin(m.lim, 0.f); e.load = fin(m.load, 0.f);
+    if (m.hasSup) { e.flags = 1u; for (int i = 0; i < kSupBands; i++) e.sup[i] = fin((double)m.sup[i], 0.f); }
+    post(&e, sizeof e);
   }
 }
 
@@ -1345,6 +1397,8 @@ void LiveHost::afterBlock(int64_t qStart) {
   }
   postMeters();
   postFxMeters(qStart + kLiveQuantum);   // M1
+  postChainsMeters(qStart + kLiveQuantum);   // M3
+  postMasterMeters(qStart + kLiveQuantum);   // M2
   publish();
   state_.store(stateA_, std::memory_order_release);
 }
