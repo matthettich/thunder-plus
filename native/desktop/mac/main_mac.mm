@@ -111,7 +111,7 @@ class MacPlatform : public tpd::IPlatform {
   o.deliver = [me](const std::string& text) { [me runInPage:"window.__thunderRecv(" + tpd::jsonQuote(text) + ")"]; };
   o.selfTest = _selftest;   // S-3: the page's "S:" verdict ends the process only under --selftest
   o.onSelfTest = [me](bool ok, const std::string& rep) { std::printf("SELFTEST %s\n%s", ok ? "PASS" : "FAIL", rep.c_str()); std::fflush(stdout); _exit(ok ? 0 : 1); };   // _exit: the worker and audio threads are not unwound (L-9)
-  { NSArray* sup = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES); if (sup.count) o.dataDir = S([sup[0] stringByAppendingPathComponent:@"Thunder Plus"]); }   // recovery copy, picked-paths list
+  { NSArray* sup = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES); if (sup.count) o.dataDir = S([sup[0] stringByAppendingPathComponent:@"Thunder Plus Native"]); }   // recovery copy, picked-paths list (its own folder: the Electron app uses "Thunder Plus")
   _core.reset(new tpd::ShellCore(_plat.get(), o));
 
   WKWebViewConfiguration* cfg = [[WKWebViewConfiguration alloc] init];
