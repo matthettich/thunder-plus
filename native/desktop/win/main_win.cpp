@@ -135,7 +135,8 @@ void onResourceRequested(ICoreWebView2WebResourceRequestedEventArgs* args) {
 void onControllerReady() {
   g_ctrl->get_CoreWebView2(&g_web);
   ComPtr<ICoreWebView2Settings> st; g_web->get_Settings(&st);
-  if (st) { st->put_IsStatusBarEnabled(FALSE); st->put_AreDevToolsEnabled(g_devtools || g_cdpPort > 0 ? TRUE : FALSE);   // (L-3) DevTools only on request: --devtools or --cdp-port st->put_IsZoomControlEnabled(FALSE); }
+  // (L-3) DevTools only on request: --devtools or --cdp-port
+  if (st) { st->put_IsStatusBarEnabled(FALSE); st->put_AreDevToolsEnabled(g_devtools || g_cdpPort > 0 ? TRUE : FALSE); st->put_IsZoomControlEnabled(FALSE); }
   resizeWeb();
   EventRegistrationToken tok;
   g_web->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>([](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* a) -> HRESULT {
