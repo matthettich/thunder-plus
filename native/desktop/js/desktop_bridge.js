@@ -3,7 +3,7 @@
    window.thunderDesktop: the 31 Electron IPC channels (docs/port/BRIDGE-TODAY.md section 4) with the shape electron/preload.js gives them.
    Transport. Page -> shell: one text message each. thunderCore: the JSON text, or "B:<base64>" for the bytes of a `put` chunk (the header goes just before it); thunderDesktop: "D:" + {ch, id, a}.
    Shell -> page: window.__thunderRecv(text), text = one or more JSON objects joined by "\n". Objects: {t:'dreply', id, v|err}, {t:'dpush', ch, v} (thunderDesktop), everything else is a thunderCore reply / event.
-   __TPD_INIT__ is replaced by the shell with the constants of DesktopApi::initJson() (the sendSync answers). Written in ES5 on purpose (the oldest web view this has to run in). */
+   The INIT placeholder (the one in `var INIT = ...` below) is replaced by the shell with the constants of DesktopApi::initJson() (the sendSync answers). Written in ES5 on purpose (the oldest web view this has to run in). */
 (function () {
   'use strict';
   if (window.thunderCore) return;
@@ -146,8 +146,8 @@
     jobs.forEach(function (j) { chain = chain.then(function () { return within(j[1](), 5000).then(function (v) { chk(j[0], v); }, function () { chk(j[0], null); }); }); });
     return chain.then(function () {
       /* the five send channels have no reply: they must not throw */
-      try { td.app.ready(); td.app.closeAck(); td.app.playing(false); res.answered.push('thunder:page-ready', 'thunder:close-ack', 'thunder:playing'); } catch (e) { res.ok = false; res.failed.push('send channels: ' + e); }
-      res.answered.push('thunder:close-reply', 'thunder:reload');   /* not sent here: they would close or reload the window; the C++ test covers them */
+      try { td.app.ready(); td.app.closeAck(); td.app.playing(false); td.app.closeReply(false); res.answered.push('thunder:page-ready', 'thunder:close-ack', 'thunder:playing', 'thunder:close-reply'); } catch (e) { res.ok = false; res.failed.push('send channels: ' + e); }
+      res.answered.push('thunder:reload');   /* not sent here: it would reload the window mid-test; the C++ test (test_desktop_api) covers it */
       res.answered.push('thunder:link-avail');   /* the sendSync one: the bootstrap constants */
       if (typeof td.link.available !== 'boolean') { res.ok = false; res.failed.push('thunder:link-avail'); }
       ['onCloseAsk', 'onOpenPath'].forEach(function (n) { if (typeof td.app[n] !== 'function') { res.ok = false; res.failed.push(n); } });

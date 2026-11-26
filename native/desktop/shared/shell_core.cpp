@@ -40,9 +40,9 @@ void ShellCore::onPageMessage(const std::string& m) {
 
 std::string ShellCore::bootstrapScript(const char* js, size_t len) const {
   std::string s(js, len);
-  const std::string key = "__TPD_INIT__";
+  const std::string key = "var INIT = __TPD_INIT__;";   // the one place the placeholder is used
   const size_t p = s.find(key);
-  if (p != std::string::npos) s.replace(p, key.size(), api_.initJson());
+  if (p != std::string::npos) s.replace(p, key.size(), "var INIT = " + api_.initJson() + ";");
   return s;
 }
 

@@ -22,7 +22,7 @@ int main() {
   ShellCore core(&plat, o); cp = &core; (void)cp;
   auto has = [&](const char* s) { std::lock_guard<std::mutex> g(m); return got.find(s) != std::string::npos; };
   // the bootstrap constants
-  { const char js[] = "var INIT = __TPD_INIT__;"; const std::string s = core.bootstrapScript(js, sizeof js - 1); CHECK(s.find("__TPD_INIT__") == std::string::npos && s.find("\"version\":\"1.2.3\"") != std::string::npos, "bootstrap: constants in place: %s", s.c_str()); }
+  { const char js[] = "// the __TPD_INIT__ word in a comment stays\nvar INIT = __TPD_INIT__;"; const std::string s = core.bootstrapScript(js, sizeof js - 1); CHECK(s.find("var INIT = {") != std::string::npos && s.find("var INIT = __TPD_INIT__") == std::string::npos && s.find("\"version\":\"1.2.3\"") != std::string::npos, "bootstrap: constants in place: %s", s.c_str()); }
   // D: reaches the API; its reply is batched until flush()
   core.onPageMessage("D:{\"ch\":\"thunder:upd-state\",\"id\":5,\"a\":[]}");
   CHECK(flushes == 1 && delivers == 0, "a reply asks for one flush and is not delivered until flush()");
