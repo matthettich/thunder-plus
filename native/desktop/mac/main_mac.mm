@@ -131,6 +131,8 @@ class MacPlatform : public tpd::IPlatform {
   [_web loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"app://thunder/index.html"]]];
   [_win makeKeyAndOrderFront:nil];
   [NSApp activateIgnoringOtherApps:YES];
+  // DEVICE RECOVERY (Electron's powerMonitor 'resume'): the computer woke, the page checks its audio output again
+  [[[NSWorkspace sharedWorkspace] notificationCenter] addObserverForName:NSWorkspaceDidWakeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification*) { self->_core->api().push("thunder:power", "\"resume\""); }];
   _timer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer*) { self->_core->tick(); }];
   if (_selftest) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ std::printf("SELFTEST FAIL\nno result in 120 s\n"); std::fflush(stdout); exit(2); });
 }

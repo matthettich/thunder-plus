@@ -86,7 +86,7 @@ jobs:
         run: cmake --build build -j3 --target ThunderPlus test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core
       - name: Library tests
         run: ctest --test-dir build --output-on-failure -R desktop_
-      - name: Ad-hoc signature (no Developer ID: this only makes the bundle coherent; H8 signs and notarises)
+      - name: "Ad-hoc signature (no Developer ID; this only makes the bundle coherent, H8 signs and notarises)"
         run: codesign --force --deep --sign - "build/desktop/Thunder Plus.app" && codesign -dv "build/desktop/Thunder Plus.app" 2>&1 | head -5
       - name: Shell selftest (every channel answers; null audio device)
         timeout-minutes: 5
