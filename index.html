@@ -8762,7 +8762,7 @@ let ctx = null, master = null;
    Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
 const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
 const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
-  s.src = 'thunder-core-client.js?v=4';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.src = 'thunder-core-client.js?v=5';   // bump with the ?v= in sw.js OPTIONAL when the file changes
   s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}, ncSongHost())); } catch(e){ tpLog('native core client: attach failed', e); } };
   s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
   document.head.appendChild(s); };
@@ -24977,9 +24977,17 @@ const ncSongHost = () => ({
     return o;
   },
   // PC4 (live edits): what the client needs to tell what changed. fxSlot: the page's own mapping of one effect slot (tfxChain's, without pumpSync's side effect); chainMods: id -> type of the chains patch's modules; pdc: the latency mode as the core's number.
-  fxSlot:(f, sr, bpm) => { const T = f && TFX[f.type]; if (!T) return null; if (T.pump) return {kind:'pump'}; if (T.mod) return {kind:'mod'}; const p = new Array(12).fill(0); T.map(f, sr, bpm).forEach((v, i) => p[i] = v); return {kind:'fx', p}; },
+  fxSlot:(f, sr, bpm) => { const T = f && TFX[f.type]; if (!T) return null;
+    // PC6 (fx.values): a pump / modular slot's whole value list as the plan makes it. A pump slot's on a copy (pumpSync writes f.pump from the boxes, as tfxChain does, without touching the song's slot); a modular one is `mp`.
+    if (T.pump){ let v = null; try { const g = Object.assign({}, f, {pump:Object.assign({}, f.pump)}); pumpSync(g); v = pumpPv(T, g); } catch(e){} return {kind:'pump', v}; }
+    if (T.mod){ let v = null; try { v = Array.from(T.map(f, sr, bpm)); } catch(e){} return {kind:'mod', v}; }
+    const p = new Array(12).fill(0); T.map(f, sr, bpm).forEach((v, i) => p[i] = v); return {kind:'fx', p}; },
   chainMods:() => { const o = {}; if (S.chainPatch && Array.isArray(S.chainPatch.modules)) for (const m of S.chainPatch.modules) if (m && m.id != null) o[m.id] = m.type; return o; },
   pdc:() => ({off:0, auto:1, on:2})[pdcModeOf()],
+  // PC6 (the shell's recovery copy): dirty / projText feed recovery.put; askRestore is the "Restore unsaved changes?" question (0 Restore, 1 Discard, -1 closed); restore keeps a backup of what is open, then loads the project text as a restored backup is.
+  dirty:() => projDirty, projText:() => projText(),
+  askRestore:(title, when) => askPick({title:'Restore unsaved changes?', body:'The app was closed with unsaved changes to \u201c' + title + '\u201d' + (when ? ' (' + when + ')' : '') + '. Restore them? Discard throws them away.'}, ['Restore', 'Discard']),
+  restore:async (text, name) => { try { await backupNow(true); } catch(e){} return await loadProjText(text, name, {dirty:true}); },
   // M5 (effect meters): the page's METERS rule, and the page's own fxDynIn for the shell's fx.dyn reports
   meterHold:() => meterHold(), fxDynIn:(n, list) => fxDynIn(n, list),
   // The shell's engine cannot play this PLAY: the old engine does, from the top of tStart (o._nf keeps the native engine from being asked again)
@@ -27282,7 +27290,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 680;
+const BUILD = 681;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37756,6 +37764,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
   [680, '25 Nov', ['Behind the scenes: with the native engine playing, the FX bar and FX screen can now ask it for each effect slot\'s level and for the compressors\' reduction (the page asks for one track at a time, and nothing while METERS is off).', 'Nothing changes while the native engine is off.']],
   [679, '25 Nov', ['Behind the scenes: with the native engine playing, a fader, mute, solo, pan, an effect knob, the master settings, the latency mode and a …chains slider now reach the sound at once, as one small message each (the whole song still follows a moment later).', 'Nothing changes while the native engine is off.']],
   [678, '25 Nov', ['Behind the scenes: with the native engine on, the page can now publish the song, send its pad renders, kit list, variations and chop data (copies, with a memory limit), and press PLAY and STOP on it. A song it cannot play goes back to the old engine with a short message.', 'Nothing changes while the native engine is off.']],
