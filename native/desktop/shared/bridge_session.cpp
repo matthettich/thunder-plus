@@ -26,16 +26,21 @@ std::string strList(const std::vector<std::string>& v) { std::string o = "["; fo
 }  // namespace
 
 BridgeSession::BridgeSession(LiveHost& host, Emit emit, RecoveryStore* recovery) : host_(host), emit_(std::move(emit)), rec_(recovery) { worker_ = std::thread([this] { worker(); }); }
-BridgeSession::~BridgeSession() { shutdown(); }
+BridgeSession::~BridgeSession() { if (abandoned_) { if (worker_.joinable()) worker_.detach(); } else shutdown(); }
 
-void BridgeSession::shutdown() {
+bool BridgeSession::shutdown(int timeoutMs) {
   std::thread p;
   { std::lock_guard<std::mutex> g(pm_); closing_ = true; pumpStop_ = true; p = std::move(pump_); }   // L-1: no late hello can start a pump after this
   pcv_.notify_all();
   if (p.joinable()) p.join();
   { std::lock_guard<std::mutex> g(qm_); stop_ = true; }
   qcv_.notify_all();
+  if (timeoutMs >= 0) {
+    std::unique_lock<std::mutex> lk(qm_);
+    if (!doneCv_.wait_for(lk, std::chrono::milliseconds(timeoutMs), [&] { return workerDone_; })) { abandoned_ = true; return false; }
+  }
   if (worker_.joinable()) worker_.join();
+  return true;
 }
 
 bool BridgeSession::post(const std::string& msg) {
@@ -65,7 +70,7 @@ void BridgeSession::worker() {
     std::string m;
     { std::unique_lock<std::mutex> lk(qm_);
       qcv_.wait(lk, [&] { return !q_.empty() || stop_; });
-      if (q_.empty() && stop_) return;
+      if (q_.empty() && stop_) { workerDone_ = true; doneCv_.notify_all(); return; }
       m = std::move(q_.front()); q_.pop_front(); qBytes_ -= m.size(); busy_ = true; }
     run(m);
     { std::lock_guard<std::mutex> g(qm_); busy_ = false; }

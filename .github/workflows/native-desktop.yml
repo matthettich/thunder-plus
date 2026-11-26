@@ -6,10 +6,10 @@ name: Native desktop
 on:
   push:
     branches: [native]
-    paths: ['native/desktop/**', 'native/CMakeLists.txt', 'native/core/include/**', 'native/android/app/src/main/cpp/**', '.github/workflows/native-desktop.yml']
+    paths: ['native/desktop/**', 'native/CMakeLists.txt', 'native/core/include/**', 'native/core/src/**', 'native/core/third_party/**', 'native/android/app/src/main/cpp/**', '.github/workflows/native-desktop.yml']
   pull_request:
     branches: [native]
-    paths: ['native/desktop/**', 'native/CMakeLists.txt', 'native/core/include/**', 'native/android/app/src/main/cpp/**', '.github/workflows/native-desktop.yml']
+    paths: ['native/desktop/**', 'native/CMakeLists.txt', 'native/core/include/**', 'native/core/src/**', 'native/core/third_party/**', 'native/android/app/src/main/cpp/**', '.github/workflows/native-desktop.yml']
   workflow_dispatch:
 
 permissions:

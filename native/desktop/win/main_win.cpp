@@ -64,7 +64,7 @@ ComPtr<ICoreWebView2> g_web;
 std::unique_ptr<tpd::ShellCore> g_core;
 std::string g_webDir, g_report;
 int g_cdpPort = 0;   // --cdp-port N: the DevTools Protocol on 127.0.0.1:N, for the UI sweeps (tests/sweep/ui-lib-shell.mjs)
-bool g_selftest = false, g_nullAudio = false, g_selfTestStarted = false;
+bool g_selftest = false, g_nullAudio = false, g_selfTestStarted = false, g_devtools = false;
 std::string g_pendingOpen;
 
 void finishSelfTest(bool ok, const std::string& rep) {
@@ -135,22 +135,34 @@ void onResourceRequested(ICoreWebView2WebResourceRequestedEventArgs* args) {
 void onControllerReady() {
   g_ctrl->get_CoreWebView2(&g_web);
   ComPtr<ICoreWebView2Settings> st; g_web->get_Settings(&st);
-  if (st) { st->put_IsStatusBarEnabled(FALSE); st->put_AreDevToolsEnabled(TRUE); st->put_IsZoomControlEnabled(FALSE); }
+  if (st) { st->put_IsStatusBarEnabled(FALSE); st->put_AreDevToolsEnabled(g_devtools || g_cdpPort > 0 ? TRUE : FALSE);   // (L-3) DevTools only on request: --devtools or --cdp-port st->put_IsZoomControlEnabled(FALSE); }
   resizeWeb();
   EventRegistrationToken tok;
   g_web->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>([](ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* a) -> HRESULT {
-    LPWSTR s = nullptr;
-    if (SUCCEEDED(a->TryGetWebMessageAsString(&s)) && s) { const std::string m = U(s); CoTaskMemFree(s); if (g_core) g_core->onPageMessage(m); }
+    // S-2: only the app's own page talks to the shell: a message from any other origin (a frame, a page the window was somehow sent to) is dropped
+    LPWSTR src = nullptr; a->get_Source(&src); const std::string from = U(src); CoTaskMemFree(src);
+    if (!tpd::isAppOrigin(from)) return S_OK;
+    try {
+      LPWSTR s = nullptr;
+      if (SUCCEEDED(a->TryGetWebMessageAsString(&s)) && s) { const std::string m = U(s); CoTaskMemFree(s); if (g_core) g_core->onPageMessage(m); }
+    } catch (...) {}   // R-2: nothing escapes into WebView2
     return S_OK;
   }).Get(), &tok);
   g_web->AddWebResourceRequestedFilter(L"app://thunder/*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
-  g_web->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>([](ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs* a) -> HRESULT { onResourceRequested(a); return S_OK; }).Get(), &tok);
+  g_web->add_WebResourceRequested(Callback<ICoreWebView2WebResourceRequestedEventHandler>([](ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs* a) -> HRESULT { try { onResourceRequested(a); } catch (...) {} return S_OK; }).Get(), &tok);
   // the window only ever shows the app: https links go to the browser, anything else is refused
   g_web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* a) -> HRESULT {
     LPWSTR u = nullptr; a->get_Uri(&u); const std::wstring url = u ? u : L""; CoTaskMemFree(u);
-    if (url.rfind(L"app://", 0) == 0 || url.rfind(L"about:", 0) == 0 || url.rfind(L"blob:", 0) == 0 || url.rfind(L"data:", 0) == 0) { if (g_core) g_core->api().onLoadStart(); return S_OK; }
+    // S-4: the window only ever shows app://thunder (a data: or blob: page would still get the bridge); http(s) links open in the browser, anything else is refused
+    if (tpd::isAppOrigin(U(url))) { if (g_core) g_core->api().onLoadStart(); return S_OK; }
     if (isHttp(url)) openExternal(url);
     a->put_Cancel(TRUE);
+    return S_OK;
+  }).Get(), &tok);
+  // S-2: a frame inside the page may load the app or about:blank only (the bridge is injected into the main frame only, see bootstrapScript)
+  g_web->add_FrameNavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* a) -> HRESULT {
+    LPWSTR u = nullptr; a->get_Uri(&u); const std::wstring url = u ? u : L""; CoTaskMemFree(u);
+    if (!tpd::isAppOrigin(U(url)) && url.rfind(L"about:", 0) != 0) a->put_Cancel(TRUE);
     return S_OK;
   }).Get(), &tok);
   g_web->add_NewWindowRequested(Callback<ICoreWebView2NewWindowRequestedEventHandler>([](ICoreWebView2*, ICoreWebView2NewWindowRequestedEventArgs* a) -> HRESULT {
@@ -178,7 +190,7 @@ void createWebView() {
   opts->put_AdditionalBrowserArguments(browserArgs.c_str());
   ComPtr<ICoreWebView2EnvironmentOptions4> o4;
   if (SUCCEEDED(opts.As(&o4))) {
-    const WCHAR* allowed[1] = {L"*"};
+    const WCHAR* allowed[1] = {L"app://thunder"};   // S-2: only the app's own origin may request app:// resources from another origin
     auto reg = Make<CoreWebView2CustomSchemeRegistration>(L"app");
     reg->put_TreatAsSecure(TRUE);
     reg->put_HasAuthorityComponent(TRUE);
@@ -214,7 +226,11 @@ LRESULT CALLBACK wndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     case WM_CLOSE:
       if (g_core && !g_core->api().requestClose(false)) return 0;   // the page was asked (close-ask); it answers, or 3 s pass
       DestroyWindow(h); return 0;
-    case WM_DESTROY: KillTimer(h, TIMER_TICK); if (g_core) g_core->shutdown(); PostQuitMessage(0); return 0;
+    case WM_DESTROY:
+      KillTimer(h, TIMER_TICK);
+      // L-2: the window is gone first; the worker may be inside a long song load: wait for it at most 3 s, then leave the process (the objects it uses are never destroyed under it)
+      if (g_core && !g_core->shutdown(3000)) ExitProcess(0);
+      PostQuitMessage(0); return 0;
     case WM_POWERBROADCAST: if (w == PBT_APMRESUMEAUTOMATIC && g_core) g_core->api().push("thunder:power", "\"resume\""); return TRUE;   // DEVICE RECOVERY: the computer woke
   }
   return DefWindowProcW(h, m, w, l);
@@ -232,6 +248,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     else if (a == L"--null-audio") g_nullAudio = true;
     else if (a == L"--web" && i + 1 < argc) g_webDir = U(argv[++i]);
     else if (a == L"--report" && i + 1 < argc) g_report = U(argv[++i]);
+    else if (a == L"--devtools") g_devtools = true;
     else if (a == L"--cdp-port" && i + 1 < argc) g_cdpPort = _wtoi(argv[++i]);
     else if (a.size() > 8 && a.compare(a.size() - 8, 8, L".thunder") == 0) g_pendingOpen = U(a);
   }
@@ -244,7 +261,9 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
   tpd::ShellCore::Options o; o.nullAudio = g_nullAudio; o.version = THUNDER_APP_VERSION; o.audio = [] { return tpd::makeMiniaudioOut(); };
   o.requestFlush = [] { PostMessageW(g_hwnd, WM_FLUSH, 0, 0); };
   o.deliver = [](const std::string& text) { if (g_web) g_web->PostWebMessageAsString(W(text).c_str()); };
+  o.selfTest = g_selftest;   // S-3: the page's "S:" verdict ends the process only under --selftest
   o.onSelfTest = [](bool ok, const std::string& rep) { finishSelfTest(ok, rep); };
+  { PWSTR local = nullptr; if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local))) { o.dataDir = U(std::wstring(local) + L"\\Thunder Plus Native\\data"); CoTaskMemFree(local); } }   // recovery copy, picked-paths list
   g_core.reset(new tpd::ShellCore(&g_plat, o));
 
   ShowWindow(g_hwnd, show == SW_HIDE ? SW_SHOWNORMAL : show);
@@ -254,6 +273,9 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0) > 0) { TranslateMessage(&msg); DispatchMessageW(&msg); }
   g_core.reset();
+  // L-2: release the WebView2 objects while COM is still up (their static destructors would run after CoUninitialize)
+  if (g_ctrl) g_ctrl->Close();
+  g_web.Reset(); g_ctrl.Reset(); g_env.Reset();
   CoUninitialize();
   return (int)msg.wParam;
 }

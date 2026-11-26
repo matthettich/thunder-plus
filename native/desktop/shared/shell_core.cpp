@@ -24,10 +24,11 @@ ShellCore::ShellCore(IPlatform* plat, Options opt)
 
 ShellCore::~ShellCore() { shutdown(); }
 
-void ShellCore::shutdown() {
+bool ShellCore::shutdown(int timeoutMs) {
   api_.stopIo();   // the IO worker emits through toPage: it ends before anything it uses
-  if (session_) session_->shutdown();
+  if (session_ && !session_->shutdown(timeoutMs)) return false;   // the worker is inside a call on the host: the host must not be torn down under it
   if (host_) host_->shutdown();
+  return true;
 }
 
 void ShellCore::toPage(const std::string& lines) {
@@ -56,6 +57,8 @@ void ShellCore::onPageMessage(const std::string& m) {
 
 std::string ShellCore::bootstrapScript(const char* js, size_t len) const {
   std::string s(js, len);
+  // S-2: the bridge exists in the main frame of the app's own origin only: not in a frame, not on another origin (document-start scripts run in every frame)
+  s = "if(window.top===window&&location.protocol==='app:'&&location.hostname==='thunder'){\n" + s + "\n}";
   const std::string key = "var INIT = __TPD_INIT__;";   // the one place the placeholder is used
   const size_t p = s.find(key);
   if (p != std::string::npos) s.replace(p, key.size(), "var INIT = " + api_.initJson() + ";");

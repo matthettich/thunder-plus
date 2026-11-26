@@ -37,7 +37,9 @@ class BridgeSession {
   bool post(const std::string& msg);
   // Waits until every message posted so far has been handled (tests, the shell's selftest).
   void drain();
-  void shutdown();   // joins the threads; the host is NOT shut down (the shell owns it)
+  // joins the threads; the host is NOT shut down (the shell owns it). timeoutMs >= 0: wait at most that long for the worker (it may be inside a long song load); false then, and the worker is still running: the caller must
+  // leave the process without destroying this object or the host (L-2). -1: wait for ever.
+  bool shutdown(int timeoutMs = -1);
   bool liveSession() const { return session_.load(); }
 
  private:
@@ -62,8 +64,8 @@ class BridgeSession {
   std::atomic<bool> session_{false}, flag_{false}, lxpActive_{false}, clockFollow_{false};
   std::atomic<int64_t> lastRev_{0};
 
-  std::mutex qm_; std::condition_variable qcv_, idleCv_;
-  std::deque<std::string> q_; size_t qBytes_ = 0; bool busy_ = false, stop_ = false;
+  std::mutex qm_; std::condition_variable qcv_, idleCv_, doneCv_;
+  std::deque<std::string> q_; size_t qBytes_ = 0; bool busy_ = false, stop_ = false, workerDone_ = false, abandoned_ = false;
   std::thread worker_;
   std::mutex pm_; std::condition_variable pcv_; bool pumpRun_ = false, pumpStop_ = false, closing_ = false;
   std::thread pump_;

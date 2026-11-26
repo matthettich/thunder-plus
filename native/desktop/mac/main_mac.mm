@@ -7,6 +7,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <unistd.h>
 #include <memory>
 #include <string>
 
@@ -20,7 +21,8 @@
 #define THUNDER_APP_VERSION "0.0.0"
 #endif
 
-static std::string S(NSString* s) { return s ? std::string([s UTF8String]) : std::string(); }
+// R-2: UTF8String is nil for a string with a lone surrogate: an empty string then, never a crash
+static std::string S(NSString* s) { const char* c = s ? [s UTF8String] : nullptr; return c ? std::string(c) : std::string(); }
 static NSString* N(const std::string& s) { NSString* r = [NSString stringWithUTF8String:s.c_str()]; return r ? r : @""; }
 
 @class TPDApp;
@@ -85,7 +87,7 @@ class MacPlatform : public tpd::IPlatform {
 @implementation TPDApp {
   NSWindow* _win; WKWebView* _web; TPDScheme* _scheme; NSTimer* _timer;
   std::unique_ptr<MacPlatform> _plat; std::unique_ptr<tpd::ShellCore> _core;
-  bool _selftest, _nullAudio, _selfTestStarted; std::string _webDir; std::string _pendingOpen;
+  bool _selftest, _nullAudio, _selfTestStarted, _devtools; std::string _webDir; std::string _pendingOpen;
 }
 - (instancetype)init {
   if ((self = [super init])) {
@@ -93,6 +95,7 @@ class MacPlatform : public tpd::IPlatform {
     for (NSUInteger i = 1; i < args.count; i++) {
       if ([args[i] isEqualToString:@"--selftest"]) _selftest = true;
       else if ([args[i] isEqualToString:@"--null-audio"]) _nullAudio = true;
+      else if ([args[i] isEqualToString:@"--devtools"]) _devtools = true;
       else if ([args[i] isEqualToString:@"--web"] && i + 1 < args.count) _webDir = S(args[++i]);
       else if ([args[i] hasSuffix:@".thunder"]) _pendingOpen = S(args[i]);
     }
@@ -106,14 +109,16 @@ class MacPlatform : public tpd::IPlatform {
   TPDApp* me = self;
   o.requestFlush = [me] { dispatch_async(dispatch_get_main_queue(), ^{ [me flushToPage]; }); };
   o.deliver = [me](const std::string& text) { [me runInPage:"window.__thunderRecv(" + tpd::jsonQuote(text) + ")"]; };
-  o.onSelfTest = [me](bool ok, const std::string& rep) { std::printf("SELFTEST %s\n%s", ok ? "PASS" : "FAIL", rep.c_str()); std::fflush(stdout); exit(ok ? 0 : 1); };
+  o.selfTest = _selftest;   // S-3: the page's "S:" verdict ends the process only under --selftest
+  o.onSelfTest = [me](bool ok, const std::string& rep) { std::printf("SELFTEST %s\n%s", ok ? "PASS" : "FAIL", rep.c_str()); std::fflush(stdout); _exit(ok ? 0 : 1); };   // _exit: the worker and audio threads are not unwound (L-9)
+  { NSArray* sup = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES); if (sup.count) o.dataDir = S([sup[0] stringByAppendingPathComponent:@"Thunder Plus"]); }   // recovery copy, picked-paths list
   _core.reset(new tpd::ShellCore(_plat.get(), o));
 
   WKWebViewConfiguration* cfg = [[WKWebViewConfiguration alloc] init];
   _scheme = [[TPDScheme alloc] init]; _scheme.root = N(_webDir);
   [cfg setURLSchemeHandler:_scheme forURLScheme:@"app"];
   cfg.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;   // audio can start without a click first (as the Electron shell's autoplay switch)
-  [cfg.preferences setValue:@YES forKey:@"developerExtrasEnabled"];
+  if (_devtools) [cfg.preferences setValue:@YES forKey:@"developerExtrasEnabled"];   // (L-3) Web Inspector only on request: --devtools
   const std::string boot = _core->bootstrapScript((const char*)kBootstrapJs, (size_t)kBootstrapJs_len);
   WKUserScript* us = [[WKUserScript alloc] initWithSource:N(boot) injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
   [cfg.userContentController addUserScript:us];
@@ -124,7 +129,7 @@ class MacPlatform : public tpd::IPlatform {
   _win.title = @"Thunder Plus"; _win.minSize = NSMakeSize(380, 500); _win.delegate = self; _win.releasedWhenClosed = NO; [_win center];
   _web = [[WKWebView alloc] initWithFrame:frame configuration:cfg];
   _web.navigationDelegate = self; _web.UIDelegate = self; _web.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-  if (@available(macOS 13.3, *)) _web.inspectable = YES;
+  if (@available(macOS 13.3, *)) _web.inspectable = _devtools ? YES : NO;
   _win.contentView = _web;
   _plat->window = _win; _plat->web = _web;
   [self buildMenu];
@@ -134,7 +139,7 @@ class MacPlatform : public tpd::IPlatform {
   // DEVICE RECOVERY (Electron's powerMonitor 'resume'): the computer woke, the page checks its audio output again
   [[[NSWorkspace sharedWorkspace] notificationCenter] addObserverForName:NSWorkspaceDidWakeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification*) { self->_core->api().push("thunder:power", "\"resume\""); }];
   _timer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer*) { self->_core->tick(); }];
-  if (_selftest) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ std::printf("SELFTEST FAIL\nno result in 120 s\n"); std::fflush(stdout); exit(2); });
+  if (_selftest) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ std::printf("SELFTEST FAIL\nno result in 120 s\n"); std::fflush(stdout); _exit(2); });
 }
 - (void)buildMenu {
   NSMenu* bar = [[NSMenu alloc] init];
@@ -166,6 +171,9 @@ class MacPlatform : public tpd::IPlatform {
 - (void)runInPage:(const std::string&)js { if (_web) [_web evaluateJavaScript:N(js) completionHandler:nil]; }
 // ---- page -> shell
 - (void)userContentController:(WKUserContentController*)c didReceiveScriptMessage:(WKScriptMessage*)m {
+  // S-2: only the main frame of the app's own origin talks to the shell (the handler is registered for every frame)
+  WKSecurityOrigin* so = m.frameInfo.securityOrigin;
+  if (!m.frameInfo.isMainFrame || !so || ![so.protocol isEqualToString:@"app"] || ![so.host isEqualToString:@"thunder"]) return;
   if ([m.body isKindOfClass:[NSString class]]) _core->onPageMessage(S((NSString*)m.body));
 }
 - (void)webView:(WKWebView*)w didStartProvisionalNavigation:(WKNavigation*)nav { _core->api().onLoadStart(); }
@@ -178,8 +186,8 @@ class MacPlatform : public tpd::IPlatform {
 }
 - (void)webViewWebContentProcessDidTerminate:(WKWebView*)w { _core->api().onLoadStart(); [w reload]; }
 - (void)webView:(WKWebView*)w decidePolicyForNavigationAction:(WKNavigationAction*)a decisionHandler:(void (^)(WKNavigationActionPolicy))h {
-  NSString* s = a.request.URL.scheme;   // the window only ever shows the app; https links go to the browser
-  if ([s isEqualToString:@"app"] || [s isEqualToString:@"about"] || [s isEqualToString:@"blob"] || [s isEqualToString:@"data"]) { h(WKNavigationActionPolicyAllow); return; }
+  NSString* s = a.request.URL.scheme;   // S-4: the window only ever shows app://thunder (a data: or blob: page would still get the bridge); https links go to the browser
+  if (tpd::isAppOrigin(S(a.request.URL.absoluteString)) || [s isEqualToString:@"about"]) { h(WKNavigationActionPolicyAllow); return; }
   if ([s isEqualToString:@"http"] || [s isEqualToString:@"https"]) [[NSWorkspace sharedWorkspace] openURL:a.request.URL];
   h(WKNavigationActionPolicyCancel);
 }
@@ -209,7 +217,7 @@ class MacPlatform : public tpd::IPlatform {
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)a { return _core->api().requestClose(true) ? NSTerminateNow : NSTerminateCancel; }
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)a { return YES; }
 - (BOOL)application:(NSApplication*)a openFile:(NSString*)f { if (_core) _core->api().openPath(S(f)); else _pendingOpen = S(f); return YES; }
-- (void)applicationWillTerminate:(NSNotification*)n { if (_core) _core->shutdown(); }
+- (void)applicationWillTerminate:(NSNotification*)n { if (_core && !_core->shutdown(3000)) _exit(0); }   // L-2: a worker inside a long load is waited for 3 s at most
 @end
 
 int main(int argc, const char* argv[]) {

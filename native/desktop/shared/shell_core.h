@@ -40,7 +40,8 @@ class ShellCore {
   // The injected script: the embedded bootstrap with the constants of DesktopApi::initJson() in place of __TPD_INIT__.
   std::string bootstrapScript(const char* js, size_t len) const;
   static const char* selfTestCall();                          // the script that runs the page's selftest and posts "S:<json>" back through `post`
-  void shutdown();                                            // join the threads, stop the engine (idempotent)
+  // join the threads, stop the engine (idempotent). timeoutMs >= 0: wait at most that long for the bridge worker; false = it is still running (a long load): then NOTHING is destroyed or stopped and the caller must leave the process.
+  bool shutdown(int timeoutMs = -1);
 
  private:
   void toPage(const std::string& lines);

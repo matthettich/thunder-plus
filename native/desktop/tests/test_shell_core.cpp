@@ -23,6 +23,7 @@ int main() {
   auto has = [&](const char* s) { std::lock_guard<std::mutex> g(m); return got.find(s) != std::string::npos; };
   // the bootstrap constants
   { const char js[] = "// the __TPD_INIT__ word in a comment stays\nvar INIT = __TPD_INIT__;"; const std::string s = core.bootstrapScript(js, sizeof js - 1); CHECK(s.find("var INIT = {") != std::string::npos && s.find("var INIT = __TPD_INIT__") == std::string::npos && s.find("\"version\":\"1.2.3\"") != std::string::npos, "bootstrap: constants in place: %s", s.c_str()); }
+  { const char js[] = "var INIT = __TPD_INIT__;"; const std::string s = core.bootstrapScript(js, sizeof js - 1); CHECK(s.find("window.top===window") != std::string::npos && s.find("location.protocol==='app:'") != std::string::npos && s.find("var INIT = {") != std::string::npos, "S-2: the bootstrap runs in the main frame of app://thunder only"); }
   // D: reaches the API; its reply is batched until flush()
   core.onPageMessage("D:{\"ch\":\"thunder:upd-state\",\"id\":5,\"a\":[]}");
   CHECK(flushes == 1 && delivers == 0, "a reply asks for one flush and is not delivered until flush()");
@@ -47,6 +48,6 @@ int main() {
     ShellCore::Options o2 = o; o2.selfTest = true; ShellCore c2(&plat, o2); c2.onPageMessage("S:" + good); CHECK(verdict && verdictOk, "with --selftest an S: message reaches onSelfTest");
     // R-1: a message over the page limit is refused, not queued
     std::string big(ShellCore::kMaxPageMessage + 1, 'x'); core.onPageMessage(big); core.flush(); CHECK(has("refused: a message over"), "a message over the limit is refused"); }
-  core.shutdown();
+  CHECK(core.shutdown(1000), "shutdown with a timeout returns true when the worker is idle");
   DONE("test_desktop_shell_core");
 }
