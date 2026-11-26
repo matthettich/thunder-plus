@@ -102,7 +102,7 @@ test('(b) __thunderClient appears only inside the loader block; thunder-core-cli
   assert.ok(start > 0 && endIdx > start);
   lines.forEach((l, i) => {
     if (l.includes('__thunderClient')) assert.ok(i >= start && i <= endIdx, 'line ' + (i + 1) + ' mentions __thunderClient outside the loader: ' + l.slice(0, 80));
-    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=4';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
+    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=5';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
   });
   assert.equal(lines.filter(l => /^\s*s\.src = /.test(l) && l.includes('thunder-core-client.js')).length, 1);
 });
@@ -127,7 +127,7 @@ test('(c) switch off, no thunderCore: the call site does not call loadClient; no
 test('(c) with the shell or the native pick the loader makes one script for the client file, and not a second time', () => {
   for (const o of [{ thunderCore: {} }, { core: 'native' }]) {
     const sb = rig(o); run(sb, LOADER + CALL + ';'); assert.equal(sb.__log.creates.join(), 'script');
-    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=4'); assert.equal(sb.__log.appended.length, 1);
+    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=5'); assert.equal(sb.__log.appended.length, 1);
     sb.__thunderClient = {}; run(sb, 'loadClient()'); assert.equal(sb.__log.creates.length, 1, 'already loaded: nothing more');
   }
 });
@@ -162,8 +162,8 @@ test('client: defines only window.__thunderClient, and loading it twice keeps th
 test('sw.js: the client is an OPTIONAL entry (a missing file cannot fail the install), the file exists, and BUILD matches the cache', () => {
   const fs = require('fs'), path = require('path');
   const opt = (sw.match(/const OPTIONAL = \[([^\]]*)\]/) || [])[1] || '', files = (sw.match(/const FILES = \[[\s\S]*?\];/) || [])[0] || '';
-  assert.ok(opt.includes("'./thunder-core-client.js?v=4'")); assert.ok(!files.includes('thunder-core-client.js'));
+  assert.ok(opt.includes("'./thunder-core-client.js?v=5'")); assert.ok(!files.includes('thunder-core-client.js'));
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'thunder-core-client.js')));
-  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=4'"), 'the page and the service worker name the same URL');
+  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=5'"), 'the page and the service worker name the same URL');
   const b = src.match(/const BUILD = (\d+);/)[1]; assert.ok(sw.includes("'thunderplus-v" + b + "'"));
 });
