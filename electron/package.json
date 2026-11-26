@@ -27,6 +27,7 @@
       "main.js",
       "updater.js",
       "preload.js",
+      "path-allow.js",
       "link-session.js",
       "io-helper.js",
       "link/**/*",

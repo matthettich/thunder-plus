@@ -27,7 +27,7 @@ test('on Arrange itself nothing changed: the selection arms and plays', () => {
   const c = rig({ tv: 'song', sel: { v: 'song', r: { y0: 2, y1: 5 } } }); c.go(); assert.deepEqual(c.log, ['song:2-5']);
 });
 test('leaving a screen keeps the selection as the armed loop', () => {
-  assert.match(src, /if \(loopSel && !tp\.on\) loopFor\(tv\);[^\n]*\n  tv = v; if \(MID\.includes\(v\)\) midV = v; selA = null;/);
+  assert.match(src, /if \(loopSel && !tp\.on && !\(tv !== 'song' && loopArm && loopArm\.v === 'song'\)\) loopFor\(tv\);[^\n]*\n  tv = v; if \(MID\.includes\(v\)\) midV = v; selA = null;/);
 });
 test('dropped pad renders are started again: after the track counts change, and when PLAY is pressed', () => {
   assert.match(src, /if \(vtrk\) growKit\(\);\n[\s\S]{0,500}if \(vtrk && \(n1 !== n0 \|\| m1 !== m0\)\) try \{ prerender\(\); \} catch\(e\)\{\}/);

@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('thunderDesktop', {
   // FILE SAFETY (21 Oct): project files by path (open, read a recent one, save, save as), and the window's close / a
-  // .thunder file opened from the desktop. Only .thunder and .json files can be read or written.
+  // .thunder file opened from the desktop. Only .thunder and .json files can be read or written, and only the ones the person chose in a dialog or opened / dropped (electron/path-allow.js).
   files: {
     open: () => ipcRenderer.invoke('thunder:file-open'),                          // the Open dialog → {path, name, text} | null
     read: p => ipcRenderer.invoke('thunder:file-read', p),                         // {path, name, text} | {error}
@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
     outPick: (name, near) => ipcRenderer.invoke('thunder:out-pick', name, near),   // RENDER TO: the Save dialog for a render → path | null
     outWrite: (p, data) => ipcRenderer.invoke('thunder:out-write', p, data),      // write it (bytes) → {ok, path} | {error}
     outShow: p => ipcRenderer.invoke('thunder:out-show', p),                       // show it in its folder
-    pathOf: f => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (e) { return ''; } }   // a dropped file's path, so Save goes back to it
+    pathOf: f => { try { const p = (webUtils && webUtils.getPathForFile(f)) || ''; if (p) ipcRenderer.send('thunder:path-drop', p); return p; } catch (e) { return ''; } }   // a dropped file's path, so Save goes back to it (the shell is told, and only then lets file-read / file-save touch it)
   },
   app: {
     ready: () => ipcRenderer.send('thunder:page-ready'),                          // the page can take close-asks and opened files

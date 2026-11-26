@@ -2260,6 +2260,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
    Two dancing dogs (outline cartoons of the pittie-dachshund and the husky) that hop on every beat while the song
    plays and breathe slowly when it stops, or a preview of the phrase under the cursor. Settings → STAGE. */
 .tstage{position:absolute; z-index:2; pointer-events:none; display:flex; flex-direction:column}
+body.rszing .tstage{visibility:hidden}   /* while the window is being resized (build 676): it sits in pixels beside the grid's text and would be over it until the refit */
 .tstage[hidden]{display:none}
 .stgx{position:absolute; top:0; right:0; pointer-events:auto; min-height:0; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--muted); opacity:0; transition:opacity .15s; font-size:var(--fs-3)}
 .tstage:hover .stgx, .stgx:focus-visible{opacity:1}
@@ -8757,10 +8758,18 @@ let ctx = null, master = null;
    rate it will use (a context made and closed straight away makes no sound). Before this, pads rendered at
    start-up at a guessed 48 kHz were all rendered again at the first sound, on the UI thread, which froze the
    first PLAY for about 2 s on a computer and several seconds on a phone. */
+/* NATIVE CORE CLIENT (PC1, docs/port/N2-PAGE-CLIENT.md): thunder-core-client.js is fetched only when the shell gives the page window.thunderCore or the owner picked
+   Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
+const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
+const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
+  s.src = 'thunder-core-client.js?v=7';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}, ncSongHost())); } catch(e){ tpLog('native core client: attach failed', e); } };
+  s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
+  document.head.appendChild(s); };
 let srGuess = 48000;
 try {
   if (aset.rate) srGuess = aset.rate;
-  else { const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:latOf()}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
+  else if (!(window.thunderCore || aset.core === 'native')){ const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:latOf()}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
 } catch(e){}
 const cpu = {cap:null, t:0, probe:null, on:false};
 /* CPU probe (18 Oct). Chrome (desktop and the Fold) doesn't offer renderCapacity, so the meter only timed the app's own
@@ -8897,7 +8906,7 @@ function renderAsync(v, sr, hold, stages){
     catch(e){ PW.jobs.delete(id); no(e); }   // a voice the Worker can't be sent: render here
   });
 }
-const padSR = () => ctx ? ctx.sampleRate : srGuess;
+const padSR = () => NCON() ? NC().sr : ctx ? ctx.sampleRate : srGuess;
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
 /* LN TEMPO START */
 /* TEMPO AND LINES (build 658): a pad with a lines-mode envelope follows the song's tempo, but not at once. While BPM or LPB keep changing
@@ -15246,7 +15255,7 @@ function setKit(k, noUndo){
   setTimeout(kitUndoBase, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0;
   if (kit.voices.length < nslots()) growKit();
   try { instFit(); } catch(e){}
-  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } buildPads(); refreshAll(); save(); try { slotsUI(); } catch(e){} }
+  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } if (NCON()) NC().newKit(ncPadApi()); buildPads(); refreshAll(); save(); try { slotsUI(); } catch(e){} }
 // Before replacing the kit: when the current one has samples (recorded or imported) the new one doesn't, say so.
 async function kitReplaceOk(next, what){
   const keep = new Set(); for (const v of (next && next.voices) || []) for (const L of v.layers || []) if (L.sample && L.sample.id) keep.add(L.sample.id);
@@ -15928,7 +15937,7 @@ const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Ba
 /* (14 Nov, build 615) three values: aset.pdcMode 'auto' (the default) | 'on' | 'off'; pdc (the old boolean) is still written, as pdcMode === 'on', for an older build. */
 const PDC_HELP = {auto:'AUTO: lines every track up when an effect with look-ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…) sits on a track or bus: the others wait for it while the song plays. Does nothing otherwise. Stopped, pads answer at once.',
   on:'ON: the same, also while stopped (pads feel later whenever such an effect is loaded).', off:'OFF: never: a track or bus with such an effect plays late.'};
-function pdcSet(v){ aset.pdcMode = v === 'on' || v === 'off' ? v : 'auto'; aset.pdc = aset.pdcMode === 'on'; asetSave(); moFxAt = -1e9;
+function pdcSet(v){ aset.pdcMode = v === 'on' || v === 'off' ? v : 'auto'; aset.pdc = aset.pdcMode === 'on'; asetSave(); moFxAt = -1e9; try { if (NCON()) NC().edit(); } catch(e){}
   try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
   let T = 0; try { T = pdcPlan(ctx ? ctx.sampleRate : 48000).T; } catch(e){}
   const ms = Math.round(T * 1000), m = aset.pdcMode;
@@ -15957,9 +15966,9 @@ const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendere
   aset.psLive = v; asetSave(); psLive.off = false; psLive.strikes = 0;
   if (v === 'render'){ try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){} }
   psLiveNote(); });
-const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']], () => coreWanted() ? 'core' : 'page', v => {
+const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']].concat(window.thunderCore ? [['native', 'Native core (test)']] : []), () => window.thunderCore && aset.core === 'native' ? 'native' : coreWanted() ? 'core' : 'page', v => {   // 'native' is listed only where the shell gave the page window.thunderCore (hidden on the web copy until core.wasm exists)
   aset.core = v; aset.corePick = true; asetSave();
-  if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
+  if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast(v === 'native' ? 'Sequencer: native core (test), from the next start.' : 'Sequencer: page, from the next PLAY.', 2500); });
 const updNoWk = makeSeg($('segNoWk'), [[0, 'On'], [1, 'Off (test)']], () => aset.noWk ? 1 : 0, v => { aset.noWk = !!v; asetSave(); audRestartRow(); });   // WORKLETS OFF (test)
 var rkOn = (() => { try { return localStorage.getItem('thunderplus-runkick-v1') !== '0'; } catch(e){ return true; } })();   // RUNAWAY KICK (TEST): per device, at once
 const updRk = makeSeg($('segRk'), [[1, 'On'], [0, 'Off']], () => rkOn ? 1 : 0, v => { rkOn = !!v; try { localStorage.setItem('thunderplus-runkick-v1', v ? '1' : '0'); } catch(e){} });
@@ -19007,6 +19016,7 @@ window.thunderChains = {
     const before = name === 'track' ? chainsAutoTracks() : null;
     const m = d.modules.find(x => x.id === id); if (m) (m.params = m.params || {})[name] = value;
     if (before){ chainsAutoOn(before); chainsPush(); }   // a Track In / Chain Out moved: re-route the tracks either way
+    if (NCON()) NC().chainParam(id, name, value);   // NATIVE CORE (PC4): one chain.edit while the native engine plays; the song carries the value too. NO return: a song that fell back plays on the page's own graph, which the lines below feed (lead's read, 25 Nov)
     if (!rt || !rt.pl) return;
     if (name === 'src' && rt.pl.tapsSync) rt.pl.tapsSync();   // a Sidechain In switched between the bus and a track
     if (name === 'pre' && rt.pl.busSync){ rt.pl.busSync(); if (view === 'tracker') draw(); }   // PRE SENDS: a Track In's Bus send before / after its fader
@@ -22286,7 +22296,7 @@ function placePending(){
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song uses ${NI} instruments. INS above 0F plays its own instrument.`, 5000); } catch(e){} } }
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
-function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){}   // FILE SAFETY: unsaved changes
+function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){} try { if (NCON()) NC().edit(); } catch(e){}   // FILE SAFETY: unsaved changes   // NATIVE CORE: the whole song goes 250 ms after the last edit
   if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; songStore(); }, 600);
   try { songVer++; songBeatsSoon(); } catch(e){} try { liveWarmSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
@@ -22623,7 +22633,7 @@ function tgtEvs(id, v, at, pno){
   return [];
 }
 // Live: send what the performance asks for now, only what changed since the last send (sent).
-function perfPush(){ try { if (tp.core) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill}); } catch(e){}
+function perfPush(){ try { if (tp.core || tp.nc) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill}); } catch(e){}
   if (!perfLive.init) perfLiveInit();
   const want = perfResolve(perfLive), at = ctx ? ctx.currentTime : 0, evs = [];
   for (const [id, v] of want) if (perfLive.sent.get(id) !== v){ evs.push(...tgtEvs(id, v, at, perfLive.pno)); perfLive.sent.set(id, v); }
@@ -24261,6 +24271,7 @@ function safeLim(ac, dest){
 // or a frozen worklet without reloading the page; the song, kit and settings are untouched.
 function resetAudio(quiet){
   try { tStop(true); } catch(e){}
+  if (NCON()){ try { NC().reset(); } catch(e){ tpLog('native engine reset', e); } if (!ctx){ if (!quiet) toast('Native engine reset: the song is sent to it again.'); return; } }   // NATIVE CORE: the shell rebuilds its engine; the page's own graph (hand-played sound) is reset below if it exists
   if (!ctx){ toast('Audio hasn’t started yet: nothing to reset.'); return; }
   const now = ctx.currentTime;
   if (rt){
@@ -24784,7 +24795,18 @@ function mstDrop(m){
   try { m.output.disconnect(); } catch(e){}
 }
 // Live: rebuilt when the EQ's shape or the worklet's presence changes; otherwise values glide into place.
-let mstMeter = null;
+let mstMeter = null, mstMeterT = 0;
+/* NATIVE CORE (M5, master meters): while the shell's engine plays, mstMeter comes from its master.lvl (the client calls mstNativeIn) instead of the master worklet, and only while the master panel is open (mstNativeWant);
+   mstM() is what the panel and the CPU panel read: a record older than 600 ms is silent. With the native switch off it is mstMeter itself. */
+const MST_SILENT = {inPk:0, outPk:0, tp:0, inLu:-180, outLu:-180, comp:0, compIn:-200, lim:0, load:0, sup:null};
+function mstNativeWant(){
+  return NCON() && tp.nc && mwOpenNow && !document.hidden;
+}
+function mstNativeIn(o){ if (o && typeof o === 'object'){ mstMeter = o; mstMeterT = performance.now(); } }
+function mstM(){
+  if (!(NCON() && tp.nc)) return mstMeter;
+  return mstMeter && performance.now() - mstMeterT <= 600 ? mstMeter : MST_SILENT;
+}
 async function mstSync(){
   if (!rt || !ctx) return;
   const M = S.mst; let ok = true;
@@ -24931,7 +24953,7 @@ function chainsTempo(){
   for (const b of rt.pl.buses) if (b && b.chn && b.chn._send) b.chn._send(m);
 }
 function mixChanged(){ if (rt) rt.pl.applyMix(); saveS(); try { clearTimeout(mixChanged.T); mixChanged.T = setTimeout(() => pbTracks('after a mix change'), 1000); } catch(e){} }
-const tp = {on:false, mode:'', seq:null, timer:0, q:[], pos:null, bpm:120, tks:TICKS, line:0.125, st:0};
+const tp = {on:false, mode:'', seq:null, timer:0, q:[], pos:null, bpm:120, tks:TICKS, line:0.125, st:0, nc:false};   // nc: the engine in the shell has the song (NATIVE CORE, PC3)
 // Trance gates on track FX restart their pattern with the song: tStart bumps this and resends the effect
 // lists; the gate waits the 80 ms the sequencer starts ahead by, so step 1 lands on the first row.
 let fxRestartN = 0;
@@ -24942,6 +24964,52 @@ let fxRestartN = 0;
 // filled row started from the top), else the next row down that has something, else the top.
 const songRow = () => { const y0 = cs.song.y; for (let y = y0; y < 256; y++){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; } return 0; };
 let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP clears it, so a STOP inside the window is not followed by the song
+/* NATIVE CORE, PC3 (docs/port/N2-PAGE-CLIENT.md 4.3 rows 4-6, 15-17): the page's side of a PLAY that the engine in the shell plays. tp.nc is true from that PLAY to its STOP; the page's own sequencer,
+   AudioContext and the JS core are not used then. The client file is handed these through attach(); nothing here runs unless tStart let the native engine in. */
+const ncSongHost = () => ({
+  padApi:() => typeof ncPadApi === 'function' ? ncPadApi() : undefined,   // (PC2's pad side reads the page through this)
+  songVer:() => songVer, vars:() => coreVars(), title:() => msTitle(), lxp:() => lxp.st | 0, pbLog:s => pbLog(s),
+  perf:() => perfLive.init ? {xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill} : null,
+  // What only the page knows and the shell's verdict cannot (4.6, last row); '' = none. (Live transpose and MIDI-clock follow are in the shell's verdict too.)
+  blocked:() => RCD.sync || RCD.starting ? 'a pattern recording take needs the old engine' : rec.on && recS.cnt > 0 && !tp.on && !mx.slave ? 'the REC count-in needs the old engine' : lk && lk.on ? 'Ableton Link needs the old engine' : midi.clkIn ? 'MIDI clock follow needs the old engine' : '',
+  // As PLAY does for the old engine: pads without a render start rendering, MUT / GEN variations are asked for (their results reach the shell through the pad hooks of PC2)
+  prep:() => { try { varPrefetch(); } catch(e){} for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (!slotAt(cache, i) && v && PW.ready && rwCan(v)) bgRender(i); else ensureLive(i); } },
+  // The page's own PLAY work for a native run: the run before ends, RESUME restarts the row (owner, 25 Nov), tp says playing with the stand-in sequencer; returns the options to play.
+  begin:(mode, o, seq) => {
+    const wasOn = tp.on; o = o || {};
+    if (mode === 'song' && loopPat && !o.loop){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
+    try { tStop(true); } catch(e){ tpLog('native PLAY: stop', e); }
+    const pz = tp.paused; tp.paused = null;
+    if (mode === 'song' && pz && S.song[pz.row] && S.song[pz.row][pz.ref] >= 0 && resumeOn && !wasOn && !o.loop && pz.key === curKey()) o = Object.assign({}, o, {row:pz.row, _resumed:pz.step > 0});
+    seq._bpm = S.bpm || 120; seq.tks = S.ticks || TICKS;
+    Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq._bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:0, lenTot:null, lenPre:0, hiRow:null, core:false, nc:true, timer:0});
+    try { pbStopCancel(); pbLog('PLAY ' + mode + ' · native · ' + pbState()); } catch(e){}
+    songBtn(); draw(); if (typeof frameWake === 'function') frameWake(); wakeLock(true);   // (no bgPlay: the shell holds the media session and the process)
+    return o;
+  },
+  // PC4 (live edits): what the client needs to tell what changed. fxSlot: the page's own mapping of one effect slot (tfxChain's, without pumpSync's side effect); chainMods: id -> type of the chains patch's modules; pdc: the latency mode as the core's number.
+  fxSlot:(f, sr, bpm) => { const T = f && TFX[f.type]; if (!T) return null;
+    // PC6 (fx.values): a pump / modular slot's whole value list as the plan makes it. A pump slot's on a copy (pumpSync writes f.pump from the boxes, as tfxChain does, without touching the song's slot); a modular one is `mp`.
+    if (T.pump){ let v = null; try { const g = Object.assign({}, f, {pump:Object.assign({}, f.pump)}); pumpSync(g); v = pumpPv(T, g); } catch(e){} return {kind:'pump', v}; }
+    if (T.mod){ let v = null; try { v = Array.from(T.map(f, sr, bpm)); } catch(e){} return {kind:'mod', v}; }
+    const p = new Array(12).fill(0); T.map(f, sr, bpm).forEach((v, i) => p[i] = v); return {kind:'fx', p}; },
+  chainMods:() => { const o = {}; if (S.chainPatch && Array.isArray(S.chainPatch.modules)) for (const m of S.chainPatch.modules) if (m && m.id != null) o[m.id] = m.type; return o; },
+  pdc:() => ({off:0, auto:1, on:2})[pdcModeOf()],
+  // PC6 (the shell's recovery copy): dirty / projText feed recovery.put; askRestore is the "Restore unsaved changes?" question (0 Restore, 1 Discard, -1 closed); restore keeps a backup of what is open, then loads the project text as a restored backup is.
+  dirty:() => projDirty, projText:() => projText(),
+  askRestore:(title, when) => askPick({title:'Restore unsaved changes?', body:'The app was closed with unsaved changes to \u201c' + title + '\u201d' + (when ? ' (' + when + ')' : '') + '. Restore them? Discard throws them away.'}, ['Restore', 'Discard']),
+  restore:async (text, name) => { try { await backupNow(true); } catch(e){} return await loadProjText(text, name, {dirty:true}); },
+  // M5 (effect meters): the page's METERS rule, and the page's own fxDynIn for the shell's fx.dyn reports
+  meterHold:() => meterHold(), fxDynIn:(n, list) => fxDynIn(n, list),
+  // M5 (chains meters): the tracks the visible chains screen shows (Track In / Chain Out modules' tracks), and the shell's ch.lvl peaks for the screen's meters
+  chWant:() => chNativeWant(), chLvlIn:(t, i, o) => chNativeIn(t, i, o),
+  // M5 (master meters): the master panel is open (asks for master.lvl), and the shell's master.lvl record
+  mstWant:() => mstNativeWant(), mstIn:o => mstNativeIn(o),
+  // The shell's engine cannot play this PLAY: the old engine does, from the top of tStart (o._nf keeps the native engine from being asked again)
+  fallback:(mode, o) => { try { tStop(true); } catch(e){} tStart(mode, Object.assign({}, o, {_nf:true})); },
+  // The shell stopped (a song's end, a fatal error, headphones pulled): the transport shows stopped
+  stopped:() => { try { if (tp.on) tStop(); } catch(e){ tpLog('native STOP', e); } }
+});
 function tStart(mode, o){
   // SAVE BEFORE PLAY (12 Nov, owner: new song, notes typed into a new pattern, PLAY hung and afterwards the notes were gone): the autosave runs 600 ms
   // after the last change, and the first PLAY can stall the page for a second or two (the audio engine starting); if the page is killed or reloaded
@@ -24950,6 +25018,7 @@ function tStart(mode, o){
   /* PADS WITHOUT A RENDER (15 Nov): a pad that is stale when PLAY is pressed starts rendering now, not at its first note (ensurePlay
      leaves a note silent while its pad renders). Only with the render Worker up: without it prerender would render on this thread. */
   if (!tp.on && !(o && o._warm) && PW.ready) try { prerender(); } catch(e){}
+  if (NCON() && NC().can(mode, o)){ NC().start(mode, o); return; }   // NATIVE CORE (PC3): the engine in the shell plays the song; false: the code below, as without it
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
   // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
@@ -25381,15 +25450,16 @@ function coreMixOff(){ const M = core.mix; if (!M) return; core.mix = null;
 // Reset audio engine: this core goes (it played into the old graph) and a fresh one loads
 function coreDrop(){ coreMixOff(); const n = core.node; if (n){ try { n.port.postMessage({op:'die'}); n.port.onmessage = null; n.disconnect(); } catch(e){} }
   Object.assign(core, {node:null, ready:false, loading:null, mir:null, wired:null, v:0, vsent:null, sfSent:null}); core.sent.clear(); }
-const corePost = (m, tr) => { try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
+const corePost = (m, tr) => { if (tp.nc) return NC().legacy(m); try { core.node.port.postMessage(m, tr || []); } catch(e){ tpLog('core post', e); } };
 function coreKit(){ const kv = coreKitV(); core.kitSig = JSON.stringify(kv);
+  if (NCON()) return NC().kit(ncPadApi());   // native core: kit.load, then the pads (the line above only worked out kv)
   corePost({op:'kit', kv}); for (let i = 0; i < kv.length; i++) if (kv[i] && kv[i].sf || (core.sfSent && core.sfSent.has(i))) coreSf(i); }
 /* KIT WHILE PLAYING (owner, 7 Nov: "changing a synth engine on the synth screen during playback would hold the old sound until
    the song was stopped and restarted"). The core learns each pad's kind (live engine or rendered, which live node, held or
    one-shot, choke, release) from 'kit', which only went at PLAY; a new render reached it (coreBuf) but a pad that changed
    kind kept playing the old way. While the core plays, the page looks at most 5 times a second whether that list changed
    and sends it again (coreKitCheck, from the rows it gets). */
-function coreKitCheck(){ const now = performance.now(); if (now - (core.kitT || 0) < 200) return; core.kitT = now;
+function coreKitCheck(){ if (NCON()) return NC().kitCheck(ncPadApi()); const now = performance.now(); if (now - (core.kitT || 0) < 200) return; core.kitT = now;
   try { if (JSON.stringify(coreKitV()) !== core.kitSig) coreKit(); } catch(e){ tpLog('core kit', e); } }
 function coreKitV(){ const kv = [];
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; let live = false; try { live = isLivePad(i); } catch(e){}
@@ -25415,12 +25485,14 @@ function coreSf(i){ if (!core.ready) return; const v = kit.voices[i], M = core.s
     const a = SF.smp.get(font.id + ':' + k), d = a.d.slice(); smp[k] = {d, sr:a.sr, ls:a.ls, le:a.le}; tr.push(d.buffer); }
   corePost({op:'sf', pad:i, data:{P:PP, font:{samples}, pr:{zones:pr.zones}, smp}}, tr); }
 // MUT / GEN: a variation for the core (by instrument, variation and pad: the core can't work out the page's varKey), once
-function coreVar(ev, rec){ if (!core.ready || !rec || !rec.data || ev.ii == null || ev.pad == null) return;
+function coreVar(ev, rec){ if (NCON()) return NC().variation(ev, rec); if (!core.ready || !rec || !rec.data || ev.ii == null || ev.pad == null) return;
   const k = ev.ii + ':' + ev.vk + ':' + ev.pad, V = core.vsent || (core.vsent = new Map()); if (V.get(k) === rec.data) return; V.set(k, rec.data);
   const d = rec.data.slice(); corePost({op:'vbuf', k, pad:ev.pad, data:d, sr:rec.sr}, [d.buffer]); }
 // A pad's render, when the core doesn't have this one yet (a copy: the page keeps playing it too)
-function coreBuf(i){ if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); coreVarGone(i); corePost({op:'buf', pad:i, data:null}); } return; }
+function coreBuf(i){ if (NCON()) return NC().pad(i, ncPadApi()); if (!core.ready) return; const c = slotAt(cache, i); if (!c || !c.data){ if (core.sent.has(i)){ core.sent.delete(i); coreVarGone(i); corePost({op:'buf', pad:i, data:null}); } return; }
   if (core.sent.get(i) === c.data) return; core.sent.set(i, c.data); coreVarGone(i); const d = c.data.slice(), d2 = c.data2 ? c.data2.slice() : null; corePost({op:'buf', pad:i, data:d, data2:d2, sr:c.sr}, d2 ? [d.buffer, d2.buffer] : [d.buffer]); }
+/* NATIVE CORE (PC2): what the client's pad code reads from the page, handed over per call so the loader's attach() list stays as PC1 made it. */
+const ncPadApi = () => ({cache:i => slotAt(cache, i), nslots:() => nslots(), kitV:() => coreKitV(), kitJSON:() => kitToJSON(true), insts:() => S.insts, loopSecs, slicePoints, toast});
 /* SONG SYNC (owner, Fold, 2 Nov: stutters on STOP, on Shift-navigating, on the screen going off and on, and a late note
    preview). Posting the whole song after every save made the audio thread unpack hundreds of KB in its own time: a glitch
    each time. Now only what changed goes: top-level fields whole, and the big lists (phrases, chains, song rows,
@@ -25747,6 +25819,7 @@ function tStop(quiet){
   tp.timer = 0; tp.on = false; try { if (rt && rt.pl) rt.pl.pdcSync(); moFxAt = -1e9; } catch(e){}   /* LATENCY COMP AUTO: stopped, pads answer at once again */
   if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
+  if (tp.nc){ tp.nc = false; G('native engine', () => NC().stop()); }   // NATIVE CORE (PC3): the sound part of STOP; the rest of tStop runs as it does (rt is null: its graph calls are already guarded)
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
   if (rt && !handing) G('stop voices', () => rt.pl.stopAll(ctx.currentTime));
@@ -26002,11 +26075,12 @@ let msTitleNow = null;
 function msTitle(){ let f = ''; try { f = (typeof projTitle === 'function' ? projTitle() : typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
 function msIcon(p, sizes){ let u = p; try { u = new URL(p, location.href).href; } catch(e){} return {src:u, sizes, type:'image/png'}; }
 function msMeta(force){
-  const ms = navigator.mediaSession; if (!ms || !bgOn || (!force && !tp.on)) return;
+  const ms = navigator.mediaSession; if (!ms || !bgOn || (!force && !tp.on) || tp.nc) return;   // (tp.nc: the shell has the one media notification while the native engine plays)
   const t = msTitle(); if (!force && t === msTitleNow) return; msTitleNow = t;
   try { ms.metadata = new MediaMetadata({title:t, artist:'Thunder Plus', artwork:[msIcon('icons/plus-icon-192.png?v=3', '192x192'), msIcon('icons/plus-icon-512.png?v=3', '512x512')]}); if (!force) msLog('title now "' + t + '"'); } catch(e){}
 }
 function bgPlay(on){
+  if (on && tp.nc) return;   // NATIVE CORE: the shell's own media session; no hidden <audio> loop for nothing
   const ms = navigator.mediaSession;
   if (on && !bgOn) on = false;
   if (ms) try {
@@ -26822,6 +26896,8 @@ async function openRecent(){
   if (k < 0) return; const e = recentL[k];
   if (!await okToLeave('opening ' + e.name)) return;
   if (e.path && DESK){ const r = await DESK.read(e.path); if (r && r.text != null) return loadProjText(r.text, r.name, {path:r.path, file:true});
+    /* the desktop shell only opens paths you chose or opened with it (build 684): a file from before that was kept stays on the list, and Open picks it again */
+    if (r && r.error && /^not allowed/.test(r.error)) return toastErr('Couldn’t open ' + e.name + ' from the list this time. Use Open to pick it once; after that it opens from here.', 6000);
     recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + (r && r.error ? ': ' + r.error : '') + '. It was taken off the list.', 5000); }
   if (e.h){ if (!await fsPerm(e.h, false)) return toastErr('The browser didn’t allow opening ' + e.name + '.');
     try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
@@ -27173,7 +27249,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ songRelease('a song was opened'); tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ songRelease('a song was opened'); tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; if (NCON()) NC().newSong(ncPadApi()); setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -27231,7 +27307,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 674;
+const BUILD = 684;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30038,7 +30114,7 @@ function go(v){
   }
   if (v === 'mixer' && (tv === 'fx' || tv === 'mod')){ if (cFxT < NT){ cs.mixer.x = cFxT; if (cs.mixer.y === 7) cs.mixer.y = 0; } else cs.mixer.y = 7; }   // FX on the master: the Mixer's master row
   const refit = (tv === 'mixer') !== (v === 'mixer');   // the Mixer is sized for more rows
-  if (loopSel && !tp.on) loopFor(tv);   /* (LOOP SEL: keep the selection's rows as the armed loop before the selection goes with the screen; 15 Nov) */
+  if (loopSel && !tp.on && !(tv !== 'song' && loopArm && loopArm.v === 'song')) loopFor(tv);   /* (LOOP SEL: keep the selection's rows as the armed loop before the selection goes with the screen; 15 Nov. 24 Nov, build 675: not when Arrange's rows are already armed and the screen being left is another one: a note selected in a phrase replaced the armed rows with the phrase's, so back on Arrange PLAY no longer looped them) */
   tv = v; if (MID.includes(v)) midV = v; selA = null; sxPicks = []; if (refit) fit(); draw(); saveCur();
 }
 // SHIFT+▼ ON MOBILE AND DESKTOP (12 Nov, owner: "Make shift + down always go to phrase or pattern view."): from the Song / Arrange (the screen, or Arrange holding the keys beside
@@ -31898,7 +31974,7 @@ let mfDrag = null;
 const mfY = (d, top, bot, rowH) => d >= 0 ? top - Math.min(1, d / 6) * rowH * 0.5 : d <= -60 ? bot + rowH * 0.5 + 1 : d <= -48 ? bot : top + (-d / 48) * (bot - top);
 const mfVol = (y, top, bot, rowH) => dbVol(y <= top ? Math.min(6, (top - y) / (rowH * 0.5) * 6) : y >= bot + rowH * 0.5 ? -999 : y >= bot ? -48 : -(y - top) / (bot - top) * 48);
 const mfToast = t => toast('Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)), 900);
-function mfSet(t, v){ v = clamp(Math.round(v), 0, 255); if (v === S.mix[t].vol) return; S.mix[t].vol = v; if (rt) rt.pl.applyMix(); }
+function mfSet(t, v){ v = clamp(Math.round(v), 0, 255); if (v === S.mix[t].vol) return; S.mix[t].vol = v; if (rt) rt.pl.applyMix(); try { if (NCON()) NC().edit(); } catch(e){} }   // (a drag saves only when let go: the native engine hears each step)
 const mfReset = t => { S.mix[t].vol = TRK_UNITY; mixChanged(); draw(); toast('Track ' + d2(t + 1) + ' · VOL E0 · 0.0 dB'); };
 async function mfType(t){ const a = await askText({title:'Track ' + d2(t + 1) + ' · VOL', body:'Now ' + hx(S.mix[t].vol) + ' (' + dB(trackGain(S.mix[t].vol)) + '). Type 00–FF, or a level in dB such as -6 (E0 is 0 dB, FF +6 dB).'}, hx(S.mix[t].vol), 8, 'Set');
   if (a == null) return; const v = parseLevel(a, dbVol); if (v == null) return toast('Not a level: 00–FF or dB, such as -6'); S.mix[t].vol = clamp(v, 0, 255); mixChanged(); draw(); mfToast(t); }
@@ -31970,7 +32046,7 @@ grid.addEventListener('pointermove', e => {
   const D = moDrag; D.vx = clamp(D.vx + (e.clientX - D.lx) * dragMul(e), D.x0 - 12, D.x0 + D.w + 2); D.lx = e.clientX;
   const v = moVal(D.vx, D.x0, D.w);
   if (v === (S.mout == null ? 255 : S.mout)) return;
-  S.mout = v; moApply(); draw(); moToast();
+  S.mout = v; moApply(); try { if (NCON()) NC().edit(); } catch(e){} draw(); moToast();   // (the bar saves only when let go: the native engine hears each step)
 }, true);
 const moDragEnd = e => { if (!moDrag || e.pointerId !== moDrag.id) return; moDrag = null; try { grid.releasePointerCapture(e.pointerId); } catch(err){} saveS(); draw(); };
 grid.addEventListener('pointerup', moDragEnd, true); grid.addEventListener('pointercancel', moDragEnd, true);
@@ -32084,7 +32160,11 @@ function stageRoom(){
   // narrower. It now starts at a fixed 72 characters (the 68ch description plus its margin), further right only for wider text.
   if (!asg && tv === 'fx'){ const cw = parseFloat(grid.style.getPropertyValue('--chw')) || parseFloat(getComputedStyle(grid).fontSize) * 0.6; right = Math.max(right, gr.left + grid.clientLeft + 72 * cw); }
   const left = right - sr.left + 18;
-  return {right, left, w:sr.width - left - 14, top:gr.top - sr.top, h:gr.height};
+  // OVERLAP (24 Nov, build 676; owner, Mac, Pattern view on the MST column: the SIGNAL chain over the phrase): the text's right edge is measured as it sits NOW. A grid that
+  // scrolls sideways (Pattern view wider than its pane) puts that edge further left the more it is scrolled, so a stage placed beside the text at the end of the scroll
+  // was over the text as soon as the cursor moved back (nothing re-places the stage on a scroll). A grid scrolled sideways has no room beside its text: ovf (the grid's scroll event re-places the stage).
+  const ovf = !asg && grid.scrollLeft > 1;
+  return {right, left, w:sr.width - left - 14, top:gr.top - sr.top, h:gr.height, ovf};
 }
 /* DANCE / DRUM / KEYS / HIDE (owner, 19 Oct): when there's no room for the dogs beside the phrase (narrower than
    150 px), DANCE and DRUM are hidden and KEYS shows lit (the keys stand in); with no room even for the keys
@@ -32099,7 +32179,7 @@ function stageLayout(){
   if (!stgReq){ box.hidden = true; stgKindNow = ''; return; }
   const {right, left, w, top, h} = R;
   let kind = stageKind(); if (tv === 'phrase' && (kind === 'dogs' || kind === 'drum') && w < 150) kind = 'piano';   // too narrow for the dogs: the keys
-  const minW = kind === 'piano' ? 90 : kind === 'peek' ? 220 : 150, show = right > 0 && w >= minW && h >= 150; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
+  const minW = kind === 'piano' ? 90 : kind === 'peek' ? 220 : 150, show = right > 0 && w >= minW && h >= 150 && !R.ovf; box.hidden = !show; if (!show){ stgKindNow = ''; return; }
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
   const dg = kind === 'dogs' || kind === 'drum'; $('tStageDogs').hidden = !dg; $('tStagePh').hidden = dg || kind === 'peek';
   $('tStagePk').hidden = kind !== 'peek'; box.classList.toggle('peek', kind === 'peek'); box.setAttribute('aria-hidden', String(kind !== 'peek')); sxStageSwitch(kind); sxPkSig = '';   // SONG EXTRAS
@@ -32108,6 +32188,7 @@ function stageLayout(){
   stgKindNow = kind; stgSig = '';
   if (dg) dogsState(); else stageCanvas(true);
 }
+{ let raf = 0, was = false; grid.addEventListener('scroll', () => { const o = grid.scrollLeft > 1; if (raf || o === was) return; was = o; raf = requestAnimationFrame(() => { raf = 0; stageLayout(); }); }, {passive:true}); }   // the grid starts or stops scrolling sideways: the stage goes, or is placed again (stageRoom: ovf)
 // Dogs: arms up and dancing while the song plays, a slow breath and a lazy tail when it stops.
 function dogsState(){
   const d = $('tStageDogs').querySelector('.dogs'), on = !!tp.on, dr = stgKindNow === 'drum';
@@ -32406,7 +32487,7 @@ function fxDynIn(n, list){
     fxDynFeed(D, v, now, FXLV.has(String(key).split(':')[1])); D.t = now; }
 }
 // The node that runs a track's effects (t −1: the master's), and switching its reports on (one node at a time).
-const fxDynNodeOf = t => !rt ? null : t < 0 ? rt.mfx || null : (rt.pl.buses[t] && rt.pl.buses[t].fx) || null;
+const fxDynNodeOf = t => NCON() && tp.nc ? NC().fxNode(t < 0 ? 32 : t) : !rt ? null : t < 0 ? rt.mfx || null : (rt.pl.buses[t] && rt.pl.buses[t].fx) || null;
 let fxTelNode = null;
 // FX BAR: the node whose slots' levels the bottom bar shows (one at a time, like the FX screen's reports)
 let fxLvlNode = null;
@@ -32775,7 +32856,7 @@ function mwSupDraw(){
   g.clearRect(0, 0, G.W, G.H);
   g.fillStyle = C.line; g.globalAlpha = .55; g.fillRect(0, 0, G.x(M.lo), G.H); g.fillRect(G.x(M.hi), 0, G.W - G.x(M.hi), G.H); g.globalAlpha = 1;
   mwSpectrum(g, G, C, -10, -100); mwGrid(g, G, C, false);
-  const red = mstMeter && !meterHold() && mstMeter.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
+  const mm = mstM(), red = mm && !meterHold() && mm.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
   g.strokeStyle = C.ink; g.lineWidth = 2 * G.dpr; for (const f of [M.lo, M.hi]){ const x = Math.round(G.x(f)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, G.H); g.stroke(); }
   g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.fillText('reduction ↓  · drag the lines to set the range', 6 * G.dpr, G.H - 18 * G.dpr);
 }
@@ -32794,7 +32875,7 @@ function mwSupDraw(){
 const mwComp = {lv:-200, gr:0, grHold:0, holdT:0, hist:new Float32Array(150), hi:0};
 function mwCompDraw(){
   const c = $('mwCompC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.comp, d1 = G.dpr;
-  const m = mstMeter, live = !!(m && M.on && S.mst.on && !meterHold() && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
+  const m = mstM(), live = !!(m && M.on && S.mst.on && !meterHold() && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
   // the readings, with ballistics (this runs ~30 times a second)
   const lvNow = live && Number.isFinite(m.compIn) ? m.compIn : -200, grNow = live ? Math.min(0, m.comp || 0) : 0;
   K.lv = lvNow > K.lv ? lvNow : Math.max(lvNow, K.lv - 0.7); K.gr = grNow < K.gr ? grNow : Math.min(0, K.gr + 0.6);
@@ -32856,7 +32937,7 @@ function mwLoop(){
     if (mwSel === 'eq') mwEqDraw(); else if (mwSel === 'sup') mwSupDraw(); else if (mwSel === 'comp') mwCompDraw(); else mwLimDraw(); })){ mwRaf = 0; return; }   // METERS: OFF while playing: readouts and curves painted without the levels, then parked (mtrWake at STOP)
   mwRaf = requestAnimationFrame(mwLoop);
   const now = performance.now(); if (!meterDue(now, mwLoop.t || 0, 33)) return; mwLoop.t = now;   // METERS: OFF holds it (the loop idles; mtrWake / the next frame at STOP)
-  const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
+  const m = mstM(), live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
   // chain readouts
   $('mwChain').querySelectorAll('.mwst').forEach(b => { const k = b.dataset.k, gr = b.querySelector('.gr');
     if (!live || !stageOn(k) || k === 'eq'){ gr.textContent = ''; return; }
@@ -32952,7 +33033,7 @@ function deckLayout(){
    scene A and B, the 8 macros, and the editors for scenes, macros and this track's locks and LFO. See PERFORM above. */
 let reloadPt = null;
 const perfS = () => perfOf();
-function perfFill(on){ perfLive.fill = !!on; try { if (tp.core) corePost({op:'perf', fill:perfLive.fill}); } catch(e){} perfDraw(); }
+function perfFill(on){ perfLive.fill = !!on; try { if (tp.core || tp.nc) corePost({op:'perf', fill:perfLive.fill}); } catch(e){} perfDraw(); }
 function perfSetXf(v){ if (!perfLive.init) perfLiveInit(); perfLive.xf = clamp(Math.round(v), 0, 255); perfPush(); perfDraw(); }
 function perfSetMac(i, v){ if (!perfLive.init) perfLiveInit(); perfLive.mac[i] = clamp(Math.round(v), 0, 255); perfPush(); perfDraw(); }
 // The song in place, as Undo does (the running sequencer keeps the same S object), as one undoable step.
@@ -34725,13 +34806,26 @@ function arrLayout(force){
 // Every "the page changed shape" signal (window, visual viewport, the screen element, fonts arriving) lands here and
 // runs ONE layout pass in the next frame: a fold/unfold used to run fit()+draw() four times over (~0.5 s on the phone).
 let refitRaf = 0, refitForce = false, refitSize = '';
+/* WINDOW RESIZE DURING PLAYBACK (24 Nov, build 676; owner, Mac desktop app: "GUI hangs when I resize the window ... animations or information overlaps with the
+   content ... intermittently during playback"): a live drag fires 60+ resize events a second and every one ran fit() + draw() (several draws: ~100–300 ms each on a
+   busy screen), so the page never caught up; the stage (dogs, piano, the FX SIGNAL chain) is placed in pixels beside the grid's text, so any frame painted between a
+   reflow and the next refit had it over the content. Now, while the window is being resized (a resize event in the last RZ_END ms): the stage is hidden (body.rszing),
+   the refit runs at most every RZ_GAP ms (the first one at once; the gap grows to twice what the last one cost), and one full refit runs RZ_END ms after the last
+   event, which shows the stage again. Not resizing: nothing here runs, nothing changes. */
+const RZ_GAP = 100, RZ_END = 160;
+let rzOn = false, rzEndT = 0, rzLast = 0, rzCost = 0, rzOwed = false;
+function rzEnd(){ rzEndT = 0; rzOn = false; rzOwed = false; document.body.classList.remove('rszing'); scheduleRefit(true); }   // true: the stage is placed again (stageLayout in the draw) whatever the signature says
+function rzMark(){ if (!rzOn){ rzOn = true; rzLast = 0; document.body.classList.add('rszing'); } clearTimeout(rzEndT); rzEndT = setTimeout(rzEnd, RZ_END); }
 function scheduleRefit(force){
   refitForce = refitForce || !!force; if (refitRaf) return;
   if (!force && typeof dkDragHold === 'function' && dkDragging){ if (dkDragHold()) return; }   // RESIZE STUTTER: a panel drag refits at most every DK_DRAG_MS
-  refitRaf = requestAnimationFrame(() => { refitRaf = 0; const f = refitForce; refitForce = false; if (f) measure(true);
+  if (!force && rzOn && rzLast){ const nw = performance.now(); if (nw - rzLast < Math.max(RZ_GAP, rzCost * 2)){ rzOwed = true; return; } }   // the rest waits for rzEnd (the last event + RZ_END ms)
+  refitRaf = requestAnimationFrame(() => { refitRaf = 0; const t0 = performance.now(), f = refitForce; refitForce = false; if (f) measure(true);
     const did = arrLayout(f), sz = scr.clientWidth + 'x' + scr.clientHeight;   // the screen element itself changed size (a panel, the keyboard): re-fit
-    if (!did && view === 'tracker' && sz !== refitSize){ fit(); draw(); } refitSize = sz; });
+    if (!did && view === 'tracker' && sz !== refitSize){ fit(); draw(); } refitSize = sz;
+    if (rzOn){ rzLast = performance.now(); rzCost = rzLast - t0; } });
 }
+addEventListener('resize', rzMark);   // before the one below: it marks the burst first
 addEventListener('resize', () => scheduleRefit(false));
 // Web fonts can arrive after the first draw: measure again so the text and the MONO / POLY boxes line up.
 if (document.fonts) document.fonts.addEventListener('loadingdone', () => scheduleRefit(true));
@@ -35842,7 +35936,7 @@ function fxLoads(){
   rt.pl.buses.forEach((b, t) => { if (t < NT && b.fx) L.push([d2(t + 1), b.fx.load || 0]); });
   rt.pl.buses.forEach((b, t) => { if (t < NT && b.chn) L.push([d2(t + 1) + ' chn', b.chn.load || 0]); });
   if (rt.mfx) L.push(['MST', rt.mfx.load || 0]);
-  if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) L.push(['MST dyn', mstMeter.load]);
+  if (rt.mst && rt.mst.wk && mstM() && mstM().load) L.push(['MST dyn', mstM().load]);
   let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0;
   if (bl) L.push(['Bass', bl]);
   return L;
@@ -35913,8 +36007,24 @@ function cpuMeter(){
 idleTick(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500, () => view !== 'tracker' && !document.hidden, 2000);   // BATTERY: the tracker's own frame loop updates it there
 // chains screen meters: sample each routed track's chains return and push it into the frame.
 // Runs on its own timer (the tracker frame loop is off while the chains screen is open).
+/* NATIVE CORE (M5, chains meters): while the shell's engine plays, the screen's levels come from its ch.lvl (the client calls chNativeIn), for the tracks chNativeWant names; a reading older than 400 ms shows silent (as the FX bar's). */
+const ncChLv = {};
+function chNativeWant(){
+  if (!NCON() || !tp.nc || view !== 'chains' || document.hidden) return [];
+  const o = new Set();
+  for (const m of ((S.chainPatch && S.chainPatch.modules) || [])) if (m && (m.type === 'chainOut' || m.type === 'trackIn')){ const k = int(m.params && m.params.track, 1); if (k >= 1 && k <= NT && k <= 32) o.add(k - 1); }
+  return [...o];
+}
+function chNativeIn(t, i, o){ ncChLv[t] = {i, o, t:performance.now()}; }
+function chNativeFeed(){
+  const out = new Array(NT).fill(0), inp = new Array(NT).fill(0), now = performance.now();
+  for (const k in ncChLv){ const v = ncChLv[k]; if (k < NT && now - v.t <= 400){ out[k] = v.o; inp[k] = v.i; } }
+  const api = chApi(); if (api && api.meters) api.meters({ peaks:out, peaksIn:inp });
+}
 idleTick(() => {
-  if (view !== 'chains' || document.hidden || !rt || !CH.frame) return;
+  if (view !== 'chains' || document.hidden || !CH.frame) return;
+  if (NCON() && tp.nc){ chNativeFeed(); return; }
+  if (!rt) return;
   const out = new Array(NT).fill(0), inp = new Array(NT).fill(0);
   let any = false;
   const peak = (an, buf) => { an.getFloatTimeDomainData(buf); let p = 0; for (let i = 0; i < buf.length; i++){ const a = Math.abs(buf[i]); if (a > p) p = a; } return p; };
@@ -35995,7 +36105,7 @@ function cpuMeasured(){
   const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const tn = t => { const nm = S.mix && S.mix[t] && S.mix[t].nm; return 'Track ' + d2(t + 1) + (nm ? ' ' + nm : ''); }, parts = [];
   if (rt){ rt.pl.buses.forEach((b, t) => { if (t >= NT) return; if (b.fx && b.fx.load) parts.push({name:'Effects · ' + tn(t) + cpuFxTop(S.tfx[t], b.fx.sl, fxNameOf), v:b.fx.load}); if (b.chn && b.chn.load) parts.push({name:'Chains · ' + tn(t), v:b.chn.load}); });
-    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects' + cpuFxTop(S.mfx, rt.mfx.sl, fxNameOf), v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) parts.push({name:'Master dynamics', v:mstMeter.load}); }
+    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects' + cpuFxTop(S.mfx, rt.mfx.sl, fxNameOf), v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstM() && mstM().load) parts.push({name:'Master dynamics', v:mstM().load}); }
   let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0; if (bl) parts.push({name:'Bass voices', v:bl});
   const inMin = a => a.filter(t => now - (t.t || t) < 60000);
   const ev = inMin(PB.ev), stl = inMin(PB.stalls), dr = inMin(glitch.ts);
@@ -36040,24 +36150,25 @@ const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 
      playhead is moved in place: the playing-row marks (Sect, Phrase, Pattern view's gutter and per-track bands) and Arrange's blocks (drawArr, which has its own
      rate on a touch screen); the Mixer, Inst, FX, MOD and Project show nothing of the playhead, so nothing is drawn for a row. Song and Arrange as the Song screen
      (their grid text carries the playing row) and every screen with a selection, a drag, Arrange focus or paging in progress take the full redraw as before.
+   - The window's size is in the stamp (vpW, vpH: a refit draws it), but not while the window is being resized (rzOn): a drag changed it every event and every playhead step drew the whole screen again (build 676).
    - A full redraw still runs when the stamp differs (the cursor or page moved: FOLLOW, an edit that moved it) and at least every PL_BEAT ms, so anything that
      changed without its own redraw is picked up within half a second. Anything the user does draws at once (it never comes through here), and STOP / PLAY draw.
    - On a touch screen (COARSE) the playhead's drawing, either kind, runs at most every PL_MIN ms (about 20 a second): the frame that would draw sooner owes it
      (plOwed) and does it on the first frame past the gap, with the newest position (the sequence is drained every frame regardless). */
 const PL_BEAT = 500, PL_MIN = 50;
 let plBase = null, plOwed = false, plLast = 0;
-const plStamp = () => [tv, view, JSON.stringify(cs), cTrack, cPhrase, cSect, tp.mode, tp.bpm, tp.tks, patRow, loopPat, followMode, scr.style.fontSize, tScale, vpW, arrW, sideOn, inlOn, stage, arrMode, apF, spOn, pvMode, pvFx, pvFold, inMode, ntr()].join('|');
+const plStamp = ns => [tv, view, JSON.stringify(cs), cTrack, cPhrase, cSect, tp.mode, tp.bpm, tp.tks, patRow, loopPat, followMode, scr.style.fontSize, tScale, ns ? 0 : vpW, ns ? 0 : vpH, arrW, sideOn, inlOn, stage, arrMode, apF, spOn, pvMode, pvFx, pvFold, inMode, ntr()].join('|');
 function playTick(){
   const now = performance.now();
   if (COARSE && now - plLast < PL_MIN){ plOwed = true; return; }
   plOwed = false; plLast = now;
   if (playLite(now)) scrAdd('draw', performance.now() - now);   // the playhead-only update is a screen update too: counted in the CPU panel's figure (a full draw() counts itself, once)
-  else { playDraw = true; try { draw(); } finally { playDraw = false; } plBase = {t:now, sig:plStamp()}; }
+  else { playDraw = true; try { draw(); } finally { playDraw = false; } plBase = {t:now, sig:plStamp(), sigN:plStamp(true)}; }
 }
 function playLite(now){
   if (!plBase || now - plBase.t > PL_BEAT || view !== 'tracker' || apHold || apF || selA || sdrag || drag || arrFast || arrSoon) return false;
   if (!(tv === 'sect' || tv === 'phrase' || tv === 'inst' || tv === 'mixer' || tv === 'fx' || tv === 'mod' || tv === 'project')) return false;
-  if (plStamp() !== plBase.sig) return false;
+  if (rzOn ? plStamp(true) !== plBase.sigN : plStamp() !== plBase.sig) return false;   // WINDOW RESIZE (build 676): the window's size changing is the refit's to draw (it runs every RZ_GAP ms, and once more at the end), not every playhead step's
   const P = tp.on ? tp.pos : null, rows = test => { const q = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) q.add(r); }); return q; };
   if (tv === 'sect') litRows(rows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null));
   else if (tv === 'phrase'){ litRows(rows(q => q.phrase === cPhrase ? q.step : null)); if (pvActive()) pvPlayMark(P); else if (pvLit.size) pvPlayMark(null); }
@@ -37686,6 +37797,16 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
+  [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
+  [683, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the master panel\u2019s IN / OUT LUFS, compressor and limiter reduction, suppressor bars and true-peak now move with the sound (the engine reports them while the panel is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
+  [682, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the \u2026chains screen\u2019s track in / out level meters now move with the sound (the engine reports them while that screen is open), and go silent on stop.', 'Nothing changes while the native engine is off.']],
+  [680, '25 Nov', ['Behind the scenes: with the native engine playing, the FX bar and FX screen can now ask it for each effect slot\'s level and for the compressors\' reduction (the page asks for one track at a time, and nothing while METERS is off).', 'Nothing changes while the native engine is off.']],
+  [679, '25 Nov', ['Behind the scenes: with the native engine playing, a fader, mute, solo, pan, an effect knob, the master settings, the latency mode and a …chains slider now reach the sound at once, as one small message each (the whole song still follows a moment later).', 'Nothing changes while the native engine is off.']],
+  [678, '25 Nov', ['Behind the scenes: with the native engine on, the page can now publish the song, send its pad renders, kit list, variations and chop data (copies, with a memory limit), and press PLAY and STOP on it. A song it cannot play goes back to the old engine with a short message.', 'Nothing changes while the native engine is off.']],
+  [677, '25 Nov', ['Behind the scenes: the page can now load the native-engine client file when the Android app (or the Native core test switch) asks for it. Nothing changes while that is off.']],
+  [676, '24 Nov', ['Fixed: resizing the window while a song plays no longer hangs the screen. A drag used to redraw the whole tracker and Arrange on every event, and again on every playhead step; now the screen is re-fitted a few times a second during the drag and once more when it ends, and the dogs / piano / FX chain beside the grid are hidden until then, so they cannot sit over the text.', 'Fixed: the master\u2019s SIGNAL chain (and the other panels beside the grid) could sit over the Pattern view\u2019s columns after the window was resized or the view scrolled sideways. It now shows only when the grid is not scrolled sideways.']],
+  [675, '24 Nov', ['Fixed: LOOP SEL (and LP.SEL) keep looping the rows you selected in Arrange after you go into a phrase, select or edit a note there and come back. A selection in the phrase used to replace the armed rows when you left it with the song stopped, so PLAY on Arrange no longer looped them.']],
   [674, '24 Nov', ['Fixed: since build 660 (20 Nov) a saved song could not be read at start-up, so the app opened the starter beat and the next autosave wrote it over your song. Songs load again. If your last song is gone, File \u25be \u2192 Restore a backup\u2026 brings back an earlier one.', 'A saved song that cannot be read at start-up is never overwritten any more: it is copied aside (File \u25be \u2192 Restore a backup\u2026, listed first as \u201cUnopened song\u201d), the starter beat is not autosaved until you change something, and a red bar tells you.', 'Settings \u2192 App says how the song at start-up was chosen (saved song, first run, could not be read, share link, project file), and Copy playback report starts with the same line.']],
   [673, '23 Nov', ['Patch knobs: a knob change on a quiet waves patch is heard at once (it used to wait for a note); knob values reach waves voices made later at the right time.']],
   [672, '23 Nov', ['New command FLZ: a third bank of 255 Flex patterns for IDM and glitch punch-ins, each a chain of two or three FLX / FLY moves (a stutter into a bit crush, a juggle with slice pitches, a tape stop on a roll, reverse into a gate mask\u2026). FLZ 01\u20130F are one of each family to try first, then by the first digit: 1 bitmangle stutter, 2 pitched juggle, 3 tape roll, 4 half / double time, 5 reverse gate, 6 filter build, 7 grain crush, 8 scratch chop, 9 poly stutter, A warp juggle, B dub echo, C skip crush, D euclid pitch, E swing chop, F double chaos. It plays on the same Flex as FLX and FLY (the last one on a row wins) and works in the MST column too.']],
@@ -38469,7 +38590,7 @@ try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; if ('m' in
 function pvSave(){ try { localStorage.setItem(PVUK, JSON.stringify({m:pvMode, fx:pvFx, fold:pvFold, fit:pvFitOn, rh:pvRH})); } catch(e){} }
 function setPv(on){ pvOn = !!on; try { localStorage.setItem(PVK, pvOn ? '1' : '0'); } catch(e){} draw(); }
 // It needs width: the computer and the unfolded Fold. On the folded phone the buttons are hidden and Phrase is as before.
-let vpW = innerWidth; addEventListener('resize', () => { vpW = innerWidth; });   // (13 Nov) read once per resize: pvActive() runs dozens of times a redraw and innerWidth can force a layout on a phone
+let vpW = innerWidth, vpH = innerHeight; addEventListener("resize", () => { vpW = innerWidth; vpH = innerHeight; });   // (13 Nov) read once per resize: pvActive() runs dozens of times a redraw and innerWidth can force a layout on a phone
 const pvRoom = () => vpW >= 600 && !spOn;   // SIMPLE PHRASE: the plain phrase only
 const pvActive = () => pvOn && pvMode && view === 'tracker' && tv === 'phrase' && pvRoom() && (cTrack < ntr() || cTrack === MT);
 // Text size: sized to show about PVW characters across (the phrase is sized for 52), but no smaller than 11px, and tall
@@ -39177,6 +39298,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
 <script src="pump/ui/tune.js?v=2"></script>
 <script src="pump/ui/chop.js?v=1"></script>
 <script>
+if (window.thunderCore || aset.core === 'native') loadClient();   // else: nothing is fetched (N2-PAGE-CLIENT 1.2)
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
   try { if (window.self === window.top) navigator.serviceWorker.register('sw.js').catch(e => tpLog('service worker (offline use and updates) did not register', e)); } catch(e){ tpLog('service worker (offline use and updates) did not register', e); }
 }
