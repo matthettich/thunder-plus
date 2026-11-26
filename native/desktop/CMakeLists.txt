@@ -47,6 +47,9 @@ if(MSVC)
   target_compile_definitions(thunder_desktop_shared PUBLIC TPD_NO_MIDI)
 else()
   target_sources(thunder_desktop_shared PRIVATE shared/midi_manager.cpp ${TPA_CPP}/midi_out.cpp ${TPA_CPP}/midi_in.cpp)
+  if(APPLE)   # midi_out.cpp sleeps with clock_nanosleep(TIMER_ABSTIME), which macOS lacks: shared/apple_shim.h supplies it on the host clock
+    set_source_files_properties(${TPA_CPP}/midi_out.cpp PROPERTIES COMPILE_OPTIONS "-include;${CMAKE_CURRENT_SOURCE_DIR}/shared/apple_shim.h")
+  endif()
 endif()
 
 if(THUNDER_BUILD_DESKTOP_TESTS)

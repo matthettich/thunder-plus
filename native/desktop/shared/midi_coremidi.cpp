@@ -10,6 +10,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreMIDI/CoreMIDI.h>
 #include <mach/mach_time.h>
+#include <pthread.h>
 
 #include <atomic>
 #include <cstring>
@@ -144,7 +145,11 @@ class CoreMidi : public MidiBackend {
 
 }  // namespace
 
+// The MIDI sender thread (midi_out.cpp) asks for this when it starts: the highest user QoS, so macOS wakes it on time (it sleeps to each message's send time).
+static void senderEnter() { pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0); }
+
 std::shared_ptr<MidiBackend> makeCoreMidiBackend() {
+  tpa::MidiHost::setSenderThreadHooks(&senderEnter, nullptr);
   auto b = std::make_shared<CoreMidi>();
   return b->ok() ? std::static_pointer_cast<MidiBackend>(b) : nullptr;
 }
