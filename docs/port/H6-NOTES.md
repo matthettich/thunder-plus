@@ -97,6 +97,8 @@ and runs `LiveEngine::render` in the callback (flush-to-zero, `thunder_live_proc
 - **C-2** a failed `engine.reset` restart sends `{t:'engine', up:false, error}` and a fatal `err` (`where:'engine.reset'`): the page's `died()` stops the transport, toasts, and the old engine plays; the next `hello` tries again.
 - **L-1** `BridgeSession::shutdown` takes the pump thread under its mutex and no late `hello` can start one after it. **L-2** the window close waits at most 3 s for the bridge worker (`ShellCore::shutdown(3000)`), then ends the process without destroying what the worker uses; the WebView2 controller is `Close()`d and the COM objects released before `CoUninitialize`. **L-3** DevTools / Web Inspector only with `--devtools` (or `--cdp-port` on Windows; `--cdp-port` is a dev flag: any local web page can attach while it runs). **L-5** numbers are clamped before they become ints. **L-8** `audioName()` takes the lifecycle lock. **L-9** the Mac selftest leaves with `_exit`. **L-11** the workflow also watches `native/core/src/**` and `third_party`.
 
+M3 (chains meters, `chains:[tracks]` -> CHLVL with its own mask) and M2 (`master:true` -> MASTERM) are in the translator and the session too; hello caps are unchanged on Android (no new bit), so unchanged here.
+
 **Left (listed, not done):** L-4 the CSP is still report-only (the page needs `'unsafe-inline'`; S-1 no longer leans on it); L-6 base64 strictness; L-7 no Range support, 404 without CORS header; L-10 actions / runner images / the NuGet package are not pinned by hash; the bundled-file read stays on the UI thread; the queue-full path has no test.
 
 ## Resume (for another worker)
@@ -111,3 +113,6 @@ Native: wasm (fixed by skipping `desktop/` for non-desktop systems), Android, GC
 - Caps as listed: ACCEPTED.
 - Mac data folder renamed to `Thunder Plus Native` so it never shares the Electron app's `Thunder Plus` folder.
 - Merge when CI is green; the menus sweep stays non-blocking until H9.
+
+## Sanitizer job (Core, Linux, sanitizers), 26 Nov
+`desktop_live_host` and `desktop_session` failed UBSan "member call on address ... which does not point to an object of type '_Sp_counted_base'" (frames: `~__shared_count` in `thunder::LiveHost::songPublish`). Not a lifetime bug: ASan is clean and nothing is freed. The core is built `-fno-rtti`; the shared_ptr control blocks it makes (Song, SeqSession) are released in code built with RTTI (this library and its tests), and UBSan's vptr check cannot validate a vtable without typeinfo. The same known false positive the core's tests turn off with `-fno-sanitize=vptr` (test_seq_takeover, test_live_pads_epoch, ...). Fix: `-fno-sanitize=vptr` for `thunder_desktop_shared` and the 7 desktop tests when `THUNDER_SANITIZE` is on. Reproduced locally with the CI flags (`-DTHUNDER_SANITIZE=ON`, -j1); all 7 pass under ASan + UBSan after the change. No TSan run (no race involved).

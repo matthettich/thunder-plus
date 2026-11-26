@@ -184,7 +184,7 @@ void BridgeSession::execute(const Call& c, const std::string& type) {
     case Op::MetersWant: { const double hz = c.hz; check(type, host_.call([=](thunder_live* L) { return thunder_live_meters_want(L, hz); })); break; }
     case Op::MetersSet: {   // M4: a REPLACEMENT state (rate, which records, whose effects); E_BUSY is reported, the page re-sends its state on its next change
       thunder_live_meters_spec sp; std::memset(&sp, 0, sizeof sp);
-      sp.size = sizeof sp; sp.kinds = (uint32_t)c.kinds; sp.rate_hz = c.hz; sp.fx_tracks = c.fxTracks; sp.chains_hz = 0;
+      sp.size = sizeof sp; sp.kinds = (uint32_t)c.kinds; sp.rate_hz = c.hz; sp.fx_tracks = c.fxTracks; sp.chains_hz = 0; sp.chains_tracks = c.chainsTracks;   // chains_hz 0 = the core's 16 a second
       check(type, host_.call([=](thunder_live* L) { return thunder_live_meters_set(L, &sp); }));
       break;
     }

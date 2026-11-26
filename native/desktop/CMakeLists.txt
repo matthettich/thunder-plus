@@ -22,6 +22,11 @@ find_package(Threads REQUIRED)
 add_library(thunder_desktop_shared STATIC
   shared/app_scheme.cpp shared/put_store.cpp shared/bridge_translator.cpp shared/live_host.cpp shared/bridge_session.cpp shared/desktop_api.cpp shared/text_util.cpp shared/audio_null.cpp shared/shell_core.cpp shared/recovery_store.cpp
   ${TPA_CPP}/live_engine.cpp ${TPA_CPP}/live_events.cpp ${TPA_CPP}/songfit.cpp ${TPA_CPP}/pad_filler.cpp)
+# UBSan's vptr check cannot work across the -fno-rtti core: the shared_ptr control blocks the core makes (Song, SeqSession) are released in code built WITH rtti (this library, its tests), and the check calls them
+# "not a _Sp_counted_base" (a false positive: the Core (Linux, sanitizers) job, desktop_live_host and desktop_session). Off for this library and its tests, as for test_seq_takeover and the other tests that hold a Seq.
+if(THUNDER_SANITIZE)
+  target_compile_options(thunder_desktop_shared PRIVATE -fno-sanitize=vptr)
+endif()
 target_include_directories(thunder_desktop_shared PUBLIC shared ${TPA_CPP} ${CMAKE_CURRENT_SOURCE_DIR}/../core/src)
 target_link_libraries(thunder_desktop_shared PUBLIC thunder_core Threads::Threads)
 target_compile_features(thunder_desktop_shared PUBLIC cxx_std_17)
@@ -40,6 +45,9 @@ if(THUNDER_BUILD_DESKTOP_TESTS)
     add_executable(test_desktop_${t} tests/test_${t}.cpp)
     target_link_libraries(test_desktop_${t} PRIVATE thunder_desktop_shared)
     target_compile_definitions(test_desktop_${t} PRIVATE TPD_REPO="${TPD_REPO}")
+    if(THUNDER_SANITIZE)
+      target_compile_options(test_desktop_${t} PRIVATE -fno-sanitize=vptr)
+    endif()
     add_test(NAME desktop_${t} COMMAND test_desktop_${t})
   endforeach()
 endif()

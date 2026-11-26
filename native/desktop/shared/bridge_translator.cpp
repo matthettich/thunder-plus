@@ -209,7 +209,20 @@ Translation translate(const std::string& raw) {
       for (size_t i = 0; i < a.size(); i++) { int tr; if (!trackOf(a.at(i), &tr)) return refuse(std::string("meters.want: ") + key + " has a bad track (0..32 or 'm')"); mask |= (uint64_t)1 << tr; }
       if (a.size() > 0) kinds |= (key[0] == 'f') ? 1 : 2;
     }
-    c.op = Op::MetersSet; c.hz = hz; c.kinds = kinds; c.fxTracks = mask; return callOf(std::move(c));
+    uint64_t chMask = 0;   // M3: chains:[tracks] (0..31) -> kind CHLVL with its OWN mask; a boolean names no track: ignored
+    if (has(j, "chains")) {
+      Json ca = j.get("chains");
+      if (ca.isArr()) {
+        for (size_t i = 0; i < ca.size(); i++) { int tr; if (!trackOf(ca.at(i), &tr) || tr > 31) return refuse("meters.want: chains has a bad track (0..31)"); chMask |= (uint64_t)1 << tr; }
+        if (ca.size() > 0) kinds |= 4;
+      } else if (!ca.isBool()) return refuse("meters.want: chains must be an array of tracks (or a boolean, ignored)");
+    }
+    if (has(j, "master")) {   // M2: master:true -> kind MASTERM (the mastering processor's meters; the master is one: no mask); false: off
+      Json mv = j.get("master");
+      if (!mv.isBool()) return refuse("meters.want: master must be a boolean");
+      if (mv.asBool()) kinds |= 8;
+    }
+    c.op = Op::MetersSet; c.hz = hz; c.kinds = kinds; c.fxTracks = mask; c.chainsTracks = chMask; return callOf(std::move(c));
   }
   if (t == "fx.values") {
     c.op = Op::FxValues; c.id = id;

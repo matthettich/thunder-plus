@@ -42,7 +42,7 @@ struct Call {
   // Lxp
   int st = 0;
   // MetersSet (M4): kinds = THUNDER_LIVE_MK_* bits, fxTracks = bit t (0..31) a track's effects, bit 32 the master's. FxValues: track, slot, kind (1 pump, 2 mod), vals, id (an ask when >= 0). RecoveryPut: raw = the project text.
-  int kinds = 0; uint64_t fxTracks = 0; int fxKind = 1; std::vector<double> vals;
+  int kinds = 0; uint64_t fxTracks = 0, chainsTracks = 0; int fxKind = 1; std::vector<double> vals;   // chainsTracks (M3): bit t (0..31) a track's chains node
 };
 
 struct Translation {
