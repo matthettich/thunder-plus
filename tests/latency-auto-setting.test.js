@@ -83,8 +83,8 @@ test('one-time notice: once, only when AUTO delays something, never in a render,
   for (const m of ['on', 'off']){ c = page({T:0.046, tfx, lats, aset:{pdcMode:m}}); c.pdcNotice(); assert.equal(c.toasts.length, 0, m); }
   c = page({T:0.046, tfx, lats}); c.pdcNotice(); c.pdcNotice(); c.pdcSet('auto'); c.pdcNotice();
   const n = c.toasts.filter(t => /look/.test(t) && /LATENCY COMP turns this off/.test(t)); assert.equal(n.length, 1, 'exactly one notice');
-  assert.match(n[0], /^CALM on track 12 looks 46 ms ahead, so the other tracks now wait 46 ms while the song plays/);
-  c = page({T:0.046, tfx:[], lats}); c.pdcNotice(); assert.match(c.toasts[0], /^An effect with look-ahead makes the other tracks wait 46 ms/);
+  assert.match(n[0], /^CALM on track 12 looks 46 ms ahead, so other tracks wait 46 ms to stay in time\./);
+  c = page({T:0.046, tfx:[], lats}); c.pdcNotice(); assert.match(c.toasts[0], /^An effect with look-ahead makes other tracks wait 46 ms to stay in time\./);
   // a device that already saw it
   c = page({T:0.046, tfx, lats}); c.store['thunderplus-seen-pdc-auto'] = '1'; c.pdcNotice(); assert.equal(c.toasts.length, 0);
 });

@@ -17,7 +17,7 @@ test('Pattern view: pvGo takes the song cell (it also handles an empty one)', ()
   const c = rig({ pv: true, cell: -1 }); c.navDownToPhrase(); assert.deepEqual(c.log, ['go phrase newBlockAllowed=false', 'pvGo 2,7,,']);
 });
 test('an empty cell opens a fresh phrase that waits in pendPlace, and makes no pattern', () => {
-  const c = rig({ cell: -1 }); c.navDownToPhrase(); assert.equal(c.cPhrase, 20); assert.equal(c.pendPlace.x, 2); assert.equal(c.pendPlace.y, 7); assert.equal(c.pendPlace.p, 20); assert.match(c.log[1], /new phrase 20/);
+  const c = rig({ cell: -1 }); c.navDownToPhrase(); assert.equal(c.cPhrase, 20); assert.equal(c.pendPlace.x, 2); assert.equal(c.pendPlace.y, 7); assert.equal(c.pendPlace.p, 20); assert.match(c.log[1], /New phrase 20 for this block\. It joins the song at row 7 when you add a note/);
 });
 test('wiring: every setup (desktop too), Song and Sect, before the old Mixer line; go() honours goNoNew', () => {
   assert.match(src, /if \(dir === 'down' && \(tv === 'song' \|\| tv === 'sect'\)\) return navDownToPhrase\(\);[^\n]*\n  if \(dir === 'down'\) return tv === 'project'/);

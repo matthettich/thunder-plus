@@ -68,7 +68,7 @@ test('chains: the real effects wasm loads, and records no error', () => {
 const SILENCERS = new Set(['mute']);
 const KEEP_DEFAULT = new Set(['flip']);   // Utility: flip (left polarity) + mono (sum) cancels a centred signal to exact silence, which is correct DSP but hashes nothing
 const switchesOn = m => { const o = {}; for (const [k, d] of Object.entries(m.params || {})) { const [, mn, mx, st] = d; if (KEEP_DEFAULT.has(k)) { o[k] = d[0]; continue; } if (mx - mn === 1 && st === 1) { o[k] = SILENCERS.has(k) ? mn : mx; continue; } let v = mn + (mx - mn) * .3; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
-const SKIP = new Set(['trackIn', 'chainOut']);
+const SKIP = new Set(['trackIn', 'chainOut', 'send', 'recv']);   // send, recv: never run, the graph's compile step resolves them into cables (tests/chains-sendrecv.test.js)
 test('chains: every module renders finite audio and matches its golden hash (defaults, stressed, switches on)', () => {
   const { E, D } = engine(), actual = {}, bad = [];
   for (const type of Object.keys(D.MODULES).sort()) {

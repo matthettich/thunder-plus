@@ -288,7 +288,7 @@ const POLY = 4, FXP_CORE = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.engSt = new Array(NT).fill(null); this.engL = new Array(NT).fill(null); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.engSt = new Array(NT).fill(null); this.engL = new Array(NT).fill(null); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map(); this.knSt = new Array(NT).fill(null); this.knT = new Array(NT).fill(null); this.knTouched = new Set();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.mixReset();
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
@@ -312,6 +312,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
       if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
       for (const e of r.evs) if (e.type === 'eng') (c.eng || (c.eng = new Map())).set(e.track, e);   // ENGINE TARGETS: the state the silent steps left
+        else if (e.type === 'chc') (c.chc || (c.chc = new Map())).set(e.track + ':' + e.p, e);   // BYP / KN1–KN8 (CodeRabbit on #289): the last switch and knob values, as the page's chase keeps them
       if (ms != null && Date.now() - t0 >= ms) return;
     }
     c.done = true;
@@ -324,14 +325,14 @@ class ThunderCore extends AudioWorkletProcessor {
   msg(d){
     if (this.chase && !this.chaseKeep(d)) this.chase = null;
     switch (d.op){
-      case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
-      case 'song': { if (!S){ S = d.S; return; } const pf = S.perf; for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); S.perf = keepObj(pf, S.perf); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
+      case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return;
+      case 'song': { if (!S){ S = d.S; return; } const pf = S.perf; for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); S.perf = keepObj(pf, S.perf); busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return; }   // in place: the running sequencer holds this object
       case 'patch': {   // only what changed (coreDiff on the page): [key, null, value] · [key, index, item] · [key, 'len', n] · [key, 'del']
         if (!S) return;
         for (const [k, i, v] of d.ops){ if (i === null) S[k] = k === 'perf' ? keepObj(S[k], v) : v; else if (i === 'del') delete S[k]; else if (i === 'len'){ if (Array.isArray(S[k])) S[k].length = v; }
           else { if (!Array.isArray(S[k])) S[k] = []; S[k][i] = v; } }
         if (d.ops.some(o => o[0] === 'insts')) varDrop(null);   // an instrument's RANGE / GEN TYPE… changed: its variations are other sounds now
-        busPlanH = null; busPlanVal = null; return; }
+        busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return; }
       case 'vars': if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } return;
       case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
       case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, data2:d.data2 || null, sr:d.sr}); else coreBufs.delete(d.pad); varDrop(d.pad); return;   // data2: a stereo pad's right channel
@@ -351,6 +352,7 @@ class ThunderCore extends AudioWorkletProcessor {
         if (d.rel) this.release(at);   // HAND-OVER (7 Nov): the page plays on from `at`, so the live engines are its own from then
         return; }
       case 'loop': if (this.seq) this.seq.setLoop(d.l || null); return;
+      case 'stp': { const at = Math.max(currentTime, d.t == null ? 0 : d.t); if (d.track >= 0 && d.track < NT){ for (const v of this.T(d.track)) this.kill(v, at, 0.004, true); this.T(d.track).length = 0; } return; }   // RESET TRACK (build 650): one track's voices let go as STOP lets them go (a voice booked to start later never sounds); the page sends the song first
       case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
       case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
       case 'lxp': lxp.st = d.st | 0; return;
@@ -416,6 +418,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
       if (!c.done) this.chaseRun(c, null);
       seq = c.seq; const first = c.first;
+      if (c.chc) for (const e of c.chc.values()) if (!(e.v === 2)) this.ev(Object.assign({}, e, {t:d.t0}));   // (a momentary BYP flip, 2, is not carried over: its own −1 to end it may be past)
       if (c.eng) for (const e of c.eng.values()) this.engEv(Object.assign({}, e, {t:d.t0}));   // the steps run silently: the live engines' state they left, now (then the step it stopped on, below)
       if (first) for (const e of first.evs) if (e.type === 'eng') this.engEv(Object.assign({}, e, {t:e.t + (d.t0 - first.t)}));
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
@@ -632,10 +635,14 @@ class ThunderCore extends AudioWorkletProcessor {
       this.fxOv.set(key, ov); tcAt(proc, Math.max(ev.t, currentTime), m); return true;
     }
     // BYP (3 Nov): a …chains module's switch (b1–b15 on the track's thunder-chains node), as fxc above
+    // KN1–KN8 (22 Nov, patch knobs): k1–k8 on the same node, and (S2) on the track's …waves live nodes (proc.__wl); knSt keeps them for nodes met later (lnode)
     if (ev.type === 'chc'){
-      const proc = tcNodes().get('chn:' + ev.track); if (!proc) return false;
-      const ov = tcOver(proc), at = Math.max(ev.t, currentTime); ov.until = Infinity;
-      tcParam(ov, ev.p, at).set(ev.v, at); this.fxTouched.add('chn:' + ev.track); return true;
+      const proc = tcNodes().get('chn:' + ev.track), at = Math.max(ev.t, currentTime); let did = false;
+      if (proc){ const ov = tcOver(proc); ov.until = Infinity; tcParam(ov, ev.p, at).set(ev.v, at); this.fxTouched.add('chn:' + ev.track); did = true; }
+      if (ev.p[0] === 'k' && ev.track >= 0 && ev.track < NT){
+        const K = this.knSt[ev.track] || (this.knSt[ev.track] = new Float32Array(9).fill(-1)), KT = this.knT[ev.track] || (this.knT[ev.track] = new Float64Array(9)); K[+ev.p.slice(1)] = ev.v; KT[+ev.p.slice(1)] = at;   // (knT: its booked time, CodeRabbit on #298)
+        const pre = ev.track + ':'; for (const [key, p] of tcNodes()) if (p && p.__wl && key.startsWith(pre)){ this.knPut(p, key, ev.p, ev.v, at); did = true; } }
+      return did;
     }
     // A tempo change: …chains' transport, at its time (the page still sets its own tempo and the live engines' bpm)
     if (ev.type === 'tempo'){
@@ -672,11 +679,15 @@ class ThunderCore extends AudioWorkletProcessor {
     for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
       for (const A of ov.p.values()){ A.cancel(at); A.set(-1, at); } ov.until = at + 0.5; }   // FXO… (fx:) and BYP b1–b15 (chn:)
     this.fxTouched.clear();
+    for (const key of this.knTouched){ const proc = tcNodes().get(key), ov = proc && proc.__ov; if (!ov) continue;   // PATCH KNOBS: the …waves nodes' k1–k8 back to their Knob's Value
+      for (let k = 1; k <= 8; k++){ const A = ov.p.get('k' + k); if (A){ A.cancel(at); A.set(-1, at); } } if (ov.until === Infinity) ov.until = at + 0.5; }
+    this.knTouched.clear(); this.knSt.fill(null); this.knT.fill(null);
     // FXV: the slots' own settings again (makePlayer's resetSeq does the same for the ones the page moved)
     for (const [key, ov] of this.fxOv){ const [t, k] = key.split(':').map(Number), proc = tcNodes().get('fx:' + t), A = S && (t >= NT ? S.mfx : S.tfx && S.tfx[t]), f = A && A[k];
       const m = proc && f && (TFX[f.type] && TFX[f.type].pump ? (TFX[f.type].pd ? {pset:{slot:k, pv:pumpPv(TFX[f.type], f, null)}} : null) : fxvMsg(f, k, {}, S.bpm)); if (m){ if (proc.__q) proc.__q = proc.__q.filter(x => !(x[1].pset && x[1].pset.slot === k)); tcAt(proc, at, m); } }
     this.fxOv.clear(); }
 
+  knPut(proc, key, name, v, at){ const ov = tcOver(proc); ov.until = Infinity; tcParam(ov, name, at).set(v, at); this.knTouched.add(key); }   // PATCH KNOBS
   /* ---- live engines: makePlayer's bassNode / bassNote / polyVox / polyPs, driving the registered nodes ---- */
   lnode(t, pad, j){
     const k = this.kv[pad], lk = k && k.lk; if (!lk) return null;
@@ -685,7 +696,8 @@ class ThunderCore extends AudioWorkletProcessor {
       if (L.ps) L.lanes = [0, 1, 2, 3].map(q => ({L, lane:q, n:L.n + q * 1e5, lastOn:-1, cur:null}));
       if (old) for (const A of this.engL) if (A) A.delete(old);
       (this.engL[t] || (this.engL[t] = new Set())).add(L);   // ENGINE TARGETS: the track's live nodes
-      this.lnodes.set(key, L); }
+      this.lnodes.set(key, L);
+      const K = proc.__wl && this.knSt[t], KT = this.knT[t]; if (K) for (let k = 1; k <= 8; k++) if (K[k] >= 0) this.knPut(proc, key, 'k' + k, K[k], Math.max(currentTime, KT ? KT[k] : 0)); }   // (at its booked time, not early)   // PATCH KNOBS: a …waves node met after KN
     return L;
   }
   // the AudioParam names on this node (a …pump synth's lane j: r/g/t/l/v + j)

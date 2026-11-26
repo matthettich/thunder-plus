@@ -24,7 +24,7 @@ test('frame(): the playhead redraw goes through playTick, one per frame at most,
 function rig(o = {}) {
   const log = [];
   const c = { performance: { now: () => c.t }, t: 1000, view: 'tracker', apHold: false, apF: null, selA: null, sdrag: null, drag: null, arrFast: false, arrSoon: 0, tv: 'mixer', COARSE: true,
-    cs: { a: 1 }, tp: { on: true, pos: [], mode: 'song', bpm: 120, tks: 6 }, cTrack: 0, cPhrase: 0, cSect: 0, patRow: -1, loopPat: false, followMode: 2, scr: { style: { fontSize: '14px' } }, tScale: 100, vpW: 900, arrW: 0, sideOn: true, inlOn: true, stage: 'off', arrMode: 1, spOn: false, pvMode: true, pvFx: false, pvFold: true, inMode: 'pad', ntr: () => 8,
+    cs: { a: 1 }, tp: { on: true, pos: [], mode: 'song', bpm: 120, tks: 6 }, cTrack: 0, cPhrase: 0, cSect: 0, patRow: -1, loopPat: false, followMode: 2, scr: { style: { fontSize: '14px' } }, tScale: 100, vpW: 900, vpH: 700, rzOn: false, arrW: 0, sideOn: true, inlOn: true, stage: 'off', arrMode: 1, spOn: false, pvMode: true, pvFx: false, pvFold: true, inMode: 'pad', ntr: () => 8,
     playDraw: false, scrAdd() { log.push('count'); }, apReady: false, apStrip() { log.push('strip'); }, apStripOk: () => false, drawArr() { log.push('arr'); }, playhead: () => null, pvActive: () => false, pvPlayMark() { log.push('pvmark'); }, pvLit: new Set(), litRows(r) { log.push('lit'); }, draw() { log.push('draw'); }, log, ...o };
   vm.createContext(c);
   vm.runInContext(cut(/const PL_BEAT = 500[\s\S]*?\nfunction frameWake\(\)/).replace(/function frameWake\(\)$/, '') + '\nthis.tick = playTick; this.base = () => plBase; this.owed = () => plOwed;', c);

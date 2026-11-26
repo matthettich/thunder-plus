@@ -7,18 +7,18 @@ const src = H.read('index.html');
 const fn = src.match(/let lsW = null;\nfunction lpSelRestore\(\)\{[^\n]*\nfunction lpSelPlay\(\)\{[\s\S]*?\n\}\n/);
 assert.ok(fn, 'could not find lpSelPlay: the code moved, this test needs updating');
 function rig({ tvv = 'song', sel = null, on = false, loopSel = false } = {}) {
-  const log = [], c = { tp: { on }, tv: tvv, loopSel, loopArm: null, warmTok: 0, cs: { song: { y: 9 } }, rS: n => String(n).padStart(3, '0'), log,
+  const log = [], c = { tp: { on, loopV: 'song', seq: { setLoop: L => log.push('setLoop:' + (L ? L.y0 + '-' + L.y1 : 'none')) } }, tv: tvv, loopSel, loopArm: null, warmTok: 0, lsLock: false, hx: n => n.toString(16).padStart(2, '0'), cs: { song: { y: 9 } }, rS: n => String(n).padStart(3, '0'), log,
     sxRect: () => sel, tStopUser: () => { log.push('stop'); c.tp.on = false; }, toast: m => log.push('toast:' + m), draw: () => log.push('draw'),
     toggleLoop: () => { log.push('toggleLoop'); c.loopSel = !c.loopSel; if (c.loopSel && sel) c.loopArm = { v: 'song', y0: sel.y0, y1: sel.y1 }; },
     playCtx: () => { log.push('playCtx:' + (c.loopSel && c.loopArm ? c.loopArm.y0 + '-' + c.loopArm.y1 : 'plain')); c.tp.on = true; }, playPatLoop: () => { log.push('playPatLoop:' + c.cs.song.y); c.tp.on = true; } };
-  vm.createContext(c); vm.runInContext(fn[0].replace(/^let lsW/, 'var lsW') + '\nthis.go = lpSelPlay; this.get = () => lsW; this.restore = lpSelRestore;', c); return c;
+  vm.createContext(c); vm.runInContext(fn[0].replace(/^let lsW/, 'var lsW') + '\nthis.go = lpSelPlay; this.get = () => lsW; this.lock = () => lsLock; this.restore = lpSelRestore;', c); return c;
 }
 test('a selection of rows: LOOP SEL turns on from it and playCtx plays those rows (no second loop path)', () => {
   const c = rig({ sel: { y0: 4, y1: 7 } }); c.go();
   assert.deepEqual(c.log.filter(x => !x.startsWith('toast')), ['toggleLoop', 'playCtx:4-7']); assert.ok(c.get(), 'remembers LOOP SEL as it was');
 });
 test('LOOP SEL already on: nothing is toggled, playCtx plays the rows', () => {
-  const c = rig({ sel: { y0: 2, y1: 3 }, loopSel: true }); c.loopArm = { v: 'song', y0: 2, y1: 3 }; c.go(); assert.deepEqual(c.log, ['playCtx:2-3']);
+  const c = rig({ sel: { y0: 2, y1: 3 }, loopSel: true }); c.loopArm = { v: 'song', y0: 2, y1: 3 }; c.go(); assert.deepEqual(c.log.filter(x => !x.startsWith('toast')), ['playCtx:2-3']);
 });
 test('no selection (or one row): loop play on the cursor row, and a toast says to select rows for a longer loop', () => {
   for (const sel of [null, { y0: 5, y1: 5 }]) { const c = rig({ sel }); c.go(); assert.deepEqual(c.log.filter(x => x !== 'draw').map(x => x.replace(/ .*/, '')), ['playPatLoop:9', 'toast:Looping']); assert.match(c.log.join(), /select 2 or more rows for a longer loop/); }
@@ -40,4 +40,11 @@ test('wiring: the button, its action, the bar orders, draw()', () => {
 test('folded: not on the row under 700 px; wider windows get a column more where it shows', () => {
   assert.match(src, /@media \(max-width:699px\)\{ \.tcmd:not\(\.cmini\) button\[data-c=lpsel\]\{display:none\} \}/);
   assert.match(src, /@media \(min-width:700px\)\{ \.tcmd\.lps\{grid-template-columns:repeat\(16,/); assert.match(src, /\.tcmd\.song\.lps\{grid-template-columns:repeat\(18,/);
+});
+test('LOCK (23 Nov): the loop LP.SEL starts holds; LP.SEL on other rows moves it; STOP releases it', () => {
+  const sel = { y0: 4, y1: 7 }, c = rig({ sel }); c.go(); assert.equal(c.lock(), true, 'locked once playing');
+  sel.y0 = 0x10; sel.y1 = 0x13; c.log.length = 0; c.go();
+  assert.deepEqual(c.log.filter(x => !x.startsWith('toast') && x !== 'draw'), ['setLoop:16-19']); assert.equal(JSON.stringify(c.loopArm), JSON.stringify({ v: 'song', y0: 16, y1: 19 })); assert.ok(c.tp.on, 'still playing');
+  c.log.length = 0; c.go(); assert.deepEqual(c.log, ['stop'], 'same rows again: it stops');
+  c.get().seen = true; c.restore(); assert.equal(c.lock(), false);
 });

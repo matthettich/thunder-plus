@@ -129,7 +129,9 @@ const mixCount = p => clamp(Math.round(p.chans) || 4, 1, MIXN);
 const Mixer = Object.assign({
   type:'mixer', scope:'mono', cost:.1,
   outputs:{ out:'audio' },
-  create:() => ({}),
+  create:() => ({ pk:0 }),
+  // OUT METER (15 Nov): the loudest sample it sent out since the editor last asked (peak in dB; -120 for nothing), so a mixer shows it is passing audio.
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },
   process(st, io, ctx){
     const p = io.p, o = io.out.out, n = ctx.block, N = mixCount(p);
     o.fill(0);
@@ -138,6 +140,8 @@ const Mixer = Object.assign({
       const x = io.in[MXI[k]], g = p[MXL[k]] * p.level;
       for (let i = 0; i < n; i++) o[i] += x[i] * g;
     }
+    let pk = st.pk; for (let i = 0; i < n; i++){ const a = o[i] < 0 ? -o[i] : o[i]; if (a > pk) pk = a; }
+    st.pk = pk < 8 ? pk : 8;
   }
 }, mixDef(false));
 
@@ -147,7 +151,8 @@ const Mixer = Object.assign({
 const StereoMixer = Object.assign({
   type:'smixer', scope:'mono', cost:.15,
   outputs:{ out:'audio', outR:'audio' },
-  create:() => ({}),
+  create:() => ({ pk:0 }),
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },   // OUT METER (15 Nov): the louder side's peak, in dB
   process(st, io, ctx){
     const p = io.p, oL = io.out.out, oR = io.out.outR, n = ctx.block, N = mixCount(p);
     oL.fill(0); oR.fill(0);
@@ -157,6 +162,8 @@ const StereoMixer = Object.assign({
       const g = p[MXL[k]] * p.level, pn = p[MXP[k]], gL = g * (pn > 0 ? 1 - pn : 1), gR = g * (pn < 0 ? 1 + pn : 1);
       for (let i = 0; i < n; i++){ oL[i] += L[i] * gL; oR[i] += R[i] * gR; }
     }
+    let pk = st.pk; for (let i = 0; i < n; i++){ const a = oL[i] < 0 ? -oL[i] : oL[i], b = oR[i] < 0 ? -oR[i] : oR[i]; if (a > pk) pk = a; if (b > pk) pk = b; }
+    st.pk = pk < 8 ? pk : 8;
   }
 }, mixDef(true));
 
@@ -1950,6 +1957,25 @@ const Constant = {
   process(st, io, ctx){ io.out.out.fill(io.p.value + io.p.fine); }
 };
 
+/* Knob (22 Nov 2026, patch knobs): a control the track drives. Out is knob N's value from the tracker (KN1–KN8) while the
+   song has set it, else Value; mapped into Min..Max. ctx.engine.knobs[1..8] (−1 = not set) is filled from the host node's
+   k1–k8 params each block; an engine without them (…waves before S2) just uses Value. A change glides across one block so
+   a jump doesn't click. */
+const Knob = {
+  type:'knob', scope:'poly', cost:.01,
+  inputs:{}, outputs:{ out:'cv' },
+  params:{ n:[1,1,8,1], value:[0,0,1,.01], min:[0,-1,1,.01], max:[1,-1,1,.01] },
+  create:() => ({ y:NaN }),
+  process(st, io, ctx){
+    const K = ctx.engine && ctx.engine.knobs, n = Math.max(1, Math.min(8, Math.round(io.p.n) || 1)), h = K ? K[n] : -1;
+    // (len: the frames rendered this block, ctx.block, not the buffer's length: CodeRabbit on #289, a short block glides all the way and the rest of the buffer holds)
+    const v = h >= 0 ? Math.min(1, h) : io.p.value, to = io.p.min + (io.p.max - io.p.min) * v, o = io.out.out, len = Math.max(1, Math.min(o.length, ctx.block || o.length)), from = st.y;
+    if (!(from === from) || from === to) o.fill(to);   // (NaN: the first block)
+    else { const d = (to - from) / len; for (let i = 0; i < len; i++) o[i] = from + d * (i + 1); o.fill(to, len); }
+    st.y = to;
+  }
+};
+
 /* Divider: counts Clock in and gates every 2nd, 4th, 8th and Nth pulse (each output stays high for the length of
    the pulse that fired it). Reset starts counting again. */
 const Divider = {
@@ -2523,7 +2549,7 @@ class FlexCore {
         const t = x * d * 1.5; if (Math.abs(t - 1) < 1e-9) return '1/' + d + 'T'; }
       return fr(b) + ' BEAT'; };
     const st = s => { const v = Math.round(12 * Math.log2(s)); return (v > 0 ? '+' : '') + v; };
-    const T = new Array(512).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
+    const T = new Array(768).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
     put(1, [null, ...[[3, 1/2], [3, 1/3], [3, 1/4], [3, 1/6], [3, 1/8], [3, 1/12], [3, 1/16], [3, 1/32], [2, 1/4], [2, 1/8], [2, 1/16], [3.5, 1/16], [3.5, 1/32], [3.5, 1/64], [0, 1/16]]
       .map(([s, L]) => ({f:'roll', s, L, n:`ROLL ${nv(L)} FROM BEAT ${s + 1}`}))]);
     put(2, [[1, 1/3], [1, 1/4], [1, 1/8], [1, 1/16], [1/2, 1/4], [1/2, 1/6], [1/2, 1/8], [1/2, 1/16], [2, 1], [2, 1/2], [2, 1/4], [4, 1/2], [4, 1/3], [4, 3/4], [4, 1/8], [1/4, 1/16]]
@@ -2629,6 +2655,11 @@ class FlexCore {
       .map(([G, d, set, fx]) => ({f:'tex', G, d, set, nb:fx ? 0 : 1, n:`${{all:'TEXTURE', crush:'CRUSH SLICES', filt:'FILTER SLICES', chop:'CHOP SLICES', cf:'CRUSH+FILTER SLICES'}[set]} ${nv(G)} ${Math.round(d * 100)}%${fx ? ' FIXED' : ''}`})));
     put2(15, [[1/4, .25], [1/4, .4], [1/4, .55], [1/4, .7], [1/4, .85], [1/4, 1], [1/2, .4], [1/2, .6], [1/2, .8], [1/8, .4], [1/8, .6], [1/3, .5], [1/4, .5, 1], [1/2, .5, 1], [1, .5], [1/4, .6, 0, 1]]
       .map(([G, d, fx, slow]) => ({f:'chaos2', G, d, nb:fx ? 0 : 1, slow:slow || 0, n:`CHAOS 2 ${nv(G)} ${Math.round(d * 100)}%` + (fx ? ' FIXED' : slow ? ' SLOW' : '')})));
+    // FLZ (owner, 23 Nov: "more effects like FLX and FLY"): a third bank, k 512–767 (flx param 512 + FLZ value). Each pattern is a
+    // `chain` of existing patterns run one after another on the read position (FlexCore.chain): x0 = now, x1 = stage 1's read of x0,
+    // x2 = stage 2's read of x1… A texture stage (gate, filter, crush) put first follows the beat grid; put later, it follows the
+    // replayed audio. Every stage reads only what has played, so the chain does too (tests/flex.test.js scans all of FLZ).
+    FlexCore.FLZ(T, nv);
     // 01–0F: one of each family
     [0x10, 0x22, 0x34, 0x41, 0x50, 0x61, 0x70, 0x81, 0x91, 0xA0, 0xB3, 0xC0, 0xD1, 0xE1, 0xF2].forEach((x, i) => { T[256 + 1 + i] = T[256 + x]; });
     return T;
@@ -2640,6 +2671,270 @@ class FlexCore {
     for (let k = 17; k < 256; k++) N[k] = T[k] ? T[k].n : 'OFF';
     return (FlexCore._N = N);
   }
+  // FLZ's table (k 512–767): filled by FLZ_LIST below; each entry {f:'chain', S:[k…], n}. Stage ks are FLX (1–255) / FLY (257–511) patterns.
+  static FLZ(T, nv){ const L = FlexCore.FLZ_LIST || []; for (let v = 1; v < 256 && v <= L.length; v++){ const e = L[v - 1]; if (e) T[512 + v] = {f:'chain', S:e[0], n:e[1]}; } }
+  // FLZ_LIST: entry i is FLZ v = i + 1, [[stage ks…], NAME]. Plain data (the class is stringified into the worklets). Stage ks: FLX 17–255, FLY 257–511.
+  static FLZ_LIST = [
+    // 01–0F: the 2nd variant of each family 1–F
+    [[0x21, 0xB1], 'STUTTER 1/16 + CRUSH 6 BIT'],
+    [[0xD0, 0x146], 'JUGGLE 1/16 + DETUNE'],
+    [[0x13, 0x7E], 'ROLL 1/16 + WARBLE'],
+    [[0x52, 0xA0], 'HALF 1/8 + LOW-PASS DOWN'],
+    [[0x42, 0x90], 'REVERSE 1/16S + GATE 1/32'],
+    [[0xA2, 0x31], 'HP RISER + BUILD 1/16'],
+    [[0x1D0, 0xB1], 'GRAINS 1/64 + CRUSH 6 BIT'],
+    [[0x80, 0x93], 'SCRATCH 1/4 + PUMP 1/4'],
+    [[0x1A1, 0x21], 'POLYMETER 5/16 + STUTTER'],
+    [[0x1B8, 0xD8], 'WARP UP 1/4 + JUGGLE 1/8'],
+    [[0xC3, 0xA0, 0x7B], 'ECHO 1/8 + LP DOWN + WOW'],
+    [[0x161, 0xB1], 'CD SKIP 35% + CRUSH 6 BIT'],
+    [[0x122, 0x112], 'EUCLID 5/16 + PITCH ROLL -1'],
+    [[0xE1, 0x93], 'SWING 1/8 + PUMP 1/4'],
+    [[0xF2, 0x1F1], 'CHAOS 1/4 58% + CHAOS 2'],
+    // 10–FF: the families by the first hex digit (1 BITMANGLE STUTTER · 2 PITCHED JUGGLE · 3 TAPE ROLL · 4 HALF / DOUBLE TIME · 5 REVERSE GATE · 6 FILTER BUILD · 7 GRAIN CRUSH · 8 SCRATCH CHOP · 9 POLY STUTTER · A WARP JUGGLE · B DUB ECHO · C SKIP CRUSH · D EUCLID PITCH · E SWING CHOP · F DOUBLE CHAOS)
+    [[0x21, 0xB0], 'STUTTER 1/16 + CRUSH 8 BIT'],
+    [[0x21, 0xB1], 'STUTTER 1/16 + CRUSH 6 BIT'],
+    [[0x24, 0xB1], 'STUTTER 1/16 EV 1/8 + 6 BIT'],
+    [[0x22, 0xB3], 'STUTTER 1/32 + DOWNSAMPLE ÷4'],
+    [[0x2A, 0xB2], 'STUTTER 1/16 EV 1/2 + 4 BIT'],
+    [[0x23, 0xB4], 'STUTTER 1/64 + DOWNSAMPLE ÷8'],
+    [[0x191, 0xB6], 'STUTTER EDIT 1/16 + ÷8 6 BIT'],
+    [[0x192, 0xBB], 'STUTTER EDIT 60% + 3 BIT'],
+    [[0x31, 0xB1], 'BUILD 1/16-1/64 + 6 BIT'],
+    [[0x34, 0xB2], 'BUILD 1/8-1/64 + 4 BIT'],
+    [[0x35, 0xBD], 'BUILD TO 1/128 + ÷4 4 BIT'],
+    [[0x196, 0xB7], 'STUTTER EDIT +2 + CRUSH RISE'],
+    [[0x19A, 0xB8], 'FADING STUTTER + CRUSH FALL'],
+    [[0x39, 0xBB], 'TRIPLET BUILD + 3 BIT'],
+    [[0x23, 0xB5], 'STUTTER 1/64 + DOWNSAMPLE ÷16'],
+    [[0x2F, 0x19C, 0xBB], 'DOUBLE STUTTER + 3 BIT MUSH'],
+    [[0xD8, 0x140], 'JUGGLE 1/8 + OCTAVE SLICES'],
+    [[0xD0, 0x146], 'JUGGLE 1/16 + DETUNE'],
+    [[0xD0, 0x141], 'JUGGLE 1/16 + OCT+5TH'],
+    [[0xD1, 0x143], 'JUGGLE #2 + SLICES UP'],
+    [[0xD9, 0x142], 'JUGGLE 1/8 #2 + SLICES DOWN'],
+    [[0xD2, 0x144], 'JUGGLE #3 + CHROMATIC'],
+    [[0xDC, 0x147], 'JUGGLE 1/8T + OCTAVE 1/8'],
+    [[0xD3, 0x145], 'JUGGLE #4 + WIDE PITCH'],
+    [[0xDA, 0x148], 'JUGGLE 1/8 #3 + OCT+5TH'],
+    [[0xD4, 0x149], 'JUGGLE #5 + CHROMATIC 1/8'],
+    [[0xDD, 0x144], 'JUGGLE 1/16T + CHROMATIC'],
+    [[0xD5, 0x14A], 'JUGGLE #6 + WIDE 1/32'],
+    [[0xDE, 0x141], 'JUGGLE ALL + OCT+5TH'],
+    [[0xDE, 0x145], 'JUGGLE ALL + WIDE PITCH'],
+    [[0xDF, 0x14B], 'JUGGLE 1/32 + OCTAVES 1/32'],
+    [[0xDF, 0x14A, 0x144], 'JUGGLE 1/32 + 2X PITCH'],
+    [[0x19, 0x7B], 'ROLL 1/16 + WOW'],
+    [[0x13, 0x7E], 'ROLL 1/16 + WARBLE'],
+    [[0x34, 0x7B], 'BUILD + WOW'],
+    [[0x70, 0x13], 'TAPE STOP + ROLL 1/16'],
+    [[0x174, 0x7D], 'ACCEL ROLL + FLUTTER'],
+    [[0x36, 0x70], 'BUILD + TAPE STOP BEAT 4'],
+    [[0x170, 0x7C], 'BOUNCE + DEEP WOW'],
+    [[0x72, 0x15], 'TAPE STOP 1/2 + ROLL 1/32'],
+    [[0x3A, 0x7C], 'SLOW DOWN BUILD + DEEP WOW'],
+    [[0x37, 0x71], 'BUILD 1/32 + TAPE STOP HALF'],
+    [[0x178, 0x76], 'DECEL ROLL + TAPE START'],
+    [[0x75, 0x174], 'TAPE STOP 1/8 + ACCEL ROLL'],
+    [[0x73, 0x33], 'TAPE STOP EVERY BEAT + BUILD'],
+    [[0x17E, 0x79], 'DECEL + TAPE START /BEAT'],
+    [[0x74, 0x177], 'TAPE STOP 2 BEATS + BUZZ'],
+    [[0x17B, 0x73, 0x7C], 'BOUNCE + STOPS + DEEP WOW'],
+    [[0x51, 0xA4], 'HALF SPEED + LOW-PASS DROP'],
+    [[0x52, 0xA0], 'HALF 1/8 + LOW-PASS DOWN'],
+    [[0x62, 0xA5], 'DOUBLE 1/2 + HIGH-PASS UP'],
+    [[0x50, 0xA6], 'HALF 1/4 + LP WOBBLE'],
+    [[0x60, 0xA8], 'DOUBLE 1/8 + HP WOBBLE'],
+    [[0x53, 0xA1], 'DOWN -5 + LOW-PASS UP'],
+    [[0x64, 0xA2], 'UP +7 1/4 + HP RISER'],
+    [[0x58, 0xA7], 'DOWN -24 + LP WOBBLE 1/8'],
+    [[0x61, 0xAC], 'DOUBLE 1/16 + BAND SWEEP'],
+    [[0x5B, 0xAE], 'HALF 1/16 + LP EACH BEAT'],
+    [[0x59, 0x6B, 0xAB], 'HALF THEN DOUBLE + BAND'],
+    [[0x6C, 0xA9], 'DOUBLE ALT 1/8 + LP CLOSED'],
+    [[0x5F, 0xAD], 'DOWN -24 1/8 + LP 1/4T'],
+    [[0x69, 0xA3], 'UP +24 1/16 + HP DOWN'],
+    [[0x5E, 0x6A, 0xA7], 'HALF / DOUBLE + WOBBLE'],
+    [[0x5B, 0x6A, 0xAF], 'HALF + DOUBLE + PHONE'],
+    [[0x41, 0x91], 'REVERSE 1/2S + GATE 1/8T'],
+    [[0x42, 0x90], 'REVERSE 1/16S + GATE 1/32'],
+    [[0x4A, 0x98], 'REVERSE BEAT 4 + GATE MASK'],
+    [[0x46, 0x93], 'REVERSE ALT 1/4 + PUMP 1/4'],
+    [[0x43, 0x99], 'REVERSE 1/32S + GATE MASK 2'],
+    [[0x47, 0x9A], 'REVERSE ALT 1/8 + GATE MASK 3'],
+    [[0x4C, 0x94], 'REVERSE 1/16 BEAT 4 + PUMP'],
+    [[0x48, 0x9B], 'REVERSE ALT 1/16 + MASK 4'],
+    [[0x1C1, 0x9C], 'REVERSE ROLL 1/8 + MASK 5'],
+    [[0x1C0, 0x9D], 'REVERSE ROLL 1/16 + MASK 6'],
+    [[0x4F, 0x9E], 'RANDOM REVERSE + MASK 7'],
+    [[0x1C4, 0x9F], 'PING-PONG ROLL + MASK 8'],
+    [[0x4D, 0x92], 'REVERSE HALF SPEED + GATE'],
+    [[0x1C2, 0x98], 'REVERSE ROLL 1/32 + MASK'],
+    [[0x1C9, 0x99], 'REWIND + GATE MASK 2'],
+    [[0x4B, 0x1C0, 0x9E], 'REVERSE x2 + GATE MASK 7'],
+    [[0xA0, 0x36], 'LOW-PASS DOWN + BUILD'],
+    [[0xA2, 0x31], 'HP RISER + BUILD 1/16'],
+    [[0xA4, 0x30], 'LP DROP + BUILD BEAT 3'],
+    [[0xA5, 0x37], 'HP UP + BUILD 1/32'],
+    [[0xAC, 0x34], 'BAND SWEEP + BUILD'],
+    [[0xA2, 0x33], 'HP RISER + BUILD 1/4'],
+    [[0xA0, 0x3D], 'LP DOWN + LONG BUILD'],
+    [[0xA7, 0x35], 'LP WOBBLE 1/8 + BUILD'],
+    [[0xA1, 0x3C], 'LP UP + BUILD 1/128'],
+    [[0xA2, 0x3E], 'HP RISER + BUILD 1/2'],
+    [[0xAE, 0x32], 'LP EACH BEAT + BUILD'],
+    [[0xA8, 0x3D], 'HP WOBBLE + LONG BUILD'],
+    [[0xA0, 0xA2, 0x35], 'LP DOWN + HP RISER + BUILD'],
+    [[0xAD, 0x38], 'LP 1/4T + TRIPLET BUILD'],
+    [[0xA3, 0xA1, 0x3D], 'HP DOWN + LP UP + BUILD'],
+    [[0xAC, 0xA8, 0x35], 'BAND + HP WOBBLE + BUILD'],
+    [[0x1D1, 0xB0], 'GRAINS 1/32 + CRUSH 8 BIT'],
+    [[0x1D0, 0xB1], 'GRAINS 1/64 + CRUSH 6 BIT'],
+    [[0x1D2, 0xB3], 'GRAINS 1/16 + ÷4'],
+    [[0x1DA, 0xB1], 'GRAINS BEAT 4 + 6 BIT'],
+    [[0x1D5, 0xB4], 'GRAINS REVERSE + ÷8'],
+    [[0x1D3, 0xB2], 'GRAINS 1/64 BAR + 4 BIT'],
+    [[0x1D7, 0xB6], 'GRAIN GAPS + ÷8 6 BIT'],
+    [[0x1DB, 0xBB], 'GRAINS HALF BAR + 3 BIT'],
+    [[0x1D6, 0xB3], 'GRAINS 1/64 REV + ÷4'],
+    [[0x1D8, 0xB2], 'SPARSE GRAINS + 4 BIT'],
+    [[0x1DC, 0xB7], 'DENSE GRAINS + CRUSH RISE'],
+    [[0x1DF, 0xBD], 'GRAINS 1/8 GAPS + ÷4 4 BIT'],
+    [[0x1DD, 0xBB], 'REVERSE GRAINS + 3 BIT'],
+    [[0x1DE, 0xB4], 'SHIMMER GRAINS + ÷8'],
+    [[0x1D4, 0xB8], 'GRAINS 1/128 + CRUSH FALL'],
+    [[0x1D5, 0x1DC, 0xBB], 'GRAIN CLOUD + 3 BIT'],
+    [[0x82, 0x91], 'SCRATCH 1/8 + GATE 1/8T'],
+    [[0x80, 0x93], 'SCRATCH 1/4 + PUMP 1/4'],
+    [[0x81, 0x1E9], 'SCRATCH x2 + CHOP SLICES'],
+    [[0x83, 0x90], 'SCRATCH 1/16 + GATE 1/32'],
+    [[0x8B, 0x94], 'SCRATCH 1/8 x2 + PUMP'],
+    [[0x85, 0x1E9], 'SCRATCH 1/4 x4 + CHOP'],
+    [[0x9D, 0x88], 'CHIRP 1/16 + GATE MASK 6'],
+    [[0x92, 0x8D], 'TRANSFORM + GATE 1/16T'],
+    [[0x84, 0x9A], 'SCRATCH 1/2 x4 + MASK 3'],
+    [[0x86, 0x1E4], 'CHIRP 1/8 + TEXTURE 1/32'],
+    [[0x8E, 0x9B], 'CHIRP x4 + GATE MASK 4'],
+    [[0x87, 0x9C], 'CHIRP 1/4 + GATE MASK 5'],
+    [[0x8A, 0x9E], 'SCRATCH x8 + GATE MASK 7'],
+    [[0x8C, 0x1E7], 'SCRATCH 1/2 + FILTER SLICES'],
+    [[0x89, 0xA6], 'SCRATCH BAR x8 + LP WOBBLE'],
+    [[0x91, 0x8E, 0x8A], 'DOUBLE SCRATCH + GATE 1/8T'],
+    [[0x1A0, 0x24], 'POLYMETER 3/16 + STUTTER'],
+    [[0x1A1, 0x21], 'POLYMETER 5/16 + STUTTER'],
+    [[0x28, 0x1A2], 'STUTTER 1/4 + POLY 3/8'],
+    [[0x1A3, 0x2A], 'POLY 7/16 + STUTTER 1/16'],
+    [[0x1A8, 0x22], 'POLY 3/16 BEAT 3 + 1/32'],
+    [[0x1A4, 0x24], 'POLY 9/16 + STUTTER 1/16'],
+    [[0x1AB, 0x21], 'POLY 1/4T + STUTTER 1/16'],
+    [[0x1A5, 0x2F], 'POLY 5/8 + STUTTER 1/64'],
+    [[0x1AC, 0x22], 'POLY PING-PONG + 1/32'],
+    [[0x1A9, 0x23], 'POLY 5/16 BEAT 3 + 1/64'],
+    [[0x1A6, 0x25], 'POLY 11/16 + STUTTER 1/16T'],
+    [[0x1AD, 0x2F], 'POLY 5/16 PING + 1/64'],
+    [[0x1A7, 0x1A0, 0x22], 'TWO POLYMETERS + 1/32'],
+    [[0x1AE, 0x23], 'POLY 7/16 PING + 1/64'],
+    [[0x1AF, 0x2A, 0x1A1], 'POLY 5/6 + STUT + POLY'],
+    [[0x1AA, 0x1A3, 0x23], 'POLY BEAT 4 + 7/16 + 1/64'],
+    [[0x1B0, 0xD0], 'WARP UP 1/16 + JUGGLE'],
+    [[0x1B8, 0xD8], 'WARP UP 1/4 + JUGGLE 1/8'],
+    [[0x1B1, 0xD1], 'WARP DOWN 1/16 + JUGGLE #2'],
+    [[0x1B4, 0xD9], 'WARP UP 1/8 + JUGGLE 1/8'],
+    [[0x1B2, 0xD2], 'WARP ZIGZAG + JUGGLE #3'],
+    [[0x1B5, 0xDA], 'WARP DOWN 1/8 + JUGGLE'],
+    [[0x1B9, 0xDC], 'WARP DOWN 1/4 + JUGGLE 1/8T'],
+    [[0x1B6, 0xD3], 'WARP ZIGZAG 1/8 + JUGGLE'],
+    [[0x1B3, 0xD4], 'WARP RANDOM + JUGGLE #5'],
+    [[0x1BB, 0xDD], 'WARP UP 1/2 + JUGGLE 1/16T'],
+    [[0x1B7, 0xD5], 'WARP RANDOM 1/8 + JUGGLE'],
+    [[0x1BD, 0xDE], 'WARP RANDOM 1/8T + JUGGLE ALL'],
+    [[0x1BA, 0xD6], 'WARP RANDOM 1/4 + JUGGLE'],
+    [[0x1BE, 0xDF], 'WARP RANDOM 1/32 + JUGGLE'],
+    [[0x1B3, 0xDE, 0x1BE], 'WARP + JUGGLE ALL + WARP'],
+    [[0x1B7, 0xD7, 0x1B2], 'WARP + JUGGLE + ZIGZAG'],
+    [[0xC0, 0xA0, 0x7B], 'ECHO 1/16 + LP DOWN + WOW'],
+    [[0xC3, 0xA0, 0x7B], 'ECHO 1/8 + LP DOWN + WOW'],
+    [[0xC2, 0xA6, 0x7E], 'ECHO 1/8T + LP WOBBLE'],
+    [[0xC4, 0xAE, 0x7B], 'ECHO 3/16 + LP EACH BEAT'],
+    [[0xC7, 0xA4, 0x7C], 'ECHO 1/8 BAR + LP + DEEP WOW'],
+    [[0xC5, 0xA0, 0x7D], 'ECHO 1/4 + LP DOWN + FLUTTER'],
+    [[0xCA, 0xA7, 0x7B], 'ECHO 1/16T + LP WOBBLE 1/8'],
+    [[0xC6, 0xA8, 0x7C], 'ECHO 3/16 BAR + HP WOBBLE'],
+    [[0xCC, 0xAD, 0x7E], 'ECHO 1/8T + LP 1/4T + WARBLE'],
+    [[0xCB, 0xA2, 0x7B], 'ECHO 1/16 BAR + HP RISER'],
+    [[0xC1, 0xAC, 0x7D], 'ECHO 1/32 + BAND SWEEP'],
+    [[0xCE, 0xA0, 0x7C], 'ECHO 3/8 + LP DOWN + WOW'],
+    [[0xCF, 0xAE, 0x7C], 'ECHO 1/2 + LP EACH BEAT'],
+    [[0xC8, 0xA6, 0x7E], 'ECHO 1/32 + LP WOBBLE'],
+    [[0xC9, 0xAD, 0x7C], 'ECHO 1/64 + LP 1/4T + WOW'],
+    [[0xCD, 0x7B, 0xA7], 'ECHO 1/64 + WOW + LP WOBBLE'],
+    [[0x160, 0xB0], 'CD SKIP 20% + CRUSH 8 BIT'],
+    [[0x161, 0xB1], 'CD SKIP 35% + CRUSH 6 BIT'],
+    [[0x164, 0xB1], 'CD SKIP 1/8 35% + 6 BIT'],
+    [[0x162, 0xB3], 'CD SKIP 50% + ÷4'],
+    [[0x166, 0xB2], 'CD SKIP 1/32 30% + 4 BIT'],
+    [[0x169, 0xB4], 'CD STUCK 1/16 + ÷8'],
+    [[0x16B, 0xB1], 'DROPOUTS 1/16 + 6 BIT'],
+    [[0x165, 0xB6], 'CD SKIP 1/8 60% + ÷8 6 BIT'],
+    [[0x16D, 0xB3], 'SKIP BACK 1/16 + ÷4'],
+    [[0x163, 0xBB], 'CD SKIP 70% + 3 BIT'],
+    [[0x16A, 0xB2], 'CD STUCK 1/32 + 4 BIT'],
+    [[0x16E, 0xBD], 'SKIP BACK 1/8 + ÷4 4 BIT'],
+    [[0x167, 0xB7], 'CD SKIP 1/32 50% + RISE'],
+    [[0x168, 0xB8], 'CD SKIP 90% + CRUSH FALL'],
+    [[0x16C, 0xB5], 'DROPOUTS 1/32 + ÷16'],
+    [[0x16A, 0x167, 0xBB], 'DOUBLE SKIP + 3 BIT'],
+    [[0x120, 0x110], 'EUCLID 3/8 + PITCH ROLL +1'],
+    [[0x122, 0x112], 'EUCLID 5/16 + PITCH ROLL -1'],
+    [[0x121, 0x116], 'EUCLID 5/8 + ROLL BEAT 3'],
+    [[0x123, 0x111], 'EUCLID 7/16 + ROLL +2'],
+    [[0x124, 0x141], 'EUCLID 9/16 + OCT+5TH'],
+    [[0x126, 0x113], 'EUCLID 5/12 + ROLL -2'],
+    [[0x127, 0x147], 'EUCLID 7/12 + OCTAVES 1/8'],
+    [[0x125, 0x14B], 'EUCLID 11/16 + OCTAVES 1/32'],
+    [[0x128, 0x144], 'EUCLID 4/9 + CHROMATIC'],
+    [[0x12C, 0x114], 'EUCLID REPEAT 3/8 + ROLL'],
+    [[0x129, 0x145], 'EUCLID 5/11 + WIDE PITCH'],
+    [[0x12D, 0x11A], 'EUCLID REPEAT 5/16 + +3'],
+    [[0x12A, 0x119], 'EUCLID 7/13 + ROLL 1/64'],
+    [[0x12E, 0x144], 'EUCLID REPEAT 7/16 + CHROMA'],
+    [[0x12B, 0x115, 0x149], 'EUCLID +2 + ROLL + CHROMA'],
+    [[0x12F, 0x11F, 0x143], 'EUCLID REPEAT + ROLL + UP'],
+    [[0xE0, 0x91], 'SWING 1/8 LIGHT + GATE 1/8T'],
+    [[0xE1, 0x93], 'SWING 1/8 + PUMP 1/4'],
+    [[0xE3, 0x94], 'SWING 1/16 LIGHT + PUMP 1/8'],
+    [[0xE4, 0x90], 'SWING 1/16 + GATE 1/32'],
+    [[0xE6, 0x92], '6/8 FEEL + GATE 1/16T'],
+    [[0xE2, 0x1E9], 'SWING 1/8 HARD + CHOP'],
+    [[0xE5, 0x98], 'SWING 1/16 HARD + MASK 1'],
+    [[0xE7, 0x9A], '6/8 FEEL 1/8 + MASK 3'],
+    [[0xE8, 0x99], '5-TUPLET + GATE MASK 2'],
+    [[0xEC, 0x9B], 'DRUNK + GATE MASK 4'],
+    [[0xED, 0x93], 'LAID-BACK + PUMP 1/4'],
+    [[0xEE, 0x9C], 'SWING EXTREME + MASK 5'],
+    [[0xEF, 0x9D], 'SWING 1/16 EXTREME + MASK 6'],
+    [[0xE8, 0x9E, 0x1E9], '5-TUPLET + MASK 7 + CHOP'],
+    [[0xEC, 0x9F, 0x1E7], 'DRUNK + MASK 8 + FILTER'],
+    [[0xEF, 0xE6, 0x98], 'SWING + 6/8 + GATE MASK'],
+    [[0xF0, 0x1F0], 'CHAOS 1/4 + CHAOS 2 25%'],
+    [[0xF2, 0x1F1], 'CHAOS 1/4 58% + CHAOS 2'],
+    [[0xF4, 0x1F6], 'CHAOS 1/8 + CHAOS 2 1/8'],
+    [[0xF6, 0x1F2], 'CHAOS 1/8 45% + CHAOS 2'],
+    [[0xFA, 0x1F3], 'CHAOS 1/16 + CHAOS 2 70%'],
+    [[0xF0, 0x1F0, 0x1E5], 'CHAOS x2 + CRUSH SLICES'],
+    [[0xFC, 0x1F8], 'CHAOS 1/16 + CHAOS 2 1/8'],
+    [[0xF8, 0x1FC, 0x1E7], 'CHAOS + CHAOS 2 + FILTER'],
+    [[0xF1, 0x1F4], 'CHAOS NEW + CHAOS 2 85%'],
+    [[0xF3, 0x1F7, 0x1E9], 'CHAOS + CHAOS 2 + CHOP'],
+    [[0xFE, 0x1F2, 0x1E0], 'CHAOS 65% + 2 + TEXTURE'],
+    [[0xF5, 0x1FA, 0x1EA], 'CHAOS NEW + 2 + CRUSH FILT'],
+    [[0xFB, 0x1F5, 0x1E2], 'CHAOS 35% + 2 100% + TEX'],
+    [[0xF9, 0x1FF, 0x1EB], 'CHAOS 75% + 2 SLOW + TEX'],
+    [[0xFD, 0x1F9, 0x1E5], 'CHAOS 55% + 2 1/32 + CRUSH'],
+    [[0xFF, 0x1F5, 0x1EC], 'CHAOS 75% + 2 100% + TEX'],
+  ];
+  // FLZ's names, 00–FF (the flx param plays FLZ v as 512 + v)
+  static get NAMES3(){ if (FlexCore._N3) return FlexCore._N3; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[512 + v] ? T[512 + v].n : 'OFF'; return (FlexCore._N3 = N); }
   // FLY's names, 00–FF (the flx param plays FLY v as 256 + v)
   static get NAMES2(){ if (FlexCore._N2) return FlexCore._N2; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[256 + v] ? T[256 + v].n : 'OFF'; return (FlexCore._N2 = N); }
   // Per-sample helpers, once (ext() / pat() run for every sample of a playing pattern: a closure or an array literal made in them was audio-thread garbage).
@@ -2697,7 +2992,7 @@ class FlexCore {
             r = src * G + (rv ? G - u : u); } } break;
         case 'swing': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, h = 0.5 + o.a;
           r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
-        case 'tup': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? FlexCore.K.tup[j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
+        case 'tup': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, j = Math.max(0, Math.min(o.q - 1, Math.floor(u * o.q + 1e-9))), sj = o.q === 5 ? FlexCore.K.tup[j] : j;   // (FLX CHECK 3: p a hair under a beat gave u −3e-10, j −1, tup[−1] undefined: NaN from FLX E8)   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
           r = c + C * (sj / 4 + (u - j / o.q)); } break;
         case 'drunk': { const s = Math.floor(p * 4); r = p - FlexCore.hh(bar & 3, s, 41) * 0.06; } break;
         case 'lag': r = (p % 1) >= 0.5 ? p - 1/16 : p; break;
@@ -2705,6 +3000,16 @@ class FlexCore {
           if (FlexCore.hh(o.seed, s, key * 7 + 3) < o.c){ const op = Math.floor(FlexCore.hh(o.seed, s, key * 7 + 4) * 7);
             if (op === 0) r = p - G; else if (op === 1) r = c - u; else if (op === 2) r = c - G + u * 2; else if (op === 3) r = c + u / 2;
             else if (op === 4) r = c + u % (G / 4); else if (op === 5) g = u < G / 2 ? 1 : 0; else r = c + u - u * u / (2 * G); } } break;
+        // ===== FLZ (23 Nov): k 513–767, a chain of FLX / FLY stages (see SPEC). Gains multiply; filters take the closest (lowest low-pass,
+        // highest high-pass); crush takes the strongest hold and the fewest bits. Stage ks below 17 (the first sixteen, made by pat())
+        // are not allowed in a chain (FLZ_LIST uses 17–255 and 257–511; tests/flex.test.js checks).
+        // (CodeRabbit on #297: a stage that reads back into the bar before hands the next one a negative phase; each stage now sees its
+        // input as a phase in [0, 4) of the right bar, and the result moves back by the same bars; gains are never negative.)
+        case 'chain': { let x = p; for (let i = 0; i < o.S.length; i++){ const sk = o.S[i]; if (!(sk > 16 && sk < 512)) continue;
+            const sh = Math.floor(x / 4 + 1e-9) * 4, xp = Math.max(0, x - sh);
+            x = this.ext(sk, xp, bar + Math.round(sh / 4)) + sh; g *= Math.max(0, this.pg); if (this.plp < lp) lp = this.plp; if (this.php > hp) hp = this.php; if (this.pcr > cr) cr = this.pcr;
+            if (this.pbt > 0 && (bt === 0 || this.pbt < bt)) bt = this.pbt; }
+          r = x; } break;
         // ===== FLY (5 Nov): k 257–511. Each reads only what has played (r ≤ p); see the notes by SPEC's FLY families.
         case 'proll': if (p >= o.a){ const n = Math.floor((p - o.a) / o.L + 1e-9), u = p - o.a - n * o.L;   // repeat n: speed ≤ n + 1 keeps it behind now
           if (n > 0) r = o.a + u * Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))); } break;
@@ -2796,7 +3101,8 @@ class FlexCore {
   // 4-point Hermite read (half speed, tape stops and scratches stay clean on cymbals); linear within 2 samples of now,
   // where the Hermite's far point would still be unwritten.
   rd(b, w, D){
-    const N = this.N; let x = w - D; if (x < 0) x += N; const i = Math.floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1;
+    const N = this.N; let x = w - D; if (x < 0) x += N; if (x >= N) x = 0;   // FLX CHECK 3 (18 Nov): w 0 with a D of 1e-12 made N − 1e-12 = N exactly: b[N] undefined, one NaN sample
+    const i = Math.floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1;
     if (D < 2) return b[i] + (b[j] - b[i]) * f;
     const y0 = b[i ? i - 1 : N - 1], y1 = b[i], y2 = b[j], y3 = b[j + 1 >= N ? 0 : j + 1];
     return ((((y3 - y0) * 0.5 + (y1 - y2) * 1.5) * f + (y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3)) * f + (y2 - y0) * 0.5) * f + y1;
@@ -2808,7 +3114,7 @@ class FlexCore {
     const N = this.N, bL = this.bL, bR = this.bR, bp = tr && tr.bp, spb = clkSpb(this, bp, n), live = !!(bp && bp.length > 1);
     // WAITS FOR ITS COMMAND (owner, 3 Nov): STARTS ON FLX (dp.wait) plays nothing until an FLX sets a pattern or an FXO
     // switches the slot on (tr.sw: that slot's FXO, then its own PATTERN); the switches go back to −1 on STOP, so it waits again.
-    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(511, Math.round(tr.flx)) : dp.wait && !(tr && tr.sw > 0.5) ? 0 : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
+    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(767, Math.round(tr.flx)) : dp.wait && !(tr && tr.sw > 0.5) ? 0 : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
     const XF = Math.max(16, Math.round(this.sr * (dp ? dp.xf : 5) / 1000)), gk = 1 - Math.exp(-1 / (this.sr * 0.002));
     // Lock our position to the clock: gently while close (the clock's own float32 steps stay out), at once when it jumps.
     const q0 = live ? bp[0] : -1;
@@ -5502,12 +5808,78 @@ function stereoUpCables(d){
   }
   return add;
 }
+/* ── Send / Receive (15 Nov): an invisible cable. Send takes In / In R; every Receive with the same label outputs what its Send(s) get. Nothing here runs:
+   the graph's compile step (srResolve, called from Graph.compile) replaces each cable out of a Receive by the cables into the matching Send, so the engine
+   sees ordinary cables and its ordering, feedback marking and run lists apply unchanged. Label: lab 1-8 is A-H; 0 is the module's own text (trimmed,
+   not case sensitive). A Receive with no matching Send is silent. Several Receives may share one Send, and several Sends with one label add together. */
+const SR_LAB = 'ABCDEFGH';
+function srKey(inst){
+  const l = Math.round(inst.params.lab) || 0;
+  if (l >= 1 && l <= 8) return SR_LAB[l - 1];
+  const t = typeof inst.text === 'string' ? inst.text.trim().toLowerCase() : '';
+  return t ? 't:' + t : '';
+}
+const SendM = { type:'send', scope:'mono', cost:0, text:true, inputs:{ in:'audio', inR:'audio' }, outputs:{}, params:{ lab:[1,0,8,1] }, create:() => ({}), process(){} };
+const RecvM = { type:'recv', scope:'mono', cost:0, text:true, inputs:{}, outputs:{ out:'audio', outR:'audio' }, params:{ lab:[1,0,8,1] }, create:() => ({}),
+  process(st, io){ io.out.out.fill(0); io.out.outR.fill(0); } };
+/* srResolve(mods, cables): the cables the engine runs. With no Send or Receive in the patch it is `cables` itself. A cable out of a Receive's Out (Out R) becomes one cable
+   from every source cabled into the matching Send's In (In R; In when In R has nothing, as a mixer pair does). A cable that closes a loop only through a pair is marked
+   fb, as the editor marks one it can see. Cables into a Send, and out of a Receive with no Send, are left out. */
+function srResolve(mods, cables){
+  let any = false; for (const m of mods.values()) if (m.def.type === 'send' || m.def.type === 'recv'){ any = true; break; }
+  if (!any) return cables;
+  const into = new Map(), per = new Map();   // label -> its Sends, each with its own In / In R cables
+  for (const c of cables){
+    const m = mods.get(c.b[0]); if (!m || m.def.type !== 'send') continue;
+    const k = srKey(m.inst); if (!k) continue; let l = into.get(k); if (!l) into.set(k, l = []);
+    let e = per.get(m.id); if (!e){ per.set(m.id, e = { in:[], inR:[] }); l.push(e); }
+    if (c.b[1] === 'in') e.in.push(c); else if (c.b[1] === 'inR') e.inR.push(c);
+  }
+  /* What a Receive's port carries: the sources cabled into its label's Sends (In R falling back to In, Send by Send). A source that is itself a Receive (a pair in series)
+     is followed through, with a loop of Receives cut. */
+  /* Memoised per label and port, so a chain of stages costs the sum of its stages (not the number of routes); identical sources are kept once (a non-feedback route wins). A result worked
+     out while a loop was cut is not kept, since it may be short. */
+  const memo = new Map(); let cuts = 0;
+  const feeds = (lab, port, seen) => {
+    const key = lab + '.' + port, hit = memo.get(key); if (hit) return hit;
+    if (seen.has(key)){ cuts++; return []; }
+    seen.add(key); const before = cuts, got = new Map();
+    const put = (a, fb) => { const k = a[0] + '.' + a[1], o = got.get(k); if (!o) got.set(k, { a, fb }); else if (o.fb && !fb) o.fb = false; };
+    for (const e of into.get(lab) || []){
+      for (const s of port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : []){
+        const sm = mods.get(s.a[0]);
+        if (sm && sm.def.type === 'recv'){ for (const f of feeds(srKey(sm.inst), s.a[1], seen)) put(f.a, f.fb || s.fb === true); }
+        else put(s.a, s.fb === true);
+      }
+    }
+    seen.delete(key); const res = [...got.values()]; if (cuts === before) memo.set(key, res); return res;
+  };
+  const eff = [], virt = [], vseen = new Map();
+  for (const c of cables){
+    const sm = mods.get(c.a[0]), dm = mods.get(c.b[0]);
+    if (dm && dm.def.type === 'send') continue;
+    if (sm && sm.def.type === 'recv'){
+      for (const f of feeds(srKey(sm.inst), c.a[1], new Set())){ const k = f.a[0] + '.' + f.a[1] + '>' + c.b[0] + '.' + c.b[1], fb = c.fb === true || f.fb, o = vseen.get(k); if (!o){ const v = { a:f.a, b:c.b, fb }; vseen.set(k, v); virt.push(v); } else if (o.fb && !fb) o.fb = false; }   // (the same cable from two Receives is kept once)
+      continue;
+    }
+    eff.push(c);
+  }
+  const adj = new Map(); for (const c of eff) if (!c.fb){ let l = adj.get(c.a[0]); if (!l) adj.set(c.a[0], l = []); l.push(c.b[0]); }
+  const reach = (a, b) => { if (a === b) return true; const seen = new Set([a]), w = [a]; while (w.length){ for (const y of adj.get(w.pop()) || []) if (y === b) return true; else if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
+  for (const v of virt){
+    if (!v.fb && reach(v.b[0], v.a[0])) v.fb = true;
+    if (!v.fb){ let l = adj.get(v.a[0]); if (!l) adj.set(v.a[0], l = []); l.push(v.b[0]); }
+    eff.push(v.fb ? v : { a:v.a, b:v.b });
+  }
+  return eff;
+}
+
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
-  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
+  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant, knob:Knob,
   steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
   onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide, dline:DelayLine, expr:Expression,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
@@ -5515,7 +5887,8 @@ const SHARED_MODULES = { beads:Beads,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
   autotune:PitchCorrect, vowel:VowelFilter, rotary:RotarySpk, gdelay:GrainDelay, reverse:ReverseEcho, envfilt:EnvFilter,
   bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM,
-  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump, buscomp:BusComp, glue:GlueComp };
+  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump, buscomp:BusComp, glue:GlueComp,
+  send:SendM, recv:RecvM };
 /* ===SHARED MODULES END=== */
 withLevels(Comp);   // METERING: Pressure (…chains only) shows its levels in and out
 /* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect. In a patch
@@ -5759,7 +6132,7 @@ class Graph {
   compile(){
     const indeg = new Map([...this.mods.keys()].map(k => [k, 0])), adj = new Map([...this.mods.keys()].map(k => [k, []]));
     this.inc = new Map([...this.mods.keys()].map(k => [k, []]));
-    for (const c of this.cables){
+    for (const c of srResolve(this.mods, this.cables)){   // SEND / RECEIVE: the cables as the engine runs them (the drawn ones when the patch has no pair)
       if (!adj.has(c.a[0]) || !adj.has(c.b[0])) continue;
       this.inc.get(c.b[0]).push(c);
       if (c.fb) continue;   // FEEDBACK: heard (it is in inc), but it does not decide who runs first
@@ -5809,6 +6182,7 @@ class ChainsEngine {
        modulates them). It used to run the whole patch, so 4 tracks on …chains did 4× every track's effects. -1 = all. */
     this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = -1;
     this.bsw = new Float32Array(16).fill(-1); this._bn = null; this._bnKey = -1;   // BYPASS: the tracker's switches, the module numbers
+    this.knobs = new Float32Array(9).fill(-1);   // PATCH KNOBS: the tracker's KN1–KN8 (index 1–8; −1 = the Knob module's own Value)
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
       // The views below are made once per slot and kept (modules ask for them every block: a new subarray each time was steady garbage).
       // The track inputs are the host's own buffers (the same each block), so their views are dropped only if the buffer is replaced.
@@ -5836,11 +6210,11 @@ class ChainsEngine {
     this.graph.add(id, def, inst);
     this._sync();
   }
-  setText(id, v){ const m = this.graph.mods.get(id); if (m && m.def.text === true && typeof v === 'string') m.inst.text = v.slice(0, 200); }
+  setText(id, v){ const m = this.graph.mods.get(id); if (m && m.def.text === true && typeof v === 'string'){ m.inst.text = v.slice(0, 200); if (m.def.type === 'send' || m.def.type === 'recv') this.graph.compile(); } }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b, fb){ this.graph.connect(a, b, fb); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
-  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; if (name === '_bn') this._bnKey = -1; } }
+  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; if (name === '_bn') this._bnKey = -1; if (name === 'lab' && (m.def.type === 'send' || m.def.type === 'recv')) this.graph.compile(); } }
   /* BYPASS: module id → its number (1–15): its own _bn, else the lowest free one, in patch order. */
   _bnMap(){
     const g = this.graph, key = g.ver * 4096 + g.mods.size;
@@ -6154,10 +6528,13 @@ registerProcessor('chains', ChainsProcessor);
    Track In modules); every Chain Out t sums into output channel pair t.
    Anything after the track in the chain (native track FX, fader, mute/solo,
    pan, master) is untouched Thunder code downstream of this node. */
+const KN_NAMES = ['', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8'];   // PATCH KNOBS (made once, as BYP_NAMES)
 const BYP_NAMES = ['', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b12', 'b13', 'b14', 'b15'];   // (the parameter names, made once: 15 strings a block otherwise)
 class ThunderChains extends AudioWorkletProcessor {
   // b1–b15: the tracker's BYP switches for the modules numbered 1–15 (−1 the patch's own, 0 in, 1 bypassed, 2 flipped)
-  static get parameterDescriptors(){ return Array.from({length:15}, (_, i) => ({name:'b' + (i + 1), defaultValue:-1, minValue:-1, maxValue:2, automationRate:'k-rate'})); }
+  // k1–k8 (22 Nov, patch knobs): the tracker's KN1–KN8 for this track's Knob modules (−1 their own Value, else 0–1)
+  static get parameterDescriptors(){ return Array.from({length:15}, (_, i) => ({name:'b' + (i + 1), defaultValue:-1, minValue:-1, maxValue:2, automationRate:'k-rate'}))
+    .concat(Array.from({length:8}, (_, i) => ({name:'k' + (i + 1), defaultValue:-1, minValue:-1, maxValue:1, automationRate:'k-rate'}))); }
   constructor(options){
     super();
     const o = options.processorOptions || {};
@@ -6213,6 +6590,7 @@ class ThunderChains extends AudioWorkletProcessor {
     if (this.__q && this.__q.length){ const q = this.__q, due = currentTime + 64 / sampleRate; while (q.length && q[0][0] <= due) this._recv(q.shift()[1]); }   // THUNDER CORE: tempo at its time
     if (this.__ov && globalThis.__tcOv) params = globalThis.__tcOv(this, params, n);   // THUNDER CORE: BYP
     if (params) for (let k = 1; k <= 15; k++){ const a = params[BYP_NAMES[k]]; e.bsw[k] = a ? a[0] : -1; }   // BYPASS: the tracker's switches
+    if (params) for (let k = 1; k <= 8; k++){ const a = params[KN_NAMES[k]]; e.knobs[k] = a ? a[0] : -1; }   // PATCH KNOBS: KN1–KN8
     const L = o[0], R = o[1] || o[0];
     // Feed this track's input into the engine's per-track buffers.
     for (const k of this._tw){ this._tmpL.fill(0, k * BLOCK, (k + 1) * BLOCK); this._tmpR.fill(0, k * BLOCK, (k + 1) * BLOCK); }

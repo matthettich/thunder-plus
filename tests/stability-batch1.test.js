@@ -71,5 +71,5 @@ test('F8: old and new mutVoice give the same voice: identical on the 16-bit grid
 test('F8: the other users of a shared sample only read it (render, vint cache)', () => {
   // renderVoice copies a layer's sample before it swaps in the right channel; the sample layer reads S.data and nothing writes into it
   assert.match(src, /Object\.assign\(\{\}, L\.sample, \{data:L\.sample\.data2, data2:null, _vint:null\}\)/, 'renderVoice copies the sample before swapping channels');
-  assert.match(src, /PW\.w\.postMessage\(\{op:'render', id, v, sr, hold, stages:!!stages, bpm:songBpm\(\), waves:WV\.doc\}\);/, 'the render Worker is sent the voice with no transfer list');
+  assert.match(src, /PW\.w\.postMessage\(\{op:'render', id, v, sr, hold, stages:!!stages, bpm:songBpm\(\), lpb:songLpb\(\), waves:WV\.doc\}\);/, 'the render Worker is sent the voice with no transfer list');
 });

@@ -16,8 +16,12 @@ device, so it runs in about 15 seconds.
 | `usability.test.js` | the usability audit's Phase 1 fixes (`docs/USABILITY-AUDIT.md`): toast timing and queue, wheel step accumulation (host sliders and pump windows), AltGr, F8 panic, row insert/remove inside a phrase's LEN, Delete on a selection, and source guards for KEYS-mode modifiers, Synth-page keys, dialogs over Settings, unsaved-change marks, Open's fresh undo, leaving the page, and the key docs |
 | `perform.test.js` | the 1 Nov Perform block (targets, scenes and the crossfader, macros, parts, LFO shapes, the song fields), latency compensation's plan, and source guards for the sequencer's new commands (CND, NUD, RTV, SLC, XFD, MAC, LK1–LK4, PRT, the track LFO) |
 | `mono-poly-counts.test.js` | MONO / POLY track counts, stage 1 (`docs/MONO-POLY-PLAN.md`): `S.nmono` / `S.hmono`, `ntrPlan` / `ntrPerm` (the old songs renumber exactly as before), hidden tracks keeping their kind, `trackHolds`, `tracksHiddenBy`, the refuse rule, `setTracks` / `setNtr`, load / save, undo |
+| `pad-inuse-outline.test.js` | the Synth page's in-use outline (build 654): which pads and instruments a note on the song plays (solid), only an unplaced phrase plays (dotted), a PERFORM part, a kit slot per track; cache invalidation; source pins for the classes and CSS |
 | `gain-staging.test.js` | the 27 Oct gain staging (`docs/GAIN-STAGING.md`): TRIM's scale, `applyMix` (TRIM, VOL, the PRE tap with mute and solo), the CHN crossfade's ramps and node lifetimes, `busPlan().pre`, and source guards for the per-track graph, the master OUT (live and in renders), the Mixer rows and the song file |
 
+| `reset-track.test.js` | Reset track (build 650, `docs/RESET-TRACK-NOTES.md`): `resetTrackData` on ELECTRO and a shared-block song with the real `makeSeq` (other tracks' events unchanged), one undo step, mixer / effects / CHN / PERFORM / parts defaults, which track on which screen, the key mapping (Mac and not), text fields, menu rows; opt-in real-page run |
+
+| `startup-song.test.js` | the start-up song (build 674, 24 Nov): a guard that nothing `normSong` / `demoSong` / `freshSong` reach is a const / let / class declared below the saved-song load (the build-660 bug); the start-up block run on its own (saved / first run / unreadable song kept, never autosaved over, copied aside); wiring pins; opt-in real page with songs from older builds and odd fields |
 `tests/sweep/` holds slower headless-Chrome sweeps (every engine, preset and effect through the app itself), not run by
 `npm test`: see `tests/sweep/README.md`.
 
@@ -52,6 +56,8 @@ npm test` renders and compares every voice. The golden records the Node version;
 message, since `Math.sin` / `Math.pow` can differ in the last bit between versions.
 
 To update on purpose: `UPDATE_GOLDEN=1 node --test tests/engine-golden.test.js` (or `UPDATE_GOLDEN=1 npm test`) and commit the diff.
+
+`engine-presets.test.js` (measuring: `tools/engine-preset-check.js`, skips in `tools/engine-preset-skip.json`, loudness windows in `engine-presets-windows.json`) checks the 14-15 Nov 2026 preset pass: every non-drum engine has its minimum of new presets, unique names, parameters inside their ranges, and a sample of the new presets renders finite, not silent, below full scale, in the engine's loudness window and in pitch.
 **Never update to make a failing test pass unless the change in sound is intended**: the failure message gives the old and new
 peak and RMS (and the dB difference) so you can tell a tiny numeric drift from a real change.
 

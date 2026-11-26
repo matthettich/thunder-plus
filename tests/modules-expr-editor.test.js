@@ -1,6 +1,6 @@
 // EXPRESSION, editor side (14 Nov 2026, module queue): one shared module in both editors (engine scope 'poly'; the shared entries are 'mono' like Math's).
 // A module whose own data is TEXT: the formula lives on the module as `text` (a string, at most 200 characters), and has to travel everywhere the module does.
-// Source guards (definition, palette, Help, the field's attributes and keys), the twelve Examples compiled with the engine's own parser, node runs of the pure helpers
+// Source guards (definition, palette, Help, the field's attributes and keys), the Examples compiled with the engine's own parser, node runs of the pure helpers
 // (the error sentence for every code, the text cleaners), node runs of the host's patchOp and chnDiff with text, and an opt-in browser run (TP_BROWSER_TESTS=1).
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('vm'), fs = require('fs'), path = require('path');
@@ -102,9 +102,12 @@ for (const ed of ['chains', 'waves']) {
 }
 test('the SHARED EDITOR block is identical in …chains and …waves', () => { assert.equal(block(ED.chains, 'SHARED EDITOR'), block(ED.waves, 'SHARED EDITOR')); });
 
-test('the twelve Examples: the names and formulas asked for, 2 to 4 words each, every one compiled by each engine\'s own parser', () => {
-  assert.deepEqual(JSON.parse(JSON.stringify(EXAMPLES)), [['Pass A (K1 = level)', 'a * k1'], ['Ring modulate A by B', 'a * b'], ['Soft clip', 'tanh(a * (1 + k1 * 4))'], ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'], ['Rectify', 'abs(a)'], ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'],
-    ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'], ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'], ['Sample and hold on C', 'c > 0.5 ? a : y'], ['Noise', 'rnd * k1'], ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'], ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']]);
+test('the Examples menu: the names and formulas, tones first then effects, 2 to 6 words each (1 for Fold, Noise, Rectify), every one compiled by each engine\'s own parser', () => {
+  assert.equal(EXAMPLES.length, 24); assert.deepEqual(JSON.parse(JSON.stringify(EXAMPLES.map(e => e[0]))), ['Sine 220 Hz', 'Saw 220 Hz', 'Triangle 220 Hz', 'Square 220 Hz', 'Sine pitch from K1', 'Glide pitch, part 1: ramp', 'Glide pitch, part 2: sine', 'FM sine (K1 = amount)', 'Chord, A major', 'Fade-in sine, 2 s', 'Sine at K1 kHz', 'Noise',
+    'Pass A (K1 = level)', 'Ring modulate A by B', 'Tremolo 4 Hz', 'Soft clip', 'Fold', 'Wavefold sine (K1)', 'Rectify', 'Crossfade by C', 'One-pole lowpass (K1)', 'Sample and hold on C', 'Bit crush (K1)', 'Gate A when B is loud']);
+  const old = { 'Pass A (K1 = level)': 'a * k1', 'Ring modulate A by B': 'a * b', 'Soft clip': 'tanh(a * (1 + k1 * 4))', 'Fold': 'tri(a * (1 + k1 * 4) / 4 + 0.25)', 'Rectify': 'abs(a)', 'Crossfade by C': 'mix(a, b, clip(c, 0, 1))', 'Sine at K1 kHz': 'sin(2 * pi * 1000 * k1 * t)', 'One-pole lowpass (K1)': 'y + (a - y) * clip(k1, 0, 1)',
+    'Sample and hold on C': 'c > 0.5 ? a : y', 'Noise': 'rnd * k1', 'Bit crush (K1)': 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)', 'Gate A when B is loud': 'abs(b) > k1 ? a : 0' };
+  for (const [nm, f] of Object.entries(old)) assert.equal(EXAMPLES.find(e => e[0] === nm)[1], f, 'the original twelve keep their formulas: ' + nm);
   for (const [nm, f] of EXAMPLES) { const w = nm.split(/\s+/).length; assert.ok(w >= 1 && w <= 6, nm); assert.ok(f.length <= 200, nm); }
   for (const [nm] of EXAMPLES.filter(e => e[0] !== 'Fold' && e[0] !== 'Noise' && e[0] !== 'Rectify')) assert.ok(nm.split(/\s+/).length >= 2, nm);
   const CC = H.freezeClock(H.workletScope()); H.load(CC, 'chains/chains-worklet.js'); const WC = H.freezeClock(H.pageScope()); H.load(WC, 'waves/waves-worklet.js');
