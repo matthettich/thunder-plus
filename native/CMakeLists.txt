@@ -43,7 +43,10 @@ if(THUNDER_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
-if(THUNDER_BUILD_DESKTOP_TESTS)
-  enable_testing()
+# (not for the wasm build: build-wasm.sh configures this file with wasi-sdk, which has no threads; the shells are for desktop systems only)
+if(CMAKE_SYSTEM_NAME MATCHES "^(Windows|Darwin|Linux)$")
+  if(THUNDER_BUILD_DESKTOP_TESTS)
+    enable_testing()
+  endif()
+  add_subdirectory(desktop)   # H6: the desktop shells (WebView2 / WKWebView): a platform-neutral library and its tests everywhere; the shell executables only with -DTHUNDER_DESKTOP_SHELL=ON
 endif()
-add_subdirectory(desktop)   # H6: the desktop shells (WebView2 / WKWebView): a platform-neutral library and its tests everywhere; the shell executables only with -DTHUNDER_DESKTOP_SHELL=ON
