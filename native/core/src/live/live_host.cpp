@@ -730,7 +730,7 @@ int LiveHost::meters(double rateHz) {
   const uint32_t known = THUNDER_LIVE_MK_FXLVL | THUNDER_LIVE_MK_FXDYN | THUNDER_LIVE_MK_CHLVL | THUNDER_LIVE_MK_MASTERM;
   if ((sp.kinds & ~known) != 0 || (sp.fx_tracks >> (THUNDER_LIVE_MASTER + 1)) != 0) return THUNDER_LIVE_E_ARG;
   if (!finite(sp.rate_hz) || sp.rate_hz < 0 || sp.rate_hz > 30 || !finite(sp.chains_hz) || sp.chains_hz < 0 || sp.chains_hz > 30) return THUNDER_LIVE_E_ARG;
-  LiveCmd c; c.type = LiveCmdType::MetersSet; c.x = sp.rate_hz; c.y = sp.chains_hz; c.i0 = (int32_t)sp.kinds; c.i64a = (int64_t)sp.fx_tracks; c.i1 = (int32_t)(uint32_t)sp.chains_tracks;
+  LiveCmd c; c.type = LiveCmdType::MetersSet; c.x = sp.rate_hz; c.y = (sp.chains_hz > 0 && sp.chains_hz < 1) ? 1.0 : sp.chains_hz /* lead's read: never a rate so small that sr / hz overflows llround on the audio thread */; c.i0 = (int32_t)sp.kinds; c.i64a = (int64_t)sp.fx_tracks; c.i1 = (int32_t)(uint32_t)sp.chains_tracks;
   return push(c);   // applied at the top of the next quantum; a full ring is E_BUSY and nothing changed
 }
 
