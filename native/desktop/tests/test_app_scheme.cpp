@@ -32,13 +32,16 @@ int main() {
   CHECK(r("app://thunder/C:/Windows/win.ini").status == 404, "drive letter");
   CHECK(r("app://thunder/a%00.js").status == 404 && r("app://thunder/%zz").status == 404 && r("app://thunder/%4").status == 404, "NUL and bad escapes");
   CHECK(r("app://thunder/sub").status == 404, "a folder without a slash is not a file");
-  { auto x = r("app://thunder/index.html"); bool csp = false, cors = false; for (auto& h : x.headers) { if (h.first == "Content-Security-Policy-Report-Only") csp = true; if (h.first == "Access-Control-Allow-Origin") cors = true; } CHECK(csp && cors, "html: report-only CSP and CORS headers"); }
+  { auto x = r("app://thunder/index.html"); bool csp = false, cors = false; for (auto& h : x.headers) { if (h.first == "Content-Security-Policy-Report-Only") csp = true; if (h.first == "Access-Control-Allow-Origin") cors = true; } CHECK(csp && !cors, "html: report-only CSP, and no cross-origin header (the page is same-origin)"); }
   { auto x = r("app://thunder/a%20b.js"); bool csp = false; for (auto& h : x.headers) if (h.first == "Content-Security-Policy-Report-Only") csp = true; CHECK(!csp, "no CSP on a script"); }
   std::string body; CHECK(tpd::readWholeFile(r("app://thunder/index.html").file, &body) && body == "<html></html>", "readWholeFile");
   // a symlink inside the root that leads out
   std::error_code ec; fs::create_symlink(outside, root / "link.txt", ec);
   if (!ec) CHECK(r("app://thunder/link.txt").status == 404, "a symlink out of the root is refused"); else std::printf("(symlinks not available here: that check skipped)\n");
   bool ok = true; CHECK(tpd::percentDecode("a%2Fb%20c", &ok) == "a/b c" && ok, "percentDecode");
+  CHECK(tpd::isAppOrigin("app://thunder/") && tpd::isAppOrigin("app://thunder") && tpd::isAppOrigin("APP://thunder/index.html?seqtest=1") && tpd::isAppOrigin("app://thunder#x"), "isAppOrigin: the app");
+  CHECK(!tpd::isAppOrigin("app://thunder.evil/") && !tpd::isAppOrigin("app://thunderx/") && !tpd::isAppOrigin("data:text/html,x") && !tpd::isAppOrigin("blob:app://thunder/x") && !tpd::isAppOrigin("https://app://thunder/") && !tpd::isAppOrigin(""), "isAppOrigin: nothing else");
+  CHECK(r("app://thunder/%ff%fe.js").status == 404 && r("app://thunder/%c3%28").status == 404, "R-2: bytes that are not UTF-8 are a 404, never a throw");
   fs::remove_all(base);
   DONE("test_desktop_app_scheme");
 }

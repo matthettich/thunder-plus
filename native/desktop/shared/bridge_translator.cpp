@@ -1,6 +1,7 @@
 #include "bridge_translator.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -26,8 +27,11 @@ const std::map<std::string, std::string>& unsupported() {
   return m;
 }
 
-int64_t atOf(Json j) { Json a = j.get("at"); return a.isNum() ? (int64_t)a.asNum() : kNow; }
-int ival(Json j, const char* k, int def) { Json v = j.get(k); return v.isNum() ? (int)v.asNum() : def; }
+// a double to an integer without undefined behaviour (NaN -> 0, out of range -> the nearest limit)
+int64_t toI64(double d) { if (!(d == d)) return 0; if (d >= 9.2e18) return INT64_MAX; if (d <= -9.2e18) return INT64_MIN; return (int64_t)d; }
+int toInt(double d) { if (!(d == d)) return 0; if (d >= 2147483647.0) return INT32_MAX; if (d <= -2147483648.0) return INT32_MIN; return (int)d; }
+int64_t atOf(Json j) { Json a = j.get("at"); return a.isNum() ? toI64(a.asNum()) : kNow; }
+int ival(Json j, const char* k, int def) { Json v = j.get(k); return v.isNum() ? toInt(v.asNum()) : def; }
 bool has(Json j, const char* k) { Json v = j.get(k); return !v.missing() && !v.isNull(); }
 // a number under the first of `keys` that is one
 bool numOf(Json j, double* out, const char* a, const char* b = nullptr) {
@@ -36,7 +40,7 @@ bool numOf(Json j, double* out, const char* a, const char* b = nullptr) {
 }
 // the page's track: 0..32 or "m" (the master, 32)
 bool trackOf(Json v, int* out) {
-  if (v.isNum()) { const int t = (int)v.asNum(); if (t < 0 || t > 32) return false; *out = t; return true; }
+  if (v.isNum()) { const int t = toInt(v.asNum()); if (t < 0 || t > 32) return false; *out = t; return true; }
   if (v.isStr() && v.asStr() == "m") { *out = 32; return true; }
   return false;
 }
@@ -106,20 +110,20 @@ Translation translate(const std::string& raw) {
   if (t == "play") {
     c.op = Op::Play;
     Json m = j.get("mode");
-    if (m.isNum()) c.mode = (int)m.asNum();
+    if (m.isNum()) c.mode = toInt(m.asNum());
     else if (m.isStr()) { auto s = m.asStr(); if (s == "sect") c.mode = 1; else if (s == "phrase") c.mode = 2; else if (s == "song") c.mode = 0; else return refuse("unknown play mode " + std::string(s)); }
     else if (m.missing() || m.isNull()) c.mode = 0;
     else return refuse("unknown play mode");
     if (c.mode < 0 || c.mode > 2) return refuse("play mode out of range");
     Json loop = j.obj("loop");
     Json only = j.arr("only");
-    if (!only.missing()) { c.hasOnly = 1; for (size_t i = 0; i < only.size(); i++) { Json e = only.at(i); const int tr = e.isNum() ? (int)e.asNum() : -1; if (tr >= 0 && tr <= 31) c.onlyBits |= (uint64_t)1 << tr; } }
+    if (!only.missing()) { c.hasOnly = 1; for (size_t i = 0; i < only.size(); i++) { Json e = only.at(i); const int tr = e.isNum() ? toInt(e.asNum()) : -1; if (tr >= 0 && tr <= 31) c.onlyBits |= (uint64_t)1 << tr; } }
     c.pdc = ival(j, "pdc", 1);
     if (c.pdc < 0 || c.pdc > 2) return refuse("pdc must be 0, 1 or 2");
     c.row = ival(j, "row", 0); c.track = ival(j, "track", 0); c.sect = ival(j, "sect", -1); c.phrase = ival(j, "phrase", -1);
     if (!loop.missing()) { c.hasLoop = 1; c.y0 = ival(loop, "y0", 0); c.y1 = ival(loop, "y1", 0); }
     c.at = atOf(j);
-    if (has(j, "seed")) { c.hasSeed = 1; c.seed = (int)(int64_t)j.num("seed", 0); }
+    if (has(j, "seed")) { c.hasSeed = 1; c.seed = (int)toI64(j.num("seed", 0)); }
     return callOf(std::move(c));
   }
   if (t == "lxp") { c.op = Op::Lxp; c.st = ival(j, "st", 0); return callOf(std::move(c)); }
@@ -166,7 +170,7 @@ Translation translate(const std::string& raw) {
     if (!j.get("outs").missing() && outs.missing()) return refuse("midi.cfg: outs must be an array of four ids");
     for (size_t i = 0; i < 4; i++) {
       Json o = outs.at(i); c.outs.push_back(o.isStr() ? std::string(o.asStr()) : std::string());
-      Json k = clk.at(i); c.clockOut[i] = (k.isBool() && k.asBool()) || (k.isNum() && (int)k.asNum() != 0);
+      Json k = clk.at(i); c.clockOut[i] = (k.isBool() && k.asBool()) || (k.isNum() && k.asNum() != 0);
       Json g = gear.at(i); double d = g.isNum() ? g.asNum() : 0.0; d = d < -50 ? -50 : d > 200 ? 200 : d; c.gear[i] = std::round(d);
     }
     Json ci = j.get("clockIn"); c.clockIn = (ci.isBool() && ci.asBool()) || (ci.isStr() && !ci.asStr().empty());
@@ -193,7 +197,40 @@ Translation translate(const std::string& raw) {
     return callOf(std::move(c));
   }
   if (t == "chain.edit") { c.op = Op::ChainEdit; Json a = j.arr("ops"); if (a.missing()) return refuse("chain.edit without ops"); c.raw = text(a); c.at = atOf(j); return callOf(std::move(c)); }
-  if (t == "meters.want") { c.op = Op::MetersWant; double r; if (!numOf(j, &r, "rate")) return refuse("meters.want without rate"); c.hz = r < 0 ? 0.0 : r > 30 ? 30.0 : r; return callOf(std::move(c)); }
+  if (t == "meters.want") {
+    double r; if (!numOf(j, &r, "rate")) return refuse("meters.want without rate");
+    const double hz = r < 0 ? 0.0 : r > 30 ? 30.0 : r;
+    if (!(has(j, "fx") || has(j, "dyn") || has(j, "chains") || has(j, "master") || has(j, "trim"))) { c.op = Op::MetersWant; c.hz = hz; return callOf(std::move(c)); }   // the rate-only form
+    uint64_t mask = 0; int kinds = 0;   // M4: the effect lists (a REPLACEMENT state); chains / master / trim are read and ignored, as on Android
+    for (const char* key : {"fx", "dyn"}) {
+      if (!has(j, key)) continue;
+      Json a = j.arr(key);
+      if (a.missing()) return refuse(std::string("meters.want: ") + key + " must be an array of tracks");
+      for (size_t i = 0; i < a.size(); i++) { int tr; if (!trackOf(a.at(i), &tr)) return refuse(std::string("meters.want: ") + key + " has a bad track (0..32 or 'm')"); mask |= (uint64_t)1 << tr; }
+      if (a.size() > 0) kinds |= (key[0] == 'f') ? 1 : 2;
+    }
+    c.op = Op::MetersSet; c.hz = hz; c.kinds = kinds; c.fxTracks = mask; return callOf(std::move(c));
+  }
+  if (t == "fx.values") {
+    c.op = Op::FxValues; c.id = id;
+    if (!trackOf(j.get("tr"), &c.track)) return refuse("fx.values: bad tr");
+    c.slot = ival(j, "slot", -1); if (c.slot < 0 || c.slot > 7) return refuse("fx.values: slot must be 0..7");
+    const std::string kind(j.str("kind"));
+    if (kind == "pump") c.fxKind = 1; else if (kind == "mod") c.fxKind = 2; else return refuse("fx.values: kind must be 'pump' or 'mod'");
+    Json a = j.arr("v");
+    if (a.missing()) return refuse("fx.values needs v: the slot's value list");
+    if (a.size() == 0 || a.size() > (size_t)kFxvMax) return refuse("fx.values: v must hold 1.." + std::to_string(kFxvMax) + " numbers");
+    for (size_t i = 0; i < a.size(); i++) { Json e = a.at(i); const double d = e.isNum() ? e.asNum() : NAN; if (std::isnan(d) || std::isinf(d)) return refuse("fx.values: a value is not a number"); c.vals.push_back(d); }
+    c.at = atOf(j);
+    return callOf(std::move(c));
+  }
+  if (t == "recovery.put") {
+    c.op = Op::RecoveryPut; Json p = j.get("project");
+    if (!p.isStr() || p.asStr().empty() || p.asStr().size() > kRecoveryMaxChars) return ign;   // not stored: the older copy stays (the page's RCV_MAX)
+    c.raw = std::string(p.asStr()); return callOf(std::move(c));
+  }
+  if (t == "recovery.get") { c.op = Op::RecoveryGet; c.id = id; return callOf(std::move(c)); }
+  if (t == "recovery.drop") { c.op = Op::RecoveryDrop; c.id = id; return callOf(std::move(c)); }
   if (t == "buf.use") {
     c.op = Op::BufUse;
     const std::string kind = j.get("kind").isStr() ? std::string(j.str("kind")) : "pad";

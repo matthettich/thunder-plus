@@ -20,7 +20,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_
 
 find_package(Threads REQUIRED)
 add_library(thunder_desktop_shared STATIC
-  shared/app_scheme.cpp shared/put_store.cpp shared/bridge_translator.cpp shared/live_host.cpp shared/bridge_session.cpp shared/desktop_api.cpp shared/text_util.cpp shared/audio_null.cpp shared/shell_core.cpp
+  shared/app_scheme.cpp shared/put_store.cpp shared/bridge_translator.cpp shared/live_host.cpp shared/bridge_session.cpp shared/desktop_api.cpp shared/text_util.cpp shared/audio_null.cpp shared/shell_core.cpp shared/recovery_store.cpp
   ${TPA_CPP}/live_engine.cpp ${TPA_CPP}/live_events.cpp ${TPA_CPP}/songfit.cpp ${TPA_CPP}/pad_filler.cpp)
 target_include_directories(thunder_desktop_shared PUBLIC shared ${TPA_CPP} ${CMAKE_CURRENT_SOURCE_DIR}/../core/src)
 target_link_libraries(thunder_desktop_shared PUBLIC thunder_core Threads::Threads)

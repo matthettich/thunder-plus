@@ -4,6 +4,8 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <set>
+#include <string_view>
 #include <system_error>
 
 #include "rt/json.h"
@@ -36,22 +38,41 @@ std::string parentDirIfProj(const std::string& near) {
   std::error_code ec; const fs::path d = u8(near).parent_path();
   return !d.empty() && fs::exists(d, ec) ? d.u8string() : "";
 }
+// A path as one comparable key: absolute, normalised, symlinks resolved as far as the path exists (lower-cased on Windows, where the file system is case-insensitive).
+std::string pathKey(const std::string& p) {
+  try {
+    std::error_code ec; fs::path c = fs::weakly_canonical(u8(p), ec);
+    std::string k = (ec ? u8(p).lexically_normal() : c).generic_u8string();
+#ifdef _WIN32
+    for (auto& ch : k) ch = (char)std::tolower((unsigned char)ch);
+#endif
+    return k;
+  } catch (...) { return p; }
+}
+const size_t kAllowMax = 64;
 std::string argStr(thunder::Json a, size_t i) { thunder::Json v = a.at(i); return v.isStr() ? std::string(v.asStr()) : std::string(); }
 }  // namespace
 
 bool DesktopApi::isProj(const std::string& p) { const std::string e = lowerExt(p); return e == "thunder" || e == "json"; }
 
 std::string DesktopApi::readProj(const std::string& p) {
-  if (!isProj(p)) return err("that isn\xe2\x80\x99t a .thunder or .json file");
-  std::ifstream in(u8(p), std::ios::binary);
-  if (!in) { std::error_code ec; return err(fs::exists(u8(p), ec) ? "could not read it" : "it isn\xe2\x80\x99t there any more"); }
-  std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-  return "{\"path\":" + jsonQuote(p) + ",\"name\":" + jsonQuote(u8(p).filename().u8string()) + ",\"text\":" + jsonQuote(text) + "}";
+  try {
+    if (!isProj(p)) return err("that isn\xe2\x80\x99t a .thunder or .json file");
+    std::error_code ec; const bool there = fs::is_regular_file(u8(p), ec);
+    if (!there) return err(fs::exists(u8(p), ec) ? "could not read it" : "it isn\xe2\x80\x99t there any more");
+    const uintmax_t sz = fs::file_size(u8(p), ec);
+    if (!ec && sz > kMaxProjBytes) return err("that file is too large (over 256 MiB)");
+    std::ifstream in(u8(p), std::ios::binary);
+    if (!in) return err("could not read it");
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return "{\"path\":" + jsonQuote(p) + ",\"name\":" + jsonQuote(u8(p).filename().u8string()) + ",\"text\":" + jsonQuote(text) + "}";
+  } catch (const std::exception& e) { return err(std::string("could not read it: ") + e.what()); } catch (...) { return err("could not read it"); }
 }
 
 // Written next to the file first, then renamed over it, so a crash mid-save never leaves half a project.
-std::string DesktopApi::writeProj(const std::string& p, const std::string& text) {
-  if (!isProj(p)) return err("not a project file");
+static std::string writeProjImpl_(const std::string& p, const std::string& text) {
+  if (!DesktopApi::isProj(p)) return err("not a project file");
+  if (text.size() > kMaxProjBytes) return err("that project is too large to save (over 256 MiB)");
   const std::string tmp = p + ".saving";
   std::error_code ec;
   { std::ofstream o(u8(tmp), std::ios::binary | std::ios::trunc); if (!o) return err("could not write next to the file"); o.write(text.data(), (std::streamsize)text.size()); o.flush(); if (!o) { o.close(); fs::remove(u8(tmp), ec); return err("write failed"); } }
@@ -60,7 +81,8 @@ std::string DesktopApi::writeProj(const std::string& p, const std::string& text)
   return "{\"ok\":true,\"path\":" + jsonQuote(p) + "}";
 }
 
-std::string DesktopApi::writeOut(const std::string& p, const std::string& bytes) {
+static std::string writeOutImpl_(const std::string& p, const std::string& bytes) {
+  if (bytes.size() > kMaxOutBytes) return err("that file is too large (over 512 MiB)");
   const std::string e = lowerExt(p);
   if (e != "wav" && e != "zip" && e != "mid") return err("not a render file");
   std::ofstream o(u8(p), std::ios::binary | std::ios::trunc);
@@ -70,11 +92,72 @@ std::string DesktopApi::writeOut(const std::string& p, const std::string& bytes)
   return "{\"ok\":true,\"path\":" + jsonQuote(p) + "}";
 }
 
-DesktopApi::DesktopApi(IPlatform* plat, Emit emit, Config cfg) : plat_(plat), emit_(std::move(emit)), cfg_(std::move(cfg)) {
-  if (!cfg_.nowMs) cfg_.nowMs = [] { return (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); };
+std::string DesktopApi::writeProj(const std::string& p, const std::string& text) {
+  try { return writeProjImpl_(p, text); } catch (const std::exception& e) { return err(std::string("could not write: ") + e.what()); } catch (...) { return err("could not write"); }
+}
+std::string DesktopApi::writeOut(const std::string& p, const std::string& bytes) {
+  try { return writeOutImpl_(p, bytes); } catch (const std::exception& e) { return err(std::string("could not write: ") + e.what()); } catch (...) { return err("could not write"); }
 }
 
-void DesktopApi::reply(const std::string& id, const std::string& v) { emit_("{\"t\":\"dreply\",\"id\":" + id + ",\"v\":" + v + "}"); }
+DesktopApi::DesktopApi(IPlatform* plat, Emit emit, Config cfg) : plat_(plat), emit_(std::move(emit)), cfg_(std::move(cfg)) {
+  if (!cfg_.nowMs) cfg_.nowMs = [] { return (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); };
+  if (!cfg_.allowFile.empty()) {   // the paths picked in earlier runs (S-1: "Open recent" keeps working; nothing the page says can add to this list)
+    try {
+      std::ifstream in(u8(cfg_.allowFile), std::ios::binary); std::string line;
+      while (in && std::getline(in, line)) { while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back(); if (!line.empty()) allowed_.push_back({pathKey(line), line}); }
+      while (allowed_.size() > kAllowMax) allowed_.erase(allowed_.begin());
+    } catch (...) {}
+  }
+  if (cfg_.asyncIo) io_ = std::thread([this] { ioLoop(); });
+}
+
+DesktopApi::~DesktopApi() { stopIo(); }
+void DesktopApi::stopIo() {
+  { std::lock_guard<std::mutex> g(ioM_); ioStop_ = true; }
+  ioCv_.notify_all();
+  if (io_.joinable()) io_.join();
+}
+
+void DesktopApi::ioLoop() {
+  for (;;) {
+    std::function<void()> f;
+    { std::unique_lock<std::mutex> lk(ioM_); ioCv_.wait(lk, [&] { return !ioQ_.empty() || ioStop_; }); if (ioQ_.empty()) return; f = std::move(ioQ_.front()); ioQ_.pop_front(); ioBusy_ = true; }
+    try { f(); } catch (...) {}
+    { std::lock_guard<std::mutex> g(ioM_); ioBusy_ = false; }
+    ioIdle_.notify_all();
+  }
+}
+void DesktopApi::runIo(std::function<void()> fn) {
+  if (!cfg_.asyncIo || ioStop_) { try { fn(); } catch (...) {} return; }
+  { std::lock_guard<std::mutex> g(ioM_); ioQ_.push_back(std::move(fn)); }
+  ioCv_.notify_one();
+}
+void DesktopApi::waitIdle() { std::unique_lock<std::mutex> lk(ioM_); ioIdle_.wait(lk, [&] { return ioQ_.empty() && !ioBusy_; }); }
+
+bool DesktopApi::pathAllowed(const std::string& p) const {
+  if (p.empty()) return false;
+  const std::string k = pathKey(p);
+  std::lock_guard<std::mutex> g(allowM_);
+  for (auto& a : allowed_) if (a.first == k) return true;
+  for (auto& d : cfg_.allowDirs) { std::string dk = pathKey(d); if (!dk.empty() && dk.back() != '/') dk += '/'; if (k.size() > dk.size() && k.compare(0, dk.size(), dk) == 0) return true; }
+  return false;
+}
+void DesktopApi::allowPath(const std::string& p) {
+  if (p.empty() || p.find('\n') != std::string::npos || p.find('\r') != std::string::npos) return;
+  const std::string k = pathKey(p);
+  { std::lock_guard<std::mutex> g(allowM_);
+    for (size_t i = 0; i < allowed_.size(); i++) if (allowed_[i].first == k) { allowed_.erase(allowed_.begin() + (long)i); break; }
+    allowed_.push_back({k, p}); while (allowed_.size() > kAllowMax) allowed_.erase(allowed_.begin()); }
+  saveAllowed();
+}
+void DesktopApi::saveAllowed() {
+  if (cfg_.allowFile.empty()) return;
+  std::string all; { std::lock_guard<std::mutex> g(allowM_); for (auto& a : allowed_) all += a.second + "\n"; }
+  const std::string file = cfg_.allowFile;
+  runIo([file, all] { try { const fs::path f = u8(file); std::error_code ec; fs::create_directories(f.parent_path(), ec); std::ofstream o(f, std::ios::binary | std::ios::trunc); o.write(all.data(), (std::streamsize)all.size()); } catch (...) {} });
+}
+
+void DesktopApi::reply(const std::string& id, const std::string& v) { if (id.empty()) return; emit_("{\"t\":\"dreply\",\"id\":" + id + ",\"v\":" + v + "}"); }
 void DesktopApi::push(const char* ch, const std::string& v) { emit_(std::string("{\"t\":\"dpush\",\"ch\":\"") + ch + "\",\"v\":" + (v.empty() ? "null" : v) + "}"); }
 
 std::string DesktopApi::initJson() const {
@@ -83,6 +166,14 @@ std::string DesktopApi::initJson() const {
 }
 
 bool DesktopApi::handle(const std::string& json) {
+  try { return handleImpl(json); }
+  catch (...) {   // R-2: nothing escapes to the shell's callback; the page's call still gets an answer
+    try { thunder::JsonDoc d; if (d.parse(json) && d.root().isObj()) { thunder::Json idj = d.root().get("id"); if (idj.isNum()) reply(std::to_string((long long)idj.asNum()), err("the shell could not handle that call")); } } catch (...) {}
+    return false;
+  }
+}
+
+bool DesktopApi::handleImpl(const std::string& json) {
   thunder::JsonDoc d;
   if (!d.parse(json) || !d.root().isObj()) return false;
   const thunder::Json j = d.root();
@@ -108,9 +199,17 @@ bool DesktopApi::handle(const std::string& json) {
     return true;
   }
   // ---- handle ----
-  if (ch == "thunder:file-open") { const std::string p = plat_->pickOpenFile(""); return done(p.empty() ? "null" : readProj(p)); }
-  if (ch == "thunder:file-read") return done(readProj(argStr(a, 0)));
-  if (ch == "thunder:file-save") { thunder::Json t = a.at(1); return done(t.isStr() ? writeProj(argStr(a, 0), std::string(t.asStr())) : err("not a project file")); }
+  const std::string notPicked = "not allowed: the shell only reads and writes files you chose in a dialog (Open, Save as) or opened with the app";
+  auto saved = [this](const std::string& r) { if (r.compare(0, 6, "{\"ok\":") == 0 && cfg_.onSaved) cfg_.onSaved(); };
+  if (ch == "thunder:file-open") { const std::string p = plat_->pickOpenFile(""); if (p.empty()) return done("null"); allowPath(p); runIo([this, id, p] { reply(id, readProj(p)); }); return true; }
+  if (ch == "thunder:file-read") { const std::string p = argStr(a, 0); if (!pathAllowed(p)) return done(err(notPicked)); runIo([this, id, p] { reply(id, readProj(p)); }); return true; }
+  if (ch == "thunder:file-save") {
+    const std::string p = argStr(a, 0); thunder::Json t = a.at(1);
+    if (!t.isStr()) return done(err("not a project file"));
+    if (!pathAllowed(p)) return done(err(notPicked));
+    runIo([this, id, p, text = std::string(t.asStr()), saved] { const std::string r = writeProj(p, text); saved(r); reply(id, r); });
+    return true;
+  }
   if (ch == "thunder:file-saveas") {
     std::string base = sanitizeName(a.at(0).isStr() && !a.at(0).asStr().empty() ? std::string(a.at(0).asStr()) : "Song.thunder");
     std::string dir = parentDirIfProj(argStr(a, 2)); if (dir.empty()) dir = plat_->knownDir("documents");
@@ -118,7 +217,10 @@ bool DesktopApi::handle(const std::string& json) {
     if (p.empty()) return done("null");
     if (!isProj(p)) p += ".thunder";
     thunder::Json t = a.at(1);
-    return done(t.isStr() ? writeProj(p, std::string(t.asStr())) : err("not a project file"));
+    if (!t.isStr()) return done(err("not a project file"));
+    allowPath(p);   // the person chose it in the Save dialog
+    runIo([this, id, p, text = std::string(t.asStr()), saved] { const std::string r = writeProj(p, text); saved(r); reply(id, r); });
+    return true;
   }
   if (ch == "thunder:out-pick") {
     const std::string base = sanitizeName(a.at(0).isStr() && !a.at(0).asStr().empty() ? std::string(a.at(0).asStr()) : "Render.wav");
@@ -130,13 +232,18 @@ bool DesktopApi::handle(const std::string& json) {
     if (p.empty()) return done("null");
     if (lowerExt(p) != ext) p += "." + ext;
     lastOut_ = u8(p).parent_path().u8string();
+    allowPath(p);
     return done(jsonQuote(p));
   }
   if (ch == "thunder:out-write") {
     thunder::Json data = a.at(1);   // {"b64": "..."}: the page's ArrayBuffer as base64
-    std::string bytes;
-    if (!data.isObj() || !base64Decode(std::string(data.str("b64")), &bytes)) return done(err("no data"));
-    return done(writeOut(argStr(a, 0), bytes));
+    const std::string p = argStr(a, 0);
+    if (!data.isObj()) return done(err("no data"));
+    if (!pathAllowed(p)) return done(err(notPicked));
+    const std::string_view b64v = data.str("b64");
+    if (b64v.size() / 4 * 3 > kMaxOutBytes + 3) return done(err("that file is too large (over 512 MiB)"));
+    runIo([this, id, p, b64 = std::string(b64v)] { std::string bytes; if (!base64Decode(b64, &bytes)) { reply(id, err("no data")); return; } reply(id, writeOut(p, bytes)); });
+    return true;
   }
   if (ch == "thunder:out-show") { const std::string p = argStr(a, 0); std::error_code ec; if (!p.empty() && fs::exists(u8(p), ec)) plat_->showInFolder(p); return done("true"); }
   if (ch == "thunder:link-enable" || ch == "thunder:link-sync" || ch == "thunder:link-tempo" || ch == "thunder:link-stop") return done("false");   // NOT YET (H8): Link off
@@ -164,6 +271,6 @@ void DesktopApi::tick() {
 
 void DesktopApi::onLoadStart() { pageReady_ = false; closeOk_ = false; closeDeadline_ = 0; }
 
-void DesktopApi::openPath(const std::string& path) { if (pageReady_) push("thunder:open-path", jsonQuote(path)); else pendingPath_ = path; }
+void DesktopApi::openPath(const std::string& path) { allowPath(path); if (pageReady_) push("thunder:open-path", jsonQuote(path)); else pendingPath_ = path; }
 
 }  // namespace tpd

@@ -7,8 +7,14 @@
 #define TPD_DESKTOP_API_H
 
 #include <cstdint>
+#include <condition_variable>
+#include <deque>
 #include <functional>
+#include <mutex>
 #include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace tpd {
 
@@ -19,6 +25,9 @@ struct Channel {
 // The 31 channels, in the order of BRIDGE-TODAY 4: 19 handle, 5 send, 1 sendSync, 6 push. kExtraChannels: what preload.js has beyond that count (the `power` push).
 extern const Channel kChannels[];
 constexpr int kChannelCount = 31;
+// R-1: what one file call may carry (decided here, noted in H6-NOTES): a project file read or saved, and a render written (decoded bytes).
+constexpr size_t kMaxProjBytes = (size_t)256 << 20;
+constexpr size_t kMaxOutBytes = (size_t)512 << 20;
 extern const Channel kExtraChannels[];
 constexpr int kExtraChannelCount = 1;
 
@@ -40,8 +49,15 @@ class IPlatform {
 class DesktopApi {
  public:
   using Emit = std::function<void(const std::string& json)>;
-  struct Config { std::string version = "0.0.0"; int closeTimeoutMs = 3000; std::function<int64_t()> nowMs; };
+  struct Config {
+    std::string version = "0.0.0"; int closeTimeoutMs = 3000; std::function<int64_t()> nowMs;
+    bool asyncIo = false;                      // T-1: file reads / writes and base64 decoding run on a worker thread and the reply is emitted from there (Emit must then be thread-safe); false: inline (tests)
+    std::function<void()> onSaved;             // a project file was written (any thread): the recovery copy is older than the save
+    std::vector<std::string> allowDirs;        // S-1: folders whose files the page may read / write without a dialog (the app's own songs folder, if there is one; none today)
+    std::string allowFile;                     // S-1: where the list of picked paths is kept between runs (so "Open recent" works); "" = this run only
+  };
   DesktopApi(IPlatform* plat, Emit emit, Config cfg);
+  ~DesktopApi();
 
   // A page message after the "D:" prefix. UI thread (the dialogs). Returns false when the channel is unknown (an err reply was sent).
   bool handle(const std::string& json);
@@ -53,6 +69,11 @@ class DesktopApi {
   void openPath(const std::string& path);       // a .thunder file opened from the desktop / a second launch: held until the page is ready
   void push(const char* channel, const std::string& valueJson);
   bool pageReady() const { return pageReady_; }
+  // S-1: file-read / file-save / out-write touch only a path the person picked in a dialog (file-open, file-saveas, out-pick), a path handed over by openPath, a path kept from an earlier run, or a file in allowDirs.
+  bool pathAllowed(const std::string& p) const;
+  void allowPath(const std::string& p);
+  void stopIo();                                // finish what is queued and join the IO worker (idempotent; the destructor does it too)
+  void waitIdle();                              // tests: until the IO worker has finished everything queued
   // The constants the bootstrap defines before the page runs (the sendSync answers): {"link":{...},"version":...}
   std::string initJson() const;
 
@@ -64,10 +85,17 @@ class DesktopApi {
 
  private:
   void reply(const std::string& id, const std::string& valueJson);
+  void runIo(std::function<void()> fn);
+  void ioLoop();
+  void saveAllowed();
+  bool handleImpl(const std::string& json);
   IPlatform* plat_; Emit emit_; Config cfg_;
   bool pageReady_ = false, closeOk_ = false, quitting_ = false;
   int64_t closeDeadline_ = 0;
   std::string pendingPath_, lastOut_;
+  std::vector<std::pair<std::string, std::string>> allowed_;   // (normalised key, path as given), oldest first, at most 64
+  mutable std::mutex allowM_;
+  std::mutex ioM_; std::condition_variable ioCv_, ioIdle_; std::deque<std::function<void()>> ioQ_; bool ioBusy_ = false, ioStop_ = false; std::thread io_;
 };
 
 }  // namespace tpd

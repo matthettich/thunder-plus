@@ -12,11 +12,13 @@
 
 namespace tpd {
 
+constexpr int kFxvMax = 512;       // the most values one fx.values may carry (the Android shell's FXV_MAX)
+constexpr size_t kRecoveryMaxChars = 24000000;   // the page's RCV_MAX
 constexpr int64_t kNow = -1;   // THUNDER_LIVE_NOW as the translator uses it: absent or null `at`
 
 enum class Op {
   SongLoad, KitLoad, Play, Stop, Hold, Bpm, Loop, Lead, Perf, MixSet, FxPlan, FxCommit, FxParam, MasterConfig, ChainEdit, MetersWant, PadsCommit, PadChop, PdcSet, EngineReset,
-  BufUse, BufFree, Hello, MidiCfg, Lxp
+  BufUse, BufFree, Hello, MidiCfg, Lxp, MetersSet, FxValues, RecoveryPut, RecoveryGet, RecoveryDrop
 };
 
 // One flat record for every call: only the fields of its `op` are meaningful.
@@ -39,6 +41,8 @@ struct Call {
   std::vector<std::string> outs; bool clockOut[4] = {false, false, false, false}; double gear[4] = {0, 0, 0, 0}; bool clockIn = false;
   // Lxp
   int st = 0;
+  // MetersSet (M4): kinds = THUNDER_LIVE_MK_* bits, fxTracks = bit t (0..31) a track's effects, bit 32 the master's. FxValues: track, slot, kind (1 pump, 2 mod), vals, id (an ask when >= 0). RecoveryPut: raw = the project text.
+  int kinds = 0; uint64_t fxTracks = 0; int fxKind = 1; std::vector<double> vals;
 };
 
 struct Translation {

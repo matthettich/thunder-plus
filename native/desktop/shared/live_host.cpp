@@ -83,7 +83,7 @@ void LiveHost::teardownLocked() {
 
 void LiveHost::shutdown() { std::lock_guard<std::mutex> lk(life_); teardownLocked(); }
 
-std::string LiveHost::audioName() const { return out_ ? out_->name() : std::string(); }
+std::string LiveHost::audioName() const { std::lock_guard<std::mutex> lk(life_); return out_ ? out_->name() : std::string(); }
 
 int LiveHost::call(std::function<int(thunder_live*)> fn, int timeoutMs) {
   auto eng = eng_.get(); if (!eng) return -2;

@@ -48,5 +48,23 @@ int main() {
   }
   CHECK(T("{\"t\":\"put.header\"}").kind == Translation::kIgnored && T("{\"t\":\"zzz\"}").kind == Translation::kIgnored && T("garbage").kind == Translation::kIgnored && T("{\"t\":\"play\" ").kind == Translation::kRefused, "ignored, and not JSON");
   CHECK(engineList(false).size() == 26 && engineList(true).size() == 30, "engine list");
+  // M4: meters.want with the effect lists (a replacement state), fx.values (an ask), recovery.*
+  { auto t = T("{\"t\":\"meters.want\",\"rate\":10}"); CHECK(t.kind == Translation::kCall && t.call.op == Op::MetersWant && t.call.hz == 10, "rate-only meters.want stays MetersWant");
+    t = T("{\"t\":\"meters.want\",\"rate\":99,\"fx\":[3,\"m\"],\"dyn\":[5]}"); CHECK(t.kind == Translation::kCall && t.call.op == Op::MetersSet && t.call.hz == 30 && t.call.kinds == 3 && t.call.fxTracks == (((uint64_t)1 << 3) | ((uint64_t)1 << 32) | ((uint64_t)1 << 5)), "lists: union mask, both kinds, master as bit 32, rate clamped");
+    t = T("{\"t\":\"meters.want\",\"rate\":5,\"fx\":[],\"dyn\":[]}"); CHECK(t.call.op == Op::MetersSet && t.call.kinds == 0 && t.call.fxTracks == 0, "all off is MetersSet(rate, 0, 0)");
+    t = T("{\"t\":\"meters.want\",\"rate\":5,\"fx\":[40]}"); CHECK(t.kind == Translation::kRefused, "a bad track refuses");
+    t = T("{\"t\":\"meters.want\",\"rate\":5,\"fx\":\"x\"}"); CHECK(t.kind == Translation::kRefused, "a non-array list refuses");
+    t = T("{\"t\":\"meters.want\",\"rate\":5,\"chains\":[1]}"); CHECK(t.call.op == Op::MetersSet && t.call.kinds == 0, "chains / master / trim are read and ignored"); }
+  { auto t = T("{\"t\":\"fx.values\",\"tr\":\"m\",\"slot\":2,\"kind\":\"mod\",\"v\":[0.5,1],\"at\":480,\"id\":7}");
+    CHECK(t.kind == Translation::kCall && t.call.op == Op::FxValues && t.call.track == 32 && t.call.slot == 2 && t.call.fxKind == 2 && t.call.vals.size() == 2 && t.call.at == 480 && t.call.id == 7, "fx.values: track, slot, kind, values, at, id");
+    for (const char* bad : {"{\"t\":\"fx.values\",\"tr\":0,\"slot\":8,\"kind\":\"pump\",\"v\":[1],\"id\":1}", "{\"t\":\"fx.values\",\"tr\":0,\"slot\":0,\"kind\":\"x\",\"v\":[1],\"id\":1}", "{\"t\":\"fx.values\",\"tr\":0,\"slot\":0,\"kind\":\"pump\",\"v\":[],\"id\":1}",
+                            "{\"t\":\"fx.values\",\"tr\":0,\"slot\":0,\"kind\":\"pump\",\"v\":[\"a\"],\"id\":1}", "{\"t\":\"fx.values\",\"tr\":33,\"slot\":0,\"kind\":\"pump\",\"v\":[1],\"id\":1}", "{\"t\":\"fx.values\",\"tr\":0,\"slot\":0,\"kind\":\"pump\",\"id\":1}"}) {
+      auto r = T(bad); CHECK(r.kind == Translation::kRefused && r.replyId == 1, "fx.values refused with the ask's id: %s", bad); }
+    std::string many = "{\"t\":\"fx.values\",\"tr\":0,\"slot\":0,\"kind\":\"pump\",\"v\":["; for (int i = 0; i < 513; i++) many += i ? ",0" : "0"; many += "],\"id\":2}"; CHECK(translate(many).kind == Translation::kRefused, "513 values: refused"); }
+  CHECK(T("{\"t\":\"recovery.put\",\"project\":\"x\"}").call.op == Op::RecoveryPut && T("{\"t\":\"recovery.put\",\"project\":\"\"}").kind == Translation::kIgnored && T("{\"t\":\"recovery.put\",\"project\":3}").kind == Translation::kIgnored, "recovery.put: a non-empty string only");
+  CHECK(T("{\"t\":\"recovery.get\",\"id\":4}").call.op == Op::RecoveryGet && T("{\"t\":\"recovery.drop\",\"id\":5}").call.id == 5, "recovery.get / drop carry the id");
+  // L-5: a number outside the int range is clamped, never undefined behaviour
+  { auto t = T("{\"t\":\"play\",\"mode\":\"song\",\"row\":1e30,\"track\":-1e30,\"at\":1e300}"); CHECK(t.kind == Translation::kCall && t.call.row == INT32_MAX && t.call.track == INT32_MIN && t.call.at == INT64_MAX, "huge numbers clamp");
+    t = T("{\"t\":\"mix.set\",\"tr\":1e30,\"k\":\"vol\",\"v\":1}"); CHECK(t.kind == Translation::kRefused, "a track outside the range is refused, not wrapped"); }
   DONE("test_desktop_translator");
 }

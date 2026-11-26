@@ -1,6 +1,7 @@
 // H6: window.thunderDesktop.* (desktop_api.h): the 31 channels, each answered; the file rules; the close and open-path hand-offs.
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <set>
 #include <sstream>
 #include "check.h"
@@ -57,6 +58,8 @@ int main() {
   // files
   const fs::path dir = fs::temp_directory_path() / "tpd_desktop_api_test"; fs::remove_all(dir); fs::create_directories(dir);
   const std::string song = (dir / "a b.thunder").u8string();
+  api.allowPath(song);   // (as if picked in a dialog; the S-1 tests below check what is refused)
+  api.allowPath((dir / "nodir2/x.thunder").u8string());
   { out.clear(); api.handle("{\"ch\":\"thunder:file-save\",\"id\":5,\"a\":[" + jsonQuote(song) + ",\"{\\\"x\\\":1}\"]}"); thunder::JsonDoc d; auto r = lastReply(d);
     CHECK(r.get("v").boolean("ok") && slurp(dir / "a b.thunder") == "{\"x\":1}" && !fs::exists(song + ".saving"), "file-save writes the file and leaves no .saving");
     out.clear(); api.handle("{\"ch\":\"thunder:file-read\",\"id\":6,\"a\":[" + jsonQuote(song) + "]}"); thunder::JsonDoc d2; auto r2 = lastReply(d2);
@@ -102,6 +105,34 @@ int main() {
     CHECK(a2.requestClose(false), "the close that follows is allowed");
     a2.onLoadStart(); CHECK(a2.requestClose(false), "a reloading page is not asked");
     a2.handle("{\"ch\":\"thunder:page-ready\",\"a\":[]}"); t = 10000; a2.requestClose(false); t = 13001; a2.tick(); CHECK(p2.closes == 2, "a page that does not answer in 3 s does not stop the window closing"); }
+  // S-1: only paths the person picked (or the app handed over) are read or written
+  { const std::string other = (dir / "other.thunder").u8string(), json = (dir / "settings.json").u8string(), wav = (dir / "sneaky.wav").u8string();
+    { std::ofstream(dir / "other.thunder") << "{\"secret\":1}"; }
+    out.clear(); api.handle("{\"ch\":\"thunder:file-read\",\"id\":30,\"a\":[" + jsonQuote(other) + "]}"); thunder::JsonDoc d; auto r = lastReply(d);
+    CHECK(r.get("v").str("error").find("not allowed") != std::string::npos && r.get("v").str("text").empty(), "file-read of a path nobody picked is refused");
+    out.clear(); api.handle("{\"ch\":\"thunder:file-save\",\"id\":31,\"a\":[" + jsonQuote(json) + ",\"{}\"]}"); thunder::JsonDoc d2; CHECK(lastReply(d2).get("v").str("error").find("not allowed") != std::string::npos && !fs::exists(json), "file-save to a path nobody picked is refused, nothing written");
+    out.clear(); api.handle("{\"ch\":\"thunder:file-save\",\"id\":32,\"a\":[" + jsonQuote(other) + ",\"{}\"]}"); thunder::JsonDoc d3; CHECK(lastReply(d3).get("v").str("error").find("not allowed") != std::string::npos && slurp(dir / "other.thunder") == "{\"secret\":1}", "file-save cannot overwrite a file nobody picked");
+    out.clear(); api.handle("{\"ch\":\"thunder:out-write\",\"id\":33,\"a\":[" + jsonQuote(wav) + ",{\"b64\":\"UklGRg==\"}]}"); thunder::JsonDoc d4; CHECK(lastReply(d4).get("v").str("error").find("not allowed") != std::string::npos && !fs::exists(wav), "out-write to a path out-pick never returned is refused");
+    out.clear(); api.handle("{\"ch\":\"thunder:file-read\",\"id\":34,\"a\":[" + jsonQuote((dir / "x/../other.thunder").u8string()) + "]}"); thunder::JsonDoc d5; CHECK(lastReply(d5).get("v").str("text").empty(), "a picked path is compared normalised: a different spelling of an unpicked file is still refused");
+    api.openPath(other); out.clear(); api.handle("{\"ch\":\"thunder:file-read\",\"id\":35,\"a\":[" + jsonQuote(other) + "]}"); thunder::JsonDoc d6; CHECK(lastReply(d6).get("v").str("text") == "{\"secret\":1}", "a path handed over with openPath is allowed");
+    plat.openAnswer = json; { std::ofstream(dir / "settings.json") << "{}"; } out.clear(); api.handle("{\"ch\":\"thunder:file-open\",\"id\":36,\"a\":[]}"); out.clear();
+    api.handle("{\"ch\":\"thunder:file-save\",\"id\":37,\"a\":[" + jsonQuote(json) + ",\"{\\\"y\\\":2}\"]}"); thunder::JsonDoc d7; CHECK(lastReply(d7).get("v").boolean("ok"), "a file picked in the Open dialog may be saved to"); }
+  // a folder allowed by the app itself (allowDirs); the list kept between runs (allowFile)
+  { FakePlat p3; std::vector<std::string> o3; DesktopApi::Config c3; c3.allowDirs = {(dir / "songs").u8string()}; c3.allowFile = (dir / "state" / "allowed.txt").u8string();
+    fs::create_directories(dir / "songs"); { std::ofstream(dir / "songs" / "s.thunder") << "{}"; }
+    { DesktopApi a3(&p3, [&](const std::string& j) { o3.push_back(j); }, c3);
+      a3.handle("{\"ch\":\"thunder:file-read\",\"id\":1,\"a\":[" + jsonQuote((dir / "songs" / "s.thunder").u8string()) + "]}"); CHECK(o3.back().find("\"text\"") != std::string::npos, "a file in an allowed folder is read");
+      CHECK(!a3.pathAllowed((dir / "songs-evil" / "s.thunder").u8string()), "a folder that only starts with the allowed name is not allowed");
+      a3.allowPath((dir / "other.thunder").u8string()); a3.waitIdle(); }
+    { DesktopApi a4(&p3, [&](const std::string&) {}, c3); CHECK(a4.pathAllowed((dir / "other.thunder").u8string()), "a path picked in an earlier run is still allowed (Open recent)"); } }
+  // T-1: with asyncIo the work runs on a worker and the reply is emitted from there; R-1: the caps
+  { FakePlat p5; std::mutex m; std::vector<std::string> o5; DesktopApi::Config c5; c5.asyncIo = true; int saves = 0; c5.onSaved = [&] { saves++; };
+    DesktopApi a5(&p5, [&](const std::string& j) { std::lock_guard<std::mutex> g(m); o5.push_back(j); }, c5);
+    const std::string f = (dir / "async.thunder").u8string(); a5.allowPath(f);
+    a5.handle("{\"ch\":\"thunder:file-save\",\"id\":1,\"a\":[" + jsonQuote(f) + ",\"{}\"]}"); a5.handle("{\"ch\":\"thunder:file-read\",\"id\":2,\"a\":[" + jsonQuote(f) + "]}"); a5.waitIdle();
+    std::lock_guard<std::mutex> g(m); CHECK(o5.size() == 2 && o5[0].find("\"id\":1") != std::string::npos && o5[1].find("\"id\":2") != std::string::npos && o5[1].find("\"text\":\"{}\"") != std::string::npos && saves == 1, "async: saved then read, in order, replies from the worker, onSaved called"); }
+  CHECK(DesktopApi::writeProj((dir / "big.thunder").u8string(), std::string(kMaxProjBytes + 1, 'x')).find("too large") != std::string::npos && !fs::exists(dir / "big.thunder"), "R-1: a project over the cap is refused");
+  CHECK(DesktopApi::readProj((dir / "no\xff.thunder").u8string()).find("error") != std::string::npos, "R-2: a path that is not UTF-8 is an error reply, not an exception");
   fs::remove_all(dir);
   DONE("test_desktop_api");
 }

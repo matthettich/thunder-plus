@@ -3,6 +3,9 @@
 #include <array>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
+#include <memory>
+#include <vector>
 
 #include "rt/json.h"
 #include "text_util.h"
@@ -10,23 +13,50 @@
 namespace tpd {
 
 namespace {
+// The reply body to an fx.values ASK (PC6): {ok:true}; {ok:false, busy:true, error:'busy'} for E_BUSY (-8); {ok:false, error:'rc N (...)'} otherwise: the Android shell's fxValuesReply.
+std::string fxValuesBody(int rc) {
+  if (rc == 0) return "\"ok\":true";
+  if (rc == -8) return "\"ok\":false,\"busy\":true,\"error\":\"busy\"";
+  std::string m = "rc " + std::to_string(rc);
+  if (rc == -1) m += " (refused: not a hosted slot of that kind, a wrong value count, or a value the core keeps in the song)"; else if (rc == -2) m += " (not allowed now)"; else if (rc == -9) m += " (not supported by this build)";
+  return "\"ok\":false,\"error\":" + jsonQuote(m);
+}
 std::string num(double v) { char b[64]; std::snprintf(b, sizeof b, "%.3f", v); return b; }
 std::string strList(const std::vector<std::string>& v) { std::string o = "["; for (size_t i = 0; i < v.size(); i++) { if (i) o += ","; o += jsonQuote(v[i]); } return o + "]"; }
 }  // namespace
 
-BridgeSession::BridgeSession(LiveHost& host, Emit emit) : host_(host), emit_(std::move(emit)) { worker_ = std::thread([this] { worker(); }); }
+BridgeSession::BridgeSession(LiveHost& host, Emit emit, RecoveryStore* recovery) : host_(host), emit_(std::move(emit)), rec_(recovery) { worker_ = std::thread([this] { worker(); }); }
 BridgeSession::~BridgeSession() { shutdown(); }
 
 void BridgeSession::shutdown() {
-  { std::lock_guard<std::mutex> g(pm_); pumpStop_ = true; }
+  std::thread p;
+  { std::lock_guard<std::mutex> g(pm_); closing_ = true; pumpStop_ = true; p = std::move(pump_); }   // L-1: no late hello can start a pump after this
   pcv_.notify_all();
-  if (pump_.joinable()) pump_.join();
+  if (p.joinable()) p.join();
   { std::lock_guard<std::mutex> g(qm_); stop_ = true; }
   qcv_.notify_all();
   if (worker_.joinable()) worker_.join();
 }
 
-void BridgeSession::post(const std::string& msg) { { std::lock_guard<std::mutex> g(qm_); q_.push_back(msg); } qcv_.notify_one(); }
+bool BridgeSession::post(const std::string& msg) {
+  const char* why = nullptr;
+  if (msg.size() >= 2 && msg[0] == 'B' && msg[1] == ':') { if (msg.size() - 2 > kMaxPutChars) why = "a put chunk over 24 M characters"; }
+  else { const bool song = typeOf(msg) == "song.load"; if (msg.size() > (song ? kMaxSongBytes : kMaxOtherBytes)) why = song ? "a song.load over 16 MiB (maxSongBytes)" : "a message over 64 MiB"; }
+  if (!why) {
+    std::lock_guard<std::mutex> g(qm_);
+    if (q_.size() >= kMaxQueueMsgs || qBytes_ + msg.size() > kMaxQueueBytes) why = "the shell's message queue is full";
+    else { q_.push_back(msg); qBytes_ += msg.size(); }
+  }
+  if (why) {   // refused: told at once, never queued (an ask gets an error reply, so the page does not wait for it)
+    const std::string t = (msg.size() >= 2 && msg[0] == 'B' && msg[1] == ':') ? std::string("put") : typeOf(msg);
+    const std::string m = std::string("refused: ") + why;
+    err(t.empty() ? "message" : t, m);
+    if (t != "put") reply(idOfTail(msg), "\"ok\":false,\"error\":" + jsonQuote(m) + ",\"err\":" + jsonQuote(m));
+    return false;
+  }
+  qcv_.notify_one();
+  return true;
+}
 
 void BridgeSession::drain() { std::unique_lock<std::mutex> lk(qm_); idleCv_.wait(lk, [&] { return (q_.empty() && !busy_) || stop_; }); }
 
@@ -36,14 +66,14 @@ void BridgeSession::worker() {
     { std::unique_lock<std::mutex> lk(qm_);
       qcv_.wait(lk, [&] { return !q_.empty() || stop_; });
       if (q_.empty() && stop_) return;
-      m = std::move(q_.front()); q_.pop_front(); busy_ = true; }
+      m = std::move(q_.front()); q_.pop_front(); qBytes_ -= m.size(); busy_ = true; }
     run(m);
     { std::lock_guard<std::mutex> g(qm_); busy_ = false; }
     idleCv_.notify_all();
   }
 }
 
-void BridgeSession::err(const std::string& where, const std::string& msg) { emit("{\"t\":\"err\",\"where\":" + jsonQuote(where) + ",\"msg\":" + jsonQuote(msg) + ",\"fatal\":false}"); }
+void BridgeSession::err(const std::string& where, const std::string& msg, bool fatal) { emit("{\"t\":\"err\",\"where\":" + jsonQuote(where) + ",\"msg\":" + jsonQuote(msg) + ",\"fatal\":" + (fatal ? "true" : "false") + "}"); }
 
 void BridgeSession::reply(int id, const std::string& fields) { if (id >= 0) emit("{\"t\":\"reply\",\"id\":" + std::to_string(id) + (fields.empty() ? "" : "," + fields) + "}"); }
 
@@ -70,7 +100,7 @@ void BridgeSession::run(const std::string& raw) {
     Translation tr = translate(raw);
     switch (tr.kind) {
       case Translation::kIgnored: break;
-      case Translation::kRefused: err(tr.where, tr.msg); reply(tr.replyId, "\"err\":" + jsonQuote(tr.msg)); break;
+      case Translation::kRefused: err(tr.where, tr.msg); reply(tr.replyId, "\"err\":" + jsonQuote(tr.msg) + ",\"ok\":false,\"error\":" + jsonQuote(tr.msg)); break;
       case Translation::kCall: execute(tr.call, type); break;
     }
   } catch (const std::exception& e) { err(typeOf(raw), std::string("shell error: ") + e.what()); }
@@ -78,10 +108,11 @@ void BridgeSession::run(const std::string& raw) {
 
 void BridgeSession::execute(const Call& c, const std::string& type) {
   // The engine is down (engine.reset in progress): the page gets an error and, for an ask, an error reply
-  if (!host_.active() && c.op != Op::Hello && c.op != Op::EngineReset && c.op != Op::BufFree && c.op != Op::Lxp && c.op != Op::MidiCfg) {
+  if (!host_.active() && c.op != Op::RecoveryPut && c.op != Op::RecoveryGet && c.op != Op::RecoveryDrop && c.op != Op::Hello && c.op != Op::EngineReset && c.op != Op::BufFree && c.op != Op::Lxp && c.op != Op::MidiCfg) {
     const std::string msg = "the live engine is down; the page re-sends its state after {t:'engine',up:true}";
     err(type, msg);
     if (c.op == Op::SongLoad) reply(idOfTail(c.raw), "\"ok\":false,\"err\":" + jsonQuote(msg));
+    if (c.op == Op::FxValues) reply(c.id, "\"ok\":false,\"error\":\"engine down\"");
     return;
   }
   const int64_t at = c.at;
@@ -146,6 +177,21 @@ void BridgeSession::execute(const Call& c, const std::string& type) {
       break;
     }
     case Op::MetersWant: { const double hz = c.hz; check(type, host_.call([=](thunder_live* L) { return thunder_live_meters_want(L, hz); })); break; }
+    case Op::MetersSet: {   // M4: a REPLACEMENT state (rate, which records, whose effects); E_BUSY is reported, the page re-sends its state on its next change
+      thunder_live_meters_spec sp; std::memset(&sp, 0, sizeof sp);
+      sp.size = sizeof sp; sp.kinds = (uint32_t)c.kinds; sp.rate_hz = c.hz; sp.fx_tracks = c.fxTracks; sp.chains_hz = 0;
+      check(type, host_.call([=](thunder_live* L) { return thunder_live_meters_set(L, &sp); }));
+      break;
+    }
+    case Op::FxValues: {   // M4 (PP): the whole value list of a pump or modular slot, at once. An ask (id) is answered either way; without an id a refusal is an err event
+      auto v = std::make_shared<std::vector<double>>(c.vals); const int t = c.track, s = c.slot, k = c.fxKind;
+      const int rc = host_.call([=](thunder_live* L) { return thunder_live_fx_values(L, t, s, k, v->data(), (int)v->size(), at); });
+      if (c.id >= 0) reply(c.id, fxValuesBody(rc)); else check(type, rc);
+      break;
+    }
+    case Op::RecoveryPut: if (rec_) rec_->put(c.raw, (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()); break;   // no reply
+    case Op::RecoveryGet: reply(c.id, rec_ ? rec_->getBody() : std::string("\"ok\":false,\"error\":\"there is no recovery copy\"")); break;
+    case Op::RecoveryDrop: if (rec_) rec_->drop(); reply(c.id, "\"ok\":true"); break;
     case Op::BufFree: puts_.free(c.bufId); break;
     case Op::BufUse: {
       if (c.kind == "pad" && c.frames == 0) { check("buf.use", host_.padRemove(c.pad)); return; }   // the page's removal: no put, zero frames
@@ -162,6 +208,7 @@ void BridgeSession::hello(const Call& h) {
   session_ = h.live;
   if (!h.live) {   // no N0 test core on the desktop: a hello without `live` is answered without starting anything, and the caps say there is no native audio
     reply(h.id, "\"v\":1,\"core\":\"h6-desktop\",\"host\":\"desktop\",\"caps\":{\"nativeAudio\":false,\"midi\":false,\"link\":false,\"plugins\":false,\"inputs\":false,\"render\":false,\"files\":false,\"engines\":[],\"fx\":[]}");
+    announce();
     return;
   }
   std::string e;
@@ -176,16 +223,20 @@ void BridgeSession::hello(const Call& h) {
   char b[512];
   std::snprintf(b, sizeof b, "\"v\":1,\"core\":\"h6-live\",\"sampleRate\":%.0f,\"sr\":%.0f,\"outLat\":%d,\"host\":\"desktop\",\"maxPadBytes\":%lld,\"maxSongBytes\":%lld,\"live\":true,", sr, sr, outLat, padBudget, (long long)16 << 20);
   std::string body = b;
-  body += std::string("\"caps\":{\"nativeAudio\":true,\"midi\":false,\"link\":false,\"plugins\":false,\"inputs\":false,\"render\":false,\"files\":false,\"live\":true,\"chains\":") + (host_.chainsOn() ? "true" : "false") +
+  body += std::string("\"caps\":{\"nativeAudio\":true,\"midi\":false,\"link\":false,\"plugins\":false,\"inputs\":false,\"render\":false,\"files\":false,\"live\":true,\"meters2\":") + ((caps & 0x400) ? "true" : "false") + ",\"fxValues\":" + ((caps & 0x800) ? "true" : "false") +
+          ",\"recoveryPut\":" + (rec_ && rec_->enabled() ? "true" : "false") + ",\"chains\":" + (host_.chainsOn() ? "true" : "false") +
           ",\"sf\":" + ((caps & 8) ? "true" : "false") + ",\"engines\":" + strList(engineList(LiveHost::hasLxr())) + ",\"fx\":[\"tfx\",\"pump\",\"modfx\",\"master\"],\"abi\":1,\"liveCaps\":" + std::to_string(caps) + "}";
   reply(h.id, body);
+  announce();
 }
+
+// after hello: a recovery copy from last time is announced once (the page asks "Restore unsaved changes?")
+void BridgeSession::announce() { if (!rec_) return; const std::string e = rec_->announceEvent(); if (!e.empty()) emit(e); }
 
 void BridgeSession::startPump() {
   std::lock_guard<std::mutex> g(pm_);
-  if (pumpRun_) return;
+  if (pumpRun_ || closing_) return;
   pumpRun_ = true; pumpStop_ = false;
-  if (pump_.joinable()) pump_.join();
   pump_ = std::thread([this] { pump(); });
 }
 
@@ -216,7 +267,12 @@ void BridgeSession::engineReset() {
   host_.shutdown();
   puts_.clear();
   std::string e;
-  if (host_.start(true, &e) < 0) { err("engine.reset", "the live engine did not restart: " + e); return; }
+  if (host_.start(true, &e) < 0) {   // C-2: a definite answer: the engine is down for good until the next reset / hello; the page falls back to its own engine and says so
+    const std::string m = "the live engine did not restart: " + e;
+    emit("{\"t\":\"engine\",\"up\":false,\"error\":" + jsonQuote(m) + "}");
+    err("engine.reset", m, true);
+    return;
+  }
   flag_ = was;
   emit("{\"t\":\"engine\",\"up\":true,\"sr\":" + std::to_string((long long)host_.sampleRate()) + "}");
 }

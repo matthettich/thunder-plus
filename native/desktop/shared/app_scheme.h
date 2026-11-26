@@ -24,6 +24,8 @@ std::string mimeOfPath(const std::string& path);   // by extension; .wasm is app
 std::string reportOnlyCsp();
 // `rootDir`: the bundle directory (UTF-8). The file's existence is checked here.
 AppResponse resolveAppUrl(const std::string& url, const std::string& rootDir);
+// true for app://thunder, app://thunder/..., ?... and #... only (the one origin the shells trust; a lookalike host such as app://thunder.evil or app://thunderx is not).
+bool isAppOrigin(const std::string& url);
 // Whole file into `out`. false when it cannot be read.
 bool readWholeFile(const std::string& path, std::string* out);
 

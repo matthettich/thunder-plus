@@ -48,7 +48,7 @@ std::string reportOnlyCsp() {
          "img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
 }
 
-AppResponse resolveAppUrl(const std::string& url, const std::string& rootDir) {
+static AppResponse resolveImpl(const std::string& url, const std::string& rootDir) {
   AppResponse r;
   const std::string scheme = "app://";
   if (lower(url.substr(0, scheme.size())) != scheme) return r;
@@ -88,17 +88,29 @@ AppResponse resolveAppUrl(const std::string& url, const std::string& rootDir) {
   r.file = canon.u8string();
   r.mime = mimeOfPath(r.file);
   r.headers.push_back({"Content-Type", r.mime});
-  r.headers.push_back({"Access-Control-Allow-Origin", "*"});
   r.headers.push_back({"Cache-Control", "no-cache"});
   if (r.mime.compare(0, 9, "text/html") == 0) r.headers.push_back({"Content-Security-Policy-Report-Only", reportOnlyCsp()});
   return r;
 }
 
+// R-2: nothing escapes to the web view's callback: a path that is not valid UTF-8 (fs::u8path may throw on MSVC) or a failed allocation is a 404.
+AppResponse resolveAppUrl(const std::string& url, const std::string& rootDir) {
+  try { return resolveImpl(url, rootDir); } catch (...) { return AppResponse(); }
+}
+
+bool isAppOrigin(const std::string& url) {
+  static const std::string o = "app://thunder";
+  if (url.size() < o.size() || lower(url.substr(0, o.size())) != o) return false;
+  return url.size() == o.size() || url[o.size()] == '/' || url[o.size()] == '?' || url[o.size()] == '#';
+}
+
 bool readWholeFile(const std::string& path, std::string* out) {
-  std::ifstream in(u8(path), std::ios::binary);
-  if (!in) return false;
-  out->assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-  return !in.bad();
+  try {
+    std::ifstream in(u8(path), std::ios::binary);
+    if (!in) return false;
+    out->assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    return !in.bad();
+  } catch (...) { return false; }
 }
 
 }  // namespace tpd

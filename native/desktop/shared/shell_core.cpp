@@ -6,16 +6,26 @@
 
 namespace tpd {
 
+namespace {
+std::string under(const std::string& dir, const char* leaf) { if (dir.empty()) return ""; const char last = dir.back(); return dir + ((last == '/' || last == '\\') ? "" : "/") + leaf; }
+}
+
 ShellCore::ShellCore(IPlatform* plat, Options opt)
-    : opt_(std::move(opt)), api_(plat, [this](const std::string& j) { toPage(j); }, [&] { DesktopApi::Config c; c.version = opt_.version; return c; }()) {
+    : opt_(std::move(opt)), recovery_(under(opt_.dataDir, "recovery")),
+      api_(plat, [this](const std::string& j) { toPage(j); }, [&] {
+        DesktopApi::Config c; c.version = opt_.version; c.asyncIo = true;   // T-1: the disk work is off the UI thread
+        c.allowFile = under(opt_.dataDir, "allowed-paths.txt");
+        c.onSaved = [this] { recovery_.drop(); };   // a saved project makes the last recovery copy older than the file
+        return c; }()) {
   AudioOutFactory f = opt_.nullAudio || !opt_.audio ? AudioOutFactory([] { return makeNullAudioOut(); }) : opt_.audio;
   host_.reset(new LiveHost(std::move(f)));
-  session_.reset(new BridgeSession(*host_, [this](const std::string& j) { toPage(j); }));
+  session_.reset(new BridgeSession(*host_, [this](const std::string& j) { toPage(j); }, &recovery_));
 }
 
 ShellCore::~ShellCore() { shutdown(); }
 
 void ShellCore::shutdown() {
+  api_.stopIo();   // the IO worker emits through toPage: it ends before anything it uses
   if (session_) session_->shutdown();
   if (host_) host_->shutdown();
 }
@@ -33,9 +43,15 @@ void ShellCore::flush() {
 }
 
 void ShellCore::onPageMessage(const std::string& m) {
-  if (m.size() >= 2 && m[0] == 'D' && m[1] == ':') { api_.handle(m.substr(2)); return; }
-  if (m.size() >= 2 && m[0] == 'S' && m[1] == ':') { std::string rep; const bool ok = judgeSelfTest(m.substr(2), &rep); if (opt_.onSelfTest) opt_.onSelfTest(ok, rep); return; }
-  session_->post(m);
+  try {
+    if (m.size() > kMaxPageMessage) { toPage("{\"t\":\"err\",\"where\":\"message\",\"msg\":\"refused: a message over 720 MiB\",\"fatal\":false}"); return; }
+    if (m.size() >= 2 && m[0] == 'D' && m[1] == ':') { api_.handle(m.substr(2)); return; }
+    if (m.size() >= 2 && m[0] == 'S' && m[1] == ':') {   // S-3: the selftest verdict only counts under --selftest; in a normal run a page cannot end the process with it
+      if (!opt_.selfTest) return;
+      std::string rep; const bool ok = judgeSelfTest(m.substr(2), &rep); if (opt_.onSelfTest) opt_.onSelfTest(ok, rep); return;
+    }
+    session_->post(m);
+  } catch (...) {}   // R-2: nothing escapes to the web view's callback
 }
 
 std::string ShellCore::bootstrapScript(const char* js, size_t len) const {

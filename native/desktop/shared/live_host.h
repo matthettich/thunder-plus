@@ -87,7 +87,8 @@ class LiveHost {
   std::unique_ptr<AudioOut> out_;
   std::atomic<double> sr_{0};
   std::atomic<double> load_{0};
-  std::mutex life_, loadM_;
+  mutable std::mutex life_;
+  std::mutex loadM_;
   int64_t rev_ = 0;
   std::vector<int> lastSlots_;
   std::shared_ptr<std::string> songText_, kitText_;

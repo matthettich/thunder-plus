@@ -2,6 +2,7 @@
 // The same sequence the page client sends: hello (ask), song.load (ask), kit.load, a put + buf.use + pads.commit, play, mix.set, stop; the refusals; engine.reset.
 #include <atomic>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -82,6 +83,35 @@ int main() {
   CHECK(sink.count("\"up\":false") == 1 && sink.count("\"up\":true") == ups + 1 && host.active(), "engine.reset: engine up:false then up:true");
   s.post("{\"t\":\"song.load\",\"title\":\"x\",\"S\":" + S + ",\"vars\":null,\"rev\":8,\"id\":50}"); s.drain();
   CHECK(sink.find({"\"t\":\"reply\"", "\"id\":50", "\"pending\":true"}) != "", "after a reset the kit is gone: the song is pending again");
+  // M4 parity: the caps, the meters lists, fx.values as an ask
+  CHECK(sink.find({"\"id\":2", "\"meters2\":true", "\"fxValues\":true", "\"recoveryPut\":false"}) != "", "hello caps: meters2 and fxValues true, recoveryPut false without a recovery folder: %s", sink.find({"\"id\":2"}).c_str());
+  s.post("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[0,\"m\"],\"dyn\":[0]}"); s.post("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[],\"dyn\":[]}"); s.post("{\"t\":\"meters.want\",\"rate\":10,\"fx\":[99]}"); s.drain();
+  CHECK(sink.find({"\"where\":\"meters.want\"", "bad track"}) != "" && sink.count("\"where\":\"meters.want\"") == 1, "meters.want with lists reaches the core; a bad track is refused (%d errs)", sink.count("\"where\":\"meters.want\""));
+  s.post("{\"t\":\"fx.values\",\"tr\":0,\"slot\":0,\"kind\":\"pump\",\"v\":[0.5,0.25],\"id\":60}"); s.post("{\"t\":\"fx.values\",\"tr\":0,\"slot\":0,\"kind\":\"pump\",\"v\":[],\"id\":61}"); s.post("{\"t\":\"fx.values\",\"tr\":0,\"slot\":9,\"kind\":\"mod\",\"v\":[1],\"id\":62}"); s.drain();
+  CHECK(sink.find({"\"t\":\"reply\"", "\"id\":60", "\"ok\":false", "\"error\":\"rc "}) != "", "fx.values on an empty slot: the core refuses, the ask gets {ok:false, error}: %s", sink.find({"\"id\":60"}).c_str());
+  CHECK(sink.find({"\"id\":61", "\"ok\":false", "1..512"}) != "" && sink.find({"\"id\":62", "\"ok\":false", "slot must be 0..7"}) != "", "fx.values refusals carry ok:false and error");
+  // R-1: the limits, refused at once with an error reply for an ask
+  CHECK(!s.post("{\"t\":\"song.load\",\"S\":\"" + std::string(tpd::kMaxSongBytes, 'x') + "\",\"id\":70}"), "a song.load over 16 MiB is refused by post()");
+  CHECK(sink.find({"\"id\":70", "\"ok\":false", "16 MiB"}) != "" && sink.find({"\"where\":\"song.load\"", "refused"}) != "", "... with an err and an error reply");
+  CHECK(!s.post("B:" + std::string(tpd::kMaxPutChars + 1, 'A')) && sink.find({"\"where\":\"put\"", "24 M"}) != "", "a put chunk over 24 M chars is refused");
+  CHECK(s.post("{\"t\":\"bpm\",\"v\":120}"), "a normal message is accepted"); s.drain();
+  // M4 recovery.* (a folder of its own): put, announce after hello, get, drop
+  { namespace fs = std::filesystem; const fs::path rd = fs::temp_directory_path() / "tpd_session_recovery"; fs::remove_all(rd);
+    tpd::RecoveryStore rs(rd.u8string()); Sink s2; tpd::BridgeSession b2(host, [&](const std::string& l) { s2.add(l); }, &rs);
+    b2.post("{\"t\":\"recovery.get\",\"id\":1}"); b2.drain(); CHECK(s2.find({"\"id\":1", "\"ok\":false"}) != "", "no copy yet: recovery.get says so");
+    b2.post("{\"t\":\"recovery.put\",\"project\":\"{\\\"app\\\":\\\"thunder-project\\\",\\\"v\\\":1,\\\"song\\\":{}}\"}"); b2.post("{\"t\":\"recovery.put\",\"project\":\"\"}"); b2.post("{\"t\":\"recovery.put\",\"project\":5}"); b2.drain();
+    CHECK(rs.has() && fs::exists(rd / "recovery.put.thunder") && !fs::exists(rd / "recovery.put.thunder.tmp"), "recovery.put stored atomically; an empty or non-string project is ignored (the copy stays)");
+    b2.post("{\"t\":\"hello\",\"v\":1,\"id\":2}"); b2.drain(); CHECK(s2.find({"\"t\":\"recovery\"", "\"time\":"}) != "", "the copy is announced after hello");
+    b2.post("{\"t\":\"recovery.get\",\"id\":3}"); b2.drain(); CHECK(s2.find({"\"id\":3", "\"ok\":true", "\"source\":\"put\"", "thunder-project"}) != "", "recovery.get returns the put: %s", s2.find({"\"id\":3"}).c_str());
+    b2.post("{\"t\":\"recovery.drop\",\"id\":4}"); b2.post("{\"t\":\"recovery.get\",\"id\":5}"); b2.drain(); CHECK(!rs.has() && s2.find({"\"id\":4", "\"ok\":true"}) != "" && s2.find({"\"id\":5", "\"ok\":false"}) != "", "recovery.drop deletes it");
+    b2.shutdown(); fs::remove_all(rd); }
+  // C-2: a restart that fails says so definitely: engine up:false with the error, and a fatal err
+  { struct FailOut : tpd::AudioOut { bool open(Callback, void*, double*, std::string* e) override { if (e) *e = "device busy"; return false; } bool start(std::string*) override { return false; } void close() override {} };
+    int made = 0; tpd::LiveHost h3([&]() -> std::unique_ptr<tpd::AudioOut> { if (made++ == 0) return std::unique_ptr<tpd::AudioOut>(new ManualOut(48000)); return std::unique_ptr<tpd::AudioOut>(new FailOut()); });
+    Sink s3; tpd::BridgeSession b3(h3, [&](const std::string& l) { s3.add(l); });
+    b3.post("{\"t\":\"hello\",\"v\":1,\"live\":true,\"id\":1}"); b3.drain(); b3.post("{\"t\":\"engine.reset\"}"); b3.drain();
+    CHECK(s3.find({"\"t\":\"engine\"", "\"up\":false", "\"error\":\"the live engine did not restart"}) != "" && s3.find({"\"t\":\"err\"", "\"where\":\"engine.reset\"", "\"fatal\":true"}) != "" && s3.count("\"up\":true") == 0 && !h3.active(), "a failed engine.reset: engine up:false + error, a fatal err, never up:true");
+    b3.shutdown(); h3.shutdown(); }
   run = false; dev.join();
   s.shutdown(); host.shutdown();
   DONE("test_desktop_session");

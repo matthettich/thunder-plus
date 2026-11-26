@@ -43,7 +43,10 @@ int main() {
     std::string rep; CHECK(judgeSelfTest(good, &rep), "a complete answer list passes: %s", rep.c_str());
     std::string bad = good; const size_t p = bad.find("\"thunder:io-mic\","); bad.erase(p, 17); CHECK(!judgeSelfTest(bad, &rep) && rep.find("thunder:io-mic") != std::string::npos, "a missing channel fails and is named: %s", rep.c_str());
     CHECK(!judgeSelfTest("{\"ok\":false,\"answered\":[],\"failed\":[\"x\"]}", &rep) && !judgeSelfTest("junk", &rep), "failures and junk fail");
-    core.onPageMessage("S:" + good); CHECK(verdict && verdictOk, "S: reaches onSelfTest"); }
+    core.onPageMessage("S:" + good); CHECK(!verdict, "S-3: in a normal run an S: message from the page does nothing (it cannot end the app)");
+    ShellCore::Options o2 = o; o2.selfTest = true; ShellCore c2(&plat, o2); c2.onPageMessage("S:" + good); CHECK(verdict && verdictOk, "with --selftest an S: message reaches onSelfTest");
+    // R-1: a message over the page limit is refused, not queued
+    std::string big(ShellCore::kMaxPageMessage + 1, 'x'); core.onPageMessage(big); core.flush(); CHECK(has("refused: a message over"), "a message over the limit is refused"); }
   core.shutdown();
   DONE("test_desktop_shell_core");
 }
