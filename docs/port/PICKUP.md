@@ -19,7 +19,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Machine: 2 cores, about 7 GB free disk. At most two compiling workers; delete build directories of merged work. One git network operation at a time per
   worker; `gh` through REST only (GraphQL is blocked); no CI runs on a push to `native`, only on PRs.
 
-## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); FX1, U37 P3, P4 and P5 merged 24 Nov; about 77% of the whole port by the lead's estimate (24 Nov, 17:05) (the lists below are older: see START HERE)
+## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); FX1, U37 P3, P4 and P5 merged 24 Nov; about 77% of the whole port by the lead's estimate (24 Nov, 17:05); about 92% on 26 Nov with the Android shell, meters, H6 and H7 merged (the lists below are older: see START HERE)
 - **Stage N1 (playback core):** every worker-buildable unit is merged, pump effect hosting (U18) and Marbles / Tides included. **Left: steps 10 and 11, the
   lead's own: U34 (offline render API and pad renders through the core), U35 (MIDI scheduling), U37 (bridge and host switch: `core.wasm` behind the Settings
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
@@ -30,7 +30,17 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (26 Nov, 10:45): FABLE REVIEW OF H7 #342. Read this section, then the 06:45 one below it.
+## START HERE (26 Nov, 12:05): H7 MERGED. Opus from here. Read this section, then the 06:45 one below.
+**H7 #342 is merged** (ffa2c69: Mac desktop audio + MIDI; `native/core` untouched). **The Fable review is done: accepted**, written up at the end of `docs/port/H7-NOTES.md`. One change by the lead: the capture start time is now the Electron helper's rule (frame 0 = callback time minus the frames delivered, lower envelope, 100 ppm let-up), which removes a one-buffer lateness of takes and decision 10's drift. Decisions 7 and 13, the shim and the two loose ends are accepted as they are.
+**No Fable work is open.** Switch back to Fable for: W-TFX's approach (judge the plan), any audio-thread code PC7 / H8 / H9 turn out to need, and a smoothed MIDI clock map if the owner's loopback test shows jitter at the device's own rate.
+**Next, in order (Opus manages, Sonnet builds, an independent Sonnet verifies):**
+1. **PC7** (page, into `beta` behind the native switch): the client for the desktop shell's audio / MIDI messages (`dev.list`, `dev.open`, `rec.*`, `take`, `midi.cfg`, `midi.ports`, `midi.in`, `rt.*`: protocol in H7-NOTES and CORE-BRIDGE section 8). **Rule from the review: Settings > Audio offers only the device's own rates (the `rates` list) or 0;** another rate makes miniaudio resample, with bursty callbacks and MIDI jitter up to one buffer.
+2. **W-TFX** plan (build dsp/ for Windows: clang-cl or MSVC fixes); Fable judges before anything is built.
+3. **H8** (files / single instance / association / updater; the hardened-runtime audio-input entitlement), **H9** (WKWebView pass, Mac menus sweep driver).
+4. Small page items still open: `fx.dyn` 600 ms age limit; `recovery.drop` when `dirty` goes false; `master.resetPeak` on native.
+**New owner punch-list items (Mac, add to HANDOVER.md on `beta` with PC7's build):** output on the Cranborne and on the built-in output; unplug / replug while playing; latency figure; all 28 inputs record and a take lands in time; the mic prompt; the 30-minute A5 gate at 128 and 256 (`--a5-log`); CoreMIDI loopback jitter at the device's own rate. None can be run until PC7 exists.
+
+## START HERE of 26 Nov, 10:45 (now history: the H7 review)
 **Done this morning:** the Electron file-access fix (S-1) is build 684 on `beta` (#340), merged to `main` (#341), and released as desktop **v1.3.15** (run 45865888087, 11 assets).
 **H7 (Mac desktop audio + MIDI) = PR #342**, `n4/h7-mac-audio-midi`, head 1381259 (notes `docs/port/H7-NOTES.md`, CORE-BRIDGE section 8). `native/core` is untouched. macOS shell CI was green at report time; check the rest.
 **The Fable review, read every line of these real-time paths:**
