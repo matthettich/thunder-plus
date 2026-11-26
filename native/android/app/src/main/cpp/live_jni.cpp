@@ -16,6 +16,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "a5_xrun.h"
 #include "engine_slot.h"
@@ -586,6 +587,21 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFxParam(
   auto eng = g.eng.get(); if (!eng || !p || env->GetArrayLength(p) < 12) return -1;
   auto v = std::make_shared<std::array<double, 12>>(); env->GetDoubleArrayRegion(p, 0, 12, v->data());
   return eng->call([=](thunder_live* L) { return thunder_live_fx_param(L, track, slot, v->data(), at); });
+}
+// M4: meters.want with the effect lists -> thunder_live_meters_set (a REPLACEMENT state; live.h M1). kinds = THUNDER_LIVE_MK_* bits, fxTracks: bit t (0..31) a track's effects, bit 32 the master's.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMetersSet(JNIEnv*, jobject, jdouble hz, jint kinds, jlong fxTracks) {
+  auto eng = g.eng.get(); if (!eng) return -2;
+  thunder_live_meters_spec sp; std::memset(&sp, 0, sizeof sp);
+  sp.size = sizeof sp; sp.kinds = (uint32_t)kinds; sp.rate_hz = hz; sp.fx_tracks = (uint64_t)fxTracks; sp.chains_hz = 0;
+  return eng->call([=](thunder_live* L) { return thunder_live_meters_set(L, &sp); });
+}
+// PP: fx.values {tr, slot, kind: 1 pump | 2 mod, v:[..]} -> thunder_live_fx_values (instant knob values of a pump or a modular slot). Refusals (E_ARG: the EQ's phase / lin_quality, a linear-phase EQ, a wrong count; E_STATE; E_BUSY) are returned as codes, never thrown.
+JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeFxValues(JNIEnv* env, jobject, jint track, jint slot, jint kind, jdoubleArray v, jlong at) {
+  auto eng = g.eng.get(); if (!eng) return -2;
+  if (!v) return -1;
+  jsize n = env->GetArrayLength(v); if (n <= 0 || n > 4096) return -1;
+  auto d = std::make_shared<std::vector<double>>((size_t)n); env->GetDoubleArrayRegion(v, 0, n, d->data());
+  return eng->call([=](thunder_live* L) { return thunder_live_fx_values(L, track, slot, kind, d->data(), (int)d->size(), at); });
 }
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeMasterConfig(JNIEnv* env, jobject, jbyteArray mst, jint safety) {
   auto eng = g.eng.get(); if (!eng) return -2;

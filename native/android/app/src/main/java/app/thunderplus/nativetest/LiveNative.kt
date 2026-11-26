@@ -43,6 +43,10 @@ object LiveNative {
     external fun nativeLead(seconds: Double, at: Long): Int
     external fun nativePerf(what: Int, index: Int, v: Double, at: Long): Int
     external fun nativeMetersWant(hz: Double): Int
+    /** M4: thunder_live_meters_set. kinds: THUNDER_LIVE_MK_* (1 FXLVL, 2 FXDYN); fxTracks: bit t (0..31) a track's effects, bit 32 the master's. A replacement state. */
+    external fun nativeMetersSet(hz: Double, kinds: Int, fxTracks: Long): Int
+    /** M4 (PP): thunder_live_fx_values; kind 1 = pump, 2 = mod. A refusal is a negative code (-1 E_ARG, -2 E_STATE, -8 E_BUSY, -9 unsupported). */
+    external fun nativeFxValues(track: Int, slot: Int, kind: Int, v: DoubleArray, at: Long): Int
     external fun nativeFxPlan(track: Int, slotsJson: ByteArray, bpm: Double): Int
     external fun nativeFxCommit(track: Int, at: Long): Int
     external fun nativeFxParam(track: Int, slot: Int, p: DoubleArray, at: Long): Int
