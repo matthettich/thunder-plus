@@ -125,7 +125,8 @@ void ChainsLive::dropPatch(const ChainsEvent& e) {
 void ChainsLive::apply(const ChainsEvent& e) {
   ChainsEngine& E = node_.engine();
   switch (e.kind) {
-    case ChainsEvent::Param: E.setParam(std::string_view(e.id), std::string_view(e.name), e.a); break;
+    case ChainsEvent::Param: if (E.paramNeedsRecompile(std::string_view(e.id), std::string_view(e.name))) { ctr_.droppedEvents.fetch_add(1, std::memory_order_relaxed); break; }   // a Send / Receive label changes the cables: the graph recompiles (allocates), so it is a patch swap here, never a live Param
+      E.setParam(std::string_view(e.id), std::string_view(e.name), e.a, true); break;
     case ChainsEvent::Tempo: E.setTransportTempo(e.a); break;
     case ChainsEvent::Playing: { Transport t = E.transport(); t.playing = e.a != 0; E.setTransport(t); break; }
     case ChainsEvent::Bypass: { const int n = (int)e.a; if (n >= 1 && n <= kBypSwitches + kKnobs) byp_[n - 1] = e.b; break; }   // 16..23: the knobs k1..k8

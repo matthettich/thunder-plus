@@ -132,7 +132,12 @@ void ChainsEngine::disconnect(std::string_view aId, std::string_view aPort, std:
   auto& cs = p_->cables; cs.erase(std::remove_if(cs.begin(), cs.end(), [&](const waves::detail::CableRec& c) { return c.a0 == a0 && c.a1 == a1 && c.b0 == b0 && c.b1 == b1; }), cs.end());
   p_->compile(); p_->sync(true); prepareDerived(*p_);
 }
-void ChainsEngine::setParam(std::string_view id, std::string_view name, double v) {
+bool ChainsEngine::paramNeedsRecompile(std::string_view id, std::string_view name) const {
+  if (name != "lab") return false; for (auto& up : p_->mods) if (up->id == id) { const std::string_view t = up->wi->type; return t == "send" || t == "recv"; }
+  return false;
+}
+void ChainsEngine::setParam(std::string_view id, std::string_view name, double v, bool rt) {
+  if (rt && paramNeedsRecompile(id, name)) return;
   ModNode* m = nullptr; for (auto& up : p_->mods) if (up->id == id) { m = up.get(); break; }   // (a linear search: no std::string made, so this allocates nothing on the audio thread)
   if (!m) return;
   const int k = waves::wparam(*m->wi, name); if (k >= 0) { m->base[(size_t)k] = v; waves::detail::repin(*m); }

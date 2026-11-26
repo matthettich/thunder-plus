@@ -28,7 +28,7 @@ const GOLDEN_INC = path.join(ROOT, 'native/tests/golden/modfx_golden.inc');
 export const MODS19 = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter', 'utility', 'ringmod', 'ensemble', 'spring', 'plate', 'lverb',
   'envfol', 'gateex', 'slew', 'snh', 'quant', 'math', 'logic', 'steps', 'clock', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'rect', 'scale', 'compare', 'switch', 'xfade', 'const', 'divider', 'euclid',
   'blades', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'dimension', 'bbd',
-  'harm', 'blipdrum', 'life', 'reson', 'degrade', 'flex', 'sgate', 'retrig', 'pitchfol', 'pitchtrk'];
+  'harm', 'blipdrum', 'life', 'reson', 'degrade', 'flex', 'sgate', 'retrig', 'pitchfol', 'pitchtrk', 'knob'];   // knob: patch knobs (build 663), appended so the others keep their indexes
 // U21 (MODFX modules C): added family by family. Their per-case seeds and signal picks use 100 + their index here (the U19 modules keep theirs; a later unit adds its own list with its own base)
 export const MODS21 = ['sdelay', 'filter', 'cut', 'compressor', 'buscomp', 'glue', 'ngate', 'autopan', 'pump', 'autotune', 'vowel', 'rotary', 'gdelay', 'reverse', 'envfilt', 'bytebeat', 'chaos', 'marbles', 'tides'];
 // The modules whose native build is STRICT while the wasm they are gated against is built with -ffast-math (the lead, 16 Nov; U21-NOTES.md): their engine renders are also written out as samples

@@ -91,7 +91,8 @@ class ChainsEngine {
   void removeModule(std::string_view id);
   void connect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort, bool fb = false);
   void disconnect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort);
-  void setParam(std::string_view id, std::string_view name, double v);   // (no allocation: the live runner calls it on the audio thread)
+  void setParam(std::string_view id, std::string_view name, double v, bool rt = false);   // (no allocation: the live runner calls it on the audio thread; rt = true: a Send / Receive `lab` is refused, since its recompile allocates; returns nothing, see paramRefusedRt)
+  bool paramNeedsRecompile(std::string_view id, std::string_view name) const;   // a Send / Receive `lab` (the graph's cables change): the live runner swaps a patch for it, it never recompiles on the audio thread
   void setText(std::string_view id, std::string_view text);
   void setTransport(const Transport& t);   // Object.assign, and startN + 1 when it starts playing
   void setTransportTempo(double t) { transport_.tempo = t; }

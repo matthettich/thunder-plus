@@ -23,6 +23,7 @@ own files changed (list at the end). No test was weakened (one test's constant m
 * `native/tests/test_song.cpp`: the "a command past FXC is dropped with its value" row used command index 81, which was the first past FXC; it now uses 90, the new first past it (FXC has 90 entries). Same assertion.
 * `native/tests/seq_plain.h`, `live/dump_plain.h`: the event dumper prints chc p 16..23 as `k1..k8`, as the JS names them.
 * `native/tests/test_chains.cpp`: scenario ops `kn` and `text` (new rows only).
+* `native/tests/test_chains_host.cpp`: the "bad switch refused" row used p = 16, now a valid knob; it uses 24, the first bad one.
 * `kKnownBuild` 616 to 684 (`song.h`; only the "newer build" toast reads it).
 
 ## Goldens / tables regenerated, and why
@@ -35,6 +36,8 @@ own files changed (list at the end). No test was weakened (one test's constant m
 | `golden/chains_cases.json`, `golden/waves_cases.json` | `chains-dump.mjs --golden`, `waves-dump.mjs --golden` | new modules (knob, send, recv), mixer flag; 11 new chains scenarios |
 | `golden/chains_diff_cases.json` | `chains-diff-dump.mjs` | page `chnDiff` / new module types; `chains_diff` (the C++ classifier) agrees on every pair |
 | `golden/fxclk_golden.inc` | `fx-clk-dump.mjs --golden` | FLZ cases added to the sweep list (existing 73 rows unchanged) |
+| `golden/modfx_golden.inc` | `modfx-dump.mjs --golden` (`knob` added to its MODS19 list, at the end) | the Knob module is a shared-block module ported in `mod_cv.cpp` |
+| `golden/envlines-web.json` | `envlines-dump.mjs` | the pin's commit text only |
 | `core/src/chains/ctable.inc`, `waves/wtable.inc`, `fx/flexspec.inc` | `chains-gen.mjs`, `waves-gen.mjs`, `flex-spec.mjs --write` | tables are generated from the JS |
 | `tests/web-ref/*` | `web-pin.mjs` | the pin moved to build 684 |
 
@@ -53,5 +56,5 @@ None changes DSP of the audio thread beyond a straight mirror, but these touch l
 1. `ChainsHost::event` (queue of tracker events, audio side): the accepted `p` range is 1..23 (knobs p 16..23); the `Ev` struct and `due` rule are unchanged. `ChainsEngine::setBypassSwitch(16..23)` is a float store.
 2. `ChainsLive` (`clive.cpp`): `byp_` is 23 long, `ChainsEvent::Bypass` accepts 1..23, `NodeIn::kn` points into it. Nothing else changed.
 3. `WavesLive::apply`: a new `Knob` kind (float store). `WavesEngine` has `knobs_[9]`.
-4. **Allocation on the calling thread**: `ChainsEngine::setParam(lab)` / `setText` and the waves equivalents recompile the graph when the module is a Send / Receive (the JS does too, on its audio thread). If a live runner posts a `lab` Param for a send / recv it allocates on the audio thread. Edits through `preparePatch` (the page's `chain.edit`) are not affected. A guard (drop such a live Param and let the page swap a patch) is a one-line change if the lead wants it.
+4. **Send / Receive `lab` on the live runner**: changing a label rewrites the graph's cables, and the recompile allocates. `ChainsEngine::setParam` / `setText` recompile on the control thread (as the JS does). `ChainsLive::apply` does NOT: a live `Param` for a send / recv `lab` is dropped (counted in `droppedEvents`; `chains_alloc` audits every module type and failed on it before this guard). Consequence for the lead: the page's `chain.edit` sends a label change as a Params diff (chnDiff classes it Params), so in the native live path it needs to become a patch swap (e.g. classify a `lab` op on a send / recv as Structural in the host, which knows the types), or the label will not change until the next swap. Not done here: `cdiff` must keep agreeing with the page's `chnDiff` golden.
 5. `Seq` emits up to 8 more `chc` events per row (KN1-KN8, no end events); worst case 33 x 8 = 264 inside the 1793 spare of `kSeqStepEvents` (comment in `seq.h` updated).

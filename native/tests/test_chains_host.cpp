@@ -180,7 +180,7 @@ int main() {
     CHECK("t <= 0 is due at frame 0", h.chcDue(-1) == 0 && h.tempoDue(0) == 0);
     int kept = 0; for (int i = 0; i < 4200; i++) { e.t = 1.0 + i * 0.0001; kept += h.event(e) ? 1 : 0; }
     CHECK("4096 events kept", kept == kChainsHostEvents && h.pendingEvents() == kChainsHostEvents && kChainsHostEvents >= 4096); CHECK("104 drops counted", h.stats().droppedEvents == 104);
-    SeqEvent b = e; b.track = 99; CHECK("bad track refused", !h.event(b)); b = e; b.p = 16; CHECK("bad switch refused", !h.event(b)); b = e; b.v = NAN; CHECK("NaN value refused", !h.event(b)); b = e; b.t = NAN; CHECK("NaN time refused", !h.event(b));
+    SeqEvent b = e; b.track = 99; CHECK("bad track refused", !h.event(b)); b = e; b.p = 24; CHECK("bad switch refused", !h.event(b)); b = e; b.v = NAN; CHECK("NaN value refused", !h.event(b)); b = e; b.t = NAN; CHECK("NaN time refused", !h.event(b));
     CHECK("bad events counted", h.stats().badEvents == 4); b = e; b.type = SEV_FXC; CHECK("another kind is not taken", !h.event(b));
   }
   {   // applied at their frame, in time order whatever the order they came in, to every node; a chc for a track with no node is counted when it arrives and not queued
