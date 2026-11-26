@@ -110,6 +110,7 @@ class BridgeTranslatorTest {
 
     @Test fun bufUse() {
         assertEquals(LiveCall.BufUse(4, 9, 0, "pad", 0, 'g'.code, 0), call("{\"t\":\"buf.use\",\"id\":4,\"pad\":9,\"kind\":\"pad\"}"))
+        assertEquals(LiveCall.BufUse(-1, 9, 0, "pad", 0, 'g'.code, 0, 0), call("{\"t\":\"buf.use\",\"id\":-1,\"pad\":9,\"kind\":\"pad\",\"frames\":0}"))
         assertEquals(LiveCall.BufUse(5, 9, 0, "var", 3, 'm'.code, 7), call("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\",\"ii\":3,\"vk\":\"m7\"}"))
         assertEquals(LiveCall.BufUse(6, 2, 0, "var", 0, 'g'.code, 1), call("{\"t\":\"buf.use\",\"id\":6,\"pad\":2,\"kind\":\"var\",\"ii\":0,\"vk\":\"g1\"}"))
         assertTrue(refused("{\"t\":\"buf.use\",\"id\":5,\"pad\":9,\"kind\":\"var\",\"ii\":3,\"vk\":\"x7\"}").msg.contains("vk"))

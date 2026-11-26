@@ -58,6 +58,7 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.CREATE_WEB_MESSAGE_CHANNEL) ||
             !WebViewFeature.isFeatureSupported(WebViewFeature.POST_WEB_MESSAGE)) return
         port?.close()
+        SongFiles.pageAttached()
         val ports = WebViewCompat.createWebMessageChannel(webView)
         ports[0].setWebMessageCallback(object : WebMessagePortCompat.WebMessageCallbackCompat() {
             override fun onMessage(port: WebMessagePortCompat, message: WebMessageCompat?) {
@@ -74,6 +75,8 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
         sendToPage(caps.toString())
     }
 
+    private val n0Cmds = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "thunder-n0-cmd").also { it.isDaemon = true } }
+
     private fun sendToPage(s: String) {
         main.post { try { port?.postMessage(WebMessageCompat(s)) } catch (e: Exception) { /* page gone */ } }
     }
@@ -81,17 +84,21 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
     private fun onPageMessage(m: WebMessageCompat) {
         if (m.type == WebMessageCompat.TYPE_ARRAY_BUFFER) { if (LiveBridge.liveSession) LiveBridge.onBytes(m.arrayBuffer) else onBytes(m.arrayBuffer); return }
         val s = m.data ?: return
+        // N2 H3: songs and samples (file.*) work in every mode: the live host, the N0 test core, no engine at all
+        if (BridgeTranslator.typeOf(s)?.startsWith("file.") == true) { SongFiles.handle(activity, s); return }
+        // N2 H5-1: the recovery copy of a swipe-away (recovery.get / recovery.drop)
+        if (BridgeTranslator.typeOf(s)?.startsWith("recovery.") == true) { Recovery.handle(activity, s); return }
         // N2 H1b: a page that said hello {live:true} talks to the LIVE host (LiveBridge, BridgeTranslator.kt); the N0 test core's messages below are unchanged for every other page.
         if (BridgeTranslator.typeOf(s) == "hello" && s.length < 1024 && (try { JSONObject(s).optBoolean("live", false) } catch (e: Exception) { false })) { LiveBridge.handle(activity, s); return }
         if (LiveBridge.liveSession) { LiveBridge.handle(activity, s); return }   // F16: also while the live engine is down: an error, never the N0 test core
         val j = try { JSONObject(s) } catch (e: Exception) { return }
         when (j.optString("t")) {
-            "hello" -> { LiveBridge.endSession(); sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("v", 1).put("core", "n0-test")
+            "hello" -> { LiveBridge.endSession(); Recovery.tracker.onHello(); Recovery.announce(activity); sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("v", 1).put("core", "n0-test")
                 .put("caps", JSONObject().put("nativeAudio", true).put("midi", false).put("link", false).put("plugins", false)
-                    .put("inputs", false).put("render", false)).toString()) }
+                    .put("inputs", false).put("render", false).put("files", true)).toString()) }
             "put.header" -> { header = j; if (j.optInt("o") == 0) putStartNs = System.nanoTime() }
             "info" -> sendToPage(JSONObject().put("t", "reply").put("id", j.optInt("id")).put("info", NativeEngine.nativeInfo()).toString())
-            else -> ThunderHost.command(activity, s)
+            else -> n0Cmds.execute { try { ThunderHost.command(activity, s) } catch (e: Exception) { } }   // ANR fix (25 Nov): "open" / "play" may wait for the live engine's shutdown: never on the main thread (one thread, so the order is kept)
         }
     }
 

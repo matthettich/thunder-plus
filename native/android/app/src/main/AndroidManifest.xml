@@ -7,23 +7,54 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- No WAKE_LOCK: audio from a foreground service of type mediaPlayback does not need it (WORKPLAN A3). No INTERNET: the page is served from the APK. -->
+    <!-- No WAKE_LOCK: audio from a foreground service of type mediaPlayback does not need it (WORKPLAN A3). The page is served from the APK.
+         INTERNET (N2 H4): used by ONE thing, the "Check for new build" menu button (UpdateCheck.kt: a single GET of the public GitHub releases list, only when the owner presses it or has switched "Check at start" on; default off). -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
-        android:label="Thunder Plus (native TEST)"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|uiMode|density"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|density|fontScale|locale|layoutDirection|colorMode|touchscreen"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
+            android:enableOnBackInvokedCallback="true"
             android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- N2 H3: a .thunder project opened from a file manager (VIEW) or shared to the app (SEND). File managers often report a project as */* or octet-stream, so the VIEW filters also match the file name
+                 (pathPattern has no "any number of dots": one pattern per depth). UNVERIFIED on the owner's file manager. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" /><data android:scheme="file" />
+                <data android:mimeType="application/x-thunder" /><data android:mimeType="application/vnd.thunderplus.project" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" /><data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.thunder" />
+                <data android:pathPattern=".*\\..*\\.thunder" />
+                <data android:pathPattern=".*\\..*\\..*\\.thunder" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.thunder" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-thunder" /><data android:mimeType="application/vnd.thunderplus.project" /><data android:mimeType="application/octet-stream" /><data android:mimeType="application/json" />
             </intent-filter>
         </activity>
 

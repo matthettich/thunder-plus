@@ -82,6 +82,7 @@ object LiveBridge {
                 // CORE-BRIDGE 7 G14: sent as an ask, the reply is {ok, rev, reasons, warn}; ok:false is the fallback verdict (the core refused the song, or SongFit says it cannot play natively)
                 val text = String(c.raw, Charsets.UTF_8)
                 val id = idOf(text); lastRev = revOf(text)
+                Recovery.tracker.onSongLoad(c.raw, SongTitle.fromMessage(text, LiveEngine.projectFile))   // H5-1: what a swipe-away from recents keeps if it was not saved
                 val r = LiveNative.nativeSongLoad(c.raw)
                 val published = FlatJson.bool(r, "ok") ?: false
                 if (published) { LiveEngine.songTitle = SongTitle.fromMessage(text, LiveEngine.projectFile); LiveSession.refresh() }   // H1c: the notification and the media session say this name
@@ -125,6 +126,7 @@ object LiveBridge {
             is BridgeTranslator.LiveCall.MetersWant -> check(type, LiveNative.nativeMetersWant(c.hz))
             is BridgeTranslator.LiveCall.BufFree -> puts.free(c.id)
             is BridgeTranslator.LiveCall.BufUse -> {
+                if (c.kind == "pad" && c.frames == 0) { check("buf.use", LiveNative.nativePadRemove(c.pad)); return }   // the page's removal: no put, zero frames (live.h pad_set: frames == 0 removes)
                 val b = puts.take(c.id) ?: run { err("buf.use", "no put with id ${c.id}"); return }
                 if (c.kind == "var") { check("buf.use", LiveNative.nativeVarSet(c.ii, c.vk, c.num, c.pad, b.data[0], b.frames, b.sr)); return }
                 check("buf.use", LiveNative.nativePadTake(c.pad, b.data[0], if (b.ch > 1) b.data[1] else null, b.frames, b.sr))   // audible at the page's pads.commit
@@ -140,6 +142,7 @@ object LiveBridge {
 
     private fun hello(ctx: Context, h: BridgeTranslator.LiveCall.Hello) {
         session = h.live
+        Recovery.tracker.onHello()   // a new page session
         if (!LiveEngine.start(ctx)) { err("hello", "the live engine did not start"); reply(h.id, JSONObject().put("err", "live engine did not start")); return }
         flag = h.live
         startPump()
@@ -149,11 +152,12 @@ object LiveBridge {
         val body = JSONObject().put("v", 1).put("core", "n2-live").put("sampleRate", LiveEngine.sampleRate)
             .put("sr", LiveEngine.sampleRate).put("outLat", (FlatJson.num(LiveNative.nativeStatus(), "outLat") ?: 0.0).toInt()).put("host", "android")   // CORE-BRIDGE 7 G1
             .put("maxPadBytes", (FlatJson.num(stats, "padBudget") ?: (128.0 * 1048576)).toLong()).put("maxSongBytes", 16L * 1048576)
-            .put("caps", JSONObject().put("nativeAudio", true).put("midi", LiveNative.nativeMidiOn()).put("link", false).put("plugins", false).put("inputs", false).put("render", false)
+            .put("caps", JSONObject().put("nativeAudio", true).put("midi", LiveNative.nativeMidiOn()).put("link", false).put("plugins", false).put("inputs", false).put("render", false).put("files", true)
                 .put("live", true).put("chains", LiveNative.nativeChainsOn()).put("sf", (caps and 8) != 0).put("engines", engines)
                 .put("fx", org.json.JSONArray(listOf("tfx", "pump", "modfx", "master"))).put("abi", 1).put("liveCaps", caps))
         reply(h.id, body)
         LiveMidi.publish(ctx)   // H2: the page learns the ports (midi.ports) right after the hello
+        Recovery.announce(ctx)  // H5-1: {t:'recovery', ...} when a swipe-away left an unsaved copy
     }
 
     private fun startPump() {

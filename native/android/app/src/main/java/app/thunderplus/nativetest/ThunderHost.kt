@@ -36,7 +36,7 @@ object ThunderHost {
     private var lastRtPush = 0L
 
     /** Resets the logger and the clock cross-check, starts the pattern and times 5 minutes by AUDIO FRAMES (so a locked screen cannot stop the timer). */
-    fun startRun(ctx: Context, label: String): Boolean {
+    fun startRun(ctx: Context, label: String): Boolean {   // may wait for the live engine's shutdown: call it OFF the main thread (MainActivity does)
         if (!ensureRunning(ctx)) return false
         NativeEngine.nativeRtReset(); clock.reset()
         activeRun = label; results.remove(label); lastFinished = null
@@ -60,18 +60,31 @@ object ThunderHost {
         appCtx?.let { c -> main.post { command(c, "{\"t\":\"stop\"}") } }
     }
 
-    @Synchronized fun ensureRunning(ctx: Context): Boolean {
-        if (running) return true
-        LiveEngine.shutdown()   // N2 H1a: the live host and the N0 test core would both open the output
+    /** NOT on the main thread when the live engine may be up: the live engine's nativeShutdown can wait behind a project load. It is awaited HERE, before ThunderHost's lock is taken (the worker needs that lock to start).
+     *  A4 (verifier): a live start can slip in between that wait and the lock: then the lock is released and the wait is done again (3 rounds at most), so the N0 core never opens the output beside the live one. */
+    fun ensureRunning(ctx: Context): Boolean {
+        for (round in 0 until 3) {
+            if (!running) LiveEngine.shutdownAndWait()   // N2 H1a: the live host and the N0 test core would both open the output
+            when (startLocked(ctx)) { 1 -> return true; 0 -> return false }
+        }
+        return false
+    }
+
+    private fun ensureRunningLocked(ctx: Context): Boolean = startLocked(ctx) == 1
+
+    /** 1: running; 0: the core did not start; -1: the live engine is (being) started again: the caller waits for its shutdown OUTSIDE this lock and retries. */
+    @Synchronized private fun startLocked(ctx: Context): Int {
+        if (running) return 1
+        if (LiveEngine.isUpOrStarting()) { LiveEngine.shutdown(); return -1 }
         val sr = NativeEngine.nativeStart()
-        if (sr <= 0) return false
+        if (sr <= 0) return 0
         sampleRate = sr
         appCtx = ctx.applicationContext
         running = true
         clock.reset()
         poller = Thread({ pollLoop() }, "thunder-poller").also { it.start() }
         try { ctx.startForegroundService(Intent(ctx, ThunderService::class.java)) } catch (e: Exception) { /* engine still runs; the owner is told by the overlay */ }
-        return true
+        return 1
     }
 
     private fun pollLoop() {
@@ -119,12 +132,20 @@ object ThunderHost {
     val isRunning: Boolean get() = running
 
     /** A command from the page or the overlay (JSON text). `open` / `close` / `play` / `stop` also manage the engine and service. */
-    @Synchronized fun command(ctx: Context, json: String): Boolean {
+    fun command(ctx: Context, json: String): Boolean {
+        if (!running) {   // A8 (verifier): the parsed `t`, not a substring of the payload (a name or title that contains "play" must not end the live engine)
+            val t = try { JSONObject(json).optString("t") } catch (e: Exception) { "" }
+            if ((t == "open" || t == "play") && !ensureRunning(ctx)) return false   // waits for the live shutdown before the lock, see ensureRunning
+        }
+        return commandLocked(ctx, json)
+    }
+
+    @Synchronized private fun commandLocked(ctx: Context, json: String): Boolean {
         val t = try { JSONObject(json).optString("t") } catch (e: Exception) { return false }
         return when (t) {
-            "open" -> ensureRunning(ctx)
+            "open" -> ensureRunningLocked(ctx)
             "close" -> { main.post { stop(ctx) }; true }
-            "play" -> ensureRunning(ctx) && NativeEngine.nativePost(json)
+            "play" -> ensureRunningLocked(ctx) && NativeEngine.nativePost(json)
             "stop" -> { NativeEngine.nativePost(json); main.postDelayed({ stop(ctx) }, 150); true }
             else -> running && NativeEngine.nativePost(json)
         }

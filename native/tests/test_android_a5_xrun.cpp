@@ -32,8 +32,23 @@ int main() {
   CHECK(s.pass == 1 && s.underruns == 0, "xruns before the run are not the run's: pass %d underruns %lld", s.pass, (long long)s.underruns);
   s = run(&lg, &gate, 1, [](int) { return 7; });
   CHECK(s.underruns == 2, "two more since the run began: %lld", (long long)s.underruns);
+  // a new stream (a reroute) counts from 0 but KEEPS what the old one counted since the run began (the 2 above)
   gate.newStream();
-  CHECK(gate.onStream(0) == 0 && gate.onStream(3) == 3, "a new stream counts from 0");
+  CHECK(gate.onStream(0) == 2 && gate.onStream(3) == 5, "a new stream counts from 0 on top of the carried 2: %lld", (long long)gate.onStream(3));
+  gate.newStream(); gate.newStream();   // twice in a row (notification + reopen): nothing is added twice
+  CHECK(gate.onStream(0) == 5, "carried 2 + the second stream's 3, added once: %lld", (long long)gate.onStream(0));
+  // a reroute in the middle of a run: 2 xruns before it, 1 after: the gate sees 3
+  rtlog_reset(&lg, 48000); gate.restart(); gate.onStream(0); gate.beginRun();
+  s = run(&lg, &gate, 2, [](int) { return 2; });
+  CHECK(s.underruns == 2 && s.pass == 0, "2 before the reroute: %lld", (long long)s.underruns);
+  gate.newStream();
+  s = run(&lg, &gate, 2, [](int i) { return i >= 100 ? 1 : 0; });
+  CHECK(s.underruns == 3, "2 before + 1 after the reroute = 3: %lld", (long long)s.underruns);
+  // a new run forgets the carried count; a fresh engine start forgets everything
+  gate.beginRun();
+  CHECK(gate.onStream(1) == 0, "beginRun drops the carried count: %lld", (long long)gate.onStream(1));
+  gate.newStream(); gate.restart();
+  CHECK(gate.onStream(4) == 4, "restart: %lld", (long long)gate.onStream(4));
   std::printf(g_fail ? "FAILED: %d\n" : "OK\n", g_fail);
   return g_fail ? 1 : 0;
 }

@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: 'Attach the debug APK to a GitHub PRE-release (test build; never touches the desktop app)'
+        description: 'Attach the APKs (the N0 debug build, and the beta / stable release builds) to GitHub PRE-releases (never touches the desktop app)'
         type: boolean
         default: false
 
@@ -21,7 +21,8 @@ permissions:
 
 concurrency:
   group: native-${{ github.ref }}
-  cancel-in-progress: true
+  # a release run (push to native, or a manual run) is never cancelled half way (beta published, stable cancelled); only pull-request runs are superseded
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # One job per pass (GCC, clang, sanitizers) so each has its own time limit (60 minutes; 120 for the sanitizers, whose ctest alone takes about 55 minutes on the runner: PRs #246 / #247 were CANCELLED at 60) and they run in parallel. fail-fast is off: one push
@@ -228,7 +229,7 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973" "cmake;3.22.1" > /dev/null
       - name: Assemble the debug APK
-        run: gradle -p native/android :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace   # U36 T9: the JVM unit tests of MidiModel.kt run first
+        run: gradle -p native/android :app:testDebugUnitTest :app:assembleDebug -PbuildNumber=${{ github.run_number }} --no-daemon --stacktrace   # U36 T9: the JVM unit tests of MidiModel.kt run first
       - name: Name the APK
         run: |
           mkdir -p out
@@ -246,7 +247,7 @@ jobs:
   android-release:
     name: Attach the APK to a pre-release
     needs: android-apk
-    if: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[release-apk]')) || (github.event_name == 'workflow_dispatch' && inputs.release) }}
+    if: ${{ github.ref == 'refs/heads/native' && ((github.event_name == 'push' && contains(github.event.head_commit.message, '[release-apk]')) || (github.event_name == 'workflow_dispatch' && inputs.release)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -267,3 +268,126 @@ jobs:
             --prerelease --latest=false \
             --title "NATIVE TEST BUILD N0 (Android, run ${{ github.run_number }}): not the desktop app" \
             --notes "Test build of the Thunder Plus native spike (stage N0). Android debug APK, sideload only. It is NOT a release of the desktop app and the desktop updater ignores it. Steps: native/tests/OWNER-TEST-N0.md on the native branch. Commit: $GITHUB_SHA"
+
+  # N2 H4: the RELEASE builds of the Android app, one per channel (beta, stable): own application id (app.thunderplus.android.beta / app.thunderplus.android), versionCode = this run number,
+  # signed with the OWNER's keystore when the four secrets exist, else with the repository's public debug key (the APK name then ends -DEBUGKEY: it will NOT install over an owner-signed build).
+  # Secrets used (the owner creates them; nothing here creates or prints one): ANDROID_KEYSTORE_B64 (the .jks / .p12, base64), ANDROID_KEYSTORE_PASS, ANDROID_KEY_ALIAS, ANDROID_KEY_PASS.
+  # R8 is off (see native/android/app/build.gradle.kts): mapping.txt is uploaded when a build has one (-PthunderMinify=true).
+  android-release-build:
+    name: Android release APK (${{ matrix.channel }})
+    needs: android-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [beta, stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Android SDK pieces (pinned)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973" "cmake;3.22.1" > /dev/null
+      # H4-1 (verifier, 25 Nov): the owner's key is read ONLY on a push to `native` and on a manual run from `native`. A pull-request job (even from a branch of this repository) never reads a secret:
+      # the steps that name a secret are skipped by their `if`, and the PR build is signed with the public debug key.
+      - name: The owner's keystore (push to native, or manual run from native; only when all four secrets exist)
+        id: ks
+        if: ${{ github.ref == 'refs/heads/native' && github.event_name != 'pull_request' }}
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+        run: |
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ] && [ -n "$KS_ALIAS" ] && [ -n "$KEY_PASS" ]; then
+            (umask 077; echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/owner.keystore")
+            echo "path=$RUNNER_TEMP/owner.keystore" >> "$GITHUB_OUTPUT"
+            echo "signed=signed" >> "$GITHUB_OUTPUT"
+            echo "Signing with the owner's key."
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "signed=DEBUGKEY" >> "$GITHUB_OUTPUT"
+            echo "The owner's signing secrets are not all set: signing with the repository's public debug key (the APK name says DEBUGKEY)."
+          fi
+      - name: The public debug key (every pull request; no secret is read)
+        id: dk
+        if: ${{ !(github.ref == 'refs/heads/native' && github.event_name != 'pull_request') }}
+        run: echo "signed=DEBUGKEY" >> "$GITHUB_OUTPUT"
+      - name: Assemble the release APK (the owner's key)
+        id: asm_owner
+        if: ${{ steps.ks.outputs.signed == 'signed' }}
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.ks.outputs.path }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+        run: gradle -p native/android :app:assembleRelease -PthunderChannel=${{ matrix.channel }} -PbuildNumber=${{ github.run_number }} --no-daemon --stacktrace
+      - name: Assemble the release APK (the public debug key)
+        if: ${{ steps.ks.outputs.signed != 'signed' }}
+        run: gradle -p native/android :app:assembleRelease -PthunderChannel=${{ matrix.channel }} -PbuildNumber=${{ github.run_number }} --no-daemon --stacktrace
+      - name: Remove the keystore file (H4-2)
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/owner.keystore"
+      - name: Name the APK, list what is in it, check the signature
+        env:
+          SIGNED: ${{ steps.ks.outputs.signed || steps.dk.outputs.signed }}
+        run: |
+          set -eo pipefail
+          mkdir -p out
+          N="thunder-plus-android-${{ matrix.channel }}-${{ github.run_number }}-$SIGNED"
+          cp native/android/app/build/outputs/apk/release/app-release.apk "out/$N.apk"
+          M=native/android/app/build/outputs/mapping/release/mapping.txt
+          if [ -f "$M" ]; then cp "$M" "out/mapping-${{ matrix.channel }}-${{ github.run_number }}.txt"; else echo "no mapping.txt: R8 is off in this build (readable crash traces without it)"; fi
+          (cd out && sha256sum *.apk | tee SHA256-${{ matrix.channel }}.txt)
+          ls -l out
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "out/$N.apk" | grep -E "package:|application-label:|uses-permission" || true
+          # H4-3: the check can fail the build. SHA-256 of the public ci-debug.keystore certificate (keytool -list -v -keystore native/android/ci-debug.keystore -storepass android).
+          DEBUG_SHA=a0a17d3511ba27992683ba572d621261e41d50d8f4a91a46b2a4caa65cdcc031
+          OUT=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "out/$N.apk")
+          echo "$OUT" | grep -E "Signer #1 certificate (DN|SHA-256)|Verifies"
+          GOT=$(echo "$OUT" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr -d ' :' | tr 'A-F' 'a-f')
+          if [ -z "$GOT" ]; then echo "::error::no signer certificate found in the APK"; exit 1; fi
+          if [ "$SIGNED" = "signed" ] && [ "$GOT" = "$DEBUG_SHA" ]; then echo "::error::the APK is named -signed but carries the public debug key"; exit 1; fi
+          if [ "$SIGNED" = "DEBUGKEY" ] && [ "$GOT" != "$DEBUG_SHA" ]; then echo "::error::the APK is named -DEBUGKEY but is not signed with the public debug key"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder-plus-android-${{ matrix.channel }}-apk
+          path: out/
+          retention-days: 30
+
+  android-release-publish:
+    name: Attach the release APKs to a pre-release
+    needs: android-release-build
+    if: ${{ github.ref == 'refs/heads/native' && ((github.event_name == 'push' && contains(github.event.head_commit.message, '[release-apk]')) || (github.event_name == 'workflow_dispatch' && inputs.release)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [beta, stable]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: thunder-plus-android-${{ matrix.channel }}-apk
+          path: out
+      - name: "Create the pre-release (tag native-android-CHANNEL-RUN, which the app's Check for new build reads)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: native-android-${{ matrix.channel }}-${{ github.run_number }}
+        run: |
+          # A PRE-release with a tag that is not v<number>: the desktop updater reads /releases/latest (never a pre-release) and only tags of the form v<digit>.
+          # A re-run of the same run finds the release already there: nothing to do (H4-4).
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then echo "$TAG exists already"; exit 0; fi
+          gh release create "$TAG" out/*.apk out/SHA256-*.txt $(ls out/mapping-*.txt 2>/dev/null) --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --latest=false \
+            --title "Thunder Plus for Android, ${{ matrix.channel }} build ${{ github.run_number }} (native port): not the desktop app" \
+            --notes "Android ${{ matrix.channel }} build ${{ github.run_number }} of the native port. Installs over the previous ${{ matrix.channel }} build of the same signing key and keeps its songs and settings. An APK named ...-DEBUGKEY.apk is signed with the public debug key and will not install over an owner-signed one. Commit: $GITHUB_SHA"

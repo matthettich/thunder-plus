@@ -29,6 +29,8 @@ static int g_fail = 0;
 
 static std::string readFile(const std::string& p) { std::ifstream f(p, std::ios::binary); std::stringstream ss; ss << f.rdbuf(); return ss.str(); }
 
+static int64_t nowNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+
 int main() {
   using namespace tpa;
   // 1. extractMember
@@ -276,7 +278,42 @@ int main() {
     CHECK(ranSlow.load(), "the -1001 task still ran to the end (that is what -1001 warns about)");
     CHECK(!ranQueued.load(), "the -1000 task was dropped: its fn must never run");
     CHECK(E.call([](thunder_live*) { return 7; }) == 7, "the control thread is alive after both"); }
-  stop = true; audio.join();
+  stop = true; audio.join();   // the device is stopped before the host is destroyed, as nativeShutdown does it
+  // ANR fix (25 Nov): a call that sits in the control thread's E_BUSY retry loop (20 s) must not hold destroy() up: stopThreads clears run_, the loop sees it and the call returns -1000 at once
+  { std::atomic<int> busyRc{12345}; std::atomic<bool> entered{false}; std::atomic<int> tries{0};
+    int64_t t0 = 0, t1 = 0;
+    std::thread loadLike([&] { busyRc = E.call([&](thunder_live*) { entered = true; tries++; return (int)THUNDER_LIVE_E_BUSY; }, 20000); t1 = nowNs(); });
+    for (int i = 0; i < 100 && !entered.load(); i++) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));   // inside the retry loop now (no callback runs: it waits in 20 ms rounds)
+    CHECK(entered.load() && busyRc.load() == 12345, "the E_BUSY call is still waiting before destroy");
+    t0 = nowNs();
+    E.destroy();
+    const int64_t dms = (nowNs() - t0) / 1000000;
+    loadLike.join();
+    const int64_t cms = (t1 - t0) / 1000000;
+    std::printf("destroy during an E_BUSY retry loop: %lld ms; the call came back %d after %lld ms (%d tries)\n", (long long)dms, busyRc.load(), (long long)cms, tries.load());
+    CHECK(dms < 200, "destroy waited %lld ms behind a call in its E_BUSY loop", (long long)dms);
+    CHECK(busyRc.load() == -1000 && cms < 200, "the call must return -1000 fast, got %d after %lld ms", busyRc.load(), (long long)cms);
+    CHECK(tries.load() >= 2, "the task did retry"); }
+  // verify A5 (25 Nov): LiveEngine::call checks run_ again under qm_ when it enqueues, so a task pushed after stopThreads drained q_ is refused (-1000) at once instead of waiting timeout + 500 ms.
+  // Two callers hammer an engine (timeout 100 ms: a stranded task would show as ~600 ms) while the main thread stops and restarts its threads 150 times.
+  { LiveEngine E3; LiveEngine::Config c3; c3.sampleRate = 48000; c3.maxBlock = 256; std::string e3;
+    CHECK(E3.create(c3, &e3), "create E3: %s", e3.c_str());
+    E3.startThreads();
+    std::atomic<bool> go{true}; std::atomic<long long> worstMs{0}; std::atomic<long> n{0}, refused{0};
+    auto hammer = [&] { while (go.load()) {
+      const auto a = std::chrono::steady_clock::now();
+      const int r = E3.call([](thunder_live*) { return 0; }, 100);
+      const long long ms = (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - a).count();
+      long long w = worstMs.load(); while (ms > w && !worstMs.compare_exchange_weak(w, ms)) {}
+      n++; if (r == -1000) refused++;
+      std::this_thread::yield(); } };
+    std::thread h1(hammer), h2(hammer);
+    for (int i = 0; i < 150; i++) { E3.stopThreads(); E3.startThreads(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+    go = false; h1.join(); h2.join();
+    std::printf("A5: %ld calls, %ld refused, worst %lld ms\n", n.load(), refused.load(), worstMs.load());
+    CHECK(worstMs.load() < 300, "a call waited %lld ms: a task was enqueued after stopThreads drained the queue", worstMs.load());
+    E3.destroy(); }
   E.destroy();
   CHECK(!E.created(), "destroyed");
   // a destroyed engine renders silence and refuses calls

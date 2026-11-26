@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.graphics.Typeface
@@ -41,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var runLines: TextView
     private lateinit var resultsBox: TextView
     private lateinit var midiLine: TextView   // U36 T9: debug MIDI out
+    private lateinit var root: FrameLayout
     private lateinit var liveLine: TextView   // N2 H1a: the live engine's status
     private val green = Color.rgb(40, 200, 90)
     private val red = Color.rgb(235, 60, 60)
@@ -85,13 +88,15 @@ class MainActivity : Activity() {
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
 
         MidiPorts.get(this).start()   // U36 T9: hot-plug callback + first scan
-        val root = FrameLayout(this)
+        root = FrameLayout(this)
         webView = WebView(this)
         root.addView(webView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         root.addView(buildOverlay(), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)   // the insets above place the content (already so on Android 15)
         setContentView(root)
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
-            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            // the keyboard too (N2 H5): with it open the page's window shrinks above it instead of being covered; a fold / unfold changes the bars and the cutout the same way
+            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
             v.setPadding(b.left, b.top, b.right, b.bottom)
             WindowInsetsCompat.CONSUMED
         }
@@ -107,20 +112,43 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String) { bridge.attach() }
         }
         bridge.install()
+        SongFiles.attach(this)            // N2 H3: the folder pickers answer to this activity
+        SongFiles.onIntent(this, intent)  // a project opened from a file manager (VIEW / SEND)
+        if (Build.VERSION.SDK_INT >= 33) registerBack()
         webView.loadUrl(base + "index.html")
+        if (UpdateCheck.checkOnStart(this)) runUpdateCheck(false)   // only when the owner switched it on
     }
 
-    private fun btn(label: String, onClick: () -> Unit) = Button(this).apply {
+    /** The "new build" check. [verbose]: say "up to date" too (the button); the start-up check speaks only when there IS a new build. A new build: a dialog that opens the release page in the browser. */
+    private fun runUpdateCheck(verbose: Boolean) {
+        UpdateCheck.check { v, text ->
+            ui.post {
+                if (isFinishing || isDestroyed) return@post   // H4-7: no dialog or toast on a finished activity (BadTokenException)
+                if (v is ReleaseTags.Verdict.NewBuild) {
+                    android.app.AlertDialog.Builder(this).setTitle("New build").setMessage(text + "\nSongs and settings stay when you install it over this one.")
+                        .setPositiveButton("Open download page") { _, _ -> try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(ReleaseTags.safePage(v.release.pageUrl)))) } catch (e: Exception) { Toast.makeText(this, "No browser found", Toast.LENGTH_LONG).show() } }
+                        .setNegativeButton("Later", null).show()
+                } else if (verbose) Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun btn(label: String, onClick: (View) -> Unit) = Button(this).apply {
         text = label; isAllCaps = false; setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setPadding(12, 0, 12, 0); minHeight = 0; minimumHeight = 0
-        setOnClickListener { onClick() }
+        setOnClickListener { onClick(it) }
         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+    }
+
+    /** ANR fix (25 Nov): starting the N0 test core waits for the live engine's shutdown, which can sit behind a project load: [work] runs on a thread, [done] on the main thread. */
+    private fun <T> off(work: () -> T, done: (T) -> Unit) {
+        Thread({ val r = try { work() } catch (e: Exception) { null }; if (r != null) runOnUiThread { done(r) } }, "thunder-overlay-work").start()
     }
 
     private fun buildOverlay(): View {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(235, 0, 0, 0)); setPadding(8, 4, 8, 4) }
         fun row(vararg v: View) = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; v.forEach { addView(it) } }
         val runRow = row(*ThunderHost.RUN_LABELS.map { l ->
-            btn("$l 5 min") { if (!ThunderHost.startRun(this, l)) Toast.makeText(this, "Audio did not start", Toast.LENGTH_LONG).show() }
+            btn("$l 5 min") { off({ ThunderHost.startRun(this, l) }) { ok -> if (!ok) Toast.makeText(this, "Audio did not start", Toast.LENGTH_LONG).show() } }
         }.toTypedArray())
         val ctlRow = row(
             btn("RESET") { ThunderHost.resetRun(this); resultsBox.text = "" },
@@ -130,7 +158,7 @@ class MainActivity : Activity() {
             btn("Hide") { val v = if (readout.visibility == View.VISIBLE) View.GONE else View.VISIBLE; readout.visibility = v; runLines.visibility = v; midiLine.visibility = v; resultsBox.visibility = if (v == View.GONE) View.GONE else resultsBox.visibility })
         // U36 T9 DEBUG (no live song host yet): MIDI out test = two bars of notes + MIDI clock to port A through the real scheduler / pump / sink; "MIDI A: next" picks the device.
         val midiRow = row(
-            btn("MIDI out test") { midiLine.text = MidiPorts.get(this).runTest(this) },
+            btn("MIDI out test") { off({ MidiPorts.get(this).runTest(this) }) { midiLine.text = it } },
             btn("MIDI A: next device") { midiLine.text = MidiPorts.get(this).cycleA() },
             btn("COPY MIDI") {
                 val t = MidiPorts.get(this).statusText()
@@ -143,13 +171,18 @@ class MainActivity : Activity() {
             btn("Stop (native)") { LiveEngine.async { LiveEngine.stop() } },
             btn("A5 gate 10 min (native)") { startNativeGate() },
             btn("Quit native") { LiveEngine.async { LiveEngine.quit(applicationContext) } })
+        // N2 H4: the owner's "new build" check (UpdateCheck.kt): ONE request, only on this button, or at start-up when the owner switched it on here (default off)
+        val updRow = row(
+            btn("Check for new build") { runUpdateCheck(true) },
+            btn(if (UpdateCheck.checkOnStart(this)) "Check at start: ON" else "Check at start: off") { v ->
+                val on = !UpdateCheck.checkOnStart(this); UpdateCheck.setCheckOnStart(this, on); (v as Button).text = if (on) "Check at start: ON" else "Check at start: off" })
         liveLine = TextView(this).apply { setTextColor(Color.rgb(255, 200, 120)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); text = "native live engine: off" }
         midiLine = TextView(this).apply { setTextColor(Color.rgb(120, 220, 255)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); text = "MIDI out: -" }
         verdict = TextView(this).apply { setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); typeface = Typeface.DEFAULT_BOLD; text = "ready" }
         readout = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f) }
         runLines = TextView(this).apply { setTextColor(Color.LTGRAY); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f) }
         resultsBox = TextView(this).apply { setTextColor(Color.YELLOW); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); setTextIsSelectable(true); visibility = View.GONE }
-        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine); col.addView(liveRow); col.addView(liveLine)
+        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow); col.addView(midiRow); col.addView(midiLine); col.addView(liveRow); col.addView(liveLine); col.addView(updRow)
         col.addView(android.widget.ScrollView(this).apply { addView(resultsBox); layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (120 * resources.displayMetrics.density).toInt()) })
         return col
     }
@@ -197,10 +230,36 @@ class MainActivity : Activity() {
         }
     }
 
-    override fun onResume() { super.onResume(); ui.post(refresh) }
-    override fun onPause() { ui.removeCallbacks(refresh); super.onPause() }
-    override fun onDestroy() { bridge.close(); webView.destroy(); super.onDestroy() }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); SongFiles.onIntent(this, intent) }
 
     @Deprecated("Deprecated in Java")
-    override fun onBackPressed() { if (webView.canGoBack()) webView.goBack() else super.onBackPressed() }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        SongFiles.onResult(applicationContext, requestCode, resultCode, data)
+    }
+
+    override fun onResume() { super.onResume(); ui.post(refresh) }
+    override fun onPause() { ui.removeCallbacks(refresh); super.onPause() }
+    override fun onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33) unregisterBack()
+        bridge.close(); webView.destroy(); super.onDestroy()   // the engine and the service are NOT touched: a song keeps playing when the screen is closed
+    }
+
+    /** N2 H5: fold / unfold, rotation, split screen, a keyboard attached, dark mode, font size: the Activity is NOT re-created (android:configChanges), the same WebView just resizes, and nothing here touches the engine. */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        ViewCompat.requestApplyInsets(root)   // new bars / cutout / hinge area: place the content again
+        ui.post(refresh)
+    }
+
+    /** N2 H5: Back (the gesture, the button, predictive back): the WebView's history first, otherwise the app goes to the background and KEEPS PLAYING; it never finishes the activity (ShellPolicy.back). */
+    private var backCb: Any? = null   // an android.window.OnBackInvokedCallback (API 33): held as Any so that Android 10 to 12 never load the class
+    @android.annotation.TargetApi(33) private fun registerBack() {
+        val cb = android.window.OnBackInvokedCallback { handleBack() }; backCb = cb
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb)
+    }
+    @android.annotation.TargetApi(33) private fun unregisterBack() { (backCb as? android.window.OnBackInvokedCallback)?.let { onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it) }; backCb = null }
+    private fun handleBack() { when (ShellPolicy.back(webView.canGoBack())) { ShellPolicy.Back.WEB_BACK -> webView.goBack(); ShellPolicy.Back.TO_BACKGROUND -> moveTaskToBack(true) } }
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() { handleBack() }   // Android 12 and older (and 13+ when the dispatcher is not used)
 }

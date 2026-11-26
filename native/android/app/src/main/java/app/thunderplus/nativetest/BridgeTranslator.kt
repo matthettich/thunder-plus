@@ -48,7 +48,7 @@ object BridgeTranslator {
         class PadChop(val pad: Int, val loopSecs: Double, val nSlices: Int, val slices: DoubleArray) : LiveCall()
         data class PdcSet(val mode: Int) : LiveCall()
         object EngineReset : LiveCall()
-        data class BufUse(val id: Int, val pad: Int, val layer: Int, val kind: String, val ii: Int, val vk: Int, val num: Int) : LiveCall()
+        data class BufUse(val id: Int, val pad: Int, val layer: Int, val kind: String, val ii: Int, val vk: Int, val num: Int, val frames: Int = -1) : LiveCall()
         data class BufFree(val id: Int) : LiveCall()
         data class Hello(val id: Int, val live: Boolean) : LiveCall()
         /** H2: midi.cfg {outs:[id x4], clockOut:[bool x4], gearDelay:[ms x4], clockIn}: the four letters (A..D), their clock boxes and Gear delays (-50..200 ms, whole ms). clockIn is read and ignored (clock follow is a fallback condition). */
@@ -175,7 +175,7 @@ object BridgeTranslator {
                 val vk = j.optString("vk", "")
                 val m = Regex("^([gm])([0-9]{1,3})$").find(vk)
                 if (kind == "var" && (!j.has("ii") || m == null)) return refuse("buf.use var needs ii and vk like 'm3' or 'g1'")
-                call(LiveCall.BufUse(j.optInt("id"), j.optInt("pad"), j.optInt("layer", 0), kind, j.optInt("ii", 0), m?.groupValues?.get(1)?.get(0)?.code ?: 'g'.code, m?.groupValues?.get(2)?.toInt() ?: 0))
+                call(LiveCall.BufUse(j.optInt("id"), j.optInt("pad"), j.optInt("layer", 0), kind, j.optInt("ii", 0), m?.groupValues?.get(1)?.get(0)?.code ?: 'g'.code, m?.groupValues?.get(2)?.toInt() ?: 0, j.optInt("frames", -1)))
             }
             "buf.free" -> call(LiveCall.BufFree(j.optInt("id", -1)))
             "open", "close", "put.header", "info" -> Translation.Ignored(t)   // the N0 path's messages (Bridge.kt)
