@@ -35,7 +35,7 @@ function rig({ meters2 = true, hold = false } = {}) {
 async function up(o) { const r = rig(o); await r.NC.attach(r.host); r.beat(); await r.ck.advance(300); return r; }
 async function playing(o) { const r = await up(o); r.NC.start('song', { row: 0 }); await r.ck.advance(50); r.beat(); await r.ck.advance(200); return r; }
 const port = (r, tr) => r.NC.fxNode(tr).port;
-const W = (fx, dyn, extra) => Object.assign({ t: 'meters.want', rate: 10, fx, dyn, chains: false, master: false }, extra || {});
+const W = (fx, dyn, extra) => Object.assign({ t: 'meters.want', rate: 10, fx, dyn, chains: [], master: false }, extra || {});
 
 test('a wish while a native PLAY runs goes as ONE whole-state meters.want 100 ms after the last change', async () => {
   const r = await playing(); r.clear();

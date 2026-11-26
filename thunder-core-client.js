@@ -300,7 +300,7 @@
     if (!tc || typeof tc.on !== 'function') return;
     var on = function (t, fn) { tc.on(t, fn); offs.push(function () { if (typeof tc.off === 'function') tc.off(t, fn); }); };
     on('clock', function (m) { lastClock = nowMs(); lost = false; if (m && m.sr && m.sr !== NC.sr && m.sr > 0) { /* a rate change arrives with engine / device events: handled there */ } });
-    if (meters2()) { on('fx.lvl', onFxLvl); on('fx.dyn', onFxDyn); }   // M5: only with caps.meters2
+    if (meters2()) { on('fx.lvl', onFxLvl); on('fx.dyn', onFxDyn); on('ch.lvl', onChLvl); }   // M5: only with caps.meters2
     on('recovery', onRecovery); rcvStart();   // PC6: the shell holds a copy of unsaved work from last time; the puts of this time
     on('song', function (m) { if (m && m.rev != null) songHeard = m.rev; });
     on('fit', function (m) {   // the shell's verdict again (after kit.load, after lxp): for the song last sent
@@ -760,15 +760,21 @@
      `wanted` is the page's wish; what goes out is the wish only while a native PLAY runs and the page's meterHold() is false (else everything off). ONE meters.want, whole state, 100 ms after the last change. ---- */
   var METER_MS = 100;         // METERS-DESIGN 4.5: meters.want goes 100 ms after the last change
   var METER_RATE = 10;        // the 70-float METERS rate the shell asked for at hello (live_jni); not changed by this unit
-  var MTR = { wanted: { rate: METER_RATE, fx: [], dyn: [], chains: false, master: false }, views: {}, t: 0, sig: null, sent: null, force: false };
+  var MTR = { wanted: { rate: METER_RATE, fx: [], dyn: [], master: false }, views: {}, t: 0, sig: null, sent: null, force: false };
   function meters2() { return !!(NC.on && NC.caps && NC.caps.meters2); }
   function mtrHold() { try { return !!(host && host.meterHold && host.meterHold()); } catch (e) { return false; } }
   /** What goes out now: the wish, or everything off (METERS OFF while playing, nothing playing natively). */
   function mtrState() {
     var w = MTR.wanted, on = meters2() && playSent && !mtrHold();
-    return { t: 'meters.want', rate: w.rate, fx: on ? w.fx.slice() : [], dyn: on ? w.dyn.slice() : [], chains: on && !!w.chains, master: on && !!w.master };
+    return { t: 'meters.want', rate: w.rate, fx: on ? w.fx.slice() : [], dyn: on ? w.dyn.slice() : [], chains: on ? chainsWish() : [], master: on && !!w.master };
   }
-  function mtrSig(m) { return m.rate + '|' + m.fx.join() + '|' + m.dyn.join() + '|' + (m.chains ? 1 : 0) + (m.master ? 1 : 0); }
+  /* M5 (second half): the tracks whose …chains in / out level the page shows right now (host.chWant(): the chains screen open and visible), as the shell's `chains:[tracks]` (0..31, each once, ascending); none otherwise. The page is asked at each look (100 ms timer and the 500 ms tick). */
+  function chainsWish() {
+    var l; try { l = host && typeof host.chWant === 'function' ? host.chWant() : null; } catch (e) { l = null; }
+    var o = [], seen = {}; if (l && typeof l.length === 'number') for (var i = 0; i < l.length; i++) { var t = l[i]; if (typeof t === 'number' && t >= 0 && t <= 31 && t === Math.floor(t) && !seen[t]) { seen[t] = 1; o.push(t); } }
+    return o.sort(function (a, b) { return a - b; });
+  }
+  function mtrSig(m) { return m.rate + '|' + m.fx.join() + '|' + m.dyn.join() + '|c' + m.chains.join() + '|' + (m.master ? 1 : 0); }
   /** Something may have changed: when the state that would go out differs from the last one scheduled, (re)start the 100 ms timer. */
   function mtrNote(force) {
     if (!meters2() || !tc || down()) return;   // (an engine that is down hears nothing: engine {up:true} sends it all again)
@@ -782,7 +788,7 @@
     var m = mtrState(), sg = mtrSig(m); MTR.sig = sg;
     var frc = MTR.force; MTR.force = false;
     if (MTR.sent === sg) return;   // the core already has exactly this (a change that went back within the 100 ms)
-    if (MTR.sent === null && !frc && !m.fx.length && !m.dyn.length && !m.chains && !m.master) return;   // nothing was ever asked and nothing is wanted: the shell's own hello state stands
+    if (MTR.sent === null && !frc && !m.fx.length && !m.dyn.length && !m.chains.length && !m.master) return;   // nothing was ever asked and nothing is wanted: the shell's own hello state stands
     MTR.sent = sg; send(m);
   }
   function mtrReset() { clearTimeout(MTR.t); MTR.t = 0; MTR.sig = null; MTR.sent = null; MTR.force = false; }   // detach: nothing pending, nothing remembered
@@ -813,6 +819,12 @@
     var v = MTR.views[m.tr | 0]; if (!v) return;
     var a = []; for (var i = 0; i < 8; i++) { var x = +m.a[i]; a.push(isFinite(x) && x > 0 ? x : 0); }
     v.lvl = a; v.lvlT = nowMs();
+  }
+  /* ch.lvl {tr, in:[l,r], out:[l,r]} (linear peaks): the page's mono bar is max(l, r). Fed to the page's chains screen through host.chLvlIn(tr, in, out); the page keeps its own age limit and the frame its own decay. Only while a native PLAY runs. */
+  function onChLvl(m) {
+    if (!meters2() || !playSent || !m || !(m.tr >= 0 && m.tr <= 31) || m.tr !== Math.floor(m.tr)) return;
+    var pk = function (a) { if (!a || typeof a.length !== 'number') return 0; var x = Math.max(+a[0] || 0, +a[1] || 0); return isFinite(x) && x > 0 ? x : 0; };
+    if (typeof host.chLvlIn === 'function') try { host.chLvlIn(m.tr, pk(m['in']), pk(m.out)); } catch (e) { log('native core client: chLvlIn failed', e); }
   }
   function onFxDyn(m) {
     if (!meters2() || !m || !(m.tr >= 0 && m.tr <= 32) || !m.d || typeof m.d.length !== 'number') return;
