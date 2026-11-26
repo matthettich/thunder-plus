@@ -127,6 +127,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      # F1: acorn first: beta's suite (native-client-inert, patch-knobs-waves) runs tools/make-core.mjs --check, which needs it; parity u02 runs the whole suite.
+      - name: acorn (the reference tools)
+        run: npm i --no-save --no-audit --no-fund acorn@8
       - name: Parity u02 (goldens through the CMake wasm)
         run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u02 "$RUNNER_TEMP/u02-wasm"
       # U03 gate: pump-synth golden + every test that loads the pump wasm, through the CMake-built pump.wasm / pump-synth.wasm
@@ -135,8 +138,6 @@ jobs:
         run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u03 "$RUNNER_TEMP/u02-wasm"
       # U18 gate: the pump effects as slot kinds of the track-effect host against the real worklet running the pump.wasm that build-wasm.sh just built from the pin (-100 dB below each case's peak, the worst printed; the
       # exact cases still exact; the native render's committed hashes). Needs acorn (fx-src.mjs cuts the worklet out of index.html). The native test build is made here too (c++ of the runner).
-      - name: acorn (the reference tools)
-        run: npm i --no-save --no-audit --no-fund acorn@8
       - name: Parity u18 (pump slot kinds against the worklet with the pin-built pump.wasm)
         run: PIN_WASM_DIR="$RUNNER_TEMP/u02-wasm" BUILD_DIR="$RUNNER_TEMP/u18-build" native/tools/parity.sh u18
       # U33 gate: the pump synths hosted natively against the web's PsynCore.render with the pump-synth.wasm that build-wasm.sh just built from the pin (the same gate as the shipped-wasm run in the Linux jobs).

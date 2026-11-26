@@ -63,3 +63,7 @@ What the report shows: after each STOP, `1 s after STOP: level -39.3 dB` (first)
 3. 1.7 repeat with the report copied immediately.
 4. 3.1-3.5 keyboard with the collapsed panel.
 5. 4.1 two minutes, then 4.3 ten minutes.
+
+## F1 parity
+
+CI "Core (wasm, wasi-sdk)" failed in `parity.sh u02`, last step (the whole suite in the tree copy with the CMake-built wasm). Not the wasm: with the CMake wasm built locally (sizes equal to CI's) the whole suite is 1960 pass, 0 fail. The two failures were `native-client-inert (b)` and `patch-knobs-waves "core/seq-core.js is current"`, both beta tests that run `tools/make-core.mjs --check`, which needs acorn; the workflow installed acorn only after the u02 step (core.test.js skips without acorn, the new beta tests do not). Fix: the acorn install step now runs before parity u02 (native.yml). parity-u02.sh now prints the failing test names of a failed run. The built wasm bytes still differ from the committed ones (INFO, as before); no dsp/ source differs between native and beta.
