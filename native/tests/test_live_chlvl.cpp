@@ -136,7 +136,8 @@ int main() {
         if (t == THUNDER_LIVE_EV_METERS) { qf = -1; stage = 0; } else { if (f != qf) { qf = f; stage = 0; } stage = rank; }
       }
     }
-    CHECK(gapless, "one gapless seq order"); CHECK(order, "FXLVL before CHLVL in a quantum"); #ifdef THUNDER_HAVE_TFX
+    CHECK(gapless, "one gapless seq order"); CHECK(order, "FXLVL before CHLVL in a quantum");
+#ifdef THUNDER_HAVE_TFX
     CHECK(nM > 5 && nF > 5 && nC > 5, "all three kinds came (%d %d %d)", nM, nF, nC);
 #else   // no effects library (MSVC, the closed build): the fx plan hosts no slot, so no FXLVL (as live_meters2 skips its parts 3 to 7)
     CHECK(nM > 5 && nF == 0 && nC > 5, "METERS and CHLVL came, no FXLVL without the effects library (%d %d %d)", nM, nF, nC);
