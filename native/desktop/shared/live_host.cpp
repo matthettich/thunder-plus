@@ -1,5 +1,7 @@
 #include "live_host.h"
 
+#include "host_clock.h"
+
 #include <array>
 #include <chrono>
 #include <cstdio>
@@ -18,19 +20,25 @@
 namespace tpd {
 
 namespace {
-int64_t steadyNs() { return (int64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+int64_t steadyNs() { return hostNowNs(); }   // H7: the shell's one clock (host_clock.h)
 long long numOf(std::string_view s, long long def) { if (s.empty()) return def; return std::strtoll(std::string(s).c_str(), nullptr, 10); }
 LoadResult fail(int rc, const std::string& err) { LoadResult r; r.ok = false; r.rc = rc; r.err = err; return r; }
 }  // namespace
 
-// THE AUDIO CALLBACK (the output's thread): LiveEngine::render (flush-to-zero, thunder_live_process, interleave) and the load figure. No allocation, no lock, no log.
+// THE AUDIO CALLBACK (the output's thread): the A5 logger (atomics), LiveEngine::render (flush-to-zero, thunder_live_process, interleave), then, MIDI on, the MIDI service's clock map (the Android shell's
+// dataCallback order: AFTER process), and the load figure. No allocation, no lock, no system call beyond the clock read, no log.
 void LiveHost::audioCb(void* user, float* out, int frames, int64_t wallNs) {
   LiveHost* h = static_cast<LiveHost*>(user);
   tpa::LiveEngine* e = h->audioEng_.load(std::memory_order_acquire);
   if (!e) { std::memset(out, 0, sizeof(float) * 2 * (size_t)frames); return; }
   const int64_t t0 = steadyNs();
-  e->render(out, frames, wallNs ? wallNs : t0);
+  rtlog_begin(&h->rt_, t0);
+  const int64_t hostF = e->hostFrameNow();
+  const int64_t wall = wallNs ? wallNs : t0;
+  e->render(out, frames, wall);
+  if (MidiService* m = h->audioMidi_.load(std::memory_order_acquire)) m->audioBlock(frames, hostF, e->engineOffsetRT(), wall);
   const int64_t t1 = steadyNs();
+  rtlog_end(&h->rt_, t1, frames);
   const double period = (double)frames / h->sr_.load(std::memory_order_relaxed), work = (double)(t1 - t0) * 1e-9, prev = h->load_.load(std::memory_order_relaxed), now = work / period;
   h->load_.store(now > prev ? now : prev * 0.95 + now * 0.05, std::memory_order_relaxed);
 }
@@ -41,18 +49,51 @@ int LiveHost::start(bool chains, std::string* err) {
 #ifdef THUNDER_HAVE_LXR
   thunder_lxr_module_register();   // idempotent registry of one pointer (lxr_seam.h)
 #endif
-  auto out = factory_();
-  double sr = 0; std::string e;
-  if (!out || !out->open(&LiveHost::audioCb, this, &sr, &e)) { if (err) *err = e.empty() ? "no audio output could be opened" : e; return -1; }
+  // The configured device first; when it will not open (unplugged since the page chose it) the system default, and the note says so.
+  note_ = OpenNote();
+  std::unique_ptr<AudioOut> out; double sr = 0; std::string e;
+  for (int attempt = 0; attempt < 2; attempt++) {
+    if (attempt == 1 && cfg_.outId.empty()) break;   // there is no other device to try
+    AudioConfig c = cfg_; if (attempt == 1) { c.outId.clear(); c.sampleRate = 0; c.bufferFrames = 0; }
+    out = factory_();
+    if (!out) break;
+    out->configure(c);
+    std::string oe;
+    if (out->open(&LiveHost::audioCb, this, &sr, &oe)) { if (attempt == 1) { note_.fellBack = true; note_.requested = cfg_.outId; } break; }
+    if (attempt == 0) e = oe;
+    out.reset();
+  }
+  if (!out) { if (err) *err = e.empty() ? "no audio output could be opened" : e; return -1; }
+  note_.actualName = out->name(); note_.actualId = out->deviceId();
   sr_.store(sr);
   auto eng = std::make_shared<tpa::LiveEngine>();
   tpa::LiveEngine::Config ec; ec.sampleRate = sr; ec.maxBlock = 4096; ec.chains = chains;
   ec.padBytes = (uint64_t)512 << 20; ec.chainsBytes = (uint64_t)512 << 20;   // a desktop has the memory a phone has not (decision for the lead, H6-NOTES)
   if (!eng->create(ec, &e)) { out->close(); if (err) *err = e; return -2; }
+  // H7, the Android shell's order (live_jni.cpp): the MIDI host on the live handle's thunder_midi BEFORE the control thread starts (this thread is the control thread until then), then the threads,
+  // then the control runner and the MIDI-in reader.
+  midiOn_ = midi_ && midi_->engineAttach(eng, sr);
+  tpa::LiveEngine* rawEng = eng.get();
+  eng->setTickHook([this, rawEng] {   // the poller thread, every ~100 ms: the output's latency for the core's stats and the MIDI clock map's floor (atomics only: it never takes life_)
+    AudioOut* o = outRaw_.load(std::memory_order_acquire);
+    if (!o) return;
+    const int lat = o->latencyFrames();
+    rawEng->setHostStats(lat > 0 ? lat : 0, 0);
+    const int rr = o->reroutes();
+    if (rr != lastReroutes_.exchange(rr, std::memory_order_relaxed)) if (MidiService* m = audioMidi_.load(std::memory_order_acquire)) m->streamRemap();
+    const double r = sr_.load(std::memory_order_relaxed);
+    if (lat > 0 && r > 0) if (MidiService* m = audioMidi_.load(std::memory_order_acquire)) m->setOutLatencyNs((int64_t)((double)lat * 1e9 / r));
+  });
+  if (midiOn_) eng->setStateHook([this](int st) { if (st == THUNDER_LIVE_STATE_ENDED) if (MidiService* m = audioMidi_.load(std::memory_order_acquire)) m->songEnded(); });   // a song that ends by itself: the clock boxes go quiet (play and stop set the flag themselves)
   eng->startThreads();
+  if (midiOn_) midi_->engineStarted();
+  rtlog_reset(&rt_, (int)sr);
+  lastReroutes_.store(0);
   eng_.set(eng);
   out_ = std::move(out);
+  outRaw_.store(out_.get(), std::memory_order_release);
   audioEng_.store(eng.get(), std::memory_order_release);   // before the stream starts: the callback never sees a half-made engine
+  audioMidi_.store(midiOn_ ? midi_ : nullptr, std::memory_order_release);
   std::string se;
   if (!out_->start(&se)) {
     audioEng_.store(nullptr, std::memory_order_release);
@@ -63,18 +104,27 @@ int LiveHost::start(bool chains, std::string* err) {
   return (int)sr;
 }
 
-// The destroy order (live.h destroy): stop the transport, let two callbacks run it, stop the stream (no more process), join the threads, destroy. life_ held.
+// The destroy order (live.h destroy; the Android shell's teardownLocked): stop the transport, let two callbacks run it, stop the stream (no more process), MIDI in off, join the threads, MIDI out stopped
+// (the sender delivers the Stop, thunder_midiout freed), destroy. The output OBJECT outlives the engine's threads (the poller reads its latency): it is closed first and freed after stopThreads. life_ held.
 void LiveHost::teardownLocked() {
   std::shared_ptr<tpa::LiveEngine> eng = eng_.take();
   if (!eng && !out_) return;
   if (eng && out_) {
     eng->call([](thunder_live* L) { return thunder_live_stop(L, THUNDER_LIVE_NOW); }, 500);
+    if (midiOn_ && midi_) eng->call([this](thunder_live*) { midi_->transport(false); return 0; }, 500);
     const int64_t c0 = eng->audioCalls();
     for (int i = 0; i < 100 && eng->audioCalls() < c0 + 2; i++) std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
-  if (out_) { out_->close(); out_.reset(); }   // no callback after this
+  if (out_) out_->close();   // no callback after this
   audioEng_.store(nullptr, std::memory_order_release);
-  if (eng) { eng->stopThreads(); eng->destroy(); }
+  audioMidi_.store(nullptr, std::memory_order_release);
+  if (midiOn_ && midi_) midi_->engineStopping();
+  if (eng) eng->stopThreads();   // the control thread is the live handle's ONE control thread: it ends before the MIDI control calls below
+  outRaw_.store(nullptr, std::memory_order_release);
+  out_.reset();
+  if (midiOn_ && midi_) { midi_->engineDetached(); }
+  midiOn_ = false;
+  if (eng) eng->destroy();
   eng.reset();
   lastSlots_.clear();
   songText_.reset(); kitText_.reset(); kitDoc_.reset();   // the page re-sends song and kit after an engine reset: a verdict must never be judged with the old kit
@@ -233,8 +283,32 @@ int LiveHost::play(int mode, int row, int track, int sect, int phrase, int hasLo
     po.size = (uint32_t)sizeof po; po.t0 = t0 < 0 ? THUNDER_LIVE_NOW : t0; po.mode = mode; po.row = row; po.track = track; po.sect = sect; po.phrase = phrase;
     po.has_loop = hasLoop; po.loop_y0 = y0; po.loop_y1 = y1; po.has_seed = hasSeed; po.seed = (uint32_t)seed; po.random_seed = rs; po.spp = -1; po.pdc_mode = pdc;
     po.only = onlyBits; po.has_only = hasOnly;
+    if (midiOn_ && midi_) midi_->transport(true);   // before play: a port set after play() is in force for its Start (live.h), the transport flag first
     return thunder_live_play(L, &po);
   });
+}
+
+int LiveHost::stop(int64_t at) {
+  return call([=](thunder_live* L) { const int r = thunder_live_stop(L, at); if (r == 0 && midiOn_ && midi_) midi_->transport(false); return r; });
+}
+
+LiveHost::AudioInfo LiveHost::audioInfo() const {
+  std::lock_guard<std::mutex> g(life_);
+  AudioInfo i;
+  if (!out_) return i;
+  i.open = true; i.name = out_->name(); i.id = out_->deviceId(); i.sampleRate = sr_.load(); i.periodFrames = out_->periodFrames(); i.latencyFrames = out_->latencyFrames(); i.lost = out_->lost();
+  return i;
+}
+
+void LiveHost::rtReset() { std::lock_guard<std::mutex> g(life_); if (out_) rtlog_reset(&rt_, (int)sr_.load()); }
+
+std::string LiveHost::rtSnapshotJson() const {
+  rtlog* g = const_cast<rtlog*>(&rt_);
+  const rtlog_snapshot sn = rtlog_read(g);
+  char b[400];
+  std::snprintf(b, sizeof b, "\"sr\":%d,\"frames\":%lld,\"calls\":%lld,\"late\":%lld,\"under\":%lld,\"audioS\":%.6f,\"wallS\":%.6f,\"ratioPpm\":%.2f,\"maxGapMs\":%.3f,\"maxWorkMs\":%.3f,\"pass\":%d",
+    g->sample_rate, (long long)sn.frames, (long long)sn.calls, (long long)sn.late, (long long)sn.underruns, sn.audio_s, sn.wall_s, sn.ratio_ppm, sn.max_gap_ms, sn.max_work_ms, sn.pass);
+  return b;
 }
 
 std::string LiveHost::drainEvents() { auto e = eng_.get(); return e ? e->drainEvents() : std::string(); }

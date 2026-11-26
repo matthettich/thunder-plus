@@ -41,9 +41,16 @@ int main() {
   CHECK(isCall(T("{\"t\":\"buf.free\",\"id\":3}"), Op::BufFree), "buf.free");
   { auto t = T("{\"t\":\"midi.cfg\",\"outs\":[\"a\",\"\",\"c\"],\"clockOut\":[true,0,1],\"gearDelay\":[500,-99,12.4],\"clockIn\":\"x\"}"); const Call& c = t.call;
     CHECK(isCall(t, Op::MidiCfg) && c.outs.size() == 4 && c.outs[0] == "a" && c.outs[3] == "" && c.clockOut[0] && !c.clockOut[1] && c.clockOut[2] && c.gear[0] == 200 && c.gear[1] == -50 && c.gear[2] == 12 && c.clockIn, "midi.cfg"); }
+  // H7: devices and the recorder
+  CHECK(isCall(T("{\"t\":\"dev.list\",\"id\":11}"), Op::DevList), "dev.list");
+  { auto t = T("{\"t\":\"dev.open\",\"id\":12,\"out\":\"out:ab\",\"in\":\"in:cd\",\"sr\":96000,\"buf\":128}"); CHECK(isCall(t, Op::DevOpen) && t.call.devOut == "out:ab" && t.call.devIn == "in:cd" && t.call.hasIn && t.call.devSr == 96000 && t.call.devBuf == 128, "dev.open fields"); }
+  { auto t = T("{\"t\":\"rec.arm\",\"id\":13,\"ins\":[0,5,27]}"); CHECK(isCall(t, Op::RecArm) && t.call.ins.size() == 3 && t.call.ins[2] == 27, "rec.arm"); }
+  CHECK(refusedWith(T("{\"t\":\"rec.arm\",\"id\":13}"), "ins"), "rec.arm needs ins");
+  { auto t = T("{\"t\":\"take\",\"id\":14,\"take\":2,\"ch\":1,\"off\":100,\"n\":300}"); CHECK(isCall(t, Op::Take) && t.call.takeCh == 1 && t.call.takeOff == 100 && t.call.takeN == 300, "take"); }
+  CHECK(isCall(T("{\"t\":\"rec.start\",\"id\":15}"), Op::RecStart) && isCall(T("{\"t\":\"rec.stop\",\"id\":16}"), Op::RecStop) && isCall(T("{\"t\":\"rt.snapshot\",\"id\":17}"), Op::RtSnapshot), "rec.start, rec.stop, rt.snapshot");
   // the messages the live host does not take: refused, and an ask carries its id so an error reply can follow
-  { auto t = T("{\"t\":\"dev.list\",\"id\":11}"); CHECK(t.kind == Translation::kRefused && t.replyId == 11 && t.msg.find("H7") != std::string::npos, "dev.list: refused with H7 and the ask's id"); }
-  for (const char* m : {"dev.open", "note.on", "note.off", "rec.arm", "rec.start", "rec.stop", "render.start", "render.cancel", "link.set", "song.patch", "kit.patch"}) {
+  { auto t = T("{\"t\":\"song.patch\",\"id\":11}"); CHECK(t.kind == Translation::kRefused && t.replyId == 11, "song.patch: refused with the ask's id"); }
+  for (const char* m : {"note.on", "note.off", "render.start", "render.cancel", "link.set", "song.patch", "kit.patch"}) {
     const std::string s = std::string("{\"t\":\"") + m + "\"}"; CHECK(translate(s).kind == Translation::kRefused, "%s refused", m);
   }
   CHECK(T("{\"t\":\"put.header\"}").kind == Translation::kIgnored && T("{\"t\":\"zzz\"}").kind == Translation::kIgnored && T("garbage").kind == Translation::kIgnored && T("{\"t\":\"play\" ").kind == Translation::kRefused, "ignored, and not JSON");

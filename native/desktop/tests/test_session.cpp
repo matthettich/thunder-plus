@@ -73,9 +73,9 @@ int main() {
   CHECK(peak > 0.001, "the song made sound (peak %.4f)", (double)peak);
   CHECK(sink.find({"\"where\":\"play\""}) == "", "play raised no error");
   // refusals: an ask carries an error reply
-  s.post("{\"t\":\"dev.list\",\"id\":40}"); s.post("{\"t\":\"song.patch\",\"id\":41}"); s.post("{\"t\":\"mix.set\",\"tr\":1,\"k\":\"send\",\"v\":1}"); s.post("{\"t\":\"midi.cfg\",\"outs\":[\"\",\"\",\"\",\"\"],\"clockOut\":[false,false,false,false],\"gearDelay\":[0,0,0,0]}"); s.drain();
+  s.post("{\"t\":\"render.start\",\"id\":40}"); s.post("{\"t\":\"song.patch\",\"id\":41}"); s.post("{\"t\":\"mix.set\",\"tr\":1,\"k\":\"send\",\"v\":1}"); s.post("{\"t\":\"midi.cfg\",\"outs\":[\"\",\"\",\"\",\"\"],\"clockOut\":[false,false,false,false],\"gearDelay\":[0,0,0,0]}"); s.drain();
   CHECK(sink.find({"\"t\":\"reply\"", "\"id\":40", "\"err\":"}) != "" && sink.find({"\"t\":\"reply\"", "\"id\":41", "\"err\":"}) != "", "refused asks get an error reply");
-  CHECK(sink.find({"\"where\":\"midi.cfg\"", "H7"}) != "", "midi.cfg: err naming H7");
+  CHECK(sink.find({"\"where\":\"midi.cfg\"", "no MIDI"}) != "", "midi.cfg: err naming the missing MIDI");
   s.post("{\"t\":\"stop\"}"); s.drain();
   // engine.reset: down, up, and the page's state is gone
   const int ups = sink.count("\"up\":true");

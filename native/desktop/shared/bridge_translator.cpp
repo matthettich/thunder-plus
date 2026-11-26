@@ -18,11 +18,9 @@ const std::map<std::string, int>& mixKeys() { static const std::map<std::string,
 
 const std::map<std::string, std::string>& unsupported() {
   static const std::string kNotes = "notes from the host are not in the live API (live.h NOT IN THIS API)";
-  static const std::string kDev = "audio devices and Settings > Audio are H7 (not in the H6 shell skeleton)";
   static const std::map<std::string, std::string> m = {
     {"song.patch", "the live host takes the whole song: send song.load"}, {"kit.patch", "the live host takes the whole kit: send kit.load"},
-    {"note.on", kNotes}, {"note.off", kNotes}, {"dev.list", kDev}, {"dev.open", kDev},
-    {"rec.arm", "recording is not on the live host"}, {"rec.start", "recording is not on the live host"}, {"rec.stop", "recording is not on the live host"},
+    {"note.on", kNotes}, {"note.off", kNotes},
     {"render.start", "renders do not go through the live host"}, {"render.cancel", "renders do not go through the live host"}, {"link.set", "Link is not on the live host"}};
   return m;
 }
@@ -242,6 +240,32 @@ Translation translate(const std::string& raw) {
     if (!p.isStr() || p.asStr().empty() || p.asStr().size() > kRecoveryMaxChars) return ign;   // not stored: the older copy stays (the page's RCV_MAX)
     c.raw = std::string(p.asStr()); return callOf(std::move(c));
   }
+  // H7: audio devices (CORE-BRIDGE 3: dev.list / dev.open are asks), the input and its takes (rec.arm / rec.start / rec.stop are asks here, take / take.free fetch and release the bulk result), the A5 logger.
+  if (t == "dev.list") { c.op = Op::DevList; c.id = id; return callOf(std::move(c)); }
+  if (t == "dev.open") {
+    c.op = Op::DevOpen; c.id = id;
+    Json o = j.get("out"), in = j.get("in");
+    if (!o.missing() && !o.isNull() && !o.isStr()) return refuse("dev.open: out must be a device id string (\"\" = the system default)");
+    if (!in.missing() && !in.isNull() && !in.isStr()) return refuse("dev.open: in must be a device id string");
+    c.devOut = o.isStr() ? std::string(o.asStr()) : std::string(); c.hasIn = in.isStr(); c.devIn = in.isStr() ? std::string(in.asStr()) : std::string();
+    Json sr = j.get("sr"), buf = j.get("buf");
+    if ((!sr.missing() && !sr.isNull() && !sr.isNum()) || (!buf.missing() && !buf.isNull() && !buf.isNum())) return refuse("dev.open: sr and buf must be numbers");
+    c.devSr = sr.isNum() ? toInt(sr.asNum()) : 0; c.devBuf = buf.isNum() ? toInt(buf.asNum()) : 0;
+    return callOf(std::move(c));
+  }
+  if (t == "rec.arm") {
+    c.op = Op::RecArm; c.id = id;
+    Json ins = j.arr("ins");
+    if (ins.missing() || ins.size() == 0) return refuse("rec.arm: ins must list the input channels (0-based)");
+    for (size_t i = 0; i < ins.size(); i++) { Json e = ins.at(i); if (!e.isNum()) return refuse("rec.arm: a channel is not a number"); c.ins.push_back(toInt(e.asNum())); }
+    return callOf(std::move(c));
+  }
+  if (t == "rec.start") { c.op = Op::RecStart; c.id = id; return callOf(std::move(c)); }
+  if (t == "rec.stop") { c.op = Op::RecStop; c.id = id; return callOf(std::move(c)); }
+  if (t == "take") { c.op = Op::Take; c.id = id; c.bufId = ival(j, "take", ival(j, "tid", -1)); if (c.bufId < 0) return refuse("take: needs the take id as `take`"); c.takeCh = ival(j, "ch", -1); c.takeOff = has(j, "off") ? toI64(j.num("off", 0)) : -1; c.takeN = has(j, "n") ? toI64(j.num("n", 0)) : -1; return callOf(std::move(c)); }
+  if (t == "take.free") { c.op = Op::TakeFree; c.bufId = ival(j, "take", ival(j, "tid", -1)); return callOf(std::move(c)); }
+  if (t == "rt.reset") { c.op = Op::RtReset; return callOf(std::move(c)); }
+  if (t == "rt.snapshot") { c.op = Op::RtSnapshot; c.id = id; return callOf(std::move(c)); }
   if (t == "recovery.get") { c.op = Op::RecoveryGet; c.id = id; return callOf(std::move(c)); }
   if (t == "recovery.drop") { c.op = Op::RecoveryDrop; c.id = id; return callOf(std::move(c)); }
   if (t == "buf.use") {

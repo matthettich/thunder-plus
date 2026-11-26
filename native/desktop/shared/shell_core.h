@@ -4,17 +4,24 @@
 #ifndef TPD_SHELL_CORE_H
 #define TPD_SHELL_CORE_H
 
+#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 
+#include "audio_devices.h"
 #include "bridge_session.h"
+#include "input_capture.h"
 #include "desktop_api.h"
 #include "live_host.h"
 #include "recovery_store.h"
 
 namespace tpd {
+
+class MidiBackend;   // midi_backend.h (not in a build without MIDI)
+class MidiManager;   // midi_manager.h
 
 class ShellCore {
  public:
@@ -26,6 +33,12 @@ class ShellCore {
     std::function<void(const std::string& text)> deliver;     // UI thread: run window.__thunderRecv(<text as a JS string>) in the page
     bool selfTest = false;                                    // --selftest: only then is an "S:" message the selftest verdict (S-3); in a normal run it is dropped
     std::function<void(bool ok, const std::string& report)> onSelfTest;   // UI thread: the selftest verdict (called only when selfTest is set)
+    // H7 (all null / empty = the H6 behaviour: no device list beyond the null device, no input, no MIDI). Ignored under nullAudio.
+    std::shared_ptr<AudioEnumerator> devices;                 // the OS device list (miniaudio)
+    AudioInFactory input;                                     // the capture device factory (miniaudio)
+    std::function<std::shared_ptr<MidiBackend>()> midi;       // the MIDI backend (CoreMIDI)
+    std::string a5LogPath;                                    // --a5-log <file>: the A5 clock-drift logger's snapshot every 10 s, one line each (the 30-minute gate of WORKPLAN H7)
+    int devWatchMs = 1000;
     std::string dataDir;                                      // the app's data folder (UTF-8): recovery copy and the list of picked file paths live under it; "" = neither is kept
   };
   ShellCore(IPlatform* plat, Options opt);
@@ -47,6 +60,10 @@ class ShellCore {
   void toPage(const std::string& lines);
   Options opt_;
   std::unique_ptr<LiveHost> host_;
+  std::unique_ptr<AudioSettingsStore> settings_;
+  std::unique_ptr<InputCapture> input_;
+  std::shared_ptr<MidiManager> midi_;   // shared_ptr: the deleter is captured where the type is complete (a build without MIDI never makes one)
+  std::thread a5_; std::mutex a5m_; std::condition_variable a5cv_; bool a5stop_ = false;
   RecoveryStore recovery_;
   DesktopApi api_;
   std::unique_ptr<BridgeSession> session_;
