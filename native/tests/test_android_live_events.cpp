@@ -40,6 +40,21 @@ int main() {
     v.track = 31; CHECK(eventToJson((const unsigned char*)&v, sizeof v, &o), "track 31 is the last");
     CHECK(!eventToJson((const unsigned char*)&v, sizeof v - 8, &o), "a short record is refused");
   }
+  {   // M2: MASTERM -> {t:"master.lvl", ...}: the page's mstMeter fields; sup null without the flag; non-finite never printed
+    thunder_live_ev_masterm v; std::memset(&v, 0, sizeof v);
+    v.h.type = THUNDER_LIVE_EV_MASTERM; v.h.bytes = sizeof v; v.h.seq = 31; v.h.f = 192000;
+    v.in_pk = 0.5f; v.out_pk = 0.25f; v.tp = 0.75f; v.in_lu = -14.5f; v.out_lu = -180.f; v.comp = -3.25f; v.comp_in = -200.f; v.lim = -0.5f; v.load = 0.015f;
+    CHECK(eventToJson((const unsigned char*)&v, sizeof v, &o), "masterm decodes");
+    CHECK(o == "{\"t\":\"master.lvl\",\"seq\":31,\"f\":192000,\"inPk\":0.5,\"outPk\":0.25,\"tp\":0.75,\"inLu\":-14.500,\"outLu\":-180.000,\"comp\":-3.250,\"compIn\":-200.000,\"lim\":-0.500,\"load\":0.015,\"sup\":null}", "master.lvl json: %s", o.c_str());
+    CHECK(o.find('\n') == std::string::npos && !eventIsCritical(THUNDER_LIVE_EV_MASTERM), "one line, droppable");
+    v.flags = 1; for (int b = 0; b < 48; b++) v.sup[b] = b * 0.5f;
+    CHECK(eventToJson((const unsigned char*)&v, sizeof v, &o) && o.find("\"sup\":[0.000,0.500,1.000,") != std::string::npos && o.find(",23.500]}") != std::string::npos && o.back() == '}', "sup: 48 numbers: %s", o.c_str());
+    int commas = 0; const size_t sp = o.find("\"sup\":["); for (size_t k = sp; k < o.size(); k++) if (o[k] == ',') commas++; CHECK(commas == 47, "47 commas in sup (%d)", commas);
+    v.in_pk = NAN; v.out_pk = -1.f; v.tp = INFINITY; v.in_lu = -INFINITY; v.out_lu = NAN; v.comp = NAN; v.comp_in = INFINITY; v.lim = NAN; v.load = -2.f; v.sup[3] = NAN;
+    CHECK(eventToJson((const unsigned char*)&v, sizeof v, &o) && o.find("inf") == std::string::npos && o.find("nan") == std::string::npos, "non-finite is never printed: %s", o.c_str());
+    CHECK(o.find("\"inPk\":0,\"outPk\":0,\"tp\":0,\"inLu\":-180.000,\"outLu\":-180.000,\"comp\":0.000,\"compIn\":-200.000,\"lim\":0.000,\"load\":0,") != std::string::npos, "defaults: %s", o.c_str());
+    CHECK(!eventToJson((const unsigned char*)&v, sizeof v - 8, &o), "a short record is refused");
+  }
   {   // FXDYN: [slot, type string, red, in, out], dB as given (-180 = silence)
     thunder_live_ev_fxdyn v; std::memset(&v, 0, sizeof v);
     v.h.type = THUNDER_LIVE_EV_FXDYN; v.h.bytes = sizeof v; v.h.seq = 9; v.h.f = 48000; v.track = 2; v.n = 2;

@@ -295,6 +295,7 @@ class LiveHost {
   void postMeters();                                          // step 9: the bank's events as METERS records
   /* M1 */ void applyMetersSet(const LiveCmd& c);                // AUDIO, step 1: setLevels / setTelemetry on the hosts whose watching changed; METERS rate as `meters`
   /* M3 */ void postChainsMeters(int64_t qEnd);                  // AUDIO, step 9 after postFxMeters: CHLVL for the watched tracks that have a chains node (ChainsHost::popPeaks); nothing for the others
+  /* M2 */ void postMasterMeters(int64_t qEnd);                  // AUDIO, step 9 after postChainsMeters: MASTERM for each message the mastering processor made (MasterProcessor::popMeter); nothing while unwatched
   /* M1 */ void postFxMeters(int64_t qEnd);                       // AUDIO, step 9 after postMeters: FXLVL / FXDYN for the watched hosts only (a copy of FxHost's own post; no pop for an unwatched host)
   // ---- C2: the chains host (audio) ----
   void commitChains(ChainsPlan* p);                                    // AUDIO: ChainsHost::commit + the whole-patch count (V3a)
@@ -405,6 +406,7 @@ class LiveHost {
   std::unique_ptr<MasterChain> mchain_;              // F_MASTER (chain.h)
   std::unique_ptr<MeterBank> meterBank_;             // F_METERS (meter.h)
   bool metersOn_ = false;                            // AUDIO: thunder_live_meters_want switched the bank on (it is fed and advanced only then)
+  /* M2 */ bool mstWatch_ = false;                                // AUDIO: the MASTERM kind is on (MasterProcessor::setMeters(true) on the mastering processor); popped in step 9
   /* M3 */ uint32_t chWatch_ = 0; double chHz_ = 16; int64_t nextChAt_ = 0;   // AUDIO: tracks whose chains peaks are tapped (ChainsHost::setPeakWatch) and posted in step 9 at chHz_ (paced in whole quanta); nextChAt_ = the engine frame the next post is due at
   /* M1 */ uint64_t fxLvlWatch_ = 0, fxDynWatch_ = 0;           // AUDIO: bit t (32 = master) set by the last MetersSet: the hosts that have setLevels / setTelemetry on and are popped in step 9
   PdcPlan pdcCur_; PdcMode pdcMode_ = PdcMode::Auto; bool pdcHave_ = false;   // AUDIO: the PDC plan in force (the play's or pdc_set's); re-applied with playing = false at a stop

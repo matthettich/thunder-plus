@@ -337,6 +337,12 @@ bool MasterProcessor::popMeter(MasterMeter* out) {
   *out = q_[qh_]; qh_ = (qh_ + 1) % kMeterQueue; qn_--; return true;
 }
 
+void MasterProcessor::setMeters(bool on) {
+  if (on == meters_) return;
+  meters_ = on;
+  qh_ = 0; qn_ = 0; inPk_ = 0; outPk_ = 0; tpMax_ = 0; compGr_ = 0; nq_ = 0; lim_->grMin = 1; comp_->detMax = -200;   // (an edge either way: nothing of the other state stays to be read)
+}
+
 bool MasterProcessor::process(float* L, float* R, int frames) {
   if (dead_) { std::memset(L, 0, sizeof(float) * (size_t)std::max(frames, 0)); std::memset(R, 0, sizeof(float) * (size_t)std::max(frames, 0)); return false; }
   for (int o = 0; o < frames; o += kQuantum) quantum(L + o, R + o, std::min(kQuantum, frames - o));

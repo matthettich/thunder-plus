@@ -687,6 +687,24 @@ typedef struct thunder_live_ev_chlvl {    /* 40 bytes */
   float out[2];                           /* peak out, left and right */
 } thunder_live_ev_chlvl;
 
+/* M2 (METERS-DESIGN 4.1 / 5a): the master's mastering meters. Type 14, 248 bytes, on the big ring, in step 9 after CHLVL. Only with F_METERS | F_MASTER and thunder_live_meters_set with THUNDER_LIVE_MK_MASTERM (the page's
+   `master:true`): the mastering MasterProcessor (the one the song's mst drives; not the safety limiter) then runs its meters (BS.1770 loudness, peaks, reductions) and one record is posted for each message the
+   processor itself makes, about 20 a second (round(sr / 128 / 20) quanta). Unwatched: the processor does none of that work, nothing is posted. Nothing posts while the mastering worklet is not in the path (mst off, or no stage on):
+   the page's own master worklet does not exist then either. The numbers are the worklet's own `{meter:{...}}` (linear peaks since the last message; dB for the rest). Differences, so the JSON carries no infinity:
+   in_lu / out_lu are -180 when the worklet would say -Infinity (before the first 100 ms block, or silence); a non-finite value of any field is 0 (comp_in -200, lu -180). comp_in is -200 when the compressor is off, as the worklet.
+   flags bit 0: sup[] holds the suppressor's 48 band reductions (dB, 20 Hz .. 20 kHz, log spaced); else sup[] is all 0. f = the frame at the end of the quantum that posted it. A full ring refuses the newest and counts it. */
+#define THUNDER_LIVE_EV_MASTERM 14
+typedef struct thunder_live_ev_masterm {  /* 248 bytes */
+  thunder_live_ev_head h;
+  float in_pk, out_pk, tp;                /* linear peaks (max(abs L, abs R)) since the last message; tp: the true-peak read-out, held until the processor's resetPeak (not called live) */
+  float in_lu, out_lu;                    /* short-term loudness, LUFS (-180: none yet / silence) */
+  float comp, comp_in;                    /* compressor gain reduction dB (<= 0, the lowest since the last message), detector level dB (-200 when the compressor is off) */
+  float lim;                              /* limiter gain reduction dB (<= 0; 0 when the limiter is off) */
+  float load;                             /* the processor's share of real time (0 .. 1+, half-second average; wall clock, not reproducible) */
+  uint32_t flags;                         /* bit 0: sup[] is present */
+  float sup[48];                          /* suppressor reduction per band, dB */
+} thunder_live_ev_masterm;
+
 /* ANY thread, once before audio: the host's output latency in frames and its underrun count; the next CLOCK records carry them (core.h thunder_host_stats). */
 void thunder_live_host_stats(thunder_live* L, int out_latency_frames, int underruns);
 
@@ -699,8 +717,7 @@ int thunder_live_poll(thunder_live* L, void* buf, int cap);
 int thunder_live_meters_want(thunder_live* L, double rate_hz);
 
 /* M1: CONTROL. The whole metering subscription as one REPLACEMENT state (METERS-DESIGN 4.2 / 5a): the page may re-send it at any time (after hello, after an engine restart); what it leaves out is switched off.
-   `size` first (the ABI rule of the other structs). rate_hz: METERS exactly as thunder_live_meters_want (0 off, > 0 and <= 30 on). kinds: THUNDER_LIVE_MK_* bits; CHLVL (M3: see THUNDER_LIVE_EV_CHLVL) works, MASTERM is reserved now (accepted, it posts
-   nothing yet). fx_tracks: bit t (0 .. 31) watches track t's effects, bit 32 the master's; with THUNDER_LIVE_MK_FXLVL the watched hosts post FXLVL, with THUNDER_LIVE_MK_FXDYN FXDYN (no cap on the number of
+   `size` first (the ABI rule of the other structs). rate_hz: METERS exactly as thunder_live_meters_want (0 off, > 0 and <= 30 on). kinds: THUNDER_LIVE_MK_* bits; CHLVL (M3: see THUNDER_LIVE_EV_CHLVL) works, MASTERM (M2: see THUNDER_LIVE_EV_MASTERM) works. fx_tracks: bit t (0 .. 31) watches track t's effects, bit 32 the master's; with THUNDER_LIVE_MK_FXLVL the watched hosts post FXLVL, with THUNDER_LIVE_MK_FXDYN FXDYN (no cap on the number of
    tracks: the page asks for one). chains_hz: the CHLVL rate (M3; 0 .. 30, 0 = 16 a second). chains_tracks (M3, last field: a caller with the older 32-byte struct passes size 32 and watches no chains track): bit t (0 .. 31) watches
    track t's chains node, used with THUNDER_LIVE_MK_CHLVL (bits above 31: E_ARG). Applied at the top of the next quantum (a NEW command: thunder_live_meters_want alone is unchanged and may still be used alone;
    the later of the two calls wins for the METERS rate). Needs F_METERS (E_STATE otherwise); without F_EFFECTS the FX kinds simply post nothing. E_ARG: NULL, size < 4, a field past our struct that is not zero,
@@ -708,7 +725,7 @@ int thunder_live_meters_want(thunder_live* L, double rate_hz);
 #define THUNDER_LIVE_MK_FXLVL 1u
 #define THUNDER_LIVE_MK_FXDYN 2u
 #define THUNDER_LIVE_MK_CHLVL 4u      /* M3: the chains in / out peaks of the tracks in chains_tracks */
-#define THUNDER_LIVE_MK_MASTERM 8u    /* reserved (M2) */
+#define THUNDER_LIVE_MK_MASTERM 8u    /* M2: the mastering processor's meters (needs F_MASTER; no track mask: the master is one) */
 typedef struct thunder_live_meters_spec {
   uint32_t size;
   uint32_t kinds;               /* THUNDER_LIVE_MK_* */

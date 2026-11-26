@@ -73,6 +73,11 @@ class MasterProcessor {
   bool limOn() const { return on_lim_; }
   // the meter messages posted since the last pop (about 20 a second); oldest first. false: none.
   bool popMeter(MasterMeter* out);
+  // M2: the meters (the BS.1770 loudness filters, the peaks, the reduction read-outs and the message queue) on or off, at run time, from the audio thread: a flag flip, no allocation, the filters are NOT
+  // reset (their state was built with the processor; while off they simply are not run, so on the first messages after an `on` the 3 s loudness window still holds what it had). On an edge the running
+  // peaks / reductions and the queue are cleared (scalars only), so the first message is fresh. The audio is bit-equal either way (the meters only read).
+  void setMeters(bool on);
+  bool metersOn() const { return meters_; }
   uint32_t meterDropped() const { return mdrop_; }   // messages lost because the host did not pop (the queue is kMeterQueue deep: the oldest goes)
   uint32_t silentBlocks() const { return sk_; }      // quanta the SILENCE SHORTCUT skipped (for tests)
 

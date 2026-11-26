@@ -61,6 +61,13 @@ bool eventToJson(const unsigned char* r, int bytes, std::string* out) {
       if (v.track < 0 || v.track > 31) return false;
       auto pk = [](float x) { return (std::isfinite(x) && x > 0.f && x < 1e30f) ? (double)x : 0.0; };
       ap(out, "{\"t\":\"ch.lvl\",\"seq\":%u,\"f\":%lld,\"tr\":%d,\"in\":[%.5g,%.5g],\"out\":[%.5g,%.5g]}", v.h.seq, (long long)v.h.f, v.track, pk(v.in[0]), pk(v.in[1]), pk(v.out[0]), pk(v.out[1])); return true; }
+    case THUNDER_LIVE_EV_MASTERM: { thunder_live_ev_masterm v; if (!take(r, bytes, &v)) return false;   // M2: {t:"master.lvl", seq, f, inPk, outPk, tp, inLu, outLu, comp, compIn, lim, load, sup:[48] | null}: the page's mstMeter object (same field names); peaks linear, the rest dB as the master worklet gives them (loudness -180 = none)
+      auto lin = [](float x) { return (std::isfinite(x) && x > 0.f && x < 1e30f) ? (double)x : 0.0; };
+      auto db = [](float x, double dflt) { return (std::isfinite(x) && x > -1000.f && x < 1000.f) ? (double)x : dflt; };
+      ap(out, "{\"t\":\"master.lvl\",\"seq\":%u,\"f\":%lld,\"inPk\":%.5g,\"outPk\":%.5g,\"tp\":%.5g,", v.h.seq, (long long)v.h.f, lin(v.in_pk), lin(v.out_pk), lin(v.tp));   // (ap's buffer is 256 bytes: two calls)
+      ap(out, "\"inLu\":%.3f,\"outLu\":%.3f,\"comp\":%.3f,\"compIn\":%.3f,\"lim\":%.3f,\"load\":%.4g,\"sup\":", db(v.in_lu, -180.0), db(v.out_lu, -180.0), db(v.comp, 0.0), db(v.comp_in, -200.0), db(v.lim, 0.0), lin(v.load));
+      if (v.flags & 1u) { out->push_back('['); for (int b = 0; b < 48; b++) ap(out, "%s%.3f", b ? "," : "", db(v.sup[b], 0.0)); out->push_back(']'); } else out->append("null");
+      out->push_back('}'); return true; }
     case THUNDER_LIVE_EV_FXDYN: { thunder_live_ev_fxdyn v; if (!take(r, bytes, &v)) return false;   // M4: {t:"fx.dyn", seq, f, tr, d:[[slot, "type", red, in, out], ...]}: dB as the core gives them (-180 = silence); the type is the page's string
       if (v.track < 0 || v.track > 32) return false;
       ap(out, "{\"t\":\"fx.dyn\",\"seq\":%u,\"f\":%lld,\"tr\":%d,\"d\":[", v.h.seq, (long long)v.h.f, v.track);
