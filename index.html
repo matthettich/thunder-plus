@@ -448,6 +448,7 @@ body:not(.nowv) .wvMobNote{display:none}
 .row output:hover{background:var(--panel2)}
 /* typed value box: double-click or double-tap a row's value; inherits the app's skin */
 .vtype{font:inherit; color:var(--ink); background:var(--inv); border:1px solid var(--line); width:11ch; padding:0 3px; text-align:right}
+.btnrow:has(> #appOpened){display:none}   /* (owner, 27 Nov) "Song at start" is no longer shown; the text is still set, for the playback report and tests */
 .segrow{display:flex; align-items:center; gap:6px; min-height:34px; font-size:var(--fs-3)}
 .segrow>span{color:var(--muted); width:70px; flex:none}
 /* AUDIO & MIDI tidy (menu audit, 2 Nov): labels on one line, Test sound beside Output, Reset as a small button whose note is
@@ -3334,7 +3335,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="note" id="coreWhy" hidden style="font-size:11px;word-break:break-word;margin:0 0 6px"></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your project is kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
-      <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span>RUNAWAY KICK (TEST)</span><div class="seg" id="segRk"></div></div>
+      <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span style="line-height:1.15">Runaway<br>kick (test)</span><div class="seg" id="segRk"></div></div>
       <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched. If the engine is stuck or the output is very late, it offers to reload the app (your project is saved first).">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play, Low power display and Meters. Projects, kits and your MIDI setup are kept.">Reset audio settings</button></div>
     </div>
   </section>
@@ -18651,7 +18652,7 @@ function lkUi(){
 let updLink = null, updLinkSync = null;
 if (LINKAPI && $('segLink')){
   updLink = makeSeg($('segLink'), [[false, 'Off'], [true, 'On']], () => !!aset.link, v => { aset.link = !!v; asetSave(); lkEnable(aset.link); });
-  updLinkSync = makeSeg($('segLinkSync'), [[true, 'On'], [false, 'Off']], () => aset.linkSync !== false, v => { aset.linkSync = !!v; asetSave(); if (LINKAPI.available) lkCall('sync', () => LINKAPI.sync(!!v)); });
+  updLinkSync = makeSeg($('segLinkSync'), [[false, 'Off'], [true, 'On']], () => aset.linkSync !== false, v => { aset.linkSync = !!v; asetSave(); if (LINKAPI.available) lkCall('sync', () => LINKAPI.sync(!!v)); });
   if (LINKAPI.available){ LINKAPI.onState(lkState); LINKAPI.onTime(lkTime); }
   lkUi();
   setTimeout(() => { if (aset.link && LINKAPI.available) lkEnable(true); }, 0);   // after the song (S) is loaded
@@ -28707,7 +28708,7 @@ function projRows(){
       info:() => 'Pads: hold ALT and press an arrow to jump to the nearest block that way on the Song grid (▲▼ up and down the track, ◀▶ along the row). Works on the Song screen, in Arrange and in the phrase editor (which opens that block’s phrase). OFF: phrase ▲▼ jumps 16 patterns, Song ◀▶ moves one block, ▲▼ moves 16 rows. KEYS mode is not affected.'},
     {l:'SCALE MODE', ck:'Notes land on the song’s scale', get:() => scaleMode ? 1 : 0, set:v => setScaleMode(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'With a song SCALE set (Song settings → Key), the notes you type and play from the computer keyboard go to the nearest note of the scale, in the tracker and on the Synth page. Notes already in phrases don’t change'},
-    {l:'PLAY NOTE ON ENTRY', ck:'Play note on entry', get:() => pnoeOn ? 1 : 0, set:v => setPnoe(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'PLAY NOTE ON ENTRY', ck:'Pressing keys plays notes', get:() => pnoeOn ? 1 : 0, set:v => setPnoe(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Typing a note into the phrase editor plays that instrument’s sound on the spot, so you hear what you enter. Off makes note entry silent'},
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
@@ -28719,7 +28720,7 @@ function projRows(){
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:smallScr() ? 2 : 0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
-    {l:'ANIMATIONS', ck:'Animations: the dancing dogs, the FX bar’s effect pictures and the rainbow skin’s drift', get:() => animOn ? 1 : 0, set:v => setAnim(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'ANIMATIONS', ck:'Show animations', get:() => animOn ? 1 : 0, set:v => setAnim(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: the dancing dogs (Song, Project, Phrase), the pictures on the FX bar’s effects and the Simple rainbow dynamic skin’s moving colours. OFF: none of them is drawn and none of their work runs. Meters, scopes, playheads and the piano stay. You can also right-click (or long press) the dogs or an FX bar effect and choose Hide animations'},
     // REC, METRONOME AND COUNT-IN (kept on this device, like the rows above)
     {l:'METRONOME', sec:'Record & play', gap:true, opts:true, get:() => recS.met, set:v => setMet(v), min:0, max:2, d:1, fmt:v => ['OFF', 'WHILE RECORDING', 'ALWAYS'][v],
@@ -36402,7 +36403,7 @@ function cpuFill(){
   const key = JSON.stringify([r.head, r.list.map(x => [x.name, x.share]), r.screen.map(x => [x.name, x.share, x.extra]), r.keep, r.tip]); if (P.key2 === key) return; P.key2 = key;   // no layout work when nothing shown changed
   P.head.textContent = 'What is using the most right now'; P.sub.textContent = r.head;
   P.list.replaceChildren(...(r.list.length ? r.list.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name), el('b', null, x.share)); return li; }) : [el('div', 'cpuNone', tp.on ? 'Nothing measurable is running.' : 'Nothing is running. Press play to see what the song uses.')]));
-  P.scr.replaceChildren(...(r.screen.length ? [el('div', 'cpuNone', r.screenHead), ...r.screen.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name + (x.extra ? ' · ' + x.extra : '')), el('b', null, x.share)); return li; })] : []));
+  P.scr.replaceChildren(...(r.screen.length ? [...r.screen.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name + (x.extra ? ' · ' + x.extra : '')), el('b', null, x.share)); return li; })] : []));
   P.keep.textContent = r.keep; P.keep.classList.toggle('bad', r.bad); P.tip.textContent = r.tip;
 }
 $('tCpu').addEventListener('click', () => {
@@ -38080,7 +38081,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.', 'Menu wording: View and Settings items renamed (Show SECT in Arrange, Allow right-click to color song row, Create unique pattern numbers on new tracks, Enable low power mode, Show Arrange left of phrase, Show section names); Meters while playing is now Meter animation quality: HIGH, LOW, OFF.', 'Arrange with FOLLOW off: when the song loops back to the top, Arrange goes back with it 4 s after you last touched it (it waited a minute).', 'Fixed: the Mixer’s TRIM number no longer shifts when its level light comes on.', 'Fixed: CLN↓ (clone down) now keeps a block’s mute: a muted block clones as a muted block.']],
+  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.', 'CPU panel: the screen list no longer has its long heading.', 'Settings: Show animations, Pressing keys plays notes, “Automatically checks for updates on launch”; the “Song at start” line is gone; Ableton Link’s Start/stop toggle reads Off | On like the one above it; Runaway kick’s label no longer runs under its toggle.', 'Menu wording: View and Settings items renamed (Show SECT in Arrange, Allow right-click to color song row, Create unique pattern numbers on new tracks, Enable low power mode, Show Arrange left of phrase, Show section names); Meters while playing is now Meter animation quality: HIGH, LOW, OFF.', 'Arrange with FOLLOW off: when the song loops back to the top, Arrange goes back with it 4 s after you last touched it (it waited a minute).', 'Fixed: the Mixer’s TRIM number no longer shifts when its level light comes on.', 'Fixed: CLN↓ (clone down) now keeps a block’s mute: a muted block clones as a muted block.']],
   [700, '27 Nov', ['Fixed: offline, the CHAINS and WAVES pages now have their own icon and app manifest (they were left out of the offline copy).']],
   [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
   [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],
@@ -39345,7 +39346,7 @@ function updBanner(){
 // The desktop app (Electron, served from app://) carries its own copy of these files: it updates by
 // installing a newer build, so the update check and the install offer are web-only.
 const DESKTOP_APP = location.protocol === 'app:';
-{ const u = document.getElementById('updBtn'); if (u){ if (DESKTOP_APP){ u.hidden = true; const n = el('span', 'lbl', 'Desktop app: it checks for a new version when it opens and offers to install it.'); u.after(n); } else u.addEventListener('click', () => checkUpdate(true)); } }
+{ const u = document.getElementById('updBtn'); if (u){ if (DESKTOP_APP){ u.hidden = true; const n = el('span', 'lbl', 'Automatically checks for updates on launch'); u.after(n); } else u.addEventListener('click', () => checkUpdate(true)); } }
 async function checkUpdate(manual){
   if (DESKTOP_APP) return;
   const sw = navigator.serviceWorker && location.protocol === 'https:';
