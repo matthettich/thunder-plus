@@ -36,6 +36,7 @@ function createAllowList(o) {
     allow(p) {
       const k = norm(p); if (!k) return '';
       session.add(k);
+      const last = kept[kept.length - 1]; if (last && last.key === k && last.p === p) return p;   // already the newest: no disk write (review P3-8)
       kept = kept.filter(x => x.key !== k); kept.push({ key: k, p }); if (kept.length > max) kept = kept.slice(-max);
       save(); return p;
     },

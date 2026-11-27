@@ -153,8 +153,9 @@ app.whenReady().then(() => {
     if (!file.startsWith(ROOT + path.sep)) return new Response('Not found', { status:404 });
     return net.fetch(pathToFileURL(file).toString()).then(res => /\.html?$/i.test(file) ? withCsp(res) : res);
   });
-  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ALLOW.has(perm) || (perm === 'media' && audioOnly(d))));
-  session.defaultSession.setPermissionCheckHandler((wc, perm, origin, d) => ALLOW.has(perm) || (perm === 'media' && audioOnly(d)));
+  // ONLY THE APP ASKS (review P3-1): a permission is granted to app://thunder pages, never to another origin a frame might load.
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(isAppUrl((d && d.requestingUrl) || (wc && wc.getURL())) && (ALLOW.has(perm) || (perm === 'media' && audioOnly(d)))));
+  session.defaultSession.setPermissionCheckHandler((wc, perm, origin, d) => isAppUrl(origin || (d && d.requestingUrl) || (wc && wc.getURL())) && (ALLOW.has(perm) || (perm === 'media' && audioOnly(d))));
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
   // DEVICE RECOVERY (10 Nov): the computer woke from sleep / the screen was unlocked: the page checks its audio output again (thunder:power).
