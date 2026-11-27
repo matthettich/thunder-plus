@@ -29,7 +29,7 @@ function rig(o = {}) {
     clamp: (v, a, b) => Math.max(a, Math.min(b, v)), d2: n => String(n).padStart(2, '0'), freshMix: () => ({ vol: 224, trim: 128, pan: 128, mute: false, solo: false, sc: false, nm: '', col: 0 }),
     sckTrack: v => { v = Math.round(+v) || 0; return v > 8 ? v - 9 : -1; }, cTrack: 0, cs: { song: { x: 0 }, mixer: { x: 0 } }, cFxT: 0, tp: {}, busPlanH: 1, rt: null, CH: {}, chainsDropFrame() {}, PumpFX: { _notifyAll() {} },
     dirty: [], cache: [], arrSig: 'x', draw() {}, growKit() {}, saves: [], voiceToJSON: v => ({ name: v.name, x: v.x }),
-    trackVoice: t => ({ name: 'T' + t, x: t >= c.polyFrom() ? 'poly' : 'mono' }), trackVoiceOf: (t, p) => ({ name: 'T' + t, x: p ? 'poly' : 'mono' }), saveS() { c.saves.push(JSON.stringify(c.S)); } };
+    trackVoice: t => ({ name: 'T' + t, x: t >= c.polyFrom() ? 'poly' : 'mono' }), trackVoiceOf: (t, p) => ({ name: 'T' + t, x: p ? 'poly' : 'mono' }), saveS() { c.saves.push(JSON.stringify(c.S)); }, logs: [], tpLog(w, e) { c.logs.push(w + ': ' + (e && e.message || e)); } };
   vm.createContext(c);
   vm.runInContext(line('const ntr = () => S.ntr') + '\n' + line('const polyFrom = ') + '\n' + code + splitCode + '\nthis.ntrPerm = ntrPerm; this.ntrPlan = ntrPlan; this.ntrPermOld = ntrPermOld; this.ntrRemap = ntrRemap; this.setTracks = setTracks; this.setNtr = setNtr; this.trackHolds = trackHolds; this.tracksHiddenBy = tracksHiddenBy; this.tracksCheck = tracksCheck; this.normSplit = normSplit; this.polyFrom = polyFrom;', c);
   const S = { ntr: o.ntr || 16, song: [], smute: [], tfx: Array.from({ length: NT }, () => []), mfx: [], chainOn: new Array(NT).fill(false), chains: [], phrases: [], chainPatch: null, perf: null, parts: [],

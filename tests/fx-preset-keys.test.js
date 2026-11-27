@@ -8,7 +8,8 @@ const src = H.read('index.html');
 const cut = (re, what) => { const m = src.match(re); assert.ok(m, `index.html: could not find ${what}`); return m[0]; };
 const code = cut(/function fxPreApply\(t, k, vals, name\)\{[\s\S]*?\n\}\n/, 'fxPreApply') +
   cut(/function fxPresetItems\(type\)\{[\s\S]*?\nfunction fxPresetOpen\(t, k\)\{/, 'the stepping block').replace(/function fxPresetOpen\(t, k\)\{$/, '') +
-  cut(/function snap\(\)\{\n  if \(undoHeld[\s\S]*?\n\}\n/, 'snap');
+  cut(/function snap\(\)\{\n  if \(undoHeld[\s\S]*?\n\}\n/, 'snap') +
+  cut(/const UNDO_MAX = [^\n]*\nfunction undoTrim\(\)\{[^\n]*\n/, 'undoTrim (the undo byte budget, build 695)');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function make() {
   const st = { now: 1000, timers: [], applied: [], toasts: [], pumpCalls: [] };

@@ -22,7 +22,9 @@ jobs:
         with:
           node-version: 22
       - name: acorn (some tests cut functions out of index.html with it; they skip without it)
-        run: npm i --no-save --no-audit --no-fund acorn@8 acorn-walk@8
+        run: npm i --no-save --no-audit --no-fund acorn@8 acorn-walk@8 eslint@9 globals@15   # (eslint for the Lint step: one install, as a second --no-save install prunes the first)
+      - name: Lint (a misspelled name, duplicate key or dead code fails the build; tools/lint.mjs, eslint.config.mjs)
+        run: npm run lint
       - name: Node tests (npm test)
         run: npm test -- --test-reporter=tap | tee node-tests.tap
       - name: Say loudly which tests SKIPPED (a skipped test checks nothing)

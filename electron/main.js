@@ -153,8 +153,9 @@ app.whenReady().then(() => {
     if (!file.startsWith(ROOT + path.sep)) return new Response('Not found', { status:404 });
     return net.fetch(pathToFileURL(file).toString()).then(res => /\.html?$/i.test(file) ? withCsp(res) : res);
   });
-  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ALLOW.has(perm) || (perm === 'media' && audioOnly(d))));
-  session.defaultSession.setPermissionCheckHandler((wc, perm, origin, d) => ALLOW.has(perm) || (perm === 'media' && audioOnly(d)));
+  // ONLY THE APP ASKS (review P3-1): a permission is granted to app://thunder pages, never to another origin a frame might load.
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(isAppUrl((d && d.requestingUrl) || (wc && wc.getURL())) && (ALLOW.has(perm) || (perm === 'media' && audioOnly(d)))));
+  session.defaultSession.setPermissionCheckHandler((wc, perm, origin, d) => isAppUrl(origin || (d && d.requestingUrl) || (wc && wc.getURL())) && (ALLOW.has(perm) || (perm === 'media' && audioOnly(d))));
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
   // DEVICE RECOVERY (10 Nov): the computer woke from sleep / the screen was unlocked: the page checks its audio output again (thunder:power).
@@ -229,7 +230,7 @@ app.whenReady().then(() => {
       if (!fromApp(e)) return { ok: false, why: NOT_APP };
       if (!win || win.isDestroyed()) return { ok: false, why: 'no window' };
       if (!ioChild) {
-        if (!ioGate.canStart()) return { ok: false, why: 'helper stopped' };
+        if (!ioGate.canStart()) return { ok: false, why: 'helper stopped', deaths: ioGate.deaths() };
         const child = utilityProcess.fork(path.join(__dirname, 'io-helper.js'), [ioAddonPath()], { serviceName: 'thunder-io' });
         ioChild = child;
         child.once('exit', () => { if (ioChild !== child) return; ioChild = null; ioGate.died(); });   // ioStop's kills aren't deaths
@@ -240,6 +241,8 @@ app.whenReady().then(() => {
       return { ok: true };
     } catch (err) { return { ok: false, why: String((err && err.message) || err) }; }
   });
+  // RESET (review P2-6): Settings → Audio → Reset audio engine gives a helper that died twice another go; the next start forks it again.
+  ipcMain.handle('thunder:io-reset', async e => { if (!fromApp(e)) return { ok: false, why: NOT_APP }; const was = ioGate.deaths(); ioGate.reset(); return { ok: true, deaths: was }; });
   // THE MICROPHONE (phase B): asked for when the recorder opens an input, not when the helper starts (it also runs for MIDI)
   ipcMain.handle('thunder:io-mic', async () => {
     try {

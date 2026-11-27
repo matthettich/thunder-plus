@@ -113,7 +113,7 @@ test('reload: a second press while one runs is ignored', async () => {
 });
 
 test('wiring: the button runs the check after the reset, quiet callers do not, and the app says the song is back', () => {
-  assert.match(src, /\$\('audReset'\)\.addEventListener\('click', \(\) => \{ resetAudio\(\); audStuckCheck\(\)/);
+  assert.match(src, /\$\('audReset'\)\.addEventListener\('click', \(\) => \{ resetAudio\(\); (?:iohReset\(\); )?audStuckCheck\(\)/);
   assert.ok(!/function resetAudio\(quiet\)\{[\s\S]{0,2500}audStuckCheck/.test(src.replace(blk, '')), 'resetAudio itself (Measure calls it quietly) does not ask');
   assert.match(src, /sessionStorage\.getItem\('thunderplus-audreload-v1'\)/);
   assert.match(blk, /applyUpdate\(\);/, 'the reload is applyUpdate (the desktop shell reloads its own window)');

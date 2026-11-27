@@ -20,7 +20,7 @@ function pageCtx(){
     clamp, int: (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d, d2: n => String(n).padStart(2, '0'), isBusT: () => true, globalThis: null });
   c.globalThis = c;
   vm.runInContext(cut(/const PM = globalThis\.PUMP_META[\s\S]*?\n(?=const pumpAllowed = )/, 'the pump block'), c);
-  vm.runInContext(cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block'), c);
+  vm.runInContext(cut(/^var PERF_SCENES = [^\n]*PLFO_SHAPES = [^\n]*\n/m, 'the PERFORM sizes (set once above the saved-song load, build 698)') + cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block'), c);
   return c;
 }
 const PAGE = pageCtx();

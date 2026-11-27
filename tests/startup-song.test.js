@@ -160,6 +160,29 @@ test('the saved song is read after the picker data it needs, and the start-up bl
   for (const n of ['SY_GROUPS', 'SY_PICK', 'OS_KEYS', 'OS_DEF']) assert.ok(new RegExp('(const |, )' + n + ' = ').test(blk), n + ' is in the data block');
   assert.equal([...src.matchAll(/^const SY_PICK = /gm)].length, 1);
 });
+/* ---------- duplicate names (review P2-5): a var or function declared twice in the same top-level scope silently wins ---------- */
+// The app's body is one big function (an IIFE) inside the main <script>: its var / function names, and each <script>'s own, may each be
+// declared once. The PERFORM sizes were set twice (above the saved-song load for normSong, and again in the PERFORM block) until build 698.
+let acorn = null; try { acorn = require('acorn'); } catch (e) {}
+function duplicateNames(html) {
+  const out = [];
+  const scan = (body, base) => { const seen = new Map();
+    for (const n of body) { const names = n.type === 'VariableDeclaration' ? n.declarations.flatMap(d => d.id.type === 'Identifier' ? [d.id.name] : []) : n.type === 'FunctionDeclaration' ? [n.id.name] : [];
+      for (const k of names) { if (seen.has(k)) out.push(k + ' (lines ' + (seen.get(k) + base) + ' and ' + (n.loc.start.line + base) + ')'); else seen.set(k, n.loc.start.line); } } };
+  for (const m of html.matchAll(/^<script>\n([\s\S]*?)^<\/script>/gm)) {
+    const base = html.slice(0, m.index).split('\n').length, ast = acorn.parse(m[1], { ecmaVersion: 'latest', locations: true });
+    scan(ast.body, base);
+    for (const n of ast.body) { const f = n.type === 'ExpressionStatement' && n.expression.type === 'CallExpression' && n.expression.callee; if (f && /Function/.test(f.type) && f.body.type === 'BlockStatement') scan(f.body.body, base); }
+  }
+  return out;
+}
+test('no var or function is declared twice in the same top-level scope (review P2-5)', { skip: !acorn && 'acorn is not installed (npm i --no-save acorn@8)' }, () => {
+  assert.deepEqual(duplicateNames(src), [], 'declared twice; the second silently replaces the first');
+});
+test('the duplicate-name guard itself: it flags the build-697 shape', { skip: !acorn && 'acorn is not installed' }, () => {
+  const html = '<script>\n(() => {\nvar PERF_SCENES = 16, PLFO_MAX = 4;\nfunction a(){}\nvar PERF_SCENES = 16;\n})();\n</script>\n';
+  assert.deepEqual(duplicateNames(html), ['PERF_SCENES (lines 3 and 5)']);
+});
 test('build 674: the number, the cache name and the changelog agree', () => {
   const b = +src.match(/^const BUILD = (\d+);/m)[1]; assert.ok(b >= 674);
   assert.ok(H.read('sw.js').includes("const CACHE = 'thunderplus-v" + b + "'")); assert.ok(src.includes('\n  [' + b + ", '"));

@@ -21,6 +21,7 @@ export async function openApp(opts = {}){
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console.error: ' + m.text()); });
+  if (opts.route) await page.route(opts.route[0], opts.route[1]);   // opts.route: [url glob, handler], set before the page loads (e.g. to hold back a file)
   await page.goto(`http://localhost:${port}/${opts.path || 'index.html?seqtest=1'}`);
   if (!opts.path){
     await page.waitForFunction(() => !!window.__seqTest, null, { timeout: 60000 });

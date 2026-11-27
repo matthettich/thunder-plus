@@ -3331,6 +3331,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" title="AUTO: lines every track up when an effect with look-ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…) sits on a track or bus: the others wait for it while the song plays. Does nothing otherwise. Stopped, pads answer at once. ON: the same, also while stopped (pads feel later whenever such an effect is loaded). OFF: never: a track or bus with such an effect plays late. Renders follow this setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>Live engines</span><div class="seg" id="segPsLive"></div></div>
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before. On a phone or tablet it plays on the Page unless you pick Audio thread here, because loading it can slow the phone’s audio clock."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
+      <div class="note" id="coreWhy" hidden style="font-size:11px;word-break:break-word;margin:0 0 6px"></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your project is kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span>RUNAWAY KICK (TEST)</span><div class="seg" id="segRk"></div></div>
@@ -8755,7 +8756,7 @@ function wkHook(){   // a module has loaded on a phone: the context is on the se
   try { if (ctx && !ctx.renderCapacity) cpuProbe(ctx); } catch(e){}   // the CPU meter's probe, only without renderCapacity
   for (const f of [...safeLims]) try { f._up(); } catch(e){}
 }
-function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){} }
+function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){ tpLog('audio settings save', e); } }
 // RESET AUDIO SETTINGS (10 Nov, owner: "reset any testing settings"): the defaults of Settings → Audio's saved fields, in one place. A field
 // with no default of its own (latPick, corePick, noWk) is removed, which is how the loaders read "default". Output, level, MIDI, input engines,
 // Link and the playhead offset are the owner's setup, not tests, so they are not here. Used by the Reset audio settings button.
@@ -8773,10 +8774,14 @@ let ctx = null, master = null;
    Settings > Audio > Sequencer > Native core (test). NCON is true only after that file's hello handshake succeeded, so with the switch off every NCON line is skipped. */
 const NC = () => window.__thunderClient, NCON = () => !!(window.__thunderClient && window.__thunderClient.on);
 const loadClient = () => { if (window.__thunderClient) return; const s = document.createElement('script');
-  s.src = 'thunder-core-client.js?v=8';   // bump with the ?v= in sw.js OPTIONAL when the file changes
-  s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD}, ncSongHost())); } catch(e){ tpLog('native core client: attach failed', e); } };
-  s.onerror = () => tpLog('native core client: thunder-core-client.js did not load');
+  s.src = 'thunder-core-client.js?v=9';   // bump with the ?v= in sw.js OPTIONAL when the file changes
+  s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD, nativeChanged:() => nativeWhyShow()}, ncSongHost())); nativeWhyShow(); } catch(e){ tpLog('native core client: attach failed', e); } };
+  s.onerror = () => { tpLog('native core client: thunder-core-client.js did not load'); try { pbLog('native engine: thunder-core-client.js did not load'); nativeWhyShow(); } catch(e){} };
   document.head.appendChild(s); };
+window.__ncBoot = () => { if (window.thunderCore || aset.core === 'native') loadClient(); };   // called by the last script of the page; else nothing is fetched (N2-PAGE-CLIENT 1.2)
+/* DIAG-1 (26 Nov): one `native:` line for the playback report header and the reason under Settings > Audio > Sequencer (shown when Native core (test) is picked but not on). */
+function nativeDiag(){ try { if (!(window.thunderCore || aset.core === 'native')) return ''; const c = NC(); if (c && c.diag) return c.diag(); return 'native: thunderCore ' + (window.thunderCore ? 'yes host=' + window.thunderCore.host : 'no') + ' · client loaded no (' + (document.querySelector('script[src^="thunder-core-client"]') ? 'file requested, not run yet or failed' : 'not requested') + ') · aset.core=' + aset.core; } catch(e){ return 'native: diag failed ' + e; } }
+function nativeWhyShow(){ try { const el = document.getElementById('coreWhy'); if (!el) return; const show = aset.core === 'native' && !NCON(); el.hidden = !show; if (show) el.textContent = nativeDiag(); } catch(e){} }
 let srGuess = 48000;
 try {
   if (aset.rate) srGuess = aset.rate;
@@ -8894,7 +8899,7 @@ self.onmessage = async e => {
     const w = new Worker(url); URL.revokeObjectURL(url);
     w.onmessage = e => {
       const m = e.data;
-      if (m.op === 'ready'){ if (m.errs) for (const x of m.errs) tpLog('render worker', x); PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; PW.ps = !!m.ps; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){} if (PW.ready) prerender(); return; }
+      if (m.op === 'ready'){ if (m.errs) for (const x of m.errs) tpLog('render worker', x); PW.ready = !!(m.pl || !plMod) && !!(m.tx || !txMod); PW.wv = !!m.wv; PW.lx = !!m.lx; PW.ps = !!m.ps; try { if ((S.irs || []).some(Boolean)) w.postMessage({op:'irs', v:irsLive()}); } catch(e){ tpLog('render worker: impulse responses not sent', e); } if (PW.ready) prerender(); return; }
       const j = PW.jobs.get(m.id); if (!j) return; PW.jobs.delete(m.id);
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
@@ -8940,7 +8945,7 @@ function lnTempo(){
     if (!near){ lnT.bpm = b; lnT.lpb = l; lnT.gen++; } }
   return lnT; }
 /* LN TEMPO END */
-setInterval(() => { try { if (!kit.voices.some(voiceLines)) return; const g = lnT.gen; lnTempo(); if (lnT.gen !== g) prerender(); } catch(e){} }, 100);   // the trailing call
+setInterval(() => { try { if (document.hidden && !tp.on) return; if (!kit.voices.some(voiceLines)) return; const g = lnT.gen; lnTempo(); if (lnT.gen !== g) prerender(); } catch(e){ tpLog('line tempo / prerender timer', e); } }, 100);   // the trailing call
 const padBpm = i => { const v = kit.voices[i]; if (voiceLines(v)){ const t = lnTempo(); return t.bpm + t.lpb / 100; } return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
 function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; if (typeof coreBuf === 'function') try { coreBuf(i); } catch(e){} }
@@ -9590,7 +9595,7 @@ function slotVoice(i){
   return isSyn(i) ? mkVoice('Synth ' + (i + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, lpCut:3000, level:0.7}], {tune:24, len:6, gate:400})
     : mkVoice('Pad ' + (i + 1), [{type:'sine', b:0.25, pAmt:24, pDec:50, atk:0.1, dec:400}]);
 }
-function kitStep(){ markKit(); try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } catch(e){} }
+function kitStep(){ markKit(); try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); undoTrim(); undo.future = []; } catch(e){} }
 function setSlots(n){
   if (vtrk) return toast('SLOTS is locked: a kit slot per track is on (Settings → Kit)', 5000);
   n = clamp(Math.round(n), 16, MAXSLOT); if (n === NSLOT){ slotsUI(); return; }
@@ -12843,7 +12848,7 @@ function sfLoad(id){
   if (!id) return Promise.resolve(null);
   if (SF.fonts.has(id)) return Promise.resolve(SF.fonts.get(id));
   if (!SF.loading.has(id)) SF.loading.set(id, (async () => {
-    let rec = null; try { rec = await sfTx('readonly', st => st.get(id)); } catch(e){}
+    let rec = null; try { rec = await sfTx('readonly', st => st.get(id)); } catch(e){ tpLog('SoundFont store read', e); }
     let bytes = rec && rec.bytes;
     if (!bytes && id === GM_FONT.id) bytes = await sfFetchGM();
     if (!bytes) throw new Error('SoundFont “' + id + '” isn’t on this device: load it on the Synth page (Engine: SoundFont)');
@@ -15162,7 +15167,7 @@ function smpPut(S){
 }
 function idbGet(name, id){ return idbOpen(name).then(db => new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); })).catch(() => null); }
 async function smpGet(id){
-  try { const db = await smpDb(); const r = await new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); if (r){ r.own = true; return r; } } catch(e){}
+  try { const db = await smpDb(); const r = await new Promise(res => { const q = db.transaction('smp').objectStore('smp').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); if (r){ r.own = true; return r; } } catch(e){ tpLog('sample store read', e); }
   for (const n of SDB_ALSO) if (n !== SDB){ const r = await idbGet(n, id); if (r){ r.own = false; return r; } }   // borrowed from Thunder's store: save() copies it into ours
   return null;
 }
@@ -15183,7 +15188,7 @@ async function resolveSamples(){
     if (missing) toastErr(missing + (missing > 1 ? ' samples' : ' sample') + ' not in this browser’s storage. Load the kit or project file to restore ' + (missing > 1 ? 'them' : 'it') + '.', 6000);
     else { smpTidy(); if (!borrowed && typeof thunderTidy === 'function') setTimeout(thunderTidy, 3000); }
     // A kit saved before samples moved to IndexedDB still has them inside localStorage: move them now.
-    try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){}
+    try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){ tpLog('save after moving samples out', e); }
     // Likewise song presets imported before samples-by-reference: move their audio out of the song.
     try { if (S && S.presets && JSON.stringify(S.presets).includes('"b64"')){ await Promise.all(presetsByRef(S.presets)); saveS(); } } catch(e){ tpLog('could not move preset samples out of the song', e); }
   } finally { smpResolving = false; }
@@ -15241,7 +15246,7 @@ function smpTidy(){
   try { const P = S.presets || {}; for (const p of P.voices || []) for (const l of (p.v && p.v.layers) || []) if (l.sample && l.sample.ref) used.add(l.sample.ref); for (const p of P.layers || []) if (p.l && p.l.sample && p.l.sample.ref) used.add(p.l.sample.ref); } catch(e){}
   try { for (const k of [KEY, TK]){ const j = localStorage.getItem(k) || ''; for (const m of j.matchAll(/"ref":"([^"]+)"/g)) used.add(m[1]); } } catch(e){}
   otherTabs().then(busy => { if (busy) return;
-    smpDb().then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
+    Promise.all([kvGet('bkIndex'), kvGet('rescueIndex')]).then(ix => { for (const l of ix) for (const e of l || []) for (const id of (e && e.refs) || []) used.add(id); return smpDb(); }).then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
       q.onsuccess = () => { for (const k of q.result) if (!used.has(k)){ st.delete(k); smpStored.delete(k); } }; }).catch(() => {}); });
 }
 // Every autosave goes through here. localStorage is ~5 MB for the whole origin: when a write fails (storage full,
@@ -15278,7 +15283,7 @@ function kitUndoJSON(){ for (const v of kit.voices) try { vSnap(v); } catch(e){}
 // grows to fit, so every pad the song plays exists.
 function setKit(k, noUndo){
   try { markChange(); } catch(e){}   // (a project being opened sets it back to saved right after)
-  if (!noUndo) try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } catch(e){}
+  if (!noUndo) try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); undoTrim(); undo.future = []; } catch(e){}
   NSLOT = k.slots = kitSlots(k);   // SLOTS: the new kit's count
   setTimeout(() => sfPrepare(null), 0); kit = k; syncHeld(); setTimeout(() => { for (let i = 0; i < kit.voices.length; i++) try { bassPush(i); } catch(e){} }, 0);
   setTimeout(kitUndoBase, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0;
@@ -16075,7 +16080,7 @@ const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendere
   if (v === 'render'){ try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){} }
   psLiveNote(); });
 const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']].concat(window.thunderCore ? [['native', 'Native core (test)']] : []), () => window.thunderCore && aset.core === 'native' ? 'native' : coreWanted() ? 'core' : 'page', v => {   // 'native' is listed only where the shell gave the page window.thunderCore (hidden on the web copy until core.wasm exists)
-  aset.core = v; aset.corePick = true; asetSave();
+  aset.core = v; aset.corePick = true; asetSave(); nativeWhyShow();
   if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast(v === 'native' ? 'Sequencer: native core (test), from the next start.' : 'Sequencer: page, from the next PLAY.', 2500); });
 const updNoWk = makeSeg($('segNoWk'), [[0, 'On'], [1, 'Off (test)']], () => aset.noWk ? 1 : 0, v => { aset.noWk = !!v; asetSave(); audRestartRow(); });   // WORKLETS OFF (test)
 var rkOn = (() => { try { return localStorage.getItem('thunderplus-runkick-v1') !== '0'; } catch(e){ return true; } })();   // RUNAWAY KICK (TEST): per device, at once
@@ -16089,7 +16094,7 @@ function psLiveNote(){
 }
 psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
-$('audReset').addEventListener('click', () => { resetAudio(); audStuckCheck().catch(e => tpLog('reset audio engine check failed', e)); });   // (RELOAD OFFER: when the context is stuck or the delay is far too high)
+$('audReset').addEventListener('click', () => { resetAudio(); iohReset(); audStuckCheck().catch(e => tpLog('reset audio engine check failed', e)); });   // (RELOAD OFFER: when the context is stuck or the delay is far too high)
 // RESET AUDIO SETTINGS: every per-device audio switch back to its default (the per-device ones outside aset: Keep screen on, Background play, Low power
 // display). If Latency, Rate or Worklets then differ from what the running audio was made with, it reloads exactly as Apply (reload) does (the song is
 // saved first); otherwise it re-applies in place.
@@ -16103,14 +16108,14 @@ $('audDefaults').addEventListener('click', async () => {
     try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); return; }
   psLive.off = false; psLive.strikes = 0;
   try { if (rt && rt.pl){ rt.pl.pdcSync(); } } catch(e){}
-  try { if (ctx && coreWanted() && !hadCore) coreLoad(); } catch(e){}
+  try { if (ctx && coreWanted() && !hadCore) coreLoad(); } catch(e){ tpLog('audio-thread sequencer load', e); }
   try { $('ckWake').checked = !!wlOn; $('ckBgPlay').checked = !!bgOn; } catch(e){}
   for (const u of [updLat, updPdc, updARate, updPsLive, updCore, updNoWk]) try { u(); } catch(e){}
   psLiveNote(); audRestartRow(); try { draw(); } catch(e){}
   toast('Audio settings are back to their defaults.');
 });
 $('audReport').addEventListener('click', () => pbCopy());
-if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); try { devRecover('devicechange'); } catch(e){} });
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); try { devRecover('devicechange'); } catch(e){ tpLog('audio device change recovery', e); } });
 /* ---------- skins (the Seeds set) ---------- */
 const SKINS = [
   {id:'auto', name:'Pastel (follows your system)', base:'pastel', dots:['#d6dbe4', '#dce7f6', '#f5eec6', '#f6dae3']},
@@ -16803,7 +16808,7 @@ async function rcdOpen1(){
   // CLOSED WHILE OPENING (owner's beta.14 test: monitoring distorted and the song silent after closing and reopening the window):
   // the window can close (rcdClose) while this waits on macOS or the helper; what this open then made is undone, not left half-open
   const gen = RCD.gen | 0, gone = () => (RCD.gen | 0) !== gen;
-  audio(); try { if (ctx.state !== 'running') await ctx.resume(); } catch(e){}
+  audio(); try { if (ctx.state !== 'running') await ctx.resume(); } catch(e){ tpLog('audio resume (recorder)', e); }
   // NATIVE DESKTOP SHELL INPUT (PC7): every channel of the interface through thunderCore (rec.arm / rec.start / rec.stop / take); a take comes whole after Stop
   if (natIn()){ const okN = await rcdOpenNat(); if (gone()){ rcdCloseIo(); RCD.node = null; return false; }
     if (okN) return true; RCD.note = 'Native input failed: ' + (RCD.ioWhy || 'it didn’t open') + '.'; toastErr(RCD.note, 6000); return false; }
@@ -17094,7 +17099,7 @@ function midiLatPanel(){
       // AFTER (owner, 7 Nov: Measure "made things worse", Reset audio engine put it right): opening the interface's input can
       // make macOS reconfigure the device and move the output's timing, so the engine is rebuilt here, and the MIDI clock
       // mapping measured again (unless Record a sample is open: it still uses the input)
-      if (!RCD.ui){ try { resetAudio(true); amap.off = null; } catch(e){} }   // (quietly: owner, 8 Nov, the "Audio engine reset" message after Measure was alarming; it's routine here)
+      if (!RCD.ui){ try { resetAudio(true); amap.off = null; } catch(e){ tpLog('audio engine reset (measure)', e); } }   // (quietly: owner, 8 Nov, the "Audio engine reset" message after Measure was alarming; it's routine here)
       busy = false; }, 'ok'],
     ['Apply', () => { if (!res) return MLT.say('Measure first.'); midi.lats[res.p] = res.want; const r = $('midiLat' + res.p); if (r) r.value = res.want; saveMidi(); toast(`Gear delay for port ${PORTL[res.p]}: ${res.want} ms`); }],
   ]);
@@ -18696,12 +18701,14 @@ async function iohStart(){
   const fail = why => { if (IOH.state === 'starting'){ IOH.state = 'unavailable'; IOH.why = why; iohUi(); } };
   iohHelloT = setTimeout(() => fail('no answer'), 3000);
   iohGo = (async () => {
-    try { const r = await IOAPI.start(); if (r && r.ok === false){ clearTimeout(iohHelloT); fail(String(r.why || 'could not start')); } }
+    try { const r = await IOAPI.start(); if (r && r.ok === false){ clearTimeout(iohHelloT); fail(String(r.why || 'could not start') + (r.deaths ? ' after ' + r.deaths + ' crashes' : '')); } }
     catch(e){ clearTimeout(iohHelloT); fail(String((e && e.message) || e)); }
   })();
   return iohGo;
 }
 
+// Reset audio engine (review P2-6): a helper that crashed twice is given up on for the session; the reset gives it another start.
+function iohReset(){ if (!IOAPI || !IOAPI.reset || IOH.state !== 'unavailable' || !/^helper stopped/.test(IOH.why || '')) return; IOAPI.reset().then(r => { if (r && r.ok && IOH.state === 'unavailable'){ IOH.state = 'off'; IOH.why = ''; iohUi(); } }, e => tpLog('io helper reset failed', e)); }
 /* ===== NATIVE MIDI (helper phase B; plan §3.3, §4): the helper's MIDI ports, looking like Web MIDI's access to the rest =====
    midi.access becomes {native:true, outputs, inputs, onstatechange}: an output's send(bytes, timeStamp) books the message for
    that performance.now() moment on the helper's sender thread (its OS clock: IOH.clk), clear() drops what it still has queued
@@ -19105,7 +19112,7 @@ let plFailed = false;
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(async b => {
     if (WASM_PRECOMPILE) try { pumpWasmMod = await WebAssembly.compile(b); } catch(e){ pumpWasmMod = null; }   // compiled here, before any node gets it (they pass sound until it arrives, as before)
-    pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage(pumpWasmMod ? {pumpModule:pumpWasmMod} : {pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
+    pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){}   /* bytes, never the Module: a Module posted on a port never arrives in Chrome 153 (messageerror); processorOptions still carry it (build 689) */ pumpWait.clear(); pumpToChains(b);
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); try { if (typeof rt !== 'undefined' && rt && rt.pl) rt.pl.pdcSync(); } catch(e){} }); }).catch(e => { if (PM) console.warn('pump effects', e); });
   const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(e => { tpLog('wasm fetch (dsp)', e); return null; }), bytes(WASM_TFX).catch(e => { tpLog('wasm fetch (effects)', e); return null; })]);
   tfxBytes = txB || false; tfxLoadDone();
@@ -19161,7 +19168,7 @@ function editorKey(e){
 }
 /* ---------- waves editor: a full-screen frame; the patch is read from and saved into the kit ---------- */
 const usesWaves = v => isWlV(v) || v.layers.some(l => l.on && l.type === 'waves');
-function wavesChanged(edit){ if (edit) try { markChange(); } catch(e){} WV.doc = kit.waves || null; try { if (rt && rt.pl && rt.pl.wlDoc) rt.pl.wlDoc(WV.doc); } catch(e){} for (let i = 0; i < nslots(); i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
+function wavesChanged(edit){ if (edit) try { markChange(); } catch(e){} WV.doc = kit.waves || null; try { if (rt && rt.pl && rt.pl.wlDoc) rt.pl.wlDoc(WV.doc); } catch(e){ tpLog('waves doc to the audio engine', e); } for (let i = 0; i < nslots(); i++) if (usesWaves(kit.voices[i])){ dirty[i] = true; cache[i] = null; } clearTimeout(sTimer); sTimer = setTimeout(save, 900); }
 window.thunderWaves = {
   viewKey: code => viewKey(code),   // VIEW KEYS from inside the editor
   appKey: e => editorKey(e),   // APP KEYS from inside the editor (transport, files, help)
@@ -19170,7 +19177,7 @@ window.thunderWaves = {
   save: d => { const was = JSON.stringify(kit.waves || null), edit = patchKey(kit.waves) !== patchKey(d);
     // (a hand-off that only moved the view, or the first one, the editor's starter patch, is no step: review, 27 Oct)
     // (nor the hand-off as it opens)
-    if (edit && kit.waves && !undo.busy && !(WV.born && performance.now() - WV.born < 3000)){ undo.past.push({k:'W', j:was}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+    if (edit && kit.waves && !undo.busy && !(WV.born && performance.now() - WV.born < 3000)){ undo.past.push({k:'W', j:was}); undoTrim(); undo.future = []; }
     kit.waves = d; wavesChanged(edit); },
   undo: dir => undoStep(dir), canUndo: () => undo.past.length > 0, canRedo: () => undo.future.length > 0,
   close: () => closeWaves()
@@ -21912,7 +21919,7 @@ function tfxNode(ac, chain, cid){
       const o = n.sl || (n.sl = new Map()), seen = new Set(); for (const [k, v] of d.sl || []){ seen.add(k); o.set(k, (o.get(k) || 0) * 0.6 + v * 0.4); } for (const k of [...o.keys()]) if (!seen.has(k)){ const v = o.get(k) * 0.6; if (v < 0.0005) o.delete(k); else o.set(k, v); } }
     if (d.dyn) fxDynIn(n, d.dyn);
     if (d.lvl){ n.lvl = d.lvl; n.lvlT = performance.now(); }   // FX BAR: each slot's level out (fxLvlSet)
-    if (d.needPump){ if (pumpBin()) n.port.postMessage(pumpModOpt() ? {pumpModule:pumpModOpt()} : {pumpBytes:pumpBin()}); else pumpWait.add(n); }
+    if (d.needPump){ if (pumpBin()) n.port.postMessage({pumpBytes:pumpBin()}); else pumpWait.add(n); }   // bytes on the port, never a Module (Chrome 153 drops it: build 689); the worklet compiles them
     if (d.pump) PumpFX._feed(n, d.pump);
     if (d.pst) PumpFX._pst(n, d.pst);   // …PUMP STATE: the plugin changed its own (MASTER learned)
     if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
@@ -22320,7 +22327,7 @@ function demoSong(){
   for (let i = 0; i < 3; i++){ S.chains[i] = freshSect(); S.chains[i][0][0] = i; S.song[0][i] = i; }
   return S;
 }
-// PERFORM's sizes and LFO lists, set early (PERFORM below sets the same again): the saved song is read just below, before the
+// PERFORM's sizes and LFO lists, set early and only here (the PERFORM block below uses them): the saved song is read just below, before the
 // PERFORM block runs, and normSong saw them undefined then: scenes A / B came back empty, parts shrank to one, and a song with
 // a track LFO threw (PLFO_SHAPES.length), so the app opened the starter beat instead and autosaved it over the song.
 var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
@@ -22376,13 +22383,13 @@ async function startRescue(){
   const raw = START.raw, h = songHash(raw);
   try { tpLog('the saved song could not be read, so the starter beat is shown; the saved song is kept', START.err); } catch(e){}
   let parsed = null; try { parsed = JSON.parse(raw); } catch(e){}
-  try { if (raw.length < 1500000){ const m = localStorage.getItem('thunderplus-song-rescue-hash-v1'); if (m !== h){ localStorage.setItem('thunderplus-song-rescue-v1', raw); localStorage.setItem('thunderplus-song-rescue-hash-v1', h); } } } catch(e){}
+  try { if (raw.length < 1500000){ const m = localStorage.getItem('thunderplus-song-rescue-hash-v1'); if (m !== h){ localStorage.setItem('thunderplus-song-rescue-v1', raw); localStorage.setItem('thunderplus-song-rescue-hash-v1', h); } } } catch(e){ tpLog('song rescue copy write', e); }
   try {
     const idx = (await kvGet('rescueIndex')) || [];
     if (!idx.some(e => e.h === h)){
       const k = 'rescue' + Date.now(), nm = (parsed && typeof parsed.name === 'string' && parsed.name) || ((raw.match(/"name":"([^"]{1,40})"/) || [])[1]) || 'Song';
       const isSong = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed), text = isSong ? JSON.stringify({app:'thunder-project', v:1, build:typeof BUILD === 'number' ? BUILD : 0, song:parsed}) : raw;
-      await kvSet(k, text); idx.unshift({k, at:Date.now(), name:nm, kb:Math.round(text.length / 1024), h, text:isSong, err:START.note});
+      await kvSet(k, text); idx.unshift({k, at:Date.now(), name:nm, kb:Math.round(text.length / 1024), h, text:isSong, err:START.note, refs:[...new Set([...raw.matchAll(/"ref":"([^"]+)"/g)].map(m => m[1]))]});
       while (idx.length > 3){ const o = idx.pop(); await kvDel(o.k); }
       await kvSet('rescueIndex', idx);
     }
@@ -22403,6 +22410,8 @@ let sT = 0, sPend = false;   // sPend (12 Nov): a change is waiting for its auto
 const undo = {past:[], future:[], cur:JSON.stringify(S), busy:false, pend:false};
 var recTake = false;   // REC: a live take is under way; its notes become one undo step when it ends (recEndTake)
 let arrKeepOff = 0;   /* 1: keep the scroll as it is, 2: use cs.song.top as set */   /* UNDO KEEPS ARRANGE'S VIEW (build 609): undoStep's redraw does not scroll Arrange back to the selection / cursor */
+const UNDO_MAX = 200, UNDO_BYTES = 32e6;   /* UNDO BYTE BUDGET: the 200-step count cap stays; also drop the oldest steps while the past stack's JSON is over ~32 MB (always keeping the newest) */
+function undoTrim(){ const p = undo.past; while (p.length > UNDO_MAX) p.shift(); let n = 0; for (const e of p) n += e && e.j ? e.j.length : 0; while (p.length > 1 && n > UNDO_BYTES){ const e = p.shift(); n -= e && e.j ? e.j.length : 0; } }
 function undoReset(){ undo.past.length = 0; undo.future.length = 0; undo.cur = JSON.stringify(S); try { kitUndoBase(); } catch(e){} }
 /* ONE UNDO STEP PER GESTURE (27 Oct, Phase 2): while a pointer is down (a fader, a value or a selection being dragged), the
    changes it makes wait, and become one step when it lets go. A drag of the Mixer's faders made a step per mouse move. */
@@ -22422,7 +22431,7 @@ function snap(){
     undo.pend = false;
     const j = JSON.stringify(S);
     if (undoQuiet) undoQuiet = false;
-    else if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+    else if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); undoTrim(); undo.future = []; }
     undo.cur = j;
   });
 }
@@ -22443,7 +22452,7 @@ function vSnap(v){ for (const L of v.layers) if (L.sample && L.sample.data){ if 
 function kitSettle(i){
   if (undoHeld){ clearTimeout(vUndo.t[i]); vUndo.t[i] = setTimeout(() => { vUndo.t[i] = 0; kitSettle(i); }, 350); return; }   // ONE GESTURE: not while the pointer is down
   const v = kit.voices[i]; if (!v) return; const j = vSnap(v), prev = vUndo.cur[i];
-  if (prev != null && j !== prev){ undo.past.push({k:'V', i, j:prev}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; }
+  if (prev != null && j !== prev){ undo.past.push({k:'V', i, j:prev}); undoTrim(); undo.future = []; }
   vUndo.cur[i] = j;
 }
 function kitSnap(i){
@@ -22452,7 +22461,7 @@ function kitSnap(i){
 function kitFlush(){ vUndo.t.forEach((h, i) => { if (h){ clearTimeout(h); vUndo.t[i] = 0; kitSettle(i); } }); }
 function undoStep(dir){
   if (undoHeld || undoWant){ undoHeld = false; undoWant = false; }   // ONE GESTURE: a waiting step first (below)
-  if (!undo.busy && !recTake){ const j = JSON.stringify(S); if (undoQuiet) undoQuiet = false; else if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } undo.cur = j; }
+  if (!undo.busy && !recTake){ const j = JSON.stringify(S); if (undoQuiet) undoQuiet = false; else if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); undoTrim(); undo.future = []; } undo.cur = j; }
   try { recEndTake(); } catch(e){}   // REC: the take so far is a step of its own (recording goes on as a new take)
   kitFlush();
   const from = dir < 0 ? undo.past : undo.future, to = dir < 0 ? undo.future : undo.past;
@@ -22519,7 +22528,7 @@ function songOut(Sx){
 // A kit edit waits 900 ms (a waves edit longer) before it's saved: closing or hiding the app saves it now.
 function flushKit(){
   try { const w = WV.frame && WV.frame.contentWindow; if (w && typeof w.__wavesFlush === 'function') w.__wavesFlush(); } catch(e){}   // its edit lands in sTimer
-  try { if (sTimer){ clearTimeout(sTimer); sTimer = 0; save(); } } catch(e){}
+  try { if (sTimer){ clearTimeout(sTimer); sTimer = 0; save(); } } catch(e){ tpLog('pending song save', e); }
 }
 addEventListener('pagehide', () => { flushS(); flushKit(); saveCur(); });
 // Another tab of the app saved the song or kit: say so once (the last tab to save wins).
@@ -22547,7 +22556,7 @@ function placePending(){
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song uses ${NI} instruments. INS above 0F plays its own instrument.`, 5000); } catch(e){} } }
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
-function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){} try { if (NCON()) NC().edit(); } catch(e){}   // FILE SAFETY: unsaved changes   // NATIVE CORE: the whole song goes 250 ms after the last edit
+function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){ tpLog('native core: song not sent', e); } try { if (NCON()) NC().edit(); } catch(e){ tpLog('native core: edit notice', e); }   // FILE SAFETY: unsaved changes   // NATIVE CORE: the whole song goes 250 ms after the last edit
   if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; songStore(); }, 600);
   try { songVer++; songBeatsSoon(); } catch(e){} try { liveWarmSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
@@ -22752,10 +22761,9 @@ const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wid
      lk  {track: [id, id, id, id]}: what LK1–LK4 on that track's rows set
      lfo {track: [{id, sh, rt, dp}, … up to PLFO_MAX]}: a track's LFOs (shape, rate as an index of PLFO_RATES in beats a cycle, depth)
    S.parts (saved in the song): 16 parts {n, insts, mix:[[vol, pan]…], fx:{'t:s':{k:v}}}: a sound setup PRT switches to. */
-// (var and function: normSong reads the saved song at start-up, before this line runs; the vars are also set before that: FIRST RUN)
-var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16;
-var PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
-var PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
+// (PERF_SCENES, PERF_MACROS, PERF_PARTS, PLFO_MAX, PLFO_RATES, PLFO_SHAPES are set once, above the saved-song load, where normSong
+// needs them at start-up: search "PERFORM's sizes". They were set here a second time until build 698; review P2-5.)
+var PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
 function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$|^kn:\d+:[1-8]$/.test(id); }   // kn:t:k (22 Nov): knob K1–K8 of track t's patch
@@ -24482,7 +24490,7 @@ function rtBufPlain(pad, rev){
   }
   return e.b;
 }
-setInterval(() => { try { if (stq.bpm && S === stq.S) stqSee(performance.now()); } catch(e){} }, 50);   // stamps when the tempo or LPB changed (the settle window counts from here)
+setInterval(() => { try { if (document.hidden && !tp.on) return; if (stq.bpm && S === stq.S) stqSee(performance.now()); } catch(e){} }, 50);   // BATTERY: not while hidden and stopped (hidden but playing it still stamps a tempo change); stamps when the tempo or LPB changed (the settle window counts from here)
 function mkLimiter(ac){ const c = ac.createDynamicsCompressor(); c.threshold.value = -2; c.knee.value = 0; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.1; return c; }
 /* The safety limiter (Project → LIMITER, and everything played live on the Synth page): the mastering worklet's brickwall
    limiter on its own — 3 ms lookahead, true-peak, nothing past −1 dBFS. The Web Audio compressor above isn't a limiter:
@@ -24540,7 +24548,7 @@ function resetAudio(quiet){
   // THE RECORDER'S MONITOR follows the new master (it stayed on the old one: monitoring went silent after a reset with Record a sample open)
   if (RCD.mon){ try { RCD.mon.disconnect(); RCD.mon.connect(master); } catch(e){} }
   rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
-  try { devRecover('reset audio engine'); } catch(e){}   // (DEVICE RECOVERY) last: reopen the output choice
+  try { devRecover('reset audio engine'); } catch(e){ tpLog('audio output recovery after reset', e); }   // (DEVICE RECOVERY) last: reopen the output choice
   if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
 /* RELOAD OFFER (11 Nov, queued item 9): Reset audio engine cannot make a new AudioContext (about 300 places hold `ctx` or nodes made on
@@ -24602,7 +24610,7 @@ async function audReloadSafe(){
     try { flushKit(); } catch(e){}   // (the waves editor's pending edit)
     const okK = storeWrite(KEY, JSON.stringify(kitToJSON(sdbOk && smpStored ? 'ref' : false))), okS = songStore();
     if (!(okK && okS)){ toastErr('Couldn’t save the project (storage full), so no reload. Save it to a file first (File ▾ › Save).', 7000); return false; }
-    try { saveCur(); asetSave(); } catch(e){}
+    try { saveCur(); asetSave(); } catch(e){ tpLog('view / audio settings save', e); }
     if (RCD.on || RCD.sync || rendering){ toastErr('A recording or render started meanwhile, so the app was not reloaded.', 5000); return false; }   // (review: the waits above let one start)
     try { sessionStorage.setItem('thunderplus-audreload-v1', String(Date.now())); } catch(e){}
     try { pbLog('reloading the app to restart the audio engine · ' + pbState()); } catch(e){}
@@ -24981,7 +24989,7 @@ function bassReady(ac){
     try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC + '\n' + AcidCore.toString() + XPROC('acid', 'AcidCore') + '\n' + MachCore.toString() + XPROC('mach', 'MachCore')], {type:'text/javascript'}));
       wkNote(ac, 'bass'); pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false)
         .then(ok => typeof PsynCore === 'undefined' ? ok : (wkNote(ac, 'psyn'), ac.audioWorklet.addModule(PSYN_WK)).then(() => { psOK.add(ac); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; }))
-        .then(ok => (wkNote(ac, 'waves'), ac.audioWorklet.addModule(WAVES_WK)).then(() => { wlOK.add(ac); return ok; }, e => { tpLog('waves live worklet (it plays its render)', e); return ok; })); } } catch(e){}
+        .then(ok => (wkNote(ac, 'waves'), ac.audioWorklet.addModule(WAVES_WK)).then(() => { wlOK.add(ac); return ok; }, e => { tpLog('waves live worklet (it plays its render)', e); return ok; })); } } catch(e){ tpLog('waves live worklet setup', e); }
     bassLoad.set(ac, pr);
   }
   return bassLoad.get(ac);
@@ -25013,7 +25021,7 @@ const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
 const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[i]) || liveX(kit.voices[i]));
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
-function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){} }   // FREEZE FILE: the sound only when it changed
+function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){ tpLog('bass voice parameters to the worklet', e); } }   // FREEZE FILE: the sound only when it changed
 const MW_URL = 'master-worklet.js?v=8', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const go = ac.audioWorklet && !wkOff(ac), pr = go ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); if (go) wkNote(ac, 'master'); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
@@ -25272,8 +25280,9 @@ function tStart(mode, o){
   if (sPend && !tp.on && !(o && o._warm)) try { flushS(); } catch(e){}
   /* PADS WITHOUT A RENDER (15 Nov): a pad that is stale when PLAY is pressed starts rendering now, not at its first note (ensurePlay
      leaves a note silent while its pad renders). Only with the render Worker up: without it prerender would render on this thread. */
-  if (!tp.on && !(o && o._warm) && PW.ready) try { prerender(); } catch(e){}
+  if (!tp.on && !(o && o._warm) && PW.ready) try { prerender(); } catch(e){ tpLog('prerender on play', e); }
   if (NCON() && NC().can(mode, o)){ NC().start(mode, o); return; }   // NATIVE CORE (PC3): the engine in the shell plays the song; false: the code below, as without it
+  if (!NCON() && !(o && (o._warm || o._nf)) && (window.thunderCore || aset.core === 'native')) try { pbLog('native: PLAY ' + mode + ' on the page engine: ' + (NC() ? NC().why() : 'the native client file is not loaded')); } catch(e){}   // DIAG-1: never silent
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
   // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
@@ -25296,7 +25305,7 @@ function tStart(mode, o){
   // synth slots here froze the UI for seconds and made the first notes late.
   for (let i = 0; i < nslots(); i++){ const v = kit.voices[i]; if (!slotAt(cache, i) && v && PW.ready && rwCan(v)) bgRender(i); else ensureLive(i); }
   sfPrepare(null);   // SoundFont pads load in the background (notes before that are silent)
-  let warmNew = 0; try { warmNew = liveWarm(512); } catch(e){}   // LIVE WARM-UP: the live engines' nodes for the first bars, before their first notes
+  let warmNew = 0; try { warmNew = liveWarm(512); } catch(e){ tpLog('live engine warm-up', e); }   // LIVE WARM-UP: the live engines' nodes for the first bars, before their first notes
   moStart(mode === 'song' ? o.row : -1);   // before the start time is set: the song position takes a moment to work out
   // REC: a count-in plays its bars of clicks first (not when another device's clock starts us: it has its own timing).
   const ci = rec.on && recS.cnt > 0 && !mx.slave && !wasOn ? recS.cnt * 4 * 60 / seq.bpm : 0;
@@ -25412,7 +25421,7 @@ function audioInterrupted(){
   if (!ctx || !tp.on) return;
   if (ctx.state === 'running'){ clearTimeout(intT); intT = 0; return; }
   if (rkKick) return;   // RUNAWAY KICK: its own short suspend, resumed by rkTick: not an interruption (no resume here, no 2.5 s stop)
-  try { ctx.resume().catch(() => {}); } catch(e){}
+  try { ctx.resume().catch(() => {}); } catch(e){ tpLog('audio resume after interruption', e); }
   if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toastErr('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) audioInterrupted(); });
@@ -25488,7 +25497,7 @@ async function devRecover(why, again){
     if (!again){ if (now - DR.t < 500) return; DR.t = now; clearTimeout(DR.T); DR.T = setTimeout(() => devRecover(why + ' (settled)', true), 1000); }
     if (stuck) pbLog('device: ' + why + ' · ' + pbState());   // (only when something is wrong: a focus with a chosen output must not fill the report)
     DR.busy = true; let changed = false;
-    if (stuck && !bgSus){ try { ctx.resume().catch(() => {}); changed = true; } catch(e){} }
+    if (stuck && !bgSus){ try { ctx.resume().catch(() => {}); changed = true; } catch(e){ tpLog('audio resume (device recovery)', e); } }
     if (sinkOk2 && (aset.sink || DR.fb) && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices){
       let outs = []; try { outs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput' && d.deviceId); } catch(e){}
       outs.forEach(d => { if (d.label) DR.names[d.deviceId] = d.label; });
@@ -25928,7 +25937,7 @@ function coreFail(self){
   core.bad = true; core.badN = (core.badN || 0) + 1; core.hk = null; core.okN = 0; let row = -1, ref = -1; (tp.pos || []).forEach((q, i) => { if (q && i !== MT && q.row > row){ row = q.row; ref = i; } }); if (row < 0) for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
   const at = ref >= 0 ? tp.pos.map(q => q && {row:q.row, phrase:q.phrase, cr:q.cr, step:0}) : null;   // (12 Nov) each track on its own row (the song restarts at the top of the furthest row, so no steps)
   const mode = tp.mode;
-  pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
+  pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){ tpLog('stop on hand-over to page sequencer', e); } try { coreDrop(); } catch(e){}
   if (row >= 0 && mode === 'song') tStart('song', at ? {row, at, atRef:ref} : {row});
   const moved = row >= 0 && mode === 'song';
   const back = core.badN < CORE_BAD_MAX ? 'The audio thread sequencer comes back once the clock has been steady for a while.' : 'PLAY uses the Page sequencer until you reload the app.';
@@ -25966,8 +25975,9 @@ function pbTracks(why){ try { if (!rt || !rt.pl) return; const o = [], any = S.m
     if (shut || (a && rest) || sp || (!a && !any && !nm)) o.push(`${t + 1}${sp}${a ? '' : ' silent'} g${g.toFixed(2)}${b.fx ? ' fx' + (rest ? 'R' : '') : ''}${b.chn ? ' chn' : ''}${b.dl && b.dl.delayTime.value > 0.0005 ? ' d' + Math.round(b.dl.delayTime.value * 1000) : ''}${shut ? ' SHUT' : ''}${a && rest ? ' STUCK-REST' : ''}`); });
   pbLog(`tracks (${why}): solo ${any ? 'yes' : 'no'} mute ${nm ? 'yes' : 'no'}${o.length ? ' · ' + o.join(' | ') : ' · all audible'}`); } catch(e){} }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\n${startLine()}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · meters ${mtrMode} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
-  const txt = head + PB.log.join('\n');
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\n${startLine()}\n${nativeDiag() ? nativeDiag() + '\n' : ''}latency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · meters ${mtrMode} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
+  const errs = (window.tpLogs || []).slice(-20).map(l => new Date(l.t).toISOString().slice(11, 19) + ' ' + l.where + ': ' + l.msg);   // (review P3-9: what tpLog caught goes into the report)
+  const txt = head + PB.log.join('\n') + (errs.length ? '\n--- logged errors (last ' + errs.length + ') ---\n' + errs.join('\n') : '');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
 }
@@ -26041,7 +26051,7 @@ function corePump(){
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
 function stopKey(){ if (tp.on) return tStop(); const warm = !!warmTok; warmTok = null; if (warm){ try { lpRestore(); lpSelRestore(); } catch(e){} } panic(); if (warm) try { draw(); } catch(e){} }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it; 12 Nov, review: loop play / LP.SEL never began then, so LOOP and LOOP SEL go back as they were)   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
 function panic(){
-  try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){}
+  try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){ tpLog('rt stopAll on stop', e); }
   try { moRelease(); } catch(e){}
   let ports = 0;
   try { for (let p = 0; p < NPORT; p++){ if (!midiOut(p)) continue; ports++;
@@ -26075,7 +26085,7 @@ function tStop(quiet){
   if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.nc){ tp.nc = false; G('native engine', () => NC().stop()); }   // NATIVE CORE (PC3): the sound part of STOP; the rest of tStop runs as it does (rt is null: its graph calls are already guarded)
-  if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
+  if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){ tpLog('audio-thread sequencer stop message', e); } }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
   if (rt && !handing) G('stop voices', () => rt.pl.stopAll(ctx.currentTime));
   fxcTL.m.clear(); fxcTL.beats.length = 0;   // FX BAR: STOP puts the switches back (resetSeq)
@@ -26143,7 +26153,7 @@ $('tMet').addEventListener('click', () => setMet((recS.met + 1) % 3));
 function recEndTake(){
   if (!recTake) return; recTake = false;
   // at once, not in snap()'s microtask: an undo straight after must find the take as its own step
-  try { const j = JSON.stringify(S); if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } undo.cur = j; } catch(e){}
+  try { const j = JSON.stringify(S); if (undo.cur !== null && j !== undo.cur){ undo.past.push({k:'S', j:undo.cur}); undoTrim(); undo.future = []; } undo.cur = j; } catch(e){}
 }
 // The track REC writes into: the one under the cursor (the Song screen's column, else the open phrase's track).
 const recTrack = () => tv === 'song' ? (cs.song.x < MT ? cs.song.x : -1) : (cTrack < MT ? cTrack : -1);
@@ -26782,7 +26792,7 @@ const isAndroid = /Android/i.test(navigator.userAgent);
 const DESK = (window.thunderDesktop && window.thunderDesktop.files) || null;   // the desktop app's file bridge (by path)
 const DESK_APP = (window.thunderDesktop && window.thunderDesktop.app) || null;
 const PJT = [{description:'Thunder Plus project', accept:{'application/json':['.thunder', '.json']}}];
-const projText = () => JSON.stringify({app:'thunder-project', v:1, build:BUILD, song:Object.assign({}, songOut(S), {presets:fullPresets(), irs:irsFull()}), kit:kitToJSON(false)});
+const projText = ref => JSON.stringify({app:'thunder-project', v:1, build:BUILD, song:Object.assign({}, songOut(S), {presets:ref ? SP() : fullPresets(), irs:ref ? (S.irs || []) : irsFull()}), kit:kitToJSON(ref ? 'ref' : false)});   // ref (backups only): samples by id, not inline audio; files and exports call it with no argument
 const projBlob = () => new Blob([projText()], {type:'application/json'});
 const projName = () => `${safe(S.name || 'Song')}.thunder`;
 // Sharing the project file: the share sheet on phones (Drive, Gmail, Quick Share, Nearby…), so a song started on the
@@ -26807,7 +26817,7 @@ async function kvGet(k){ try { const db = await kvDb(); return await new Promise
 // A failed write (storage full, blocked, private mode) fires the transaction's error or abort, which never reaches the
 // catch, so those log too. The promise still resolves either way: callers carry on exactly as before.
 const kvFail = (what, k, tx) => tpLog(what + ' "' + k + '" failed (is the browser storage full?)', tx && tx.error);
-async function kvSet(k, v){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('saving', k, tx); res(); }; }); } catch(e){ tpLog('saving "' + k + '" failed', e); } }
+async function kvSet(k, v){ try { const db = await kvDb(); return await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(true); tx.onerror = tx.onabort = () => { kvFail('saving', k, tx); res(false); }; }); } catch(e){ tpLog('saving "' + k + '" failed', e); return false; } }   // true when stored, false when not (callers that ignore it behave as before)
 async function kvDel(k){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('deleting', k, tx); res(); }; }); } catch(e){ tpLog('deleting "' + k + '" failed', e); } }
 // The project file: a handle (browser) or a path (desktop app). Remembered across restarts.
 let projFile = null, projPath = null;
@@ -26837,7 +26847,7 @@ function projSet(path, handle){
 let projDirty = (() => { try { return localStorage.getItem(DTK) === '1'; } catch(e){ return false; } })(), dirtyArmed = false, bkDirty = false;
 setTimeout(() => { dirtyArmed = true; }, 2500);
 function markChange(){ if (!dirtyArmed) return; if (START.held && performance.now() - START.inT < 3000) songRelease('you changed the song'); bkDirty = true; if (!projDirty) setDirty(true); else dirtyShow(); }
-function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { localStorage.setItem(DTK, projDirty ? '1' : '0'); localStorage.setItem(DTK + '-smp', smpNew ? '1' : '0'); } catch(e){} dirtyShow(); }
+function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { localStorage.setItem(DTK, projDirty ? '1' : '0'); localStorage.setItem(DTK + '-smp', smpNew ? '1' : '0'); } catch(e){ tpLog('unsaved-changes flag write', e); } dirtyShow(); }
 // a sample recorded or loaded since the last save (the close prompt says so); cleared with the dirty mark
 var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
 function markSmpNew(){ smpNew = true; try { localStorage.setItem(DTK + '-smp', '1'); } catch(e){} }
@@ -27158,16 +27168,22 @@ async function openRecent(){
     try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
 }
 // BACKUPS: song + kit, every 3 minutes while something changed (and before anything replaces the song), the last 10.
-const BK_N = 10, BK_MS = 180000;
+const BK_N = 10, BK_MS = 180000; var bkBad = false;   // bkBad: the failure toast shows once, until a backup works again
 async function backupNow(force){
   if (!bkDirty && !force) return;
   try { bkDirty = false; flushS(); await presetSmpFill();
     if (!await smpSaveGate(10000, true)){ bkDirty = true; return; }   // a backup without its samples is skipped; the next one is tried in 3 minutes
-    const text = projText(), idx = (await kvGet('bkIndex')) || [], k = 'bk' + Date.now();
-    await kvSet(k, text); idx.unshift({k, at:Date.now(), name:S.name || 'Song', kb:Math.round(text.length / 1024)});
+    const ref = !!(sdbOk && smpStored), pend = [];   // a backup holds sample ids, not audio: the audio must be in the sample store first (no store: the old inline copy)
+    if (ref){ for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.data && !smpStored.has(L.sample.id)) pend.push(smpPut(L.sample));
+      for (const e of S.irs || []) if (e) for (const c of [e.L, e.R]) if (c && c.ref && IRDATA.has(c.ref) && !smpStored.has(c.ref)) pend.push(smpPut({id:c.ref, name:e.name, sr:e.sr, data:IRDATA.get(c.ref)}));
+      if (pend.length) await Promise.all(pend); }
+    const text = projText(ref), idx = (await kvGet('bkIndex')) || [], k = 'bk' + Date.now(), refs = ref ? [...new Set([...text.matchAll(/"ref":"([^"]+)"/g)].map(m => m[1]))] : [];   // refs: smpTidy keeps these samples
+    if (!await kvSet(k, text)) throw new Error('the browser would not store the backup');
+    idx.unshift({k, at:Date.now(), name:S.name || 'Song', kb:Math.round(text.length / 1024), refs});
     while (idx.length > BK_N){ const o = idx.pop(); await kvDel(o.k); }
-    await kvSet('bkIndex', idx);
-  } catch(e){}
+    if (!await kvSet('bkIndex', idx)) throw new Error('the browser would not store the backup list');
+    bkBad = false;
+  } catch(e){ bkDirty = true; tpLog('backup failed', e); if (!bkBad){ bkBad = true; toastErr('Backups are failing. Export a project file to keep your work (File → Save).', 8000); } }
 }
 setInterval(() => { if (!rendering && !tp.on) backupNow(false); }, BK_MS);   // not mid-render or while playing (a big kit takes a moment)
 async function restoreBackup(){
@@ -27454,7 +27470,7 @@ function resetCursors(){ fxOpenedOnce = false; cSect = cPhrase = cInst = cTrack 
 var IRDATA = new Map();   // sample id → its sound (Float32Array)
 let irsVer = 1; const irsSent = new WeakMap();
 const irsLive = () => (S.irs || []).slice(0, 4).map(e => e && e.L && IRDATA.get(e.L.ref) ? {L:IRDATA.get(e.L.ref), R:e.R && IRDATA.get(e.R.ref) || null, sr:e.sr || 48000, id:e.L.ref + (e.R ? '/' + e.R.ref : '')} : null);
-function irsToCtx(ac, send){ if (!(S.irs || []).some(Boolean) && !irsSent.has(ac)) return; if (irsSent.get(ac) === irsVer) return; try { send(irsLive()); irsSent.set(ac, irsVer); } catch(e){} }
+function irsToCtx(ac, send){ if (!(S.irs || []).some(Boolean) && !irsSent.has(ac)) return; if (irsSent.get(ac) === irsVer) return; try { send(irsLive()); irsSent.set(ac, irsVer); } catch(e){ tpLog('impulse responses to the audio context', e); } }
 // For a node being made: the IRs go in its processorOptions (there at once, even in an offline render), when its thread hasn't had them.
 function irsOpt(ac){ let v; irsToCtx(ac, x => { v = x; }); return v; }
 function irsPublish(){
@@ -27462,7 +27478,7 @@ function irsPublish(){
   try { if (PW.w) PW.w.postMessage({op:'irs', v}); } catch(e){}
   try { if (rt && rt.pl){ const n = rt.pl.buses.find(b => b && b.fx) || null, c = rt.pl.buses.find(b => b && b.chn && b.chn._live) || null;
     if (n) irsToCtx(n.fx.context, x => n.fx.port.postMessage({irs:x})); else if (rt.mfx) irsToCtx(rt.mfx.context, x => rt.mfx.port.postMessage({irs:x}));
-    else if (c) irsToCtx(c.chn.context, x => c.chn.port.postMessage({target:'chains-host', op:'irs', value:x})); } } catch(e){}
+    else if (c) irsToCtx(c.chn.context, x => c.chn.port.postMessage({target:'chains-host', op:'irs', value:x})); } } catch(e){ tpLog('impulse responses to the chains host', e); }
   for (let i = 0; i < nslots(); i++){ const w = kit.voices[i]; if (w && (w.fx || []).some(f => f && f.type === 'convolve' && (f.type_ | 0) >= 10)){ dirty[i] = true; cache[i] = null; } }   // pads using a Song IR re-render
 }
 // A song arriving with IRs inside (a project file): their sound goes to IndexedDB and the song keeps {ref}s.
@@ -27562,7 +27578,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 686;
+const BUILD = 698;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -27985,7 +28001,7 @@ function setTracks(mono, poly){
   /* The counts changed: every pad's render was dropped above, and nothing made them again until a note needed one, which while the
      song plays means that note is silent (owner, 15 Nov: "added a new poly track with an instrument, but when I played it nothing
      played until second pass"). Start the renders now, in the Worker. */
-  if (vtrk && (n1 !== n0 || m1 !== m0)) try { prerender(); } catch(e){}
+  if (vtrk && (n1 !== n0 || m1 !== m0)) try { prerender(); } catch(e){ tpLog('prerender after track change', e); }
   if (cFxT < NT && cFxT >= n) cFxT = 0; arrSig = ''; saveS(); draw();
   return {why:'', tN:tOut || (x => x)};
 }
@@ -38060,6 +38076,18 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],
+  [697, '27 Nov', ['Behind the scenes: every change to the app is now checked for misspelled names and similar slips before it ships.']],
+  [696, '27 Nov', ['Behind the scenes: with the app hidden and stopped, two timers that ran 10 and 20 times a second now sleep (better for the battery). Playing with the screen off is unchanged.']],
+  [695, '27 Nov', ['Behind the scenes: undo still keeps 200 steps, but on a very large song it now drops the oldest ones once they add up to about 32 MB, so a long session can’t run the phone out of memory.']],
+  [694, '27 Nov', ['Fixed: opening the app offline from a link with something after the address (a shared project, for one) could show an error page instead of the app.']],
+  [693, '27 Nov', ['Behind the scenes: failures in saving, the sample store, the audio engine and its workers, which used to pass silently, now go to the log in Copy playback report, so a bug report says what went wrong.']],
+  [692, '27 Nov', ['Fixed: if one file of the app could not be fetched while an update installed, offline use stopped updating for good. The update now installs anyway, keeping the older copy of that file.']],
+  [691, '27 Nov', ['Fixed (desktop app): if the audio input helper crashed twice, native inputs and MIDI were gone until you quit the app. Settings › Audio › Reset audio engine now gives it another start.']],
+  [690, '27 Nov', ['Fixed: the automatic backups kept a full copy of every sample ten times over, which could fill the browser’s storage, and a backup that failed said nothing. Backups now keep only a reference to each sample, and if one fails you are told to save a project file.']],
+  [689, '26 Nov', ['Fixed: a …pump effect added to a track that already existed (or waiting for pump to load) could get no pump code in Chrome 153, so it passed the sound dry. It now always gets it.']],
+  [688, '26 Nov', ['Fixed: since build 677 the last script of the page stopped with an error on every load, so the app did not set itself up for offline use on a first visit, and on the Android app the native engine was never asked for. Both work again.']],
+  [687, '26 Nov', ['Behind the scenes: on the Android app the playback report now has a `native:` line saying whether the native engine is on and why not, and Settings \u203a Audio \u203a Sequencer shows it when Native core (test) is picked but off. The page asks the shell again if its first hello came too early.']],
   [686, '26 Nov', ['Picking up an effect command with Enter no longer shows a message.', 'Arrange / Song: CLN↓ while the song plays no longer clones the wrong block after the song wraps.', 'Synth page: ◀ ▶ beside Pad presets step through the pad presets, like the engine presets.', 'Instruments in use on the song (sidebar and Synth page) have a thicker line and a light tint, so they stand out from free ones.', 'chains: a message when a bus has a Track In set to its own track (that stops it being a bus, so the tracks feeding it go quiet).']],
   [685, '26 Nov', ['Behind the scenes: in the Mac and Windows desktop app\u2019s native shell, Settings \u203a Audio now picks the output and input device, the buffer and the device\u2019s own sample rates, and shows the latency; Record a sample records every input of the interface; Settings \u203a MIDI lists the shell\u2019s ports and plays notes in.', 'Nothing changes in the Electron app, the website or the Android app.']],
   [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
@@ -39563,7 +39591,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
 <script src="pump/ui/tune.js?v=2"></script>
 <script src="pump/ui/chop.js?v=1"></script>
 <script>
-if (window.thunderCore || aset.core === 'native') loadClient();   // else: nothing is fetched (N2-PAGE-CLIENT 1.2)
+try { if (window.__ncBoot) window.__ncBoot(); } catch(e){ try { tpLog('native core client: boot failed', e); } catch(_){} }   // build 687: the client loader and the audio settings live inside the main script's own scope, so this script cannot name them (it threw a ReferenceError on every load from build 677 to 686, which also skipped the service worker lines below)
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
   try { if (window.self === window.top) navigator.serviceWorker.register('sw.js').catch(e => tpLog('service worker (offline use and updates) did not register', e)); } catch(e){ tpLog('service worker (offline use and updates) did not register', e); }
 }

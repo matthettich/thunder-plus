@@ -374,6 +374,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.16** (26 Nov 2026, a regular release; owner, 26 Nov 19:04: "Go ahead" (merge and build); PR #347 into `beta`, PR #348 beta → main at build 686 (merge commit 045d654), Run workflow through the API from `main`, run 45926543825, 11 assets, the latest release): build 686 (silent effect pick-up, own-Track-In bus toast, stronger in-use outline + tint, Pad preset ◀ ▶, CLN↓ during playback fix) and 685 (PC7).
 - **v1.3.15** (26 Nov 2026, a regular release; owner, 26 Nov 10:13: "Make a build please"; PR #341 beta → main at build 684 (merge commit bf02525), Run workflow through the API from `main`, run 45865888087, all three platforms (Mac, Windows, Linux) and 11 assets, the latest release (checked 26 Nov 10:25)): build 684 (the Electron file-access fix S-1: file channels only touch dialog-picked / opened / dropped paths or the last 64 kept in userData; recent projects from before 684 need one Open each) and 681–683 (native-engine client, inert with the switch off). Next is 1.3.16.
 - **v1.3.14** (24 Nov 2026, a regular release; owner, 24 Nov 14:39: "Can we merge beta to main and push a release?"; PR #305 beta → main at build 674 (merge commit c98b410), Run workflow through the API from `main`, run 45494033754, all three platforms (Mac, Windows, Linux) and 11 assets, the latest release (checked 24 Nov 22:11 UTC)): builds 648 to 674, including 674's fix: since build 660 a saved song could not be read at start-up, so the app opened the starter beat and autosaved it over the song. Next is 1.3.15.
 - **v1.3.13** (18 Nov 2026, a regular release; owner, 18 Nov 13:56: "When things come back, push a desktop build"; Run workflow through the API from `main` at build 647, run 44405171015, all three platforms (Mac, Windows, Linux) and 11 assets, the latest release (checked 18 Nov 15:03)): builds 640 to 647 (a module dragged to the edge stays under the pointer; pop-up messages reworded; one playhead rule in Pattern view, the FX bar's ...CHAINS section collapses to its tab, FIT rows and A- / A+; the pump update of 643 / 644 backed out in 645; the side panel's instrument list above the PLAYING box; two flex patterns no longer output a broken sample; the FX bar's Flex PATTERN writes the FLX command under the cursor). Next is 1.3.14.
@@ -541,6 +542,28 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
    follows Ableton's guidelines (the name in full, Enabled / Disabled).
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
+
+### 27 Nov code review implemented: builds 690–698 (`docs/audits/2026-11-27-code-review.md`, §8 packages 1–11)
+
+Owner, 27 Nov: work through the review's §8, may dismiss findings, then merge to `main` and build a desktop. One commit per package on `beta`:
+- **1 · P1-1** `electron/updater.js` `newer()`: real semver (1.3.0 > 1.3.0-beta.2; leading `v`s stripped, so the stray `vv1.2.23` tag reads right). `tests/updater-version.test.js`.
+- **2 · P1-2 (build 690)** backups store sample refs, not base64 audio (`projText(ref)`; files and exports unchanged); refs listed in `bkIndex` / `rescueIndex` and kept by `smpTidy`; `kvSet` returns true/false; a failing backup logs and toasts once. `tests/backup-refs.test.js`.
+- **8 · P2-6 (build 691)** Reset audio engine gives a twice-crashed input helper another start (`ioGate.reset`, `thunder:io-reset`, `io.reset` in preload). `tests/io.test.js`.
+- **3 · P1-3 (build 692)** `sw.js` installs file by file (a failure is filled from the old cache), `tools/precache-check.mjs` (run by `tests/precache.test.js`, so by CI).
+- **11 · P3-1, P3-8** permissions only for `app://thunder`; no allow-list disk write when nothing changed. **P3-7 (build 694)** offline `?query` navigations fall back with `ignoreSearch`.
+- **4 · P2-1 (build 693)** 30 consequential empty catches now `tpLog`; Copy playback report ends with the last 20 tpLog entries (part of P3-9). `tests/silent-catch.test.js` keeps a ceiling (186) on empty catches on those paths.
+- **5 · P2-2 (build 695)** undo `undoTrim()`: the 200 cap plus a 32e6-char budget, newest always kept. `tests/undo-budget.test.js`.
+- **6 · P2-4 (build 696)** the 100 ms tempo/prerender and 50 ms settle timers sleep while hidden **and stopped** (background play unchanged). `tests/hidden-timers.test.js`.
+- **10 · P2-8 (build 697)** lint gate: `npm run lint` (`tools/lint.mjs`, `eslint.config.mjs`; no-undef, dupe keys, unreachable, fallthrough…), a CI step before the Node tests. Its one finding: chains' duplicate `adsr` help key (same text), removed.
+- **7 · P2-5 (build 698)** PERFORM sizes / LFO lists declared once; `tests/startup-song.test.js` now fails on any var/function declared twice in a top-level scope.
+- **Dismissed:** P2-7 (`npm test` completes: 5 min 10 s here on 2 vCPU, ~3 min in CI, which already has a 20-minute timeout; the review killed it at 4 min), so package 9 is not needed. The 60 s trim and 3-min backup timers stay as they are (P2-4: deliberate in the battery audit; a backup while hidden is the last chance to keep recent edits). P3-6 (each build's new `CACHE` replaces the runtime cache). P3-2, P3-3, P3-4 are notes or need the owner (CSP, `?seqtest`, a GENERATED banner / `.coderabbit.yaml`).
+- **Checks run:** full `npm test` 2080 tests, 2027 pass, 0 fail, 53 skipped (with acorn, as CI); `npm run lint` 0 errors; `make-core` / `make-fx-cores --check` up to date; `tools/browser-check.mjs` all ok.
+- **Open, not from this review:** `tools/recorder-check.mjs` fails 2 lines on the sample-rate toast **before these changes too** (it expects the old wording "… kHz and the app at …"; the app now says "Test interface is 48 kHz, the app 44.1 kHz: …"): the check needs its regex updated. `songBpm()` / `wavesPre()` sit in the ENGINE block, outside the app's IIFE, so on the page they cannot see `S` and fall back to 120 BPM (in the render worker the glue declares `S`): check whether any page-side caller (envelope ms in the UI, `envMs`) shows a wrong time at other tempos. `tpLog` stops after 200 distinct entries in a session (it never rotates).
+
+### Pump code sent to the track-FX worklet over the port is lost in Chrome 153: FIXED in build 689 (26 Nov)
+
+Both port messages now send `{pumpBytes}` (see the 26 Nov build 689 entry). Left for later: none known; `tests/port-no-module.test.js`
+guards every `port.postMessage` in the page, the editors and the pump-synth files.
 
 ### Time stretch: what is left (20 Nov; design `docs/STRETCH-DESIGN.md` on branch `beta-stretch-design`)
 
@@ -901,6 +924,17 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/pump-synth.wasm`). It re-pins once pump builds FREEZE's seven spectra lazily per source, or in chunks, or behind a build option, so creation no longer costs about 0.9 s on the audio thread. The request to pump is in `docs/port/PUMP-REQUESTS.md` on the `native` branch. When it lands: re-pin both wasm files, regenerate the six golden rows (`tests/golden/chains-modules.json`, `tests/golden/pump-synth.json`), and flip `tests/pump-wob-extreme.test.js` (it asserts the known WOB trap today).
 
+**26 Nov: the pump side is done, waiting for its merge.** pump PR #8 (branch `freeze-warm`, https://github.com/matthettich/pump/pull/8)
+does PUMP-REQUESTS items 1 and 2: `psyn_new` builds no FREEZE spectra; new export `psyn_warm(units)` builds a bounded slice (one
+256-sample engine block or one FFT frame a unit, about 0.17 ms on average; the slowest single units, engine set-up, 2 to 8 ms in
+Node, once each) and returns how many of the seven sources are left; a note on a source not ready finishes that one source then
+(deb07d3's behaviour, so renders that never warm still play); `-DPUMP_FREEZE_EAGER=1` keeps e43ee10's build-all-in-`psyn_new`
+for native if it wants it (single-threaded: warm and process from one thread). FREEZE's output is sample-identical to e43ee10's for
+all seven sources, cold and warmed. Oversampler `dot4` has `#pragma clang fp reassociate(off)`. **Still to do here when it is merged:**
+re-pin both wasm files to the merge commit (wasi-sdk 25, `pump/wasm/build.sh`), have `pump/synth/pump-synth-worklet.js` call
+`X.psyn_warm(2)` once per `process()` (any node; stop when it returns 0) while a FREEZE node exists, bump `?v=`, then the goldens and
+the WOB test as above; native re-pins (PR #225) to the same commit.
+
 ### Owner's to-do: what only Matt can do (keep it current; newest state 25 Nov)
 
 **When the owner asks "what do I need to do?" (or "what's waiting on me?"): answer from THIS section, most useful first, in a few lines; then offer the punch list below.** An item leaves when he says it is done or decides against it. Add an item whenever work is waiting on him (a decision, a secret, a device test, an account). Port details: `docs/port/PICKUP.md` on `native`.
@@ -919,6 +953,17 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
+**27 Nov review fixes (builds 690–698, desktop v1.3.17)**
+- [ ] **Phone and computer: record or load a long sample, keep working past two backups (3 min each), then File → Restore a backup.** Pass: the backup opens with the sample's audio; Settings › App storage is not growing by the sample's size every 3 minutes.
+- [ ] **Desktop app (Mac): if the input helper ever says it stopped, press Settings › Audio › Reset audio engine.** Pass: native inputs / MIDI come back without quitting the app.
+- [ ] **Phone: open the app once online after this build, then offline (airplane mode) open a shared-project link or the app.** Pass: the app opens, not an error page.
+- [ ] **Desktop app (beta tester on a -beta build): when v1.3.17 is out, Check for update.** Pass: it offers v1.3.17 (a -beta was wrongly ranked above its release before).
+- [ ] **Phone: a song with PERFORM scenes, macros and track LFOs opens and plays as before.** Pass: scenes A/B, parts and LFOs are intact.
+
+**…pump effects that get their code late (26 Nov; build 689, branch `fix/pump-port-bytes`)**
+- [ ] **Computer (Chrome / desktop app) and phone: open a song with a …pump effect on a track (TUBE, CRUSH, SPRING…) and press PLAY straight away.** Pass: the effect is heard from the first bars (before, in Chrome 153, a track whose effects were set up before pump had loaded could stay dry until reload).
+- [ ] **Computer: on a track with no …pump effect, add one from the FX picker while the song plays.** Pass: it is heard as soon as it is added.
+
 **Quiet effect pick-up + own-Track-In bus toast (26 Nov; build 686, branch `fx-pickup-quiet`)**
 - [ ] **Phone or computer: Enter on a filled effect command picks it up with no toast.** Pass: no message; Enter on an empty effect cell drops it; note pick-ups still say "Picked up".
 - [ ] **Sidebar Instruments and Synth page pads: instruments used on the song have a thicker line and a light tint.** Pass: easy to tell from free ones in your usual skins (IDM, IDM pink, IDM pink & green, 909); the selected one still looks selected.
@@ -936,6 +981,13 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 - [ ] **Phone (Fold) with the native engine on (Android beta, build 682, M5 second half): open …chains while a song plays.** Pass: the Track In / Chain Out module meters and the bus strip move with the sound (in and out), and go silent when you press STOP or leave the chains screen. Needs a shell with `ch.lvl` (PR #334). Computer and native switch off: unchanged from 681.
 - [ ] **Computer (desktop app, build 684: file-access security fix, PR into `beta`): open, save, save-as, recent, render a WAV, record, load a sample folder all still work.** Pass: Open picks a .thunder and loads it; Save writes it back; Save as writes a new file and later Saves go to it; double-clicking a .thunder in the file manager (and dropping one on the window) opens it and Save writes back to it; Open recent opens a song you opened or saved on THIS build (a project from an older build may say "Use Open to pick it once": pick it with Open, then it opens from the list); Render to WAV / Export ZIP / MIDI asks where, writes the file and Show opens its folder; recording into a pad works; Samples → load a folder / kit loads; closing the app asks to save as before; a https link in Help opens in the browser and nothing opens a second app window. Fail: any of these says "not allowed" for a file you just picked.
 - [ ] **Phone (Fold) with the native engine on (Android beta, build 683, M5 master meters): open the master panel while a song plays.** Pass: IN / OUT LUFS, the compressor and limiter reduction, the suppressor bars and PEAK (true-peak) move with the sound, and go silent within a second of STOP (or of closing the song's sound). The first few seconds of IN / OUT LUFS after opening the panel may still show stale values (the engine's 3 s loudness window is not reset). Needs a shell with `master.lvl` (PR #336). Computer and native switch off: unchanged from 682.
+
+**Build 687 (the last script's error)**
+- [ ] **Computer, a browser profile that never opened the beta site (or a private window): open the beta, wait 10 s, then switch Wi-Fi off and reload.** Pass: the app still loads (the service worker registered). Before 687 it did not on a first visit.
+- [ ] **Phone (Fold), Android beta APK with page build 688: press PLAY.** Pass: the debug panel's line reads `native live engine: live ...` and `hellos from the page: 1` or more; the playback report's `native:` line says `on yes`.
+
+**Android native, build 687 (DIAG-1: why PLAY is not native)**
+- [ ] **Phone (Fold) with the Android beta APK built from build 687: Settings > Audio > Sequencer = Native core (test); wait 10 s.** Pass: either the native engine is on (PLAY plays natively, no old-engine toast), or a small line under the Sequencer row reads `native: ... reason ...`. Then PLAY once and Copy playback report: send me the whole report; its third line starts `native:` and the PLAY line says `native:` or the exact refusal.
 
 **Mac, native desktop build (build 685, PC7: audio, input and MIDI of the native shell on the page; needs the shell's H7 build; docs/plans/PC7-NOTES.md)** (nothing changes in the Electron app, the website or Android)
 - [ ] **Mac, Cranborne 500R8: output.** Settings → Audio → Desktop audio device → Output = the 500R8, Rate = Device, Buffer = Device; play a song. Pass: sound from the 500R8 only; the line under the rows names it with its rate, buffer and an output latency in ms and frames; changing the Buffer to 128 then 256 restarts audio ("Audio restarted on …") and the line follows. Rate offers Device plus ONLY the 500R8's own rates (nothing else); picking one keeps the sound clean.
@@ -1840,6 +1892,37 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 26 Nov (build 689: …pump code over the port as bytes, never a Module; branch `fix/pump-port-bytes`, PR into `beta`)
+
+The 26 Nov to-do. **Confirmed in Chrome 153.0.8010** (`/usr/bin/google-chrome` here): a minimal page shows a Module in
+`processorOptions` arrives, the same Module on `node.port.postMessage` gives the processor a `messageerror`, and bytes on the port
+arrive. **In the app:** `tools/pump-port-check.mjs` holds pump.wasm back 6 s (a Playwright route; `tests/sweep/lib.mjs` `openApp`
+takes `opts.route` for it), plays a song where only one track plays, with pump CRUSH (3 bits, 2 kHz) alone in its chain, and
+measures the master's spectrum once pump has arrived, against an empty chain. **Before the fix: FAIL** (with and without CRUSH
+4.3 dB apart, two takes with it 4.4 dB: the slot was dry). **After: PASS** (37.6 dB against 0.9 dB). So the race is real: any
+track-FX node made before pump.wasm arrived (PLAY soon after opening; a slow phone) played its pump slots dry until it was made again.
+**Fix:** `index.html` `pumpWait` (when pump.wasm arrives) and `needPump` (a node asking later) both post `{pumpBytes}`; the worklet's
+existing handler compiles them (a one-off compile of pump.wasm on that audio thread, the pre-WASM_PRECOMPILE path). Modules still
+go in `processorOptions` (works) and to the render Worker (a dedicated Worker: works). A sweep of every `port.postMessage` in
+`index.html`, `chains/`, `waves/`, `pump/synth/` and `thunder-core-client.js` found no other Module on a port (chains' `op:'pump'`
+already sends bytes). **Tests:** `tests/port-no-module.test.js` (no `port.postMessage` argument names a page-compiled Module or a
+`*Module` key; the two pump sends are bytes; fails on build 688's file); `tests/native-client-pc7.test.js` now checks that `sw.js`'s
+cache follows `BUILD` instead of pinning 688. `npm test` passes. Punch list: "…pump effects that get their code late".
+
+## 26 Nov (build 688: the page's last script threw on every load since build 677; found on the owner's Fold)
+
+- **The bug.** PC1 (build 677) added `if (window.thunderCore || aset.core === 'native') loadClient();` to the page's LAST inline script. `aset` and `loadClient` live inside the main script's own scope, so that script threw a ReferenceError on every load, on every platform. Two effects: (1) the native client file was never fetched, so the Android app never used the native engine (the owner's 26 Nov tests: `native: ... client loaded no (not requested)`, shell: `hellos from the page: 0`); (2) the service worker lines after it never ran, so a first visit to the web app did not register the service worker (no offline use; browsers that had it registered before build 677 kept it). **Builds 677 to 687 are affected, and so is `main` (v1.3.14 and v1.3.15).**
+- **Released versions with the bug (checked 26 Nov with `git show origin/main:index.html | tail -8` and the release tags):** `main` (build 686) still has the faulty line in the last script. v1.3.16 (build 686) and v1.3.15 (build 684) carry it; v1.3.14 (build 674) and older do not (they predate build 677). So the fix has to reach `main` and a v1.3.17 release.
+- **The fix.** The main script now defines `window.__ncBoot`; the last script calls it inside a try and names nothing from the main scope. Checked in headless Chrome with and without a fake `window.thunderCore`: no error, the client file is requested only with the shell (or the switch).
+- **Why the tests missed it.** `tests/native-client-inert.test.js` cut the loader and the call site out of the page and ran them in ONE scope. New `tests/last-script-scope.test.js` runs every later inline script on its own and forbids the main script's names in it.
+- **For the owner:** `main` needs this fix too (merge `beta` when you ask). Punch list: the item below.
+
+## 26 Nov (DIAG-1: the native client says why it is off; build 687, branch `diag/native-client-report`, PR into `beta`)
+- Cause trace: `/home/claude/reports/HELLO-ROOTCAUSE.md` (not in the repo). The Fold's PLAY never went native because `NC.on` never became true (no toast and no `native engine:` line at PLAY proves the hello never succeeded); the shell posts the bridge port only in `onPageFinished`, the client asked the hello once with a 5 s timeout and never again.
+- Client (`thunder-core-client.js?v=9`): the hello is asked again on the shim's `bridge` up event while off and once more 3 s after a failure (3 tries at most); `diag()` makes one `native: ...` line; `why()`; every on / off / PLAY decision goes to `host.pbLog` (and still `tpLog`); a hello reply with `err` and no `v` reads "the shell refused the hello: ...".
+- Page: the playback report header gets the `native:` line whenever `window.thunderCore` exists or Sequencer is native (`nativeDiag()`); a PLAY on the page engine with the client off logs `native: PLAY song on the page engine: <reason>` (never silent); Settings > Audio > Sequencer shows the same text under the row when Native core (test) is picked and the client is off (`#coreWhy`, `nativeWhyShow()`). `tests/native-client-diag.test.js`.
+- Shell fixes proposed (not made, Kotlin): post the port earlier than `onPageFinished`; the hello `err` reply carries the start rc; debug-panel line shows the last hello; retry the start when `up` is true and `active` false.
 
 ## 26 Nov (native page client PC7: the desktop shell's audio devices, input and MIDI; build 685, branch `pc7/desktop-audio-midi`, PR into `beta`)
 - Settings → Audio, the Record a sample window and Settings → MIDI now speak the native desktop shell's H7 messages (`dev.list` / `dev.open` / `dev` events, `rec.arm` / `start` / `stop` + `take`, `midi.cfg` / `midi.ports` / `midi.in`, `rt.snapshot`) when the client is on and `hello.caps` says `devices` / `inputs` / `midi`. Electron, the website and Android are unchanged. Settings offers only the device's own sample rates or Device (the F-review's rule). Design, what is not wired (pattern-synced takes, monitor, MIDI out from the page, `midi.send`) and the questions for the lead: `docs/plans/PC7-NOTES.md`. Punch list: "Mac, native desktop build (build 685)". `npm test`: 1995 -> 2034 tests (2004 pass, 0 fail, 30 skipped).

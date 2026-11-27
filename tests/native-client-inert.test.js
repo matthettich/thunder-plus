@@ -12,7 +12,8 @@ const cut = (re, what) => { const m = src.match(re); assert.ok(m, 'not found: ' 
 const LOADER = cut(/\/\* NATIVE CORE CLIENT \(PC1[\s\S]*?document\.head\.appendChild\(s\); \};\n/, 'the NC / NCON / loadClient block');
 const SRGUESS = cut(/let srGuess = 48000;\ntry \{[\s\S]*?\n\} catch\(e\)\{\}\n/, 'the srGuess block');
 const PADSR = cut(/const padSR = [^\n]*\n/, 'padSR');
-const CALL = cut(/\nif \(window\.thunderCore \|\| aset\.core === 'native'\) loadClient\(\);[^\n]*\n/, 'the loadClient call site').trim();
+// build 688: the call site is a boot function the main script defines (the page's last script, outside that scope, calls it: tests/last-script-scope.test.js)
+const CALL = cut(/\nwindow\.__ncBoot = \(\) => \{ if \(window\.thunderCore \|\| aset\.core === 'native'\) loadClient\(\); \};[^\n]*\n/, 'the loadClient call site').trim() + '\nwindow.__ncBoot();';
 
 // A page-like sandbox: `window` is the sandbox itself, so window.thunderCore / window.__thunderClient are plain properties of it.
 function rig({ core = 'core', thunderCore = null, rate = 0, withCtx = null } = {}) {
@@ -73,21 +74,21 @@ test('(a) the Settings value "Native core (test)" is listed only where window.th
 // ---- (b) source guards -----------------------------------------------------------------------------------------------------------
 test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 of N2-PAGE-CLIENT 4.3 (and the two media-session guards), PC2 adds 7, 8 (two), 9, 10 (two); a new NCON() / tp.nc use needs a row there and a change here', () => {
   const at = re => (src.split('\n').map((l, i) => re.test(l) ? i + 1 : 0).filter(Boolean));
-  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 20, 'NCON() occurrences: PC7 natC() (the one gate of Settings > Audio, the recorder and MIDI on the desktop shell); padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2); mfSet, the OUT bar drag, pdcSet, thunderChains.param (PC4); fxDynNodeOf (M5)');
-  assert.equal((src.match(/\bNC\(\)/g) || []).length, 19, 'NC() occurrences: PC7 natC(); padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16); coreBuf, coreKit, coreKitCheck, setSong, setKit, newKit (PC2); mfSet, the OUT bar drag, pdcSet, param (PC4)');
+  assert.equal((src.match(/\bNCON\(\)/g) || []).length, 22, 'NCON() occurrences: DIAG-1 nativeWhyShow and the tStart report line (both only read, both inside the `thunderCore || native` guard); PC7 natC() (the one gate of Settings > Audio, the recorder and MIDI on the desktop shell); padSR (PC1), tStart (4), saveS (6), resetAudio (17); coreBuf, coreKit, coreKitCheck, coreVar, setSong, setKit (PC2); mfSet, the OUT bar drag, pdcSet, thunderChains.param (PC4); fxDynNodeOf (M5)');
+  assert.equal((src.match(/\bNC\(\)/g) || []).length, 22, 'NC() occurrences: DIAG-1 nativeDiag (2) and the tStart report line (why); PC7 natC(); padSR, tStart x2 (can, start), tStop (5), saveS, resetAudio, corePost (16); coreBuf, coreKit, coreKitCheck, setSong, setKit, newKit (PC2); mfSet, the OUT bar drag, pdcSet, param (PC4)');
   assert.equal((src.match(/\btp\.nc\b/g) || []).length, 14, 'tp.nc: perfPush, perfFill (15), corePost (16), tStop x2 (5), msMeta x2 (code and comment) and bgPlay (the one media session), the ncSongHost comment');
   for (const [re, fn] of [[/^function perfPush\(\)/, 'perfPush'], [/^function perfFill\(/, 'perfFill'], [/^const corePost = /, 'corePost'], [/^\s*if \(tp\.nc\)\{ tp\.nc = false;/, 'tStop'], [/const ms = navigator\.mediaSession; if \(!ms \|\| !bgOn/, 'msMeta'], [/^\s*if \(on && tp\.nc\) return;/, 'bgPlay']]) assert.equal(at(re).length, 1, fn);
   assert.equal(at(/\btp\.nc\b/).length, 12, 'tp.nc on twelve lines (M5: fxDynNodeOf, chains and master meters) (the tp literal and begin() say nc: without the tp. prefix)');
   for (const fn of ['coreBuf', 'coreKit', 'coreKitCheck', 'coreVar']) assert.ok(new RegExp('NCON\\(\\)[^\\n]*', 'm').test(cut(new RegExp('function ' + fn + '\\([^\\n]*(\\n[^\\n]*)?', 'm'), fn)), fn + ' has its branch');
   assert.equal((src.match(/\bncPadApi\b/g) || []).length, 8, 'ncPadApi: its definition, the five PC2 calls (coreVar does not need it), and PC3\'s padApi line (typeof test and call)');
   assert.equal((src.match(/\bloadClient\b/g) || []).length, 2, 'loadClient: its declaration and its one call site');
-  assert.equal((src.match(/window\.thunderCore/g) || []).length, 7, 'window.thunderCore: PC7 IOAPI (the Electron helper path is for Electron only: the desktop shell has thunderDesktop.io too); the loader comment, srGuess, updCore (options, get, comment), the call site');
-  assert.equal((src.match(/aset\.core === 'native'/g) || []).length, 3, "aset.core === 'native': srGuess, updCore's getter, the call site");
+  assert.equal((src.match(/window\.thunderCore/g) || []).length, 11, 'window.thunderCore: DIAG-1 nativeDiag (3) and the tStart report line; window.thunderCore: PC7 IOAPI (the Electron helper path is for Electron only: the desktop shell has thunderDesktop.io too); the loader comment, srGuess, updCore (options, get, comment), the call site');
+  assert.equal((src.match(/aset\.core === 'native'/g) || []).length, 6, "aset.core === 'native': DIAG-1 nativeDiag, nativeWhyShow, the tStart report line; srGuess, updCore's getter, the call site");
   assert.ok(/else if \(!\(window\.thunderCore \|\| aset\.core === 'native'\)\)\{ const AC = /.test(SRGUESS), 'branch 2');
   // the PC3 branches say what they are: tStart's is the first thing after the render prep and before the first PLAY's audio warm-up (rtInit)
   const ts = src.slice(src.indexOf('function tStart(mode, o){'), src.indexOf('function tStart(mode, o){') + 6000);
   assert.ok(ts.indexOf("if (NCON() && NC().can(mode, o)){ NC().start(mode, o); return; }") > 0 && ts.indexOf("if (NCON() && NC().can(mode, o))") < ts.indexOf('rtInit()'), 'the native branch comes before rtInit() (no AudioContext for a native PLAY)');
-  assert.ok(/function saveS\(\)\{[^\n]*try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'saveS publishes through the client, after coreSong');
+  assert.ok(/function saveS\(\)\{[^\n]*try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{(?: tpLog\('[^']*', e\); )?\}/.test(src), 'saveS publishes through the client, after coreSong');
   assert.ok(/const corePost = \(m, tr\) => \{ if \(tp\.nc\) return NC\(\)\.legacy\(m\); try \{ core\.node\.port/.test(src), 'corePost: the JS core body is unchanged behind the tp.nc line');
 });
 test('(b) PC4: the four live-edit branches (mfSet, the OUT bar drag, pdcSet, param) are one guarded line each, and the host gives the client its three hooks', () => {
@@ -102,12 +103,12 @@ test('(b) __thunderClient appears only inside the loader block; thunder-core-cli
   assert.ok(start > 0 && endIdx > start);
   lines.forEach((l, i) => {
     if (l.includes('__thunderClient')) assert.ok(i >= start && i <= endIdx, 'line ' + (i + 1) + ' mentions __thunderClient outside the loader: ' + l.slice(0, 80));
-    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=8';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
+    if (l.includes('thunder-core-client.js')) assert.ok(/^\/\*/.test(l) || /^\s*s\.src = 'thunder-core-client\.js\?v=9';/.test(l) || /^\s*s\.onerror/.test(l), 'line ' + (i + 1) + ' names the client file: ' + l.slice(0, 80));
   });
   assert.equal(lines.filter(l => /^\s*s\.src = /.test(l) && l.includes('thunder-core-client.js')).length, 1);
 });
 test('(b) the call site is guarded by the switch and the shell, and is the only call; the loader makes one script element', () => {
-  assert.equal(CALL.split(';')[0], "if (window.thunderCore || aset.core === 'native') loadClient()");
+  assert.equal(CALL.split(';')[0], "window.__ncBoot = () => { if (window.thunderCore || aset.core === 'native') loadClient()");
   assert.equal((src.match(/\bloadClient\(\)/g) || []).length, 1);
   assert.equal((LOADER.match(/createElement\(/g) || []).length, 1);
 });
@@ -127,7 +128,7 @@ test('(c) switch off, no thunderCore: the call site does not call loadClient; no
 test('(c) with the shell or the native pick the loader makes one script for the client file, and not a second time', () => {
   for (const o of [{ thunderCore: {} }, { core: 'native' }]) {
     const sb = rig(o); run(sb, LOADER + CALL + ';'); assert.equal(sb.__log.creates.join(), 'script');
-    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=8'); assert.equal(sb.__log.appended.length, 1);
+    assert.equal(sb.__log.scripts[0].src, 'thunder-core-client.js?v=9'); assert.equal(sb.__log.appended.length, 1);
     sb.__thunderClient = {}; run(sb, 'loadClient()'); assert.equal(sb.__log.creates.length, 1, 'already loaded: nothing more');
   }
 });
@@ -162,8 +163,8 @@ test('client: defines only window.__thunderClient, and loading it twice keeps th
 test('sw.js: the client is an OPTIONAL entry (a missing file cannot fail the install), the file exists, and BUILD matches the cache', () => {
   const fs = require('fs'), path = require('path');
   const opt = (sw.match(/const OPTIONAL = \[([^\]]*)\]/) || [])[1] || '', files = (sw.match(/const FILES = \[[\s\S]*?\];/) || [])[0] || '';
-  assert.ok(opt.includes("'./thunder-core-client.js?v=8'")); assert.ok(!files.includes('thunder-core-client.js'));
+  assert.ok(opt.includes("'./thunder-core-client.js?v=9'")); assert.ok(!files.includes('thunder-core-client.js'));
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'thunder-core-client.js')));
-  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=8'"), 'the page and the service worker name the same URL');
+  assert.ok(src.includes("s.src = 'thunder-core-client.js?v=9'"), 'the page and the service worker name the same URL');
   const b = src.match(/const BUILD = (\d+);/)[1]; assert.ok(sw.includes("'thunderplus-v" + b + "'"));
 });

@@ -176,6 +176,6 @@ test('index.html: every PC7 entry point is behind natDev() / natIn() / natMidi()
   for (const t of ['dev.open', 'dev.list', 'rec.arm', 'rec.start', 'rec.stop', 'midi.cfg']) assert.ok(!new RegExp("t:\\s*'" + t.replace('.', '\\.') + "'").test(src), t + ' is sent by the client only');
 });
 test('the client file and the service worker name the same ?v=', () => {
-  const sw = H.read('sw.js'); assert.ok(sw.includes("'./thunder-core-client.js?v=8'")); assert.ok(src.includes("s.src = 'thunder-core-client.js?v=8'"));
-  assert.ok(/const BUILD = 686;/.test(src)); assert.ok(sw.includes("'thunderplus-v686'"));
+  const sw = H.read('sw.js'); assert.ok(sw.includes("'./thunder-core-client.js?v=9'")); assert.ok(src.includes("s.src = 'thunder-core-client.js?v=9'"));
+  const b = (src.match(/const BUILD = (\d+);/) || [])[1]; assert.ok(+b >= 688); assert.ok(sw.includes("'thunderplus-v" + b + "'"), 'sw.js cache names BUILD');   // (any later build: the cache follows BUILD)
 });

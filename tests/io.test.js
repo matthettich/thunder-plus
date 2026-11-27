@@ -54,6 +54,12 @@ test('io helper: the restart rule: one restart after a death, then given up', ()
   g.died(); assert.equal(g.canStart(), true, 'restarted once after the first death');
   g.died(); assert.equal(g.canStart(), false, 'second death: "helper stopped"');
 });
+test('io helper: Reset audio engine gives a stopped helper another start (review P2-6)', () => {
+  const g = createRestartGate();
+  g.died(); g.died(); assert.equal(g.canStart(), false, 'stopped after two deaths'); assert.equal(g.deaths(), 2);
+  g.reset(); assert.equal(g.canStart(), true, 'start allowed after reset'); assert.equal(g.deaths(), 0);
+  g.died(); g.died(); assert.equal(g.canStart(), false, 'the crash-loop guard still holds after a reset');
+});
 
 // ---- input: open / poll / close (A1.2) ----
 function makeIn(over = {}) {
