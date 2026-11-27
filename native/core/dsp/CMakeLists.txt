@@ -10,6 +10,22 @@ set(DSP_CLANGCL FALSE)
 if(MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   set(DSP_CLANGCL TRUE)
 endif()
+# W-TFX fallback (a): a cl.exe configure (the WebView2 shell, which clang-cl cannot compile) may take the three libraries from a clang-cl build made beforehand
+# (cmake -S native -B <dir> -T ClangCL; cmake --build <dir> --config Release --target thunder_dsp_tfx thunder_dsp_pe thunder_dsp_mods). Same /MD CRT, same MSVC STL,
+# no /GL on either side (Release, _ITERATOR_DEBUG_LEVEL 0 in both): the .lib files are plain COFF archives.
+if(MSVC AND NOT DSP_CLANGCL AND THUNDER_DSP_PREBUILT_DIR)
+  set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../../dsp)
+  foreach(l tfx pe mods)
+    if(NOT EXISTS ${THUNDER_DSP_PREBUILT_DIR}/thunder_dsp_${l}.lib)
+      message(FATAL_ERROR "thunder_dsp: ${THUNDER_DSP_PREBUILT_DIR}/thunder_dsp_${l}.lib not found (THUNDER_DSP_PREBUILT_DIR)")
+    endif()
+    add_library(thunder_dsp_${l} STATIC IMPORTED GLOBAL)
+    set_target_properties(thunder_dsp_${l} PROPERTIES IMPORTED_LOCATION ${THUNDER_DSP_PREBUILT_DIR}/thunder_dsp_${l}.lib
+      INTERFACE_INCLUDE_DIRECTORIES "${SRC}/tfx;${SRC}/mods")
+  endforeach()
+  message(STATUS "thunder_dsp: prebuilt clang-cl libraries from ${THUNDER_DSP_PREBUILT_DIR}")
+  return()
+endif()
 if(MSVC AND NOT DSP_CLANGCL)
   message(STATUS "thunder_dsp: skipped on cl.exe (the upstream sources need clang or gcc; configure with -T ClangCL)")
   return()

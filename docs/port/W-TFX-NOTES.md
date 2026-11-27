@@ -1,6 +1,6 @@
 # W-TFX notes: the effects library on Windows through clang-cl (builder log, Sonnet, 26 Nov 2026)
 
-Plan: `W-TFX-PLAN.md` (section 7 overrides). Branch `n4/w-tfx` from the plan branch (native 4b646448). PICKUP: first CI round pending.
+Plan: `W-TFX-PLAN.md` (section 7 overrides). Branch `n4/w-tfx` from the plan branch (native 4b646448). PICKUP: clang-cl core job green; desktop shell on fallback (a) in CI (see "Lead's decisions"); W-PUMP item: live_meters2 must pass (3 checks listed under "For W-PUMP") and its exclusion in `windows-clangcl` be dropped.
 
 ## Done (before the first CI round)
 - Step 2: `native/core/dsp/CMakeLists.txt` gate is `MSVC AND NOT Clang` (cl.exe configures skip as before, only the message changed).
@@ -76,3 +76,7 @@ Cases where the three differ (all other 246 cases print the same figure on all t
 | rv_noseg_tremolo_shape | -170.3 | -170.4 | -170.4 |
 
 (14 rows. Full per-effect list: the `windows-clangcl` job log, step 'The effects must RUN here', and the `W-TFX figures` job logs of the PR.)
+
+## Lead's decisions (26 Nov), work log
+1. Desktop shell, fallback (a): `native-desktop.yml` `windows` (cl.exe, WebView2) first builds `thunder_dsp_tfx/_pe/_mods` with clang-cl into `build-clang`, then configures the shell with `-DTHUNDER_DSP_PREBUILT_DIR=...\build-clang\core\dsp\Release`; `core/dsp/CMakeLists.txt` then makes IMPORTED static libraries instead of building (cl.exe only). New `desktop_tfx` test (native/desktop/tests/test_tfx.cpp): prints `TFX: yes`, checks the live caps word and runs all 34 effects through the linked libraries; `THUNDER_EXPECT_TFX=1` is set for it when the libraries are prebuilt, so a cl.exe build without effects fails there. The parallel clang-cl shell job I had added was removed (it could not compile WebView2). Results: see "Fallback (a) rounds" below.
+2. For W-PUMP: live_meters2 (non-gating step until W-PUMP) fails these 3 checks without the pump library: (a) `test_live_meters2.cpp:167 badSlots == 0: slots mask is 0b111 for a chain of 3 (50 records differ)`; (b) `:185 ntype == 2 * dy.size(): both dynamics slots carry their core type id (7 and 201): 50 of 100`; (c) `:186 nred > 0 && minRed < -3: the pump COMP slot shows gain reduction (deepest 0.00 dB, 0 posts below -3)`. W-PUMP must make them pass and then drop the `-E "^live_meters2$"` in `windows-clangcl`.
