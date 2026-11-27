@@ -73,9 +73,9 @@ test('measuring is kept: the frame loop and the header still read the analysers;
   assert.doesNotMatch(cut(/function pbLevel\(\)\{[^\n]*/), /meter/); assert.doesNotMatch(cut(/function pbLvRead\(\)\{[^\n]*/), /meter/);
 });
 test('Settings has the METERS row beside LOW POWER DISPLAY, three choices, default SMOOTH, and Reset audio settings puts it back', () => {
-  const row = cut(/\{l:'METERS WHILE PLAYING', segs:true[^\n]*\n[^\n]*\n/);
-  assert.match(row, /d:0/); assert.match(row, /'SMOOTH', 'LIGHT', 'OFF'/); assert.match(row, /set:v => setMeters\(MTR_MODES\[v\]\)/);
-  assert.ok(src.indexOf("{l:'METERS WHILE PLAYING'") > src.indexOf("{l:'LOW POWER DISPLAY'") && src.indexOf("{l:'METERS WHILE PLAYING'") < src.indexOf("{l:'FOLLOW', segs"));
+  const row = cut(/\{l:'METER ANIMATION QUALITY', segs:true[^\n]*\n[^\n]*\n/);
+  assert.match(row, /d:0/); assert.match(row, /'HIGH', 'LOW', 'OFF'/); assert.match(row, /set:v => setMeters\(MTR_MODES\[v\]\)/);
+  assert.ok(src.indexOf("{l:'METER ANIMATION QUALITY'") > src.indexOf("{l:'LOW POWER DISPLAY'") && src.indexOf("{l:'METER ANIMATION QUALITY'") < src.indexOf("{l:'FOLLOW', segs"));
   assert.match(src, /if \(mtrMode !== 'smooth'\) setMeters\('smooth'\)/);
 });
 

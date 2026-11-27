@@ -545,6 +545,15 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### 27 Nov (11:22): build 701, Enter on an FX slot opens the effect list
+
+- Owner: "pressing enter on an empty fx slot opens the fx menu rather than popping up a prompt to type a number". `keyType` now declines rows with `tap` (the FX screen's SLOT rows), so Enter falls through to `editTap` → the slot's `tap` → `fxsOpen`, as EDIT. Applies to filled slots too (a number prompt there made no sense either). Other values on FX / INST / Mixer still type on Enter. `CACHE` v701, changelog 701.
+- Owner, 12:02: Arrange with FOLLOW OFF waited `ARR_IDLE` (a minute after a touch, CLN↓ included via markHands) before paging, even after the song wrapped; "I'd like loop to loop back with follow off after a wait". `arrFollowPage` now uses `FOLLOW_HOLD` (4 s) when the playhead is above the view (wrap / jump back); paging down keeps the minute.
+- Owner, 12:04: TRIM row numbers shifted. The TRIM light's classes were `ih` / `ic`, and `.ic` is the global icon class (1.05em box, vertical-align −.17em). Renamed `tlh` / `tlc`.
+- Owner, 12:02: master VOL 00 "doesn't drop the volume completely": not reproduced in headless Chrome (demo song, master block VOL 00, both sequencers: master peak 0 after the row; only the row's own first hit gets through the 4 ms glide). Asked the owner for the song / what they hear.
+- Owner, 12:12–12:21: wording in View / Settings (see the changelog for 701); METERS WHILE PLAYING → METER ANIMATION QUALITY with HIGH / LOW / OFF (same modes underneath); "Song at start" hidden by CSS (`.btnrow:has(> #appOpened)`, still set for reports and tests); Link's Start/stop seg is Off | On like Link's; RUNAWAY KICK (TEST) label wraps in its 70 px column. "Arrange at the left" became "Show Arrange left of phrase" (the owner asked for "Show Arrange next to phrase", but the row picks the SIDE, LEFT / RIGHT; ARRANGE above it is the show / hide). Edit ▾ LOOP SEL kept: it is not the same as "Loop the selection" (see the chat answer). SONG PEEK wording: suggested, not changed.
+- Owner, 11:43: "is it deliberate that clone down seems to forget the mute state of tracks muted with the alt key on arrange?" No: `cloneDown` never copied the block-mute bit. It now reads `bmu(y, x)` for each source block and `setBlockMute`s the clone the same (master column too, via `setMasterBlockMute`).
+
 ### 27 Nov review, second pass: every finding re-verified on `beta`; build 700 closes P3-5
 
 Owner, 27 Nov: verify the review's findings and fix what is valid. Re-checked each package's fix on `beta` at `ea1fa86` (not from the notes above):
@@ -970,6 +979,10 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 - [ ] **Phone or computer: a song at a tempo other than 120 (or other than 4 lines a beat) with a pad whose envelope is set in lines.** Pass: the envelope's length matches the song (e.g. 4 lines lasts 4 rows); the envelope editor's ms value matches that tempo; changing the tempo re-renders the pad within a moment of the change.
 
 **27 Nov review fixes (builds 690–698, desktop v1.3.17)**
+- [ ] **Computer: build 701, FOLLOW off, Arrange with the keys: touch Arrange, let the song loop back to the top.** Pass: about 4 s later Arrange shows the top again.
+- [ ] **Computer: build 701, Mixer, a track loud enough to light TRIM.** Pass: the TRIM numbers stay still while the light flickers.
+- [ ] **Computer: build 701, Arrange, Alt-click a block to mute it, then CLN↓.** Pass: the clone is muted too; an unmuted block clones unmuted.
+- [ ] **Computer: build 701, FX screen, cursor on an empty SLOT, press Enter.** Pass: the effect list opens (no "type a number" box); Enter on a filled slot opens the list too.
 - [ ] **Phone: after build 700, open CHAINS or WAVES once online, then offline (airplane mode) open it again.** Pass: the page opens with its own icon (no broken icon) and can still be added to the home screen.
 - [ ] **Phone and computer: record or load a long sample, keep working past two backups (3 min each), then File → Restore a backup.** Pass: the backup opens with the sample's audio; Settings › App storage is not growing by the sample's size every 3 minutes.
 - [ ] **Desktop app (Mac): if the input helper ever says it stopped, press Settings › Audio › Reset audio engine.** Pass: native inputs / MIDI come back without quitting the app.
