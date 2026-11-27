@@ -6,7 +6,14 @@ const test = require('node:test'), assert = require('node:assert'), fs = require
 const root = path.join(__dirname, '..');
 const files = ['index.html', 'chains/index.html', 'waves/index.html', 'pump/synth/pump-synth-engine.js', 'pump/synth/pump-synth-worklet.js', 'thunder-core-client.js'];
 // the names the page keeps its compiled Modules under, and the message keys that would carry one
-const MOD = /\b(pumpModOpt\(\)|pumpWasmMod|tfxModOpt\(\)|tfxMod|txMod|plMod|lxMod|psMod|PsynCore\.module\(\)|pumpModule|tfxModule|dspModule)\b/;
+// (the word boundary sits before the call's brackets: after `)` there is none to match)
+const MOD = /\b(?:pumpModOpt|tfxModOpt|PsynCore\.module)\s*\(\s*\)|\b(?:pumpWasmMod|tfxMod|txMod|plMod|lxMod|psMod|pumpModule|tfxModule|dspModule)\b/;
+test('the Module pattern catches calls and names, and lets bytes through', () => {
+  for (const bad of ['{pumpBytes:pumpModOpt()}', '{m:tfxModOpt()}', '{module:PsynCore.module()}', '{pumpModule:x}', 'pumpWasmMod ? {a:1} : {b:2}', '{tfxModule:t}'])
+    assert.ok(MOD.test(bad), 'should catch ' + bad);
+  for (const ok of ['{pumpBytes:pumpBin()}', '{pumpBytes:b}', '{target:\'chains-host\', op:\'pump\', value:b}', '{needPump:true}'])
+    assert.ok(!MOD.test(ok), 'should allow ' + ok);
+});
 test('no port.postMessage carries a WebAssembly.Module', () => {
   let seen = 0;
   for (const f of files) {

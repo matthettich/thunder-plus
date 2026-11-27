@@ -22,8 +22,11 @@ async function take(on) {
   try {
     await A.page.evaluate(t => window.__seqTest.load(t, 'check.thunder'), song(on));
     return await A.run(`
-      aset.vol = 100; rtInit(); tStart('song', {row:0});   // PLAY at once: the track-FX nodes are made while pump.wasm is held back
       const loaded = () => typeof pumpBin === 'function' && !!pumpBin();
+      if (loaded()) return {err:'pump.wasm had already arrived before PLAY: this take would test the processorOptions path, not the port (raise HOLD)'};
+      aset.vol = 100; rtInit(); tStart('song', {row:0});   // PLAY at once: the track-FX nodes are made while pump.wasm is held back
+      await new Promise(r => setTimeout(r, 300));
+      if (loaded()) return {err:'pump.wasm arrived before the track-FX nodes were made (raise HOLD)'};
       for (let i = 0; i < 200 && !loaded(); i++) await new Promise(r => setTimeout(r, 50));
       if (!loaded()) return {err:'pump.wasm never arrived'};
       await new Promise(r => setTimeout(r, 1500));   // the nodes waiting for it get it now
