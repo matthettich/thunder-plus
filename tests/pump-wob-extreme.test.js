@@ -1,8 +1,6 @@
-// KNOWN TRAP on the pinned pump wasm (pump deb07d3, build 645, same as 642): WOB's sub oscillator reads its table past the end
-// at extreme pitch (its phase wraps once, but inc / 2 can exceed 1). pump-synth.wasm traps with "memory access out of bounds"
-// at 22050 Hz, MIDI note 127, Octave +2, Tune +12. Fixed in pump commit 5468d8c (WOB), d4c4987 (BandWaves::read) and 8d851d0
-// (GLOSS DigiWaves::read), which build 643 / 644 carried and build 645 backed out. THIS TEST FLIPS when pump is re-pinned to a
-// commit with the fix: then turn it back into "no trap, NaN-free, bounded output". The pad path clamps the note to 60 + Tune, so
+// WOB at extreme pitch (pump 5468d8c, d4c4987, 8d851d0; in the app since build 690): on pump deb07d3 (builds 642 to 689) the sub
+// oscillator read its table past the end and pump-synth.wasm trapped with "memory access out of bounds" at 22050 Hz, MIDI note 127,
+// Octave +2, Tune +12. Now it must run finite and bounded there and at other rates. The pad path clamps the note to 60 + Tune, so
 // it cannot reach note 127: the case is driven through the wasm's own C interface.
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('fs'), path = require('path'), vm = require('vm');
@@ -30,7 +28,9 @@ function wobExtreme(X, M, sr, note, over) {
   X.psyn_free(h); return { pk, bad };
 }
 
-test('pump WOB: KNOWN trap on this wasm (22050 Hz, note 127, Octave +2, Tune +12) still throws out of bounds; flips when pump is re-pinned', () => {
-  const X = wasm(), M = meta();
-  assert.throws(() => wobExtreme(X, M, 22050, 127, { octave: 2, tune: 12 }), /memory access out of bounds/);
-});
+for (const [sr, over] of [[22050, { octave: 2, tune: 12 }], [44100, { octave: 2, tune: 12 }], [48000, { octave: 2, tune: 12 }], [96000, { octave: 2, tune: 12 }], [22050, { octave: -3, sub: 100, sub_oct: 2 }]]) {
+  test(`pump WOB at ${sr} Hz, note 127, ${JSON.stringify(over)}: no trap, finite, bounded`, () => {
+    const X = wasm(), M = meta(); const r = wobExtreme(X, M, sr, 127, over);
+    assert.equal(r.bad, 0); assert.ok(r.pk < 4, 'peak ' + r.pk);
+  });
+}

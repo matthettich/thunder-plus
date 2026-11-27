@@ -157,6 +157,9 @@ class PsynProc extends AudioWorkletProcessor {
     if (!X){ L.fill(0); if (R !== L) R.fill(0); return true; }
     const t0 = Date.now();
     if (this.h < 0){ this.open(X); if (this.h < 0){ L.fill(0); if (R !== L) R.fill(0); return true; } }
+    // FREEZE's built-in spectra (pump 26 Nov, psyn_warm): made a slice at a time, about 2 x 0.17 ms once per audio block on this thread
+    // (whichever FREEZE node runs first in the block), until all seven are ready; a note before then finishes its own source at once
+    if (this.type === 11 && X.psyn_warm && !globalThis.__psynWarmDone && globalThis.__psynWarmAt !== currentFrame){ globalThis.__psynWarmAt = currentFrame; try { if (X.psyn_warm(2) === 0) globalThis.__psynWarmDone = true; } catch (e){ globalThis.__psynWarmDone = true; } }
     const bpm = P.bpm ? P.bpm[0] : 120; if (bpm !== this.bpm && X.psyn_tempo){ X.psyn_tempo(this.h, bpm); this.bpm = bpm; }
     if (this.fileDirty && X.psyn_file){ this.fileDirty = false; const F = this.file, n = F ? Math.min(F.d.length, Math.round(F.sr * 20)) : 0, p = n ? X.psyn_buf(n) : 0;
       if (p){ new Float32Array(X.memory.buffer, p, n).set(F.d.subarray(0, n)); X.psyn_file(this.h, n, F.sr); } else X.psyn_file(this.h, 0, 0); }
