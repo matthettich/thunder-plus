@@ -27580,7 +27580,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 701;
+const BUILD = 702;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -28759,7 +28759,7 @@ function projRows(){
       info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
-    {l:'SONG PEEK', ck:'Song: the phrase under the cursor beside it (not the dogs)', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+    {l:'SONG PEEK', ck:'Show the phrase under the cursor next to Song', get:() => SX.peek ? 1 : 0, set:v => sxSet('peek', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'Wide screens with STAGE on BY SCREEN: beside the Song screen, the phrase under the cursor instead of the dancing dogs. The DOGS | PEEK switch there does the same'},
     {l:'SIDE PANEL', ck:'Show side panel', get:() => sideOn ? 1 : 0, set:v => setSide(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'The gray column at the right on wide screens: the screen map, track meters and key reminders. Hide it to give the tracker and Arrange more room'},
@@ -36097,20 +36097,25 @@ function sxLaneDraw(){
   sxLane.hidden = false;
   const a = arrEl.getBoundingClientRect(), g = arrGrid.getBoundingClientRect(), th = $('tArrTh').getBoundingClientRect(), rh = arrRowH() || 22, top = cs.song.top || 0, VR = arrRows();
   // The + on the cursor's row when that row isn't in a section yet (so the lane says what it's for: owner, 21 Oct)
-  const L = sxSecs(), cy = cs.song.y, add = cy >= top && cy < top + VR && !songSecAt(cy) ? cy : -1;
-  const key = [JSON.stringify(L), top, VR, rh, g.top - a.top, g.height, th.top - a.top, add].join('|');
+  // (owner, 27 Nov: "impossible to add more than one") the + shows on any cursor row that doesn't start a section; inside one it splits it
+  const L = sxSecs(), cy = cs.song.y, cur = songSecAt(cy), add = cy >= top && cy < top + VR && !(cur && cur.y === cy) ? cy : -1;
+  const st = arrGrid.scrollTop, key = [JSON.stringify(L), top, VR, rh, g.top - a.top, g.height, th.top - a.top, add, st].join('|');
   if (key === sxLaneKey) return; sxLaneKey = key;
   let h = `<span class="sxlh" style="top:${(th.top - a.top).toFixed(1)}px" title="Song sections: name a part of the song (INTRO, VERSE, DROP…) from a row">SECT</span>`;
-  const ry = y => arrRowTop(y) - arrRowTop(top);   // (3 Nov: measured rows)
-  if (add >= 0) h += `<button type="button" class="sxadd" data-ay="${add}" style="top:${(g.top - a.top + 3 + ry(add)).toFixed(1)}px;height:${(rh - 3).toFixed(1)}px" title="Name a section starting at row ${rS(add, 3)}" aria-label="Name a section starting at row ${rS(add, 3)}">+</button>`;
+  // LOCKED TO THE ROWS (owner, 27 Nov: "not locked to the row… doesn't scroll if you're scrolling"): a row's place is where the
+  // grid has it now, scroll position included (a trackpad or a finger scrolls by pixels, not whole rows); clipped to the grid
+  const gy0 = g.top - a.top, gy1 = g.bottom - a.top, ry = y => gy0 + arrRowTop(y) - st, vis0 = arrRowAt(Math.max(0, st - rh / 2)), vis1 = Math.min(255, arrRowAt(st + arrGrid.clientHeight) + 1);
+  const span = (y0, y1) => { const t = Math.max(gy0, ry(y0) + 3), b = Math.min(gy1, ry(y1) + rh); return b - t > 2 ? [t, b - t] : null; };
   L.forEach((s, i) => {
-    const end = i + 1 < L.length ? L[i + 1].y - 1 : 255, a0 = Math.max(s.y, top), a1 = Math.min(end, top + VR - 1); if (a1 < a0) return;
-    const y = g.top - a.top + 3 + ry(a0), hh = ry(a1) - ry(a0) + rh - 3;
+    const end = i + 1 < L.length ? L[i + 1].y - 1 : 255, a0 = Math.max(s.y, vis0), a1 = Math.min(end, vis1); if (a1 < a0) return;
+    const sp = span(a0, a1); if (!sp) return; const y = sp[0], hh = sp[1];
     h += `<button type="button" class="sxsec${a0 > s.y ? ' cont' : ''}" data-sy="${s.y}" style="top:${y.toFixed(1)}px;height:${hh.toFixed(1)}px;--sxh:${Math.round((i * 67 + 200) % 360)}" title="${esc(s.n)}: rows ${rS(s.y, 3)}–${rS(end, 3)} · click to go there. Double-click the first row to rename it. Double-click another row to start a new section there. Right-click for more."><span>${esc(s.n)}</span></button>`;
   });
+  { const sp = add >= 0 && span(add, add); if (sp) h += `<button type="button" class="sxadd" data-ay="${add}" style="top:${sp[0].toFixed(1)}px;height:${sp[1].toFixed(1)}px" title="Name a section starting at row ${rS(add, 3)}" aria-label="Name a section starting at row ${rS(add, 3)}">+</button>`; }   // (after the boxes, so it is on top of one it splits)
   sxLane.innerHTML = h;
 }
-function sxLaneRow(clientY){ const g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 22, px = arrRowTop(cs.song.top || 0) + clientY - g.top - 2; let y = clamp((cs.song.top || 0) + Math.floor((clientY - g.top - 2) / rh), 0, 255);
+{ let raf = 0; arrGrid.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (sxLane && !sxLane.hidden) sxLaneDraw(); }); }, {passive:true}); }   // every scroll step, not only a new top row
+function sxLaneRow(clientY){ const g = arrGrid.getBoundingClientRect(), rh = arrRowH() || 22, px = arrGrid.scrollTop + clientY - g.top - 2; let y = clamp(Math.floor(px / rh), 0, 255);   // (27 Nov: from the grid's real scroll)
   while (y > 0 && arrRowTop(y) > px) y--; while (y < 255 && arrRowTop(y + 1) <= px) y++; return y; }
 function sxLaneWire(){
   // touch: a tap on the empty lane names a section at that row (a long press opens the menu instead). Done on pointerup:
@@ -38081,6 +38086,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [702, '27 Nov', ['Arrange and Song: the + to name a section now shows on any row that doesn’t already start one, so you can add as many as you like (inside a section it splits it). The section names follow the rows exactly while you scroll.']],
   [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.', 'CPU panel: the screen list no longer has its long heading.', 'Settings: Show animations, Pressing keys plays notes, “Automatically checks for updates on launch”; the “Song at start” line is gone; Ableton Link’s Start/stop toggle reads Off | On like the one above it; Runaway kick’s label no longer runs under its toggle.', 'Menu wording: View and Settings items renamed (Show SECT in Arrange, Allow right-click to color song row, Create unique pattern numbers on new tracks, Enable low power mode, Show Arrange left of phrase, Show section names); Meters while playing is now Meter animation quality: HIGH, LOW, OFF.', 'Arrange with FOLLOW off: when the song loops back to the top, Arrange goes back with it 4 s after you last touched it (it waited a minute).', 'Fixed: the Mixer’s TRIM number no longer shifts when its level light comes on.', 'Fixed: CLN↓ (clone down) now keeps a block’s mute: a muted block clones as a muted block.']],
   [700, '27 Nov', ['Fixed: offline, the CHAINS and WAVES pages now have their own icon and app manifest (they were left out of the offline copy).']],
   [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
