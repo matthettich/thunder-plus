@@ -29624,7 +29624,7 @@ function cloneDown(){
   if (typeof markHands === 'function') markHands();
   const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {x0:c.x, x1:c.x, y0:c.y, y1:c.y};
   const h = r.y1 - r.y0 + 1, d0 = r.y1 + 1, src = [];
-  for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ const v = getCell('song', x, y); if (v >= 0) src.push([x, y, v]); }
+  for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ const v = getCell('song', x, y); if (v >= 0) src.push([x, y, v, bmu(y, x)]); }   // [3]: the block's mute (Alt-click / M.PAT), copied to the clone (owner, 27 Nov: CLN↓ forgot it)
   if (!src.length) return toast(sel ? 'Nothing to clone in the selection.' : 'Move onto a filled block to clone it down.');
   // EMPTY ROW AFTER CLONE DOWN (12 Nov, owner: "Pressing clone down multiple times eventually inserts an empty row"): a block with notes on a bus is refused by newBlock
   // (build 569, busNo), but the row for its clone had already been inserted: a whole empty row, every track, and the cursor moved onto it. The refused cells now leave src
@@ -29638,9 +29638,9 @@ function cloneDown(){
   const clash = src.some(([x, y]) => getCell('song', x, d0 + y - r.y0) >= 0);
   if (clash && !songRowsInsert(d0, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty`);
   let made = 0, lastId = -1;
-  for (const [x, y, v] of src){
+  for (const [x, y, v, mu] of src){
     const p = {x, y:d0 + y - r.y0}; newBlock(p, v);
-    const id = getCell('song', p.x, p.y); if (id < 0) break; made++; lastId = id;
+    const id = getCell('song', p.x, p.y); if (id < 0) break; made++; lastId = id; setBlockMute(p.y, p.x, mu);
   }
   if (!made){ if (clash) songRowsRemove(d0, h); return; }   // nothing written: take the rows we put in out again (newBlock has said why)
   if (sel){ selA.y += h; c.y += h; } else c.y = d0;
@@ -38077,7 +38077,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.']],
+  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.', 'Fixed: CLN↓ (clone down) now keeps a block’s mute: a muted block clones as a muted block.']],
   [700, '27 Nov', ['Fixed: offline, the CHAINS and WAVES pages now have their own icon and app manifest (they were left out of the offline copy).']],
   [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
   [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],

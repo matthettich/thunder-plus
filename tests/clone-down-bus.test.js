@@ -7,10 +7,10 @@ const H = require('./helpers');
 const src = H.read('index.html');
 const m = src.match(/function cloneDown\(\)\{[\s\S]*?\n\}\n/); assert.ok(m, 'cloneDown not found');
 function rig({ bus = [], free = true } = {}) {
-  const NT = 8, log = [], song = Array.from({ length: 256 }, () => new Array(NT + 1).fill(-1));
+  const NT = 8, log = [], mutes = new Set(), song = Array.from({ length: 256 }, () => new Array(NT + 1).fill(-1));
   song[0][0] = 1; song[1][0] = 2; song[0][5] = 3; song[1][5] = 4;   // a block under the cursor, one below it (a clash), and the same on track 05
   const c = { NT, tv: 'song', selA: null, cs: { song: { x: 0, y: 0 } }, song, log, rS: n => n, hp: n => n, toast: t => log.push('toast ' + t), saveS() {}, draw() {}, firstPhrase: id => id,
-    selRect: () => ({ x0: 0, x1: 5, y0: 0, y1: 0 }), getCell: (v, x, y) => song[y][x],
+    selRect: () => ({ x0: 0, x1: 5, y0: 0, y1: 0 }), getCell: (v, x, y) => song[y][x], mutes, bmu: (y, x) => mutes.has(y + ':' + x), setBlockMute: (y, x, on) => { if (on) mutes.add(y + ':' + x); else mutes.delete(y + ':' + x); },
     busNo: (x, id) => bus.includes(x), songRowsInsert: (at, h) => { log.push('insert ' + at); song.splice(at, 0, new Array(NT + 1).fill(-1)); song.length = 256; return true; },
     songRowsRemove: (at, h) => { log.push('remove ' + at); song.splice(at, h); song.push(new Array(NT + 1).fill(-1)); },
     newBlock: (p, v) => { if (free) song[p.y][p.x] = 100 + v; } };
@@ -39,7 +39,7 @@ function rigSel({ rows = 8, below = 20 } = {}) {
   const NT = 8, song = Array.from({ length: 256 }, () => new Array(NT + 1).fill(-1)); let next = 1000;
   for (let y = 0; y < rows + below; y++) song[y][0] = y + 1;
   const c = { NT, tv: 'song', selA: { x: 0, y: 0, v: 'song' }, cs: { song: { x: 0, y: rows - 1, top: 0 } }, song, log: [], rS: n => n, hp: n => n, toast() {}, saveS() {}, draw() {}, firstPhrase: id => id,
-    selRect: () => ({ x0: 0, x1: 0, y0: Math.min(c.selA.y, c.cs.song.y), y1: Math.max(c.selA.y, c.cs.song.y) }), getCell: (v, x, y) => song[y][x], busNo: () => false,
+    selRect: () => ({ x0: 0, x1: 0, y0: Math.min(c.selA.y, c.cs.song.y), y1: Math.max(c.selA.y, c.cs.song.y) }), getCell: (v, x, y) => song[y][x], busNo: () => false, bmu: () => false, setBlockMute() {},
     songRowsInsert: (at, h) => { for (let y = 256 - h; y < 256; y++) if (song[y].some(v => v >= 0)) return false; song.splice(at, 0, ...Array.from({ length: h }, () => new Array(NT + 1).fill(-1))); song.length = 256; return true; },
     songRowsRemove: (at, h) => { song.splice(at, h); while (song.length < 256) song.push(new Array(NT + 1).fill(-1)); },
     newBlock: (p, v) => { song[p.y][p.x] = next++; c.cloneOf = (c.cloneOf || {}); c.cloneOf[song[p.y][p.x]] = v; } };
@@ -68,4 +68,11 @@ test('a cursor moved by playback (FOLLOW) clones the block you left it on; one y
   c.cloneDown(); assert.equal(c.song[6][0], 107, 'row 5 cloned below itself'); assert.equal(c.song[1][0], 2, 'nothing changed at the top'); assert.equal(c.cs.song.y, 6); assert.equal(marked, 1); assert.equal(c.songFollowFrom, null);
   const d = rig(); d.markHands = () => {}; d.song[5][0] = 7; d.arrHandT = 20; d.songFollowFrom = { x: 0, y: 5, to: 0, t: 10 };   // you moved after the follow: your row (0) counts
   d.cloneDown(); assert.equal(d.song[1][0], 101); assert.equal(d.cs.song.y, 1);
+});
+
+// CLN↓ FORGOT THE MUTE (27 Nov, owner: "is it deliberate that clone down seems to forget the mute state of tracks muted with the alt key on arrange?"): not deliberate; the clone takes the block's mute.
+test('a muted block clones as a muted block; an unmuted one stays unmuted', () => {
+  const c = rig(); c.mutes.add('0:0'); c.mutes.add('1:9'); c.cloneDown();
+  assert.equal(c.song[1][0], 101); assert.ok(c.mutes.has('1:0'), 'the clone is muted'); assert.ok(c.mutes.has('0:0'), 'the source stays muted');
+  const d = rig(); d.mutes.add('1:0'); d.song[1][0] = -1; d.cloneDown(); assert.equal(d.song[1][0], 101); assert.ok(!d.mutes.has('1:0'), 'an unmuted clone clears a stale mute bit on its cell');
 });
