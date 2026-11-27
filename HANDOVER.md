@@ -6,6 +6,7 @@ Keep this file up to date at the end of a work session.
 
 ## PICK UP HERE (27 Nov 2026, 14:00): beta = main = build 702, desktop v1.3.20
 
+- **Build 703 (27 Nov, 14:30):** FOLLOW froze on a track that had played one stray block and gone quiet (tp.pos kept its old row; `posLive` in followPlay now goes by tracks that played in the last 16 lines). PLY on live engines: a reversed note swells up from silence and stops dead (bassNote, `rvd` from the sequencer: until KIL / OFF, else PLY X1 = X lines, 01 = 4). Not heard by the lead: on the punch list.
 - **Shipped today:** the 27 Nov code review (builds 690–698, its entry under To-do), tempo-synced envelopes follow the song
   (699), and Song sections (702: + on any row; the lane follows the grid's real scroll). Builds 700–701 came from another session.
   Desktop v1.3.17, v1.3.18, v1.3.20 (v1.3.19 from the other session).
@@ -992,6 +993,10 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 **Decided 25 Nov (nothing to do):** pad removal fix pushed; on the new engine the effect and chains level meters come first, then the pad flashes / dogs, then the metronome click; hand-played pads and keys stay on the old engine for the first Android beta; the fallback message shows on the first PLAY of each song; Resume restarts the row; no verdict within 5 s = the old engine plays; Claude merges PRs without asking once CI and the lead's review pass.
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
+
+**FOLLOW with a stray block, and PLY on live synths (27 Nov; build 703)**
+- [ ] **Computer: a song where an otherwise unused track has one block near the top (the stray empty pattern), FOLLOW ON or PATTERN, play the song with the cursor on that track and then on an empty track.** Pass: Song / Arrange keep following and paging with the playhead after the stray block has played.
+- [ ] **Phone or computer: on a live synth track (Bass, Acid, Voice, Machine, a pump or …waves synth) put PLY 01 on a note, then PLY 81, then PLY 01 with KIL 10 on the same row.** Pass: the note swells up from silence and stops dead: over 4 lines, 8 lines, then up to the KIL. A sample / rendered pad with PLY 01 still plays backwards.
 
 **Song sections (27 Nov; build 702)**
 - [ ] **Computer and phone (Fold open), Arrange beside Song: add three sections with the + (put the cursor inside VERSE and press +), then scroll Arrange with a trackpad / finger, slowly and fast.** Pass: each name box stays on its rows the whole time, and a new section can be started inside an existing one. If a box still drifts, say which device and how you scrolled: in headless Chrome (desktop and Fold widths) the old code stayed aligned too, so that report is not reproduced yet.
