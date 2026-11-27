@@ -24,6 +24,41 @@ env:
   WEBVIEW2_VERSION: 1.0.2739.15
 
 jobs:
+  # W-TFX: the same shell built by clang-cl (the VS ClangCL toolset), which also builds the effects library (the cl.exe job above has none). First a parallel job: it replaces `windows` only when the lead says so.
+  windows-clangcl:
+    name: Desktop shell (Windows x64, WebView2, clang-cl)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4   # the core's configure step fetches its pinned sources with the same tools as the Core (Windows) job
+        with: { node-version: 22 }
+      - name: WebView2 SDK (pinned NuGet package)
+        shell: pwsh
+        run: |
+          nuget install Microsoft.Web.WebView2 -Version $env:WEBVIEW2_VERSION -OutputDirectory "$env:RUNNER_TEMP\wv2" -NonInteractive
+          $dir = Join-Path $env:RUNNER_TEMP "wv2\Microsoft.Web.WebView2.$env:WEBVIEW2_VERSION"
+          if (-not (Test-Path "$dir\build\native\include\WebView2.h")) { throw "WebView2.h not found in $dir" }
+          "WEBVIEW2_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Get-ChildItem "$dir\build\native\x64"
+      - name: Configure
+        shell: pwsh
+        run: cmake -S native -B build -A x64 -T ClangCL -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_WEBVIEW2_DIR=$env:WEBVIEW2_DIR" "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}-clangcl"
+      - name: Build the shell and the library tests
+        run: cmake --build build --config Release -j 3 --target thunder_desktop_win test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session
+      - name: Library tests
+        run: ctest --test-dir build -C Release --output-on-failure -R desktop_
+      - name: Shell selftest (every channel answers; null audio device)
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $exe = Resolve-Path "build\desktop\Release\Thunder Plus.exe"
+          $rep = Join-Path $PWD "selftest.txt"
+          $p = Start-Process -FilePath $exe -ArgumentList "--selftest","--null-audio","--report","`"$rep`"" -PassThru
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); Write-Host "selftest timed out"; if (Test-Path $rep) { Get-Content $rep }; exit 2 }
+          if (Test-Path $rep) { Get-Content $rep } else { Write-Host "no report file" }
+          exit $p.ExitCode
+
   windows:
     name: Desktop shell (Windows x64, WebView2)
     runs-on: windows-latest

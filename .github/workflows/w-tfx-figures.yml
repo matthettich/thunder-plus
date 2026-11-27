@@ -23,4 +23,4 @@ jobs:
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --target test_fx test_padfx test_modfx -j3
       - name: figures
-        run: ctest --test-dir build -R '^(fx|padfx|modfx)$' -V 2>&1 | tee figures.log | grep -E "^ *(e_|fx_|h_|m_|worst)|Passed|Failed|tests passed" | cut -c1-200
+        run: ctest --test-dir build -R '^(fx|padfx|modfx)$' -V 2>&1

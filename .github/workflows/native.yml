@@ -220,7 +220,7 @@ jobs:
         shell: bash
         run: |
           ctest --test-dir build -C Release -R "^(fx|fxzero|padfx|live_chlvl|live_masterm|fxsong|modfx|dsp_layout)$" --no-tests=error -V > subset.log 2>&1; rc=$?
-          grep -E "worst|TFX:|dsp_layout|sizeof|Test +#|tests passed|Skipped|Not Run" subset.log | head -150
+          cat subset.log
           [ $rc -eq 0 ] || { echo "subset failed (rc=$rc)"; exit 1; }
           if grep -Eq "\*\*\*Skipped|Not Run" subset.log; then echo "a test of the effects subset skipped"; exit 1; fi
           [ "$(grep -c 'TFX: yes' subset.log)" -eq 2 ] || { echo "TFX: yes expected 2 times"; exit 1; }
