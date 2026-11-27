@@ -27579,7 +27579,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 699;
+const BUILD = 700;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38077,6 +38077,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [700, '27 Nov', ['Fixed: offline, the CHAINS and WAVES pages now have their own icon and app manifest (they were left out of the offline copy).']],
   [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
   [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],
   [697, '27 Nov', ['Behind the scenes: every change to the app is now checked for misspelled names and similar slips before it ships.']],
