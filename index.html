@@ -26843,7 +26843,7 @@ function projSet(path, handle){
 let projDirty = (() => { try { return localStorage.getItem(DTK) === '1'; } catch(e){ return false; } })(), dirtyArmed = false, bkDirty = false;
 setTimeout(() => { dirtyArmed = true; }, 2500);
 function markChange(){ if (!dirtyArmed) return; if (START.held && performance.now() - START.inT < 3000) songRelease('you changed the song'); bkDirty = true; if (!projDirty) setDirty(true); else dirtyShow(); }
-function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { localStorage.setItem(DTK, projDirty ? '1' : '0'); localStorage.setItem(DTK + '-smp', smpNew ? '1' : '0'); } catch(e){} dirtyShow(); }
+function setDirty(on){ projDirty = !!on; if (!projDirty){ smpNew = false; try { const c = natC(); if (c && c.dirtyOff) c.dirtyOff(); } catch(e){} }   /* PC8: unsaved state cleared (a save, undo to clean): the shell's recovery copy is stale */ try { localStorage.setItem(DTK, projDirty ? '1' : '0'); localStorage.setItem(DTK + '-smp', smpNew ? '1' : '0'); } catch(e){} dirtyShow(); }
 // a sample recorded or loaded since the last save (the close prompt says so); cleared with the dirty mark
 var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
 function markSmpNew(){ smpNew = true; try { localStorage.setItem(DTK + '-smp', '1'); } catch(e){} }
@@ -27568,7 +27568,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 688;
+const BUILD = 689;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32730,7 +32730,7 @@ const FXDYN = {
   pcomp: p => ({ thr:p.threshold, ratio:p.ratio, knee:p.knee, range:p.range, mk:p.out_gain }),
   plimit: p => ({ lim:true, gain:p.gain, ceil:p.ceiling, thr:p.ceiling - p.gain }),
   pband: () => null
-}, FXLV = new Set(['comp', 'ott', 'transient']), FXD_N = 80, FXD_LO = -60, FXD_HI = 6, FXD_GR = 24;
+}, FXLV = new Set(['comp', 'ott', 'transient']), FXD_N = 80, FXD_AGE = 600, FXD_LO = -60, FXD_HI = 6, FXD_GR = 24;
 const isFxDyn = type => !!(FXDYN[type] && TFX[type] && (TFX[type].mod || TFX[type].pump)) || (FXLV.has(type) && !!TFX[type]);
 const fxStageLive = type => isFxDyn(type) || type === 'pmeter';   // …PUMP: METER's loudness readout redraws too
 function fxDynOut(c, x){
@@ -32885,7 +32885,7 @@ function stageChain(){
     let txt = s; while (g.measureText(txt).width > bw - 16 * dpr && txt.length > 3) txt = txt.slice(0, -2) + '…'; g.fillText(txt, x + 8 * dpr, y + bh / 2);
     // a dynamics slot: its reduction (or, for the level-only ones, its change) as a thin bar along the bottom of its box
     const k = slotOf[i], f = k >= 0 ? A[k] : null, D = f && isFxDyn(f.type) && node && node.dyn ? node.dyn.get(k) : null;
-    if (D && now - D.t < 600){ const lv = FXLV.has(f.type), v = D.hold[0], fr = lv ? Math.min(1, Math.abs(v) / 12) : Math.min(1, -v / FXD_GR);
+    if (D && now - D.t < FXD_AGE){ const lv = FXLV.has(f.type), v = D.hold[0], fr = lv ? Math.min(1, Math.abs(v) / 12) : Math.min(1, -v / FXD_GR);
       if (fr > .002){ g.fillStyle = lv ? '#3cc8b9' : '#f39a43'; g.fillRect(x + 3 * dpr, y + bh - 5 * dpr, (bw - 6 * dpr) * fr, 3 * dpr); } }
     if (i < items.length - 1){ g.strokeStyle = X.mid; g.beginPath(); g.moveTo(W / 2, y + bh); g.lineTo(W / 2, y + bh + gap); g.moveTo(W / 2 - 4 * dpr, y + bh + gap - 5 * dpr); g.lineTo(W / 2, y + bh + gap); g.lineTo(W / 2 + 4 * dpr, y + bh + gap - 5 * dpr); g.stroke(); }
     y += bh + gap; });
@@ -33216,7 +33216,7 @@ function mwLoop(){
   if (m && S.mst.on){ mwLimHist[mwLimI] = live ? m.lim : 0; mwLimI = (mwLimI + 1) % mwLimHist.length; }
   if (mwSel === 'eq') mwEqDraw(); else if (mwSel === 'sup') mwSupDraw(); else if (mwSel === 'comp') mwCompDraw(); else mwLimDraw();
 }
-$('mwRead').addEventListener('click', () => { if (rt && rt.mst && rt.mst.wk) rt.mst.wk.port.postMessage({resetPeak:true}); });
+$('mwRead').addEventListener('click', () => { if (rt && rt.mst && rt.mst.wk) rt.mst.wk.port.postMessage({resetPeak:true}); try { const c = natC(); if (c && c.mstResetPeak) c.mstResetPeak(); } catch(e){} });   // PC8: the native engine's held peak too (only when the shell says caps.masterResetPeak; none does yet)
 $('mwRead').title = 'Short-term loudness in and out (3 s, BS.1770 standard) and the highest output peak. Tap to reset the peak.';
 $('bMst').addEventListener('click', () => openMst());
 mstLabel();
@@ -33927,7 +33927,7 @@ function dkDynMeters(cv, f, k, node, now){
   const W = cv.clientWidth, H = cv.clientHeight; if (W < 20 || H < 40) return;
   const dpr = devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const lv = FXLV.has(f.type), key = k + ':' + f.type, D = node && node.dyn && node.dyn.get(k), live = D && D.key === key && now - D.t < 600;
+  const lv = FXLV.has(f.type), key = k + ':' + f.type, D = node && node.dyn && node.dyn.get(k), live = D && D.key === key && now - D.t < FXD_AGE;   // PC8: no fx.dyn for FXD_AGE (600 ms) = no reading (a stopped stream never leaves a frozen bar)
   const cur = live ? D.cur : [0, -120, -120], hold = live ? D.hold : [0, -120, -120];
   let c = null; try { c = lv ? null : FXDYN[f.type](TFX[f.type].map(f, ctx ? ctx.sampleRate : 48000, S.bpm)); } catch(e){}
   const st = getComputedStyle(cv), ink = st.color || '#111', font = st.fontFamily || 'monospace';

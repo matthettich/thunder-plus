@@ -659,6 +659,9 @@
   var MUTE_RAMP_S = 0.012;    // the page's mute glide (applyMix: setTargetAtTime 12 ms), as frames for mix.set's ramp
   var MIX_KEYS = ['vol', 'trim', 'pan', 'mute', 'solo'];   // the order of a track's signature row; the shell's MIX_KEYS also has 'out' (the master's); 'send' is refused: it rides in the song text
   var CHAIN_ROUTED = { trackIn: 1, chainOut: 1, scin: 1, scout: 1 };   // chain_edit answers E_ARG for these modules (their params move the bus plan): they go with the song
+  // PC8: a Send / Receive module's `lab` rewrites the graph's cables: the live runner's Params diff drops it (it would recompile on the audio thread; MIRROR-684-NOTES 4), so it is STRUCTURAL: no chain.edit, the song (a swap) carries it.
+  // (A module's text, `{op:'text'}`, never was a chain.edit op: it is made by the editor's TW.mod, whose saveS publishes the song.)
+  function CHAIN_STRUCT(ty, name) { return (ty === 'send' || ty === 'recv') && name === 'lab'; }
   var CHAIN_NAMES = { track: 1, src: 1, pre: 1 };                       // the same, by parameter name (the page re-routes tracks and taps for these)
   var L = { sent: null, pdc: null, t: 0, ops: new Map(), poke: false, gen: 0, refused: {}, retry: {} };   // PC6: gen / refused / retry belong to fx.values (see fxvSend)
   function liveReset() { L.sent = null; L.pdc = null; L.ops.clear(); L.poke = false; clearTimeout(L.t); L.t = 0; L.gen++; L.refused = {}; L.retry = {}; }
@@ -784,7 +787,7 @@
     sentVer = -1; schedPublish();   // the song text must carry it (the shell finds the same value there: harmless); the page's param() does not bump songVer
     id = String(id); name = String(name);
     var ty = L.sent && L.sent.mods ? L.sent.mods[id] : undefined;
-    if (!playSent || !L.sent || ty === undefined || CHAIN_ROUTED[ty] || CHAIN_NAMES[name] || !fin(value) || id.length > 47 || name.length > 31) return;   // chain_edit is all or nothing: nothing it could refuse goes in
+    if (!playSent || !L.sent || ty === undefined || CHAIN_ROUTED[ty] || CHAIN_NAMES[name] || CHAIN_STRUCT(ty, name) || !fin(value) || id.length > 47 || name.length > 31) return;   // chain_edit is all or nothing: nothing it could refuse goes in
     L.ops.set(id + '\u0000' + name, { op: 'param', id: id, name: name, value: value });
     liveSoon();
   };
@@ -894,7 +897,7 @@
   var RCV_MS = 10000;         // the put interval
   var RCV_MAX = 24e6;         // characters: a project with more is not put (a bridge message that size would hold the page); the shell's own song.load copy stays
   var RCV_COST = 40;          // the next put waits at least this many times the last one's cost (a big project is not stringified every 10 s on a slow phone)
-  var RV = { t: 0, last: '', hold: false, asked: false, cost: 0, big: false };
+  var RV = { t: 0, last: '', hold: false, asked: false, cost: 0, big: false, put: false };   // put: a recovery.put of this session may still be on the shell's disk
   function rcvPutOn() { return !!(NC.on && NC.caps && NC.caps.recoveryPut && host && typeof host.projText === 'function' && typeof host.dirty === 'function'); }
   function rcvTick() {
     RV.t = 0; if (!NC.on || !rcvPutOn()) return;
@@ -905,16 +908,24 @@
           var t0 = nowMs(), text = host.projText(); RV.cost = nowMs() - t0;
           if (typeof text === 'string' && text && text !== RV.last) {
             if (text.length > RCV_MAX) { if (!RV.big) { RV.big = true; log('native core client: project too big for recovery.put (' + text.length + ' characters)'); } }
-            else { RV.big = false; RV.last = text; send({ t: 'recovery.put', project: text }); }
+            else { RV.big = false; RV.last = text; RV.put = true; send({ t: 'recovery.put', project: text }); }
           }
-        } else RV.last = '';   // saved: the next unsaved change puts again
+        } else { RV.last = ''; rcvClean(); }   // saved: the next unsaved change puts again (and the shell's copy is dropped, in case the page's dirty flag fell between two looks)
       } catch (e) { log('native core client: recovery.put failed', e); }
       wait = Math.max(RCV_MS, RV.cost * RCV_COST);
     }
     RV.t = setTimeout(rcvTick, wait);
   }
+  /* PC8: the page's unsaved state went false (a save, a new / opened project, undo back to clean): the put this session made is stale, so the shell is told to forget it (`recovery.drop`, both shells: translator `recovery.drop`
+     / Recovery.kt; an ASK that deletes the put and the song.load copy). Only when this session put something and no copy awaits the person's answer (RV.hold: that copy is the one being decided). */
+  function rcvClean() {
+    if (!RV.put || RV.hold || !rcvPutOn() || down()) return;
+    try { if (host.dirty()) return; } catch (e) { return; }
+    RV.put = false; RV.last = '';
+    try { Promise.resolve(tc.ask({ t: 'recovery.drop' }, ASK_MS)).then(function () {}, function (e) { log('native core client: recovery.drop failed', e); }); } catch (e) { log('native core client: recovery.drop failed', e); }
+  }
   function rcvStart() { if (!RV.t && rcvPutOn()) RV.t = setTimeout(rcvTick, RCV_MS); }   // (no timer at all without caps.recoveryPut: nothing to put, and nothing keeps a test process alive)
-  function rcvStop() { clearTimeout(RV.t); RV.t = 0; RV.last = ''; RV.hold = false; RV.asked = false; }
+  function rcvStop() { clearTimeout(RV.t); RV.t = 0; RV.put = false; RV.last = ''; RV.hold = false; RV.asked = false; }
   function ago(ms) { var m = Math.round((Date.now() - ms) / 60000); return !(m >= 0) ? '' : m < 1 ? 'just now' : m < 90 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; }
   /** The copy as a project text for the page's loader: the page's own put, or (only the song.load message) the song wrapped as a project, which has no kit. */
   function rcvProject(text) {
@@ -1061,6 +1072,10 @@
     emit7('midi.in', { port: m.port, bytes: m.bytes, ts: ts, f: m.f });
   }
 
+  /** PC8: the page's unsaved state is gone (host.dirty() is false): drop the shell's recovery copy. */
+  NC.dirtyOff = function () { rcvClean(); };
+  /** PC8: the PEAK readout's reset. No shell has a message for it yet (CORE-BRIDGE 7.2 "Known gaps"): sent only when hello says caps.masterResetPeak === true, else nothing. Returns true when sent. */
+  NC.mstResetPeak = function () { if (!capOn('masterResetPeak') || !playSent) return false; send({ t: 'master.resetPeak' }); return true; };
   NC.devOn = function () { return capOn('devices'); };
   NC.inOn = function () { return capOn('devices') && capOn('inputs'); };
   NC.midiOn = function () { return capOn('midi') && capOn('devices'); };   // the Android live shell also says caps.midi (its own MIDI path): the desktop shell is the one that says caps.devices
