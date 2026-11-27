@@ -112,7 +112,7 @@ try {
     say(res.clk4 === '0:00', `${mode}: the next take starts again from ${res.clk4}`);
     say(res.clk5 && !res.clk5.timer && !res.clk5.on && !res.clk5.ui, `${mode}: closing the window mid-take clears the timer and ends the take: ${JSON.stringify(res.clk5)}`);
     say(res.clk6 === 'waiting…' && /^0:0[01]$/.test(res.clk7) && res.clk8 && !res.clk8.timer, `${mode}: PATTERN take shows "${res.clk6}" before capture, then ${res.clk7} while capturing; after it ${res.clk8 && res.clk8.txt}, timer ${res.clk8 && res.clk8.timer}`);
-    say(res.rate1 && res.rate1.length === 1 && res.rate1[0][1] === 8000 && / kHz and the app at/.test(res.rate1[0][0]), `${mode}: the sample-rate mismatch shows once as an 8 s toast: ${JSON.stringify(res.rate1)}`);
+    say(res.rate1 && res.rate1.length === 1 && res.rate1[0][1] === 8000 && / kHz(?: and|,) the app (?:at )?\d/.test(res.rate1[0][0]), `${mode}: the sample-rate mismatch shows once as an 8 s toast: ${JSON.stringify(res.rate1)}`);
     say(res.rate2 === 1 && res.rate3 === 2 && res.rate4 === 2, `${mode}: no repeat for the same pair (${res.rate2}), again when the rate changes (${res.rate3}), none when they match (${res.rate4})`);
     say(res.long1 && res.long1.length === 1 && res.long1[0][0] === 'Rec long' && res.long1[0][1] === 300 && res.long1[0][2] === 1 && res.longStored, `${mode}: a 5-minute stereo take is in RECENT (${JSON.stringify(res.long1)}) and in the sample store (${res.longStored})`);
     say(res.longLoad === '14400000x2', `${mode}: and RECENT loads it back from the store alone: ${res.longLoad}`);
