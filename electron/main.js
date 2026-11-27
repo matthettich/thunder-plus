@@ -229,7 +229,7 @@ app.whenReady().then(() => {
       if (!fromApp(e)) return { ok: false, why: NOT_APP };
       if (!win || win.isDestroyed()) return { ok: false, why: 'no window' };
       if (!ioChild) {
-        if (!ioGate.canStart()) return { ok: false, why: 'helper stopped' };
+        if (!ioGate.canStart()) return { ok: false, why: 'helper stopped', deaths: ioGate.deaths() };
         const child = utilityProcess.fork(path.join(__dirname, 'io-helper.js'), [ioAddonPath()], { serviceName: 'thunder-io' });
         ioChild = child;
         child.once('exit', () => { if (ioChild !== child) return; ioChild = null; ioGate.died(); });   // ioStop's kills aren't deaths
@@ -240,6 +240,8 @@ app.whenReady().then(() => {
       return { ok: true };
     } catch (err) { return { ok: false, why: String((err && err.message) || err) }; }
   });
+  // RESET (review P2-6): Settings → Audio → Reset audio engine gives a helper that died twice another go; the next start forks it again.
+  ipcMain.handle('thunder:io-reset', async e => { if (!fromApp(e)) return { ok: false, why: NOT_APP }; const was = ioGate.deaths(); ioGate.reset(); return { ok: true, deaths: was }; });
   // THE MICROPHONE (phase B): asked for when the recorder opens an input, not when the helper starts (it also runs for MIDI)
   ipcMain.handle('thunder:io-mic', async () => {
     try {

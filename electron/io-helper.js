@@ -104,7 +104,7 @@ function createIoHelper({ loadAddon, post, timers }) {
 // request; after the second the helper is given up on (the page falls back to getUserMedia / Web MIDI).
 function createRestartGate(maxDeaths = 2) {
   let deaths = 0;
-  return { died: () => { deaths++; }, canStart: () => deaths < maxDeaths, deaths: () => deaths };
+  return { died: () => { deaths++; }, canStart: () => deaths < maxDeaths, deaths: () => deaths, reset: () => { deaths = 0; } };   // reset: the user's Reset audio engine (review P2-6)
 }
 
 module.exports = { createIoHelper, createRestartGate };

@@ -16094,7 +16094,7 @@ function psLiveNote(){
 }
 psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
-$('audReset').addEventListener('click', () => { resetAudio(); audStuckCheck().catch(e => tpLog('reset audio engine check failed', e)); });   // (RELOAD OFFER: when the context is stuck or the delay is far too high)
+$('audReset').addEventListener('click', () => { resetAudio(); iohReset(); audStuckCheck().catch(e => tpLog('reset audio engine check failed', e)); });   // (RELOAD OFFER: when the context is stuck or the delay is far too high)
 // RESET AUDIO SETTINGS: every per-device audio switch back to its default (the per-device ones outside aset: Keep screen on, Background play, Low power
 // display). If Latency, Rate or Worklets then differ from what the running audio was made with, it reloads exactly as Apply (reload) does (the song is
 // saved first); otherwise it re-applies in place.
@@ -18701,12 +18701,14 @@ async function iohStart(){
   const fail = why => { if (IOH.state === 'starting'){ IOH.state = 'unavailable'; IOH.why = why; iohUi(); } };
   iohHelloT = setTimeout(() => fail('no answer'), 3000);
   iohGo = (async () => {
-    try { const r = await IOAPI.start(); if (r && r.ok === false){ clearTimeout(iohHelloT); fail(String(r.why || 'could not start')); } }
+    try { const r = await IOAPI.start(); if (r && r.ok === false){ clearTimeout(iohHelloT); fail(String(r.why || 'could not start') + (r.deaths ? ' after ' + r.deaths + ' crashes' : '')); } }
     catch(e){ clearTimeout(iohHelloT); fail(String((e && e.message) || e)); }
   })();
   return iohGo;
 }
 
+// Reset audio engine (review P2-6): a helper that crashed twice is given up on for the session; the reset gives it another start.
+function iohReset(){ if (!IOAPI || !IOAPI.reset || IOH.state !== 'unavailable' || !/^helper stopped/.test(IOH.why || '')) return; IOAPI.reset().then(r => { if (r && r.ok && IOH.state === 'unavailable'){ IOH.state = 'off'; IOH.why = ''; iohUi(); } }, e => tpLog('io helper reset failed', e)); }
 /* ===== NATIVE MIDI (helper phase B; plan §3.3, §4): the helper's MIDI ports, looking like Web MIDI's access to the rest =====
    midi.access becomes {native:true, outputs, inputs, onstatechange}: an output's send(bytes, timeStamp) books the message for
    that performance.now() moment on the helper's sender thread (its OS clock: IOH.clk), clear() drops what it still has queued
@@ -27574,7 +27576,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 690;
+const BUILD = 691;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38072,6 +38074,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [691, '27 Nov', ['Fixed (desktop app): if the audio input helper crashed twice, native inputs and MIDI were gone until you quit the app. Settings › Audio › Reset audio engine now gives it another start.']],
   [690, '27 Nov', ['Fixed: the automatic backups kept a full copy of every sample ten times over, which could fill the browser’s storage, and a backup that failed said nothing. Backups now keep only a reference to each sample, and if one fails you are told to save a project file.']],
   [689, '26 Nov', ['Fixed: a …pump effect added to a track that already existed (or waiting for pump to load) could get no pump code in Chrome 153, so it passed the sound dry. It now always gets it.']],
   [688, '26 Nov', ['Fixed: since build 677 the last script of the page stopped with an error on every load, so the app did not set itself up for offline use on a first visit, and on the Android app the native engine was never asked for. Both work again.']],
