@@ -21617,6 +21617,26 @@ const SEND_COLOR = '#7a8a00';   // (no longer used: sends take their bus's colou
 // Pattern view / Mixer redraw): the page wraps it to answer once per redraw (busPlan.m.on). The sequencer core's copy of busPlan (core/seq-core.js) is the unwrapped one.
 busPlan = (() => { const raw = busPlan, m = {on:false, v:null}, f = function(){ return m.on ? (m.v || (m.v = raw())) : raw(); }; f.m = m; return f; })();
 const busPlanM = () => busPlan();
+/* OWN TRACK IN ON A BUS (26 Nov, build 686; owner: a bus's mixer had its 5th input's Track In set to the bus's own track 4, so 4 stopped being a
+   bus (busPlan's ownRet) and tracks 1, 2, 3 and 7 went missing; "probably worth a toast about disabling a bus"). Called when the bus plan changes
+   (planChanged): says it once per patch shape. Reads the patch only; the plan is not touched. */
+let busOwnWarned = '';
+function busOwnCheck(){
+  const d = S.chainPatch; if (!(d && d.format === 'chains.patch' && Array.isArray(d.modules))){ busOwnWarned = ''; return; }
+  const by = new Map(); for (const m of d.modules) if (m && m.id != null) by.set(m.id, m);
+  const nx = new Map(); for (const c of d.cables || []) if (c && c.from && c.to){ const a = c.from[0]; if (!nx.has(a)) nx.set(a, []); nx.get(a).push(c.to[0]); }
+  const trk = m => { const k = int(m.params && m.params.track, 1); return k >= 1 && k <= NT ? k - 1 : -1; }, ti = [];
+  for (const m of by.values()){ if (m.type !== 'trackIn') continue; const t = trk(m); if (t < 0) continue;
+    const seen = new Set([m.id]), w = [m.id], outs = new Set();
+    while (w.length){ const id = w.pop(), x = by.get(id); if (x && x.type === 'chainOut'){ const o = trk(x); if (o >= 0) outs.add(o); } for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } }
+    ti.push({t, outs}); }
+  const own = new Set(); for (const q of ti) if (q.outs.has(q.t)) own.add(q.t);
+  const lost = new Map(); for (const q of ti) if (S.chainOn && S.chainOn[q.t]) for (const b of q.outs) if (b !== q.t && own.has(b)){ if (!lost.has(b)) lost.set(b, new Set()); lost.get(b).add(q.t); }
+  const key = [...lost].map(([b, v]) => b + ':' + [...v].sort((x, y) => x - y).join(',')).sort().join(';'), was = busOwnWarned; busOwnWarned = key;
+  if (!key || key === was) return;
+  const [b, v] = [...lost].sort((x, y) => x[0] - y[0])[0], L = [...v].sort((x, y) => x - y).map(x => d2(x + 1)), n = L.length;
+  toast(`Track ${d2(b + 1)} has a Track In set to itself in chains, so it is not a bus: track${n > 1 ? 's' : ''} ${L.join(', ')} ${n > 1 ? 'are' : 'is'} not heard through it. Set that Track In to another track.`, 7000);
+}
 const isSendT = t => { const P = busPlanM(); return t >= 0 && t < NT && P.targets.has(t) && !P.pure.has(t) && !P.feeds.has(t); };
 // BUS COLOURS as CSS (--bus1 …): the Mixer and Pattern view use the same colours as Arrange's BUS GROUPS
 try { BUS_COLORS.forEach((c, i) => document.documentElement.style.setProperty('--bus' + (i + 1), c)); } catch(e){}
@@ -23511,6 +23531,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   function planChanged(){
     const P0 = busPlan(); if (P0 === planSeen) return; planSeen = P0;
     if (!live) return;
+    if (typeof busOwnCheck === 'function') busOwnCheck();   // OWN TRACK IN ON A BUS: a toast when a bus stops being one
     if (S.mix.some(m => m.solo)) applyMix(mixFilt);
     try { if (typeof tp !== 'undefined' && tp.seq && tp.seq.rebus) tp.seq.rebus(); } catch(e){}
   }
@@ -27525,7 +27546,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 685;
+const BUILD = 686;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29030,8 +29051,9 @@ function pickUp(x, y, say){
     if (fc >= 0 && FXC[fc] && (fc !== last.fxc || fv !== last.fxv)){ last.fxc = fc; last.fxv = fv; got.push(`effect ${FXC[fc]} ${hx(fv)}`); } }
   const fx = k === 'fxc' || k === 'fxv';
   const cp = clipped ? ' · copied (' + pasteKey() + ' pastes it)' : '';
-  if (got.length){ toast('Picked up: ' + got.join(' · ') + cp + (say ? (fx ? ' · Enter on an empty effect cell adds it · Enter twice opens the list' : ' · Enter on an empty note adds it') : '')); draw(); }
-  else if (say) toast((fx ? `Already picked up: effect ${FXC[last.fxc]} ${hx(last.fxv)}` : `Already current: note ${noteS(last.note)} · instrument ${hx(last.inst)}`) + cp + (fx ? ' · Enter twice opens the list' : ''));
+  // (26 Nov, build 686; owner: "get rid of the toast that opens when you pick an fx command up with enter") picking up an effect is silent (the copy to the clipboard still happens)
+  if (got.length){ if (!fx) toast('Picked up: ' + got.join(' · ') + cp + (say ? ' · Enter on an empty note adds it' : '')); draw(); }
+  else if (say && !fx) toast(`Already current: note ${noteS(last.note)} · instrument ${hx(last.inst)}` + cp);
 }
 const curS = () => `inst ${hx(last.inst)}${midiTag(last.inst)} · ${FXC[last.fxc]} ${hx(last.fxv)}`;
 // MIDI INSTRUMENTS EASIER TO SEE (owner, 5 Nov): an instrument that sends MIDI says so wherever its number shows
@@ -38015,6 +38037,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [686, '26 Nov', ['Picking up an effect command with Enter no longer shows a message.', 'chains: a message when a bus has a Track In set to its own track (that stops it being a bus, so the tracks feeding it go quiet).']],
   [685, '26 Nov', ['Behind the scenes: in the Mac and Windows desktop app\u2019s native shell, Settings \u203a Audio now picks the output and input device, the buffer and the device\u2019s own sample rates, and shows the latency; Record a sample records every input of the interface; Settings \u203a MIDI lists the shell\u2019s ports and plays notes in.', 'Nothing changes in the Electron app, the website or the Android app.']],
   [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
   [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
