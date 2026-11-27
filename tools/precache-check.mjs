@@ -19,6 +19,11 @@ for (const page of ['index.html', 'chains/index.html', 'waves/index.html']){
     if (!cached.has(p)) problems.push(page + ' loads ' + rel + '?v=' + v + ', which sw.js does not precache');
     else if (cached.get(p) !== v) problems.push(page + ' loads ' + rel + '?v=' + v + ', but sw.js precaches ?v=' + (cached.get(p) || '(none)'));
   }
+  // Unversioned local <link href> / <script src> (the pages' icons, review P3-5): must be precached too, or the page is incomplete offline.
+  for (const m of src.matchAll(/<(?:link|script)\b[^>]*?\b(?:href|src)="((?:\.{1,2}\/)?[\w./-]+\.(?:js|mjs|png|svg|webmanifest|css))"/g)){
+    const p = path.posix.normalize(path.posix.join(dir, m[1]));
+    if (!cached.has(p)) problems.push(page + ' links ' + m[1] + ', which sw.js does not precache');
+  }
 }
 if (problems.length){ console.error('precache check: ' + problems.length + ' problem(s)\n  ' + [...new Set(problems)].join('\n  ')); process.exit(1); }
 console.log('precache check: ' + cached.size + ' precached files, every versioned file the pages load matches sw.js');
