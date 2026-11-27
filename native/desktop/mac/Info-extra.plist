@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- H8: merged into the built bundle's Info.plist by mac/plist_extras.sh. `.thunder` project files open in Thunder Plus (the same association electron-builder writes for the Electron app:
+     extension thunder, name "Thunder Plus project", role Editor, mime application/x-thunder-plus). The type is exported as a UTI of our own that conforms to public.json (the files are JSON text). -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Thunder Plus project</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array><string>com.matthettich.thunderplus.project</string></array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>thunder</string></array>
+      <key>CFBundleTypeMIMETypes</key>
+      <array><string>application/x-thunder-plus</string></array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>com.matthettich.thunderplus.project</string>
+      <key>UTTypeDescription</key><string>Thunder Plus project</string>
+      <key>UTTypeConformsTo</key>
+      <array><string>public.json</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array><string>thunder</string></array>
+        <key>public.mime-type</key>
+        <array><string>application/x-thunder-plus</string></array>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>

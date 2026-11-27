@@ -44,7 +44,7 @@ jobs:
         shell: pwsh
         run: cmake -S native -B build -A x64 -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_WEBVIEW2_DIR=$env:WEBVIEW2_DIR" "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}"
       - name: Build the shell and the library tests
-        run: cmake --build build --config Release -j 3 --target thunder_desktop_win test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session
+        run: cmake --build build --config Release -j 3 --target thunder_desktop_win test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session test_desktop_launch_args test_desktop_update_check
       - name: Library tests
         run: ctest --test-dir build -C Release --output-on-failure -R desktop_
       - name: Shell selftest (every channel answers; null audio device)
@@ -57,6 +57,42 @@ jobs:
           if (-not $p.WaitForExit(150000)) { $p.Kill(); Write-Host "selftest timed out"; if (Test-Path $rep) { Get-Content $rep }; exit 2 }
           if (Test-Path $rep) { Get-Content $rep } else { Write-Host "no report file" }
           exit $p.ExitCode
+      # H8: the .thunder association (per-user registry keys written by `--register-file-type`), single instance (a second launch hands its file to the first through WM_COPYDATA and exits), and the double-click path
+      # (ShellExecute of a .thunder file goes through the association to a second launch, which hands the file over). `--open-log` is the shell's test hook: every path given to the page is appended to that file.
+      - name: File association and single instance
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $exe = (Resolve-Path "build\desktop\Release\Thunder Plus.exe").Path
+          $p = Start-Process -FilePath $exe -ArgumentList "--register-file-type" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "--register-file-type failed ($($p.ExitCode))" }
+          $ext = (Get-Item 'HKCU:\Software\Classes\.thunder').GetValue('')
+          $cmd = (Get-Item 'HKCU:\Software\Classes\ThunderPlus.Project\shell\open\command').GetValue('')
+          Write-Host "ext -> $ext ; command = $cmd"
+          if ($ext -ne 'ThunderPlus.Project') { throw "the extension does not point at the ProgID" }
+          if ($cmd -ne "`"$exe`" `"%1`"") { throw "unexpected open command" }
+          $log = Join-Path $PWD "open.log"; Remove-Item $log -ErrorAction SilentlyContinue
+          $song1 = Join-Path $PWD "hand off one.thunder"; $song2 = Join-Path $PWD "assoc two.thunder"
+          '{}' | Set-Content $song1; '{}' | Set-Content $song2
+          $first = Start-Process -FilePath $exe -ArgumentList "--null-audio","--open-log","`"$log`"" -PassThru
+          Start-Sleep -Seconds 10
+          # a second launch with a file: it must exit by itself, quickly, and the first copy must get the file
+          $second = Start-Process -FilePath $exe -ArgumentList "--null-audio","--open-log","`"$log`"","`"$song1`"" -PassThru
+          if (-not $second.WaitForExit(20000)) { $second.Kill(); $first.Kill(); throw "the second launch did not exit" }
+          Write-Host "second launch exit code $($second.ExitCode)"
+          if ($second.ExitCode -ne 0) { $first.Kill(); throw "the second launch exit code is not 0" }
+          for ($i = 0; $i -lt 40 -and -not ((Test-Path $log) -and (Select-String -Path $log -SimpleMatch -Pattern "hand off one.thunder" -Quiet)); $i++) { Start-Sleep -Milliseconds 500 }
+          if (-not ((Test-Path $log) -and (Select-String -Path $log -SimpleMatch -Pattern "hand off one.thunder" -Quiet))) { $first.Kill(); throw "the first copy never received the file" }
+          if ($first.HasExited) { throw "the first copy is gone" }
+          # the double-click path: the association starts a second launch with the file, the first copy gets it
+          Start-Process -FilePath $song2
+          for ($i = 0; $i -lt 40 -and -not (Select-String -Path $log -SimpleMatch -Pattern "assoc two.thunder" -Quiet); $i++) { Start-Sleep -Milliseconds 500 }
+          $okAssoc = Select-String -Path $log -SimpleMatch -Pattern "assoc two.thunder" -Quiet
+          Get-Content $log
+          Get-Process | Where-Object { $_.ProcessName -eq "Thunder Plus" } | ForEach-Object { try { $_.Kill() } catch {} }
+          if (-not $okAssoc) { throw "opening a .thunder file through the association did not reach the running copy" }
+          $p = Start-Process -FilePath $exe -ArgumentList "--unregister-file-type" -PassThru -Wait
+          if (Test-Path 'HKCU:\Software\Classes\ThunderPlus.Project') { throw "--unregister-file-type left the ProgID behind" }
       # The UI sweep of the top-bar and right-click menus (tests/sweep/menus.mjs), driven over the DevTools Protocol into the SHELL's WebView2 (native/desktop/tests/sweep/ui-lib-shell.mjs replaces
       # the sweep's own Chrome). First runs report without failing the job (continue-on-error): read the log, then make it a gate.
       - name: Menus sweep inside the shell (WebView2 over CDP)
@@ -104,11 +140,25 @@ jobs:
       - name: Configure
         run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}"
       - name: Build the shell and the library tests
-        run: cmake --build build -j3 --target ThunderPlus test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session test_desktop_midi_manager
+        run: cmake --build build -j3 --target ThunderPlus test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session test_desktop_midi_manager test_desktop_launch_args test_desktop_update_check
       - name: Library tests
         run: ctest --test-dir build --output-on-failure -R desktop_
-      - name: "Ad-hoc signature (no Developer ID; this only makes the bundle coherent, H8 signs and notarises)"
-        run: codesign --force --deep --sign - "build/desktop/Thunder Plus.app" && codesign -dv "build/desktop/Thunder Plus.app" 2>&1 | head -5
+      - name: "Sign: hardened runtime + entitlements, ad hoc (no Developer ID yet: mac/sign.sh with an identity does the real one)"
+        run: |
+          sh native/desktop/mac/sign.sh "build/desktop/Thunder Plus.app"
+          APP="build/desktop/Thunder Plus.app"
+          codesign -d --entitlements - "$APP" 2>&1 | tee ents.txt
+          grep -q "com.apple.security.device.audio-input" ents.txt
+          codesign -dv "$APP" 2>&1 | grep -E "flags=.*runtime"
+      - name: Info.plist (microphone text, .thunder document type and UTI)
+        run: |
+          P="build/desktop/Thunder Plus.app/Contents/Info.plist"
+          plutil -lint "$P"
+          /usr/libexec/PlistBuddy -c "Print :NSMicrophoneUsageDescription" "$P"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:CFBundleTypeExtensions:0" "$P" | grep -qx thunder
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:LSItemContentTypes:0" "$P" | grep -qx com.matthettich.thunderplus.project
+          /usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:0:UTTypeIdentifier" "$P" | grep -qx com.matthettich.thunderplus.project
+          /usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0" "$P" | grep -qx thunder
       - name: Shell selftest (every channel answers; null audio device)
         timeout-minutes: 5
         run: |
@@ -120,6 +170,26 @@ jobs:
           ( sleep 150; pkill -f "Thunder Plus.app/Contents/MacOS" ) &
           wait $PID
           grep -q "^SELFTEST PASS" selftest-macos.txt
+      # H8: single instance. The first copy runs on the null device; a second launch with a file asks it (open -a, LaunchServices) to open that file and leaves. --open-log is the shell's test hook.
+      - name: Single instance (second launch hands its file over)
+        timeout-minutes: 5
+        run: |
+          APP="build/desktop/Thunder Plus.app/Contents/MacOS/Thunder Plus"
+          LOG="$PWD/open.log"; rm -f "$LOG"
+          S1="$PWD/hand off one.thunder"; echo '{}' > "$S1"
+          "$APP" --null-audio --open-log "$LOG" > first.txt 2>&1 &
+          FIRST=$!
+          sleep 12
+          kill -0 $FIRST
+          "$APP" --null-audio --open-log "$LOG" "$S1" > second.txt 2>&1 &
+          SECOND=$!
+          for i in $(seq 1 30); do kill -0 $SECOND 2>/dev/null || break; sleep 1; done
+          if kill -0 $SECOND 2>/dev/null; then kill $SECOND $FIRST; echo "the second launch did not exit"; exit 1; fi
+          for i in $(seq 1 30); do grep -q "hand off one.thunder" "$LOG" 2>/dev/null && break; sleep 1; done
+          cat "$LOG" || true; cat first.txt second.txt || true
+          kill -0 $FIRST
+          grep -q "hand off one.thunder" "$LOG"
+          kill $FIRST || true
       - name: Package (unsigned; right-click Open the first time)
         if: ${{ always() }}
         run: |

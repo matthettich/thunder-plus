@@ -110,7 +110,7 @@ if(THUNDER_DESKTOP_SHELL)
     set(WV2_DLL "${THUNDER_WEBVIEW2_DIR}/build/native/${WV2_ARCH}/WebView2Loader.dll")
     add_executable(thunder_desktop_win WIN32 win/main_win.cpp)
     target_include_directories(thunder_desktop_win PRIVATE "${THUNDER_WEBVIEW2_DIR}/build/native/include" ${TPD_GEN})
-    target_link_libraries(thunder_desktop_win PRIVATE thunder_desktop_audio "${WV2_LIB}" user32 ole32 shell32 comdlg32 shlwapi advapi32 oleaut32 runtimeobject)
+    target_link_libraries(thunder_desktop_win PRIVATE thunder_desktop_audio "${WV2_LIB}" user32 ole32 shell32 comdlg32 shlwapi advapi32 oleaut32 runtimeobject winhttp)
     target_compile_definitions(thunder_desktop_win PRIVATE THUNDER_APP_VERSION="${THUNDER_APP_VERSION}" UNICODE _UNICODE)
     target_compile_options(thunder_desktop_win PRIVATE /EHsc /utf-8 /W3)
     set_target_properties(thunder_desktop_win PROPERTIES OUTPUT_NAME "Thunder Plus")
@@ -129,6 +129,8 @@ if(THUNDER_DESKTOP_SHELL)
     # H7: the audio input needs NSMicrophoneUsageDescription in Info.plist (macOS asks the person the first time an input opens; without the key the open is refused). PlistBuddy runs after the plist is written.
     add_custom_command(TARGET ThunderPlus POST_BUILD
       COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/mac/add_mic_key.sh" "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>"
-      COMMENT "Info.plist: NSMicrophoneUsageDescription" VERBATIM)
+      # H8: the .thunder document type + UTI (mac/Info-extra.plist). The hardened-runtime audio-input entitlement (mac/Thunder.entitlements) is applied at signing time by mac/sign.sh.
+      COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/mac/plist_extras.sh" "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>" "${CMAKE_CURRENT_SOURCE_DIR}/mac/Info-extra.plist"
+      COMMENT "Info.plist: NSMicrophoneUsageDescription, .thunder document type" VERBATIM)
   endif()
 endif()
