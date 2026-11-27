@@ -4,6 +4,22 @@ Pick-up notes for continuing this work in a later session. Read this together wi
 [`README.md`](README.md) (the app's own docs) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 Keep this file up to date at the end of a work session.
 
+## PICK UP HERE (27 Nov 2026, 14:00): beta = main = build 702, desktop v1.3.20
+
+- **Shipped today:** the 27 Nov code review (builds 690–698, its entry under To-do), tempo-synced envelopes follow the song
+  (699), and Song sections (702: + on any row; the lane follows the grid's real scroll). Builds 700–701 came from another session.
+  Desktop v1.3.17, v1.3.18, v1.3.20 (v1.3.19 from the other session).
+- **Waiting on the owner:** the punch-list items dated 27 Nov (backups with a long sample, helper reset, offline link,
+  update offer, PERFORM songs, tempo-synced envelopes, song sections). **Section drift while scrolling is not reproduced**:
+  headless Chrome kept the boxes on their rows before and after build 702; if it still drifts, get the device and the way of
+  scrolling (finger, trackpad, wheel, scrollbar) and whether Arrange was beside Song or Phrase.
+- **Open, small, not started:** `tpLog` stops after 200 distinct entries (no rotation); redo pushes into undo.past skip
+  `undoTrim` (bounded at the next edit); other permanent timers (500 ms io tick, 1 s lock drift) unchecked for hidden use; review
+  P3-2 (CSP), P3-3 (`?seqtest` in desktop builds), P3-4 (GENERATED banner / `.coderabbit.yaml`) need the owner. The reviewer's
+  branch `freebuff/986ec098e9c1087fd3df6245` can be deleted (its docs are on beta and main).
+- **Checks to run before any merge:** full `npm test` (with `npm i --no-save acorn@8 acorn-walk@8 eslint@9 globals@15`; ~5 min,
+  the per-file runs miss source pins), `npm run lint`, `node tools/precache-check.mjs`, both generator `--check`s.
+
 ## Where things stand (13 Oct 2026, morning; newest work is in the dated entries below)
 
 - **One repo now:** `matthettich/thunder-plus` (this one), branch `main`, pushed, nothing uncommitted.
@@ -374,6 +390,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.20** (27 Nov 2026, a regular release; owner, 27 Nov 13:46: "push to main and build a desktop"; PR #359 beta → main at build 702 (merge commit 3d3a5fc), Run workflow through the API from `main`, run 46065958742, all three platforms and 11 assets, the latest release): Song sections, + on any row and the lane following the grid's scroll.
 - **v1.3.19** (27 Nov 2026, a regular release; owner, 27 Nov 12:27: "merge with main and push a new desktop build"; PR #357 into `beta`, PR #358 beta → main at build 701 (merge commit e8d53aa), Run workflow through the API from `main`, run 46057548764, the latest release): build 701 (FX slot Enter, CLN↓ keeps mutes, Arrange loop-back with FOLLOW off, TRIM light, menu wording).
 - **v1.3.18** (27 Nov 2026, a regular release; owner, 27 Nov 11:11: "Push to main and desktop"; PR #355 beta → main at build 699 (merge commit e29273a), Run workflow through the API from `main`, run 46047667178, all three platforms and 11 assets, the latest release): build 699, tempo-synced envelopes follow the song's tempo.
 - **v1.3.17** (27 Nov 2026, a regular release; owner, 27 Nov 10:01: "You can push to main and build a new desktop once you're done"; PR #354 beta → main at build 698 (merge commit da4d373), Run workflow through the API from `main`, run 46043714322, all three platforms and 11 assets, the latest release (checked 27 Nov)): the 27 Nov code review, builds 690–698 (see its entry under To-do).
