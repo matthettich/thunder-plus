@@ -58,6 +58,11 @@ bool same(float a, double b) { return a == (float)b; }
 }  // namespace
 
 int main() {
+#ifdef THUNDER_HAVE_TFX
+  std::printf("TFX: yes\n");   // W-TFX: CI greps this line for the Windows clang-cl job (no effects library = the plans below are not made)
+#else
+  std::printf("TFX: no\n");
+#endif
   {   // ---- (1) the call ----
     Host N(opts(THUNDER_LIVE_F_MASTER, 4096)); thunder_live_meters_spec s = spec(MK);
     CHECK(N->metersSet(s) == THUNDER_LIVE_E_STATE, "no F_METERS: E_STATE");

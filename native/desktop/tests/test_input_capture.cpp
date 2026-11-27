@@ -34,8 +34,11 @@ int main() {
   CHECK(!ic.arm({}, &e) && !ic.arm({28}, &e) && e.find("28 channels") != std::string::npos && !ic.arm({-1}, &e), "arm refuses no channels and channels the device lacks");
   CHECK(ic.arm({0, 17, 27}, &e) && ic.armed(), "arm three of 28");
   CHECK(ic.start(&e), "start"); CHECK(ic.recording() && !ic.arm({1}, &e), "no re-arm while recording");
-  int64_t f = 0; for (int k = 0; k < 40; k++) { fi->feed(128, f); f += 128; std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
-  waitFor(ic, 0);
+  // readPeaks() reads AND resets, and the drain thread's periodic meter event resets the peaks too: one read after stop can land just after such a reset and see zeros (W-TFX, M2). So the
+  // peaks are polled over the whole window and the per-channel maximum is kept; what the check below requires is unchanged.
+  std::vector<float> peak; auto poll = [&] { auto q = ic.readPeaks(); if (peak.size() < q.size()) peak.resize(q.size(), 0.f); for (size_t i = 0; i < q.size(); i++) peak[i] = std::fmax(peak[i], q[i]); };
+  int64_t f = 0; for (int k = 0; k < 40; k++) { fi->feed(128, f); f += 128; std::this_thread::sleep_for(std::chrono::milliseconds(1)); poll(); }
+  for (int i = 0; i < 500 && ic.availableFrames() > 0; i++) { std::this_thread::sleep_for(std::chrono::milliseconds(2)); poll(); }
   const int id = ic.stop(&e); CHECK(id == 1 && !ic.recording(), "stop gives take 1");
   auto t = ic.take(id);
   CHECK(t && t->channels == 3 && t->frames == 5120 && t->sr == 48000 && t->data.size() == 3 && t->latencyFrames == 96 && t->gaps == 0, "the take: 3 channels, 5120 frames: %lld", t ? (long long)t->frames : -1);
@@ -44,7 +47,7 @@ int main() {
   CHECK(right, "every sample of channels 0, 17 and 27 is the right one (no channel mix-up, no shift)");
   // the host time of the take's first frame: the stream's frame 0 (1000 ns: each fake callback comes at the END of its frames, so a start taken from the first callback would be 128 frames late) + frame / rate - the latency (96 frames = 2 ms)
   CHECK(t && std::llabs(t->hostNs0 - (1000 - (int64_t)(96.0 * 1e9 / 48000.0))) < 1000, "hostNs0 = start - input latency: %lld", t ? (long long)t->hostNs0 : 0);
-  auto pk = ic.readPeaks(); CHECK(pk.size() == 3 && pk[0] > 0.f && pk[2] > 26.9f, "meters: one peak per armed channel");
+  poll(); auto pk = peak; CHECK(pk.size() == 3 && pk[0] > 0.f && pk[2] > 26.9f, "meters: one peak per armed channel");
   CHECK(ic.stop(&e) < 0 && e.find("no take") != std::string::npos, "stop without a take");
   { std::lock_guard<std::mutex> g(em); bool any = false; for (auto& l : events) if (l.find("\"t\":\"rec\"") != std::string::npos && l.find("\"pk\":[") != std::string::npos) any = true; CHECK(any, "the rec meter event is emitted while armed"); }
 
