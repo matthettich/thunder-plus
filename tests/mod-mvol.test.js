@@ -17,7 +17,7 @@ const curve = v => Math.pow(Math.max(0, Math.min(255, v)) / 255, 2);
 const PAGE = vm.createContext({ Math, JSON, Object, Array, Map, Set, String, Number, isNaN, NT, MT, TFX: {}, FX_GROUP: {}, FX_CREDIT: {}, PUMP_META: {}, clamp,
   int: (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d, d2: n => String(n).padStart(2, '0'), isBusT: () => true, isPumpT: () => false, globalThis: null });
 PAGE.globalThis = PAGE;
-vm.runInContext(cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block'), PAGE);
+vm.runInContext(cut(/^var PERF_SCENES = [^\n]*PLFO_SHAPES = [^\n]*\n/m, 'the PERFORM sizes (set once above the saved-song load, build 698)') + cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block'), PAGE);
 const run = code => vm.runInContext(code, PAGE);
 
 function mkSong({ cells, lfo = {}, mout = 200, master = 255 }){

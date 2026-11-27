@@ -116,7 +116,7 @@ test('a track with nothing on it: nothing changes (changed is false), the song i
 });
 
 // ---------- resetTrack(): the real function, one undo step, the live calls ----------
-const undoCode = line('const undo = {past:[]') + '\n' + cut('function snap(){', 'const vUndo = ');
+const undoCode = line('const undo = {past:[]') + '\n' + line('const UNDO_MAX = ') + '\n' + line('function undoTrim(){') + '\n' + cut('function snap(){', 'const vUndo = ');   // (undoTrim: the byte budget, build 695)
 const trkCode = line('const TRK_SCREENS = ');
 const liveCode = cut('function resetTrackFocus(){', '/* ---------- mastering on the master bus');
 function liveVm(S, o = {}) {

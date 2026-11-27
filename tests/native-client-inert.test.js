@@ -88,7 +88,7 @@ test('(b) branch count: PC1 + PC3 own rows 1, 2, 3, 4, 5, 6, 15, 16, 17 and 18 o
   // the PC3 branches say what they are: tStart's is the first thing after the render prep and before the first PLAY's audio warm-up (rtInit)
   const ts = src.slice(src.indexOf('function tStart(mode, o){'), src.indexOf('function tStart(mode, o){') + 6000);
   assert.ok(ts.indexOf("if (NCON() && NC().can(mode, o)){ NC().start(mode, o); return; }") > 0 && ts.indexOf("if (NCON() && NC().can(mode, o))") < ts.indexOf('rtInit()'), 'the native branch comes before rtInit() (no AudioContext for a native PLAY)');
-  assert.ok(/function saveS\(\)\{[^\n]*try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{\}/.test(src), 'saveS publishes through the client, after coreSong');
+  assert.ok(/function saveS\(\)\{[^\n]*try \{ if \(NCON\(\)\) NC\(\)\.edit\(\); \} catch\(e\)\{(?: tpLog\('[^']*', e\); )?\}/.test(src), 'saveS publishes through the client, after coreSong');
   assert.ok(/const corePost = \(m, tr\) => \{ if \(tp\.nc\) return NC\(\)\.legacy\(m\); try \{ core\.node\.port/.test(src), 'corePost: the JS core body is unchanged behind the tp.nc line');
 });
 test('(b) PC4: the four live-edit branches (mfSet, the OUT bar drag, pdcSet, param) are one guarded line each, and the host gives the client its three hooks', () => {

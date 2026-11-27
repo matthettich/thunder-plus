@@ -30,8 +30,8 @@ test('leaving a screen keeps the selection as the armed loop', () => {
   assert.match(src, /if \(loopSel && !tp\.on && !\(tv !== 'song' && loopArm && loopArm\.v === 'song'\)\) loopFor\(tv\);[^\n]*\n  tv = v; if \(MID\.includes\(v\)\) midV = v; selA = null;/);
 });
 test('dropped pad renders are started again: after the track counts change, and when PLAY is pressed', () => {
-  assert.match(src, /if \(vtrk\) growKit\(\);\n[\s\S]{0,500}if \(vtrk && \(n1 !== n0 \|\| m1 !== m0\)\) try \{ prerender\(\); \} catch\(e\)\{\}/);
-  assert.match(src, /if \(!tp\.on && !\(o && o\._warm\) && PW\.ready\) try \{ prerender\(\); \} catch\(e\)\{\}/);
+  assert.match(src, /if \(vtrk\) growKit\(\);\n[\s\S]{0,500}if \(vtrk && \(n1 !== n0 \|\| m1 !== m0\)\) try \{ prerender\(\); \} catch\(e\)\{(?: tpLog\('[^']*', e\); )?\}/);
+  assert.match(src, /if \(!tp\.on && !\(o && o\._warm\) && PW\.ready\) try \{ prerender\(\); \} catch\(e\)\{(?: tpLog\('[^']*', e\); )?\}/);
 });
 test('LP.SEL lock (23 Nov): a locked loop keeps its rows while another selection is made; a stale lock (not playing) does not', () => {
   const sel = { r: { y0: 0x20, y1: 0x27 } };

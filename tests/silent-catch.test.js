@@ -8,8 +8,8 @@ function cut(re, what) { const m = html().match(re); assert.ok(m, `index.html: c
 function sandbox(extra) { const c = Object.assign({ console: { warn() {}, log() {} }, JSON, Math, Date, Set, Map, Error, String, Number, Array, Object, Promise }, extra); vm.createContext(c); return c; }
 
 test('line-tempo / prerender timer: a throw is logged to tpLog, not swallowed', () => {
-  const blk = cut(/setInterval\(\(\) => \{ try \{ if \(!kit\.voices\.some\(voiceLines\)\) return;[^\n]*\}, 100\);/, 'the lnTempo/prerender 100 ms timer');
-  const logs = []; let cb; const c = sandbox({ setInterval: f => { cb = f; }, kit: { voices: [{}] }, voiceLines: () => true, lnT: { gen: 0 }, lnTempo() { this.lnT.gen++; }, prerender() { throw new Error('render boom'); }, tpLog: (w, e) => logs.push({ w, e }) });
+  const blk = cut(/setInterval\(\(\) => \{ try \{ (?:if \(document\.hidden && !tp\.on\) return; )?if \(!kit\.voices\.some\(voiceLines\)\) return;[^\n]*\}, 100\);/, 'the lnTempo/prerender 100 ms timer');
+  const logs = []; let cb; const c = sandbox({ setInterval: f => { cb = f; }, document: { hidden: false }, tp: { on: false }, kit: { voices: [{}] }, voiceLines: () => true, lnT: { gen: 0 }, lnTempo() { this.lnT.gen++; }, prerender() { throw new Error('render boom'); }, tpLog: (w, e) => logs.push({ w, e }) });
   c.lnTempo = () => { c.lnT.gen++; };
   vm.runInContext(blk, c); assert.equal(typeof cb, 'function'); cb();
   assert.equal(logs.length, 1, 'one tpLogs entry'); assert.match(logs[0].w, /prerender/); assert.equal(logs[0].e.message, 'render boom');

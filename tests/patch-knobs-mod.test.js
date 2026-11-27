@@ -10,7 +10,7 @@ const PAGE = vm.createContext({ Math, JSON, Object, Array, Map, Set, String, Num
   int: (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d, d2: n => String(n).padStart(2, '0'), isBusT: () => true, isPumpT: () => false,
   isLivePad: p => p === 'live', isWlV: v => v === 'waves', kit: { voices: { live: 'x', wv: 'waves' } }, voiceForTrack: () => null, globalThis: null });
 PAGE.globalThis = PAGE;
-vm.runInContext(cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block'), PAGE);
+vm.runInContext(cut(/^var PERF_SCENES = [^\n]*PLFO_SHAPES = [^\n]*\n/m, 'the PERFORM sizes (set once above the saved-song load, build 698)') + cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block'), PAGE);
 const run = code => vm.runInContext(code, PAGE), J = x => JSON.parse(JSON.stringify(x));
 // a song where track 2 plays an instrument whose pad is `pad` (phrase rows: [note, inst])
 function song(pad, chainOn){
