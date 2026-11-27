@@ -31,3 +31,14 @@ test('service worker: one file that 404s still lets the new worker install, with
   assert.equal(nu.m.get(failing), 'old copy', 'the failed file is the previous cache\'s copy');
   assert.ok(nu.m.get('./index.html'), 'the rest is precached from the network');
 });
+
+test('service worker: offline, a page URL with a query (./?shared=1) is served from the precached page (review P3-7)', async () => {
+  const src = fs.readFileSync(path.join(H.ROOT, 'sw.js'), 'utf8'), L = {}, page = 'https://x.test/app/';
+  const store = new Map([[page, 'cached page']]), strip = u => u.split('?')[0];
+  const ctx = { self: { addEventListener: (t, f) => { L[t] = f; }, skipWaiting() {}, clients: { claim() {} }, registration: { scope: page } }, console, URL, location: { origin: 'https://x.test' },
+    fetch: () => Promise.reject(new TypeError('offline')), Request: function (u) { this.url = u; },
+    caches: { open: async () => ({ put() {} }), match: async (r, o) => { const u = r.url || r; if (store.has(u)) return store.get(u); if (o && o.ignoreSearch) for (const [k, v] of store) if (strip(k) === strip(u)) return v; } } };
+  vm.runInNewContext(src, ctx);
+  let res; L.fetch({ request: { url: page + '?shared=1', method: 'GET', mode: 'navigate' }, respondWith: p => { res = p; } });
+  assert.equal(await res, 'cached page');
+});
