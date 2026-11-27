@@ -12,7 +12,8 @@ const cut = (re, what) => { const m = src.match(re); assert.ok(m, 'not found: ' 
 const LOADER = cut(/\/\* NATIVE CORE CLIENT \(PC1[\s\S]*?document\.head\.appendChild\(s\); \};\n/, 'the NC / NCON / loadClient block');
 const SRGUESS = cut(/let srGuess = 48000;\ntry \{[\s\S]*?\n\} catch\(e\)\{\}\n/, 'the srGuess block');
 const PADSR = cut(/const padSR = [^\n]*\n/, 'padSR');
-const CALL = cut(/\nif \(window\.thunderCore \|\| aset\.core === 'native'\) loadClient\(\);[^\n]*\n/, 'the loadClient call site').trim();
+// build 687: the call site is a boot function the main script defines (the page's last script, outside that scope, calls it: tests/last-script-scope.test.js)
+const CALL = cut(/\nwindow\.__ncBoot = \(\) => \{ if \(window\.thunderCore \|\| aset\.core === 'native'\) loadClient\(\); \};[^\n]*\n/, 'the loadClient call site').trim() + '\nwindow.__ncBoot();';
 
 // A page-like sandbox: `window` is the sandbox itself, so window.thunderCore / window.__thunderClient are plain properties of it.
 function rig({ core = 'core', thunderCore = null, rate = 0, withCtx = null } = {}) {
@@ -107,7 +108,7 @@ test('(b) __thunderClient appears only inside the loader block; thunder-core-cli
   assert.equal(lines.filter(l => /^\s*s\.src = /.test(l) && l.includes('thunder-core-client.js')).length, 1);
 });
 test('(b) the call site is guarded by the switch and the shell, and is the only call; the loader makes one script element', () => {
-  assert.equal(CALL.split(';')[0], "if (window.thunderCore || aset.core === 'native') loadClient()");
+  assert.equal(CALL.split(';')[0], "window.__ncBoot = () => { if (window.thunderCore || aset.core === 'native') loadClient()");
   assert.equal((src.match(/\bloadClient\(\)/g) || []).length, 1);
   assert.equal((LOADER.match(/createElement\(/g) || []).length, 1);
 });

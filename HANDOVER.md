@@ -930,6 +930,10 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 - [ ] **Computer (desktop app, build 684: file-access security fix, PR into `beta`): open, save, save-as, recent, render a WAV, record, load a sample folder all still work.** Pass: Open picks a .thunder and loads it; Save writes it back; Save as writes a new file and later Saves go to it; double-clicking a .thunder in the file manager (and dropping one on the window) opens it and Save writes back to it; Open recent opens a song you opened or saved on THIS build (a project from an older build may say "Use Open to pick it once": pick it with Open, then it opens from the list); Render to WAV / Export ZIP / MIDI asks where, writes the file and Show opens its folder; recording into a pad works; Samples → load a folder / kit loads; closing the app asks to save as before; a https link in Help opens in the browser and nothing opens a second app window. Fail: any of these says "not allowed" for a file you just picked.
 - [ ] **Phone (Fold) with the native engine on (Android beta, build 683, M5 master meters): open the master panel while a song plays.** Pass: IN / OUT LUFS, the compressor and limiter reduction, the suppressor bars and PEAK (true-peak) move with the sound, and go silent within a second of STOP (or of closing the song's sound). The first few seconds of IN / OUT LUFS after opening the panel may still show stale values (the engine's 3 s loudness window is not reset). Needs a shell with `master.lvl` (PR #336). Computer and native switch off: unchanged from 682.
 
+**Build 687 (the last script's error)**
+- [ ] **Computer, a browser profile that never opened the beta site (or a private window): open the beta, wait 10 s, then switch Wi-Fi off and reload.** Pass: the app still loads (the service worker registered). Before 687 it did not on a first visit.
+- [ ] **Phone (Fold), Android beta APK with page build 687: press PLAY.** Pass: the debug panel's line reads `native live engine: live ...` and `hellos from the page: 1` or more; the playback report's `native:` line says `on yes`.
+
 **Android native, build 686 (DIAG-1: why PLAY is not native)**
 - [ ] **Phone (Fold) with the Android beta APK built from build 686: Settings > Audio > Sequencer = Native core (test); wait 10 s.** Pass: either the native engine is on (PLAY plays natively, no old-engine toast), or a small line under the Sequencer row reads `native: ... reason ...`. Then PLAY once and Copy playback report: send me the whole report; its third line starts `native:` and the PLAY line says `native:` or the exact refusal.
 
@@ -1836,6 +1840,13 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 26 Nov (build 687: the page's last script threw on every load since build 677; found on the owner's Fold)
+
+- **The bug.** PC1 (build 677) added `if (window.thunderCore || aset.core === 'native') loadClient();` to the page's LAST inline script. `aset` and `loadClient` live inside the main script's own scope, so that script threw a ReferenceError on every load, on every platform. Two effects: (1) the native client file was never fetched, so the Android app never used the native engine (the owner's 26 Nov tests: `native: ... client loaded no (not requested)`, shell: `hellos from the page: 0`); (2) the service worker lines after it never ran, so a first visit to the web app did not register the service worker (no offline use; browsers that had it registered before build 677 kept it). **Builds 677 to 686 are affected, and so is `main` (v1.3.14 and v1.3.15).**
+- **The fix.** The main script now defines `window.__ncBoot`; the last script calls it inside a try and names nothing from the main scope. Checked in headless Chrome with and without a fake `window.thunderCore`: no error, the client file is requested only with the shell (or the switch).
+- **Why the tests missed it.** `tests/native-client-inert.test.js` cut the loader and the call site out of the page and ran them in ONE scope. New `tests/last-script-scope.test.js` runs every later inline script on its own and forbids the main script's names in it.
+- **For the owner:** `main` needs this fix too (merge `beta` when you ask). Punch list: the item below.
 
 ## 26 Nov (DIAG-1: the native client says why it is off; build 686, branch `diag/native-client-report`, PR into `beta`)
 - Cause trace: `/home/claude/reports/HELLO-ROOTCAUSE.md` (not in the repo). The Fold's PLAY never went native because `NC.on` never became true (no toast and no `native engine:` line at PLAY proves the hello never succeeded); the shell posts the bridge port only in `onPageFinished`, the client asked the hello once with a 5 s timeout and never again.
