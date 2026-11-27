@@ -53,7 +53,7 @@ else()
 endif()
 
 if(THUNDER_BUILD_DESKTOP_TESTS)
-  set(TPD_TESTS app_scheme translator put_store desktop_api live_host session shell_core audio_devices midi_registry input_capture audio_session)
+  set(TPD_TESTS app_scheme translator put_store desktop_api live_host session shell_core audio_devices midi_registry input_capture audio_session tfx)
   if(NOT MSVC)
     list(APPEND TPD_TESTS midi_manager)
   endif()
@@ -66,6 +66,9 @@ if(THUNDER_BUILD_DESKTOP_TESTS)
     endif()
     add_test(NAME desktop_${t} COMMAND test_desktop_${t})
   endforeach()
+  if(THUNDER_DSP_PREBUILT_DIR)   # W-TFX: the effects come from clang-cl-built libraries: the shell's test must see them
+    set_tests_properties(desktop_tfx PROPERTIES ENVIRONMENT THUNDER_EXPECT_TFX=1)
+  endif()
 endif()
 
 # ---- the shells -------------------------------------------------------------------------------------------------------------------------------------------------------------------------

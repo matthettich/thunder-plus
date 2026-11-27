@@ -58,6 +58,125 @@ new="          int slice_duration = int(\n              clock_.interval(interval
 if s.count(old)!=1: sys.exit("Beads delay_controller.cc patch failed")
 open(p,'w').write(s.replace(old,new,1))
 PY
+# Beads (W-TFX, B2): the 12-bit delay items are two 12-bit bit-fields in `__attribute__((packed))` structs, 3 bytes per item with GCC and clang on Linux, Mac and wasm. The Microsoft ABI (clang-cl) never
+#   shares a storage unit between two int16_t bit-fields, and `packed` does not change that: 4 bytes per item, so the 12-bit delay memory (the Vintage digital and Clean tape media of the Beads
+#   effect) would hold 3/4 of the samples the same code holds elsewhere. Host builds (not wasm: that code is unchanged) now pack and unpack the 3 bytes explicitly, little-endian, first
+#   field in the low 12 bits: bit for bit the layout GCC and clang give the bit-fields, on every host, so every platform runs the same code (tests/test_dsp_layout.cpp holds it).
+python3 - "$E/beads/dsp/delay_line.h" <<'PY'
+import sys; p=sys.argv[1]; s=open(p).read()
+helpers = """#ifndef __wasm__
+// Thunder (W-TFX, prepare.sh): 12-bit items as 3 explicit bytes (see prepare.sh); slot 0 = bits 0..11, slot 1 = bits 12..23 of the little-endian 24-bit word.
+inline int thunder_get12(const uint8_t* b, int slot) {
+  const unsigned w = unsigned(b[0]) | (unsigned(b[1]) << 8) | (unsigned(b[2]) << 16);
+  const int v = int((w >> (slot ? 12 : 0)) & 0xfffu);
+  return v >= 0x800 ? v - 0x1000 : v;
+}
+inline void thunder_put12(uint8_t* b, int slot, int v) {
+  unsigned w = unsigned(b[0]) | (unsigned(b[1]) << 8) | (unsigned(b[2]) << 16);
+  const int sh = slot ? 12 : 0;
+  w = (w & ~(0xfffu << sh)) | ((unsigned(v) & 0xfffu) << sh);
+  b[0] = uint8_t(w); b[1] = uint8_t(w >> 8); b[2] = uint8_t(w >> 16);
+}
+#endif
+
+"""
+reps = [
+("""    l = stmlib::Clip16(static_cast<int32_t>(s.l * 32768.0f)) >> 4;
+    r = stmlib::Clip16(static_cast<int32_t>(s.r * 32768.0f)) >> 4;
+  }
+  inline FloatFrame value(int i) const {
+    FloatFrame result;
+    result.l = static_cast<float>(l) / 2048.0f;
+    result.r = static_cast<float>(r) / 2048.0f;
+    return result;
+  }
+  enum { bundle_size = 1 };
+  int16_t l : 12;
+  int16_t r : 12;
+} __attribute__((packed));
+""",
+"""#ifdef __wasm__
+    l = stmlib::Clip16(static_cast<int32_t>(s.l * 32768.0f)) >> 4;
+    r = stmlib::Clip16(static_cast<int32_t>(s.r * 32768.0f)) >> 4;
+#else
+    thunder_put12(raw, 0, stmlib::Clip16(static_cast<int32_t>(s.l * 32768.0f)) >> 4);
+    thunder_put12(raw, 1, stmlib::Clip16(static_cast<int32_t>(s.r * 32768.0f)) >> 4);
+#endif
+  }
+  inline FloatFrame value(int i) const {
+    FloatFrame result;
+#ifdef __wasm__
+    result.l = static_cast<float>(l) / 2048.0f;
+    result.r = static_cast<float>(r) / 2048.0f;
+#else
+    result.l = static_cast<float>(thunder_get12(raw, 0)) / 2048.0f;
+    result.r = static_cast<float>(thunder_get12(raw, 1)) / 2048.0f;
+#endif
+    return result;
+  }
+  enum { bundle_size = 1 };
+#ifdef __wasm__
+  int16_t l : 12;
+  int16_t r : 12;
+} __attribute__((packed));
+#else
+  uint8_t raw[3];
+};
+#endif
+"""),
+("""    if (i) {
+      odd = lr;
+    } else {
+      even = lr;
+    }
+  }
+  inline FloatFrame value(int i) const {
+    FloatFrame result;
+    result.l = result.r = static_cast<float>(i ? odd : even) / 2048.0f;
+    return result;
+  }
+  enum { bundle_size = 2 };
+  int16_t odd : 12;
+  int16_t even : 12;
+} __attribute__((packed));
+""",
+"""#ifdef __wasm__
+    if (i) {
+      odd = lr;
+    } else {
+      even = lr;
+    }
+#else
+    thunder_put12(raw, i ? 0 : 1, lr);
+#endif
+  }
+  inline FloatFrame value(int i) const {
+    FloatFrame result;
+#ifdef __wasm__
+    result.l = result.r = static_cast<float>(i ? odd : even) / 2048.0f;
+#else
+    result.l = result.r = static_cast<float>(thunder_get12(raw, i ? 0 : 1)) / 2048.0f;
+#endif
+    return result;
+  }
+  enum { bundle_size = 2 };
+#ifdef __wasm__
+  int16_t odd : 12;
+  int16_t even : 12;
+} __attribute__((packed));
+#else
+  uint8_t raw[3];
+};
+#endif
+"""),
+]
+for o,n in reps:
+    if s.count(o)!=1: sys.exit("Beads delay_line.h 12-bit layout patch failed (struct)")
+    s=s.replace(o,n,1)
+anchor="template<Resolution resolution, int num_channels>\nstruct Item { };\n"
+if s.count(anchor)!=1: sys.exit("Beads delay_line.h 12-bit layout patch failed (anchor)")
+open(p,'w').write(s.replace(anchor, helpers+anchor,1))
+PY
 # stmlib::Random (U14 diagnosis): its state is one static. In the web app every ThunderFx node has its own wasm instance, so its own state
 # (0x21 at start); natively all effect hosts in the process shared one, so a Beads / Clouds heard the draws of every other. Host builds
 # (not wasm: that code is unchanged) read the state through a per-thread pointer the effect host sets around its work (FxHost, see

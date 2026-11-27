@@ -172,6 +172,75 @@ jobs:
           path: build/core/Release/thunder_core.lib
           retention-days: 7
 
+  # W-TFX: the same core built by clang-cl (the VS "ClangCL" toolset), which also builds the upstream DSP (tfx / pe / mods; the sources need clang or gcc, so the cl.exe job above skips them).
+  # The cl.exe job stays as the portability check of the core. Docs: docs/port/W-TFX-PLAN.md, docs/port/W-TFX-NOTES.md.
+  windows-clangcl:
+    name: Core (Windows x64, clang-cl, with the effects)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm i --no-save --no-audit --no-fund acorn@8
+      - name: Probe (W-TFX step 1; never fails the job)
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e
+          echo "--- tools"; clang-cl --version; cmake --version | head -1; for t in sh sed python3 git node; do printf '%s: ' "$t"; command -v "$t"; done
+          sed --version | head -1; python3 --version
+          VSW="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          "$VSW" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath
+          find "/c/Program Files/Microsoft Visual Studio" -iname clang-cl.exe 2>/dev/null | head
+          echo "--- fetch + prepare, as CMake runs them (forward-slash drive paths)"
+          T=$(cygpath -m "$RUNNER_TEMP")
+          sh native/core/third_party/fetch.sh "$T/probe-deps" && sh native/core/third_party/prepare.sh "$T/probe-deps" "$T/probe-up"; echo "fetch+prepare rc=$?"
+          echo "--- the layout of the upstream 12-bit bit-fields under the MS ABI (what B2 is about; prepare.sh no longer relies on it)"
+          printf '#include <cstdint>\n#include <cstdio>\nstruct A { int16_t l:12; int16_t r:12; } __attribute__((packed));\nstruct B { int16_t odd:12; int16_t even:12; } __attribute__((packed));\nint main(){ std::printf("unpatched sizeof A=%%zu B=%%zu (3 on gcc/clang Linux)\\n", sizeof(A), sizeof(B)); }\n' > probe_layout.cpp
+          VSCL=$(find "/c/Program Files/Microsoft Visual Studio" -ipath "*Llvm/x64/bin/clang-cl.exe" 2>/dev/null | head -1); echo "VS clang-cl: $VSCL"; "$VSCL" --version
+          MSYS_NO_PATHCONV=1 "$VSCL" /nologo probe_layout.cpp /Fe:probe_layout.exe && ./probe_layout.exe
+          exit 0
+      - run: cmake -S native -B build -A x64 -T ClangCL
+      - name: Build
+        run: cmake --build build --config Release -j 4 -- /v:n
+      - name: Check the dsp objects (CRT /MD, exceptions, flags clang-cl dropped)
+        shell: bash
+        continue-on-error: true
+        run: |
+          grep -rl "thunder_dsp" build --include=*.vcxproj | head -3
+          grep -h -o "<RuntimeLibrary>[A-Za-z]*</RuntimeLibrary>" -r build/core/dsp --include=*.vcxproj | sort | uniq -c
+          grep -h -o "<ExceptionHandling>[A-Za-z]*</ExceptionHandling>" -r build/core/dsp --include=*.vcxproj | sort | uniq -c
+      # live_meters2 parts (3) to (7) expect the pump COMP slot (type 201) in the chain: there is no pump on Windows until W-PUMP, so it fails here for that reason only (see the separate step below, kept visible).
+      - run: ctest --test-dir build -C Release --output-on-failure -E "^live_meters2$"
+      - name: "live_meters2: gate on everything except the three known pump-only checks (until W-PUMP)"
+        shell: bash
+        run: |
+          ctest --test-dir build -C Release -R "^live_meters2$" -V > lm2.log 2>&1 || true
+          grep -E "TFX:|FAIL|checks" lm2.log | cut -c1-300
+          [ "$(grep -c 'TFX: yes' lm2.log)" -eq 1 ] || { echo "TFX: yes missing"; exit 1; }
+          [ "$(grep -c 'FAIL .*test_live_meters2.cpp' lm2.log)" -eq 3 ] || { echo "expected exactly 3 FAIL lines"; exit 1; }
+          grep -q 'FAIL .*badSlots == 0: slots mask is 0b111 for a chain of 3' lm2.log || { echo "pump check 1 (slots mask) not among the failures"; exit 1; }
+          grep -q 'FAIL .*ntype == 2 \* dy.size(): both dynamics slots carry their core type id' lm2.log || { echo "pump check 2 (type ids) not among the failures"; exit 1; }
+          grep -q 'FAIL .*nred > 0 && minRed < -3: the pump COMP slot' lm2.log || { echo "pump check 3 (COMP reduction) not among the failures"; exit 1; }
+          grep -q 'live_meters2: [0-9]* checks, 3 failed' lm2.log || { echo "summary is not '3 failed'"; exit 1; }
+      - name: The effects must RUN here, not skip (TFX macro, fx / padfx / modfx figures)
+        shell: bash
+        run: |
+          ctest --test-dir build -C Release -R "^(fx|fxzero|padfx|live_chlvl|live_masterm|fxsong|modfx|dsp_layout)$" --no-tests=error -V > subset.log 2>&1; rc=$?
+          cat subset.log
+          [ $rc -eq 0 ] || { echo "subset failed (rc=$rc)"; exit 1; }
+          if grep -Eq "\*\*\*Skipped|Not Run" subset.log; then echo "a test of the effects subset skipped"; exit 1; fi
+          [ "$(grep -c 'TFX: yes' subset.log)" -eq 2 ] || { echo "TFX: yes expected 2 times"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_core-windows-clangcl-x64
+          path: |
+            build/core/Release/thunder_core.lib
+            build/core/dsp/Release/thunder_dsp_*.lib
+          if-no-files-found: warn
+          retention-days: 7
+
   macos:
     name: Core (macOS universal)
     runs-on: macos-latest

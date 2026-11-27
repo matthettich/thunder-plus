@@ -85,7 +85,13 @@ endif()
 # ramps and the sequencer's times, and the goldens are compared exactly. PUBLIC so the tests' own reference code is built
 # the same way. MSVC: /fp:precise does not contract.
 if(MSVC)
-  target_compile_options(thunder_core PUBLIC /fp:precise)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # clang-cl (W-TFX): /fp:precise is its default model and leaves contraction on; the goldens need it off. Passing both makes clang warn "overriding -ffp-model=precise" (an error in the C tests under /WX),
+    # so only the explicit flag goes in (no /fp:fast, no /fp:strict: the model stays the default precise one).
+    target_compile_options(thunder_core PUBLIC /clang:-ffp-contract=off)
+  else()
+    target_compile_options(thunder_core PUBLIC /fp:precise)
+  endif()
 else()
   target_compile_options(thunder_core PUBLIC -ffp-contract=off)
 endif()
