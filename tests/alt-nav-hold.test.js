@@ -8,6 +8,7 @@ const H = require('./helpers');
 const src = H.read('index.html');
 const cut = (re, what) => { const m = src.match(re); assert.ok(m, 'could not find ' + what + ': the code moved, this test needs updating'); return m[0]; };
 const code = [cut(/const handsOn = [^\n]*\n/, 'handsOn'), cut(/let navT = -1e9;\n/, 'navT'), cut(/const ARR_AHEADS = \[[\s\S]*?\nfunction arrPageTop\([^\n]*\)\{[\s\S]*?\n\}\n/, 'arrPageTop (14 Nov: the early page turn; 15 Nov: the look-ahead is a setting)'), cut(/function arrFollowPage\(own\)\{[\s\S]*?\n\}\n/, 'arrFollowPage'),
+  cut(/const posLive = [^\n]*\n/, 'posLive (build 703)'),
   cut(/function followPlay\(\)\{[\s\S]*?\n\}\n\/\/ ARRANGE PAGES/, 'followPlay').replace(/\n\/\/ ARRANGE PAGES$/, '')].join('\n');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function rig({ follow = 2, row = 2, y = 30, top = 15 } = {}) {
