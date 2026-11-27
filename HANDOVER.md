@@ -543,26 +543,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-### Pump code sent to the track-FX worklet over the port is lost in Chrome 153 (found 26 Nov, not fixed)
+### Pump code sent to the track-FX worklet over the port is lost in Chrome 153: FIXED in build 689 (26 Nov)
 
-Owner, 26 Nov: fix this in a new chat. Found while fixing the same bug in ...Spores (its Coil / Orbit / Fold / Boing were
-silent live; fixed there by sending the wasm bytes and compiling them in the worklet).
-- **The bug:** in Chrome 153, a compiled `WebAssembly.Module` sent with `node.port.postMessage` to an AudioWorklet never
-  arrives: the processor gets a `messageerror` instead, live and offline (checked with a minimal test page). A Module
-  passed in `processorOptions` at node creation still works, and posting one to a dedicated Worker works too, so most of
-  Thunder Plus is fine.
-- **Affected here (beta as of build 688):** `index.html` ~21920 `if (d.needPump){ … n.port.postMessage(pumpModOpt() ?
-  {pumpModule: pumpModOpt()} : {pumpBytes: pumpBin()}) … }` (a track-FX node asking for pump code after it was created),
-  and ~19113 `for (const n of pumpWait) … n.port.postMessage(pumpWasmMod ? {pumpModule: pumpWasmMod} : {pumpBytes: b})`
-  (nodes that were waiting for the wasm to load). With `WASM_PRECOMPILE = true` both send the Module, so those nodes never
-  get the pump code: a pump effect in a track's FX chain most likely passes dry or stays silent. Not yet heard in the app.
-- **Fix:** on the port, always send `{pumpBytes: …}` (the worklet's handler ~21100, `e.data.pumpBytes`, already compiles
-  them); keep Modules only in `processorOptions`. Grep for any other `port.postMessage` carrying a Module (tfx, pump-synth,
-  waves `dspModule` / `tfxModule`) and treat them the same.
-- **Test:** add a pump effect to a track's FX chain after the track exists, play live, check its slot level / output is
-  wet, and the same in a render; a check like ...Spores' `tests/live-sounds-check.mjs` (every engine played live, peak at
-  the output) would catch this class of bug.
-
+Both port messages now send `{pumpBytes}` (see the 26 Nov build 689 entry). Left for later: none known; `tests/port-no-module.test.js`
+guards every `port.postMessage` in the page, the editors and the pump-synth files.
 
 ### Time stretch: what is left (20 Nov; design `docs/STRETCH-DESIGN.md` on branch `beta-stretch-design`)
 
@@ -923,6 +907,17 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/pump-synth.wasm`). It re-pins once pump builds FREEZE's seven spectra lazily per source, or in chunks, or behind a build option, so creation no longer costs about 0.9 s on the audio thread. The request to pump is in `docs/port/PUMP-REQUESTS.md` on the `native` branch. When it lands: re-pin both wasm files, regenerate the six golden rows (`tests/golden/chains-modules.json`, `tests/golden/pump-synth.json`), and flip `tests/pump-wob-extreme.test.js` (it asserts the known WOB trap today).
 
+**26 Nov: the pump side is done, waiting for its merge.** pump PR #8 (branch `freeze-warm`, https://github.com/matthettich/pump/pull/8)
+does PUMP-REQUESTS items 1 and 2: `psyn_new` builds no FREEZE spectra; new export `psyn_warm(units)` builds a bounded slice (one
+256-sample engine block or one FFT frame a unit, about 0.17 ms on average; the slowest single units, engine set-up, 2 to 8 ms in
+Node, once each) and returns how many of the seven sources are left; a note on a source not ready finishes that one source then
+(deb07d3's behaviour, so renders that never warm still play); `-DPUMP_FREEZE_EAGER=1` keeps e43ee10's build-all-in-`psyn_new`
+for native if it wants it (single-threaded: warm and process from one thread). FREEZE's output is sample-identical to e43ee10's for
+all seven sources, cold and warmed. Oversampler `dot4` has `#pragma clang fp reassociate(off)`. **Still to do here when it is merged:**
+re-pin both wasm files to the merge commit (wasi-sdk 25, `pump/wasm/build.sh`), have `pump/synth/pump-synth-worklet.js` call
+`X.psyn_warm(2)` once per `process()` (any node; stop when it returns 0) while a FREEZE node exists, bump `?v=`, then the goldens and
+the WOB test as above; native re-pins (PR #225) to the same commit.
+
 ### Owner's to-do: what only Matt can do (keep it current; newest state 25 Nov)
 
 **When the owner asks "what do I need to do?" (or "what's waiting on me?"): answer from THIS section, most useful first, in a few lines; then offer the punch list below.** An item leaves when he says it is done or decides against it. Add an item whenever work is waiting on him (a decision, a secret, a device test, an account). Port details: `docs/port/PICKUP.md` on `native`.
@@ -940,6 +935,10 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 **Decided 25 Nov (nothing to do):** pad removal fix pushed; on the new engine the effect and chains level meters come first, then the pad flashes / dogs, then the metronome click; hand-played pads and keys stay on the old engine for the first Android beta; the fallback message shows on the first PLAY of each song; Resume restarts the row; no verdict within 5 s = the old engine plays; Claude merges PRs without asking once CI and the lead's review pass.
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
+
+**…pump effects that get their code late (26 Nov; build 689, branch `fix/pump-port-bytes`)**
+- [ ] **Computer (Chrome / desktop app) and phone: open a song with a …pump effect on a track (TUBE, CRUSH, SPRING…) and press PLAY straight away.** Pass: the effect is heard from the first bars (before, in Chrome 153, a track whose effects were set up before pump had loaded could stay dry until reload).
+- [ ] **Computer: on a track with no …pump effect, add one from the FX picker while the song plays.** Pass: it is heard as soon as it is added.
 
 **Quiet effect pick-up + own-Track-In bus toast (26 Nov; build 686, branch `fx-pickup-quiet`)**
 - [ ] **Phone or computer: Enter on a filled effect command picks it up with no toast.** Pass: no message; Enter on an empty effect cell drops it; note pick-ups still say "Picked up".
@@ -1869,6 +1868,23 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 26 Nov (build 689: …pump code over the port as bytes, never a Module; branch `fix/pump-port-bytes`, PR into `beta`)
+
+The 26 Nov to-do. **Confirmed in Chrome 153.0.8010** (`/usr/bin/google-chrome` here): a minimal page shows a Module in
+`processorOptions` arrives, the same Module on `node.port.postMessage` gives the processor a `messageerror`, and bytes on the port
+arrive. **In the app:** `tools/pump-port-check.mjs` holds pump.wasm back 6 s (a Playwright route; `tests/sweep/lib.mjs` `openApp`
+takes `opts.route` for it), plays a song where only one track plays, with pump CRUSH (3 bits, 2 kHz) alone in its chain, and
+measures the master's spectrum once pump has arrived, against an empty chain. **Before the fix: FAIL** (with and without CRUSH
+4.3 dB apart, two takes with it 4.4 dB: the slot was dry). **After: PASS** (37.6 dB against 0.9 dB). So the race is real: any
+track-FX node made before pump.wasm arrived (PLAY soon after opening; a slow phone) played its pump slots dry until it was made again.
+**Fix:** `index.html` `pumpWait` (when pump.wasm arrives) and `needPump` (a node asking later) both post `{pumpBytes}`; the worklet's
+existing handler compiles them (a one-off compile of pump.wasm on that audio thread, the pre-WASM_PRECOMPILE path). Modules still
+go in `processorOptions` (works) and to the render Worker (a dedicated Worker: works). A sweep of every `port.postMessage` in
+`index.html`, `chains/`, `waves/`, `pump/synth/` and `thunder-core-client.js` found no other Module on a port (chains' `op:'pump'`
+already sends bytes). **Tests:** `tests/port-no-module.test.js` (no `port.postMessage` argument names a page-compiled Module or a
+`*Module` key; the two pump sends are bytes; fails on build 688's file); `tests/native-client-pc7.test.js` now checks that `sw.js`'s
+cache follows `BUILD` instead of pinning 688. `npm test` passes. Punch list: "…pump effects that get their code late".
 
 ## 26 Nov (build 688: the page's last script threw on every load since build 677; found on the owner's Fold)
 

@@ -177,5 +177,5 @@ test('index.html: every PC7 entry point is behind natDev() / natIn() / natMidi()
 });
 test('the client file and the service worker name the same ?v=', () => {
   const sw = H.read('sw.js'); assert.ok(sw.includes("'./thunder-core-client.js?v=9'")); assert.ok(src.includes("s.src = 'thunder-core-client.js?v=9'"));
-  assert.ok(/const BUILD = 688;/.test(src)); assert.ok(sw.includes("'thunderplus-v688'"));
+  const b = (src.match(/const BUILD = (\d+);/) || [])[1]; assert.ok(+b >= 688); assert.ok(sw.includes("'thunderplus-v" + b + "'"), 'sw.js cache names BUILD');   // (any later build: the cache follows BUILD)
 });
