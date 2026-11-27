@@ -53,3 +53,26 @@ Plan: `W-TFX-PLAN.md` (section 7 overrides). Branch `n4/w-tfx` from the plan bra
 - Android debug APK failed once on Maven 429 (Too Many Requests): infrastructure, not this change.
 - Added `native-desktop.yml` job `windows-clangcl` (a parallel copy of `windows` with `-T ClangCL`, no sweep, not replacing the cl.exe job: that is the lead's call). Owner's PC: Visual Studio Installer > C++ Clang tools for Windows is needed for `-T ClangCL` (HANDOVER line to be added when the desktop job moves).
 - A temporary workflow `w-tfx-figures.yml` prints the Linux (GCC) and macOS (arm64) fx / padfx / modfx figures for the table below; delete it with the merge.
+
+## Windows (clang-cl) figures beside Linux (GCC) and macOS (arm64), run 17d5ef06 (dB vs the wasm / worklet reference)
+Summary lines (Linux / Mac / Windows): fx worst -68.526 dB (e_pshift_def) on all three, 0 failed; bit-exact cases 47 / 46 / 48 of 91; padfx worst -57.245 dB (rv_noseg_beads_media) on all three, bit-exact 130 / ? / 129 of 165; modfx 1326 of 1362 bit-exact (committed hashes) on Linux, Mac and Windows, Marbles / Tides 42 of 42 inside -100 dB, worst of the rest -106.798 dB (tides_mod1) on all three. Argument-order (B9) produced no Windows-only miss. The Beads cases (media 1 and 2 use the 12-bit items): e_beads_def/alt Windows -133.7 / -102.4 dB = Linux.
+Cases where the three differ (all other 246 cases print the same figure on all three):
+
+| case | Linux | Mac | Windows |
+|---|---|---|---|
+| e_tape_def | -210.8 | -198.8 | -204.8 |
+| e_tgate_def | exact | -109.6 | exact |
+| e_fshift_def | -140.1 | -146.2 | -140.1 |
+| e_fshift_alt | -117.9 | -139.9 | -118.1 |
+| h_series2_drums | -193.6 | -193.6 | exact |
+| h_rest | -286.4 | -286.4 | -288.0 |
+| fx_tremolo_def | -168.2 | -168.2 | -169.2 |
+| fx_space_def | -127.9 | -127.9 | -127.7 |
+| fx_transient_def | exact | -159.6 | -159.6 |
+| fx_fshift_def | -160.6 | -180.5 | -168.3 |
+| fx_fshift_alt | -119.0 | -274.3 | -118.4 |
+| fx_tape_def | exact | -244.3 | exact |
+| fx_tape_alt | -231.1 | -230.2 | -231.1 |
+| rv_noseg_tremolo_shape | -170.3 | -170.4 | -170.4 |
+
+(14 rows. Full per-effect list: the `windows-clangcl` job log, step 'The effects must RUN here', and the `W-TFX figures` job logs of the PR.)
