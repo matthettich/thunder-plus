@@ -8775,6 +8775,7 @@ const loadClient = () => { if (window.__thunderClient) return; const s = documen
   s.onload = () => { try { window.__thunderClient.attach(Object.assign({S:() => S, kit:() => kit, aset, toast, tpLog, now:() => performance.now(), prerender:() => prerender(), build:() => BUILD, nativeChanged:() => nativeWhyShow()}, ncSongHost())); nativeWhyShow(); } catch(e){ tpLog('native core client: attach failed', e); } };
   s.onerror = () => { tpLog('native core client: thunder-core-client.js did not load'); try { pbLog('native engine: thunder-core-client.js did not load'); nativeWhyShow(); } catch(e){} };
   document.head.appendChild(s); };
+window.__ncBoot = () => { if (window.thunderCore || aset.core === 'native') loadClient(); };   // called by the last script of the page; else nothing is fetched (N2-PAGE-CLIENT 1.2)
 /* DIAG-1 (26 Nov): one `native:` line for the playback report header and the reason under Settings > Audio > Sequencer (shown when Native core (test) is picked but not on). */
 function nativeDiag(){ try { if (!(window.thunderCore || aset.core === 'native')) return ''; const c = NC(); if (c && c.diag) return c.diag(); return 'native: thunderCore ' + (window.thunderCore ? 'yes host=' + window.thunderCore.host : 'no') + ' · client loaded no (' + (document.querySelector('script[src^="thunder-core-client"]') ? 'file requested, not run yet or failed' : 'not requested') + ') · aset.core=' + aset.core; } catch(e){ return 'native: diag failed ' + e; } }
 function nativeWhyShow(){ try { const el = document.getElementById('coreWhy'); if (!el) return; const show = aset.core === 'native' && !NCON(); el.hidden = !show; if (show) el.textContent = nativeDiag(); } catch(e){} }
@@ -27530,7 +27531,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 686;
+const BUILD = 687;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38020,6 +38021,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [687, '26 Nov', ['Fixed: since build 677 the last script of the page stopped with an error on every load, so the app did not set itself up for offline use on a first visit, and on the Android app the native engine was never asked for. Both work again.']],
   [686, '26 Nov', ['Behind the scenes: on the Android app the playback report now has a `native:` line saying whether the native engine is on and why not, and Settings \u203a Audio \u203a Sequencer shows it when Native core (test) is picked but off. The page asks the shell again if its first hello came too early.']],
   [685, '26 Nov', ['Behind the scenes: in the Mac and Windows desktop app\u2019s native shell, Settings \u203a Audio now picks the output and input device, the buffer and the device\u2019s own sample rates, and shows the latency; Record a sample records every input of the interface; Settings \u203a MIDI lists the shell\u2019s ports and plays notes in.', 'Nothing changes in the Electron app, the website or the Android app.']],
   [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
@@ -39523,7 +39525,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
 <script src="pump/ui/tune.js?v=2"></script>
 <script src="pump/ui/chop.js?v=1"></script>
 <script>
-if (window.thunderCore || aset.core === 'native') loadClient();   // else: nothing is fetched (N2-PAGE-CLIENT 1.2)
+try { if (window.__ncBoot) window.__ncBoot(); } catch(e){ try { tpLog('native core client: boot failed', e); } catch(_){} }   // build 687: the client loader and the audio settings live inside the main script's own scope, so this script cannot name them (it threw a ReferenceError on every load from build 677 to 686, which also skipped the service worker lines below)
 if ('serviceWorker' in navigator && location.protocol === 'https:'){
   try { if (window.self === window.top) navigator.serviceWorker.register('sw.js').catch(e => tpLog('service worker (offline use and updates) did not register', e)); } catch(e){ tpLog('service worker (offline use and updates) did not register', e); }
 }

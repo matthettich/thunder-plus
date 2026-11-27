@@ -390,7 +390,7 @@
 
   function onHello(r) {
     if (!r || typeof r !== 'object') return off('empty hello reply');
-    if (r.err && r.v == null) return off('the shell refused the hello: ' + r.err);
+    if (r.err) return off('the shell refused the hello: ' + r.err);
     if (r.v !== BRIDGE_V) return off('bridge version ' + r.v + ' (this page speaks ' + BRIDGE_V + ')');
     var caps = r.caps || (tc && tc.caps) || null;
     if (!caps || !caps.nativeAudio) return off('shell has no native audio');
