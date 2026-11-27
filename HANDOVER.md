@@ -4,7 +4,7 @@ Pick-up notes for continuing this work in a later session. Read this together wi
 [`README.md`](README.md) (the app's own docs) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 Keep this file up to date at the end of a work session.
 
-## PICK UP HERE (27 Nov 2026, 14:00): beta = main = build 702, desktop v1.3.20
+## PICK UP HERE (27 Nov 2026, 14:00): beta = main = build 703, desktop v1.3.21
 
 - **Build 703 (27 Nov, 14:30):** FOLLOW froze on a track that had played one stray block and gone quiet (tp.pos kept its old row; `posLive` in followPlay now goes by tracks that played in the last 16 lines). PLY on live engines: a reversed note swells up from silence and stops dead (bassNote, `rvd` from the sequencer: until KIL / OFF, else PLY X1 = X lines, 01 = 4). Not heard by the lead: on the punch list.
 - **Shipped today:** the 27 Nov code review (builds 690–698, its entry under To-do), tempo-synced envelopes follow the song
@@ -391,6 +391,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.21** (27 Nov 2026, a regular release; owner, 27 Nov 14:15: "please add it and push a new main and desktop"; PR #360 into `beta`, PR #361 beta → main at build 703 (merge commit 8c2f9cc), Run workflow through the API from `main`, run 46070929940, the latest release): build 703 (FOLLOW with a stray block; PLY on live synths).
 - **v1.3.20** (27 Nov 2026, a regular release; owner, 27 Nov 13:46: "push to main and build a desktop"; PR #359 beta → main at build 702 (merge commit 3d3a5fc), Run workflow through the API from `main`, run 46065958742, all three platforms and 11 assets, the latest release): Song sections, + on any row and the lane following the grid's scroll.
 - **v1.3.19** (27 Nov 2026, a regular release; owner, 27 Nov 12:27: "merge with main and push a new desktop build"; PR #357 into `beta`, PR #358 beta → main at build 701 (merge commit e8d53aa), Run workflow through the API from `main`, run 46057548764, the latest release): build 701 (FX slot Enter, CLN↓ keeps mutes, Arrange loop-back with FOLLOW off, TRIM light, menu wording).
 - **v1.3.18** (27 Nov 2026, a regular release; owner, 27 Nov 11:11: "Push to main and desktop"; PR #355 beta → main at build 699 (merge commit e29273a), Run workflow through the API from `main`, run 46047667178, all three platforms and 11 assets, the latest release): build 699, tempo-synced envelopes follow the song's tempo.
