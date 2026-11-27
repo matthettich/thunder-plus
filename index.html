@@ -27714,7 +27714,7 @@ function followPlay(){
     else if (tv === 'phrase'){ const mine = P[cTrack]; if (mine && mine.phrase >= 0 && fch('p' + cTrack, mine.phrase) && mine.phrase !== cPhrase){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); } }
     // Arrange follows the playing pattern too: on the Song screen the selected block moves to the row playing on its track
     // (owner, 31 Oct), unless you've just moved it yourself; Arrange turns its pages with it
-    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && fch('r' + cs.song.x, own.row) && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ cs.song.y = own.row; }
+    else if (tv === 'song' && tp.mode === 'song' && own.row >= 0 && fch('r' + cs.song.x, own.row) && cs.song.y !== own.row && performance.now() - arrHandT > 4000 && !selA){ songFollowFrom = {x:cs.song.x, y:cs.song.y, to:own.row, t:performance.now()}; cs.song.y = own.row; }   // (build 686) where the cursor was: CLN↓ uses it
     // ...and beside Phrase / Pattern view while Arrange has the keys (owner, 31 Oct: then only the phrase followed): the
     // selected block goes to the row playing on its own track
     if (tv !== 'song' && apReady && apF === 'arr' && tp.mode === 'song' && performance.now() - arrHandT > 4000){ const q = P[cs.song.x] || own; if (q && q.row >= 0 && fch('a' + cs.song.x, q.row) && cs.song.y !== q.row){ cs.song.y = q.row; apLastKey = ''; } }
@@ -29596,8 +29596,15 @@ function dupTrack(notes, tAt){
 }
 // CLN↓ (command row, Ctrl/⌘+Shift+C) on the song: the block under the cursor, or every block in the
 // selection, is cloned into new, unique numbers on the row(s) just below; the cursor follows.
+/* CLN↓ DURING PLAYBACK (26 Nov, build 686; owner: "pressing clone down on arrange while the song plays, and it wraps the arrange screen around, the clone down
+   inserts an empty pattern"): FOLLOW PATTERN moves the song cursor to the row its track is playing once your hands have been off Arrange for 4 s, so at the
+   song's wrap the cursor jumped to the top block and the next CLN↓ cloned THAT one, inserting a row up there (empty on every other track). Now, if the cursor
+   was last moved by playback (not by you) on the same track, CLN↓ works on the block you left it on; and CLN↓ counts as your hands, so presses in a row hold. */
+let songFollowFrom = null;
 function cloneDown(){
   if (tv !== 'song') return toast('CLN↓ works on the SONG screen.');
+  if (typeof songFollowFrom !== 'undefined'){ const f = songFollowFrom; if (f && !selA && cs.song.x === f.x && cs.song.y === f.to && arrHandT < f.t && f.y >= 0 && f.y < 256) cs.song.y = f.y; songFollowFrom = null; }
+  if (typeof markHands === 'function') markHands();
   const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {x0:c.x, x1:c.x, y0:c.y, y1:c.y};
   const h = r.y1 - r.y0 + 1, d0 = r.y1 + 1, src = [];
   for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ const v = getCell('song', x, y); if (v >= 0) src.push([x, y, v]); }
@@ -38053,7 +38060,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [686, '26 Nov', ['Picking up an effect command with Enter no longer shows a message.', 'Synth page: ◀ ▶ beside Pad presets step through the pad presets, like the engine presets.', 'Instruments in use on the song (sidebar and Synth page) have a thicker line and a light tint, so they stand out from free ones.', 'chains: a message when a bus has a Track In set to its own track (that stops it being a bus, so the tracks feeding it go quiet).']],
+  [686, '26 Nov', ['Picking up an effect command with Enter no longer shows a message.', 'Arrange / Song: CLN↓ while the song plays no longer clones the wrong block after the song wraps.', 'Synth page: ◀ ▶ beside Pad presets step through the pad presets, like the engine presets.', 'Instruments in use on the song (sidebar and Synth page) have a thicker line and a light tint, so they stand out from free ones.', 'chains: a message when a bus has a Track In set to its own track (that stops it being a bus, so the tracks feeding it go quiet).']],
   [685, '26 Nov', ['Behind the scenes: in the Mac and Windows desktop app\u2019s native shell, Settings \u203a Audio now picks the output and input device, the buffer and the device\u2019s own sample rates, and shows the latency; Record a sample records every input of the interface; Settings \u203a MIDI lists the shell\u2019s ports and plays notes in.', 'Nothing changes in the Electron app, the website or the Android app.']],
   [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
   [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],

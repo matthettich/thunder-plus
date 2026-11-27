@@ -922,6 +922,7 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 **Quiet effect pick-up + own-Track-In bus toast (26 Nov; build 686, branch `fx-pickup-quiet`)**
 - [ ] **Phone or computer: Enter on a filled effect command picks it up with no toast.** Pass: no message; Enter on an empty effect cell drops it; note pick-ups still say "Picked up".
 - [ ] **Sidebar Instruments and Synth page pads: instruments used on the song have a thicker line and a light tint.** Pass: easy to tell from free ones in your usual skins (IDM, IDM pink, IDM pink & green, 909); the selected one still looks selected.
+- [ ] **Computer, Arrange (FOLLOW PATTERN on): press CLN↓ on a block a few times while the song plays, including across the song's wrap.** Pass: every press clones the block you were on; no empty row appears at the top.
 - [ ] **Synth page: ◀ ▶ either side of Pad presets step through the pad presets.** Pass: the button shows the preset's name; picking one from the list then ▶ carries on from it; each pad remembers its own place.
 - [ ] **Computer: in a bus's …chains patch, set one Track In to the bus's own track.** Pass: one toast says that track is not a bus and names the tracks no longer heard; setting it back clears it, no repeat toast.
 
