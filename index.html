@@ -1067,7 +1067,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .mfbar.mobar::before{left:-6px; right:-6px; top:0; bottom:0}
 @media (pointer:coarse){ .mfbar.mobar::before{left:-19px; right:-19px} }
 /* the TRIM row's light: what the track sends in runs hot (above −6 dB) or near full scale (above −1 dB) */
-.tscr .trm.ih{box-shadow:inset 0 -3px var(--ts-hot)} .tscr .trm.ic{box-shadow:inset 0 -3px var(--ts-clip)}
+.tscr .trm.tlh{box-shadow:inset 0 -3px var(--ts-hot)} .tscr .trm.tlc{box-shadow:inset 0 -3px var(--ts-clip)}   /* (not .ih / .ic: .ic is the icon class, its size and baseline made the TRIM number jump when it lit; owner, 27 Nov) */
 .tscr .m1{color:var(--ts-ok)} .tscr .m2{color:var(--ts-hot)} .tscr .m3{color:var(--ts-clip)}
 .tscr .pl{background:var(--ts-pl-bg); color:var(--ts-pl)}
 .tscr .sel{background:var(--ts-sel)}
@@ -27818,8 +27818,11 @@ function arrWrapRow(){
 function arrFollowPage(own){
   if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
-  if ((apF === 'arr' || asongOn()) && handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, arrActT, arrHandT)) return;
-  if (handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, navT)) return;
+  // LOOP BACK (owner, 27 Nov: "I'd like loop to loop back with follow off after a wait"): when the playhead has wrapped or jumped back above the view, FOLLOW OFF waits the short
+  // hold, not the minute: you are not working on rows that the playhead has left behind. Paging down past the view's bottom still keeps the minute.
+  const above = !!(own && own.row >= 0 && tp.mode === 'song' && own.row < (cs.song.top || 0)), idle = followMode || above ? FOLLOW_HOLD : ARR_IDLE;
+  if ((apF === 'arr' || asongOn()) && handsOn(idle, arrActT, arrHandT)) return;
+  if (handsOn(idle, navT)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
     // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
@@ -28738,20 +28741,20 @@ function projRows(){
       info:() => 'HIDDEN: the song opens straight into phrases, like patterns (each new song block gets its own sect with one phrase). SHOWN brings back the sect screen. Nothing is deleted either way'},
     {l:'ARRANGE', opts:true, get:() => arrMode, set:v => setArr(v), tap:() => setArr((arrMode + 1) % 3), min:0, max:2, d:1, fmt:v => ['OFF', 'AUTO', 'ON'][v],
       info:() => `Song overview beside the other screens (ARRANGE SIDE: left or right). AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth && !asongOn() ? ' (too small for AUTO)' : '') + (songGrid ? '' : '. The Song screen is Arrange whatever this says')},
-    {l:'ARRANGE SIDE', ck:'Arrange at the left', get:() => arrLeft ? 1 : 0, set:v => setArrLeft(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'LEFT' : 'RIGHT',
+    {l:'ARRANGE SIDE', ck:'Show Arrange left of phrase', get:() => arrLeft ? 1 : 0, set:v => setArrLeft(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'LEFT' : 'RIGHT',
       info:() => 'Which side of the screen Arrange sits on when it shows beside it. LEFT: SHIFT+◀ goes left to the song and SHIFT+▶ back right to the phrase. RIGHT: as before'},
     {l:'CLASSIC SONG', ck:'Show classic Song screen', get:() => songGrid ? 1 : 0, set:v => setSongGrid(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN (the default): the Song screen is Arrange, full width on any screen, with every Song key, pad command and the master column. SHOWN brings back the text grid, with Arrange beside it as before. The song is the same either way'},
     // SONG EXTRAS (each one off = the Song screen as it was before them)
     {l:'SONG MOUSE', get ck(){ return touchUi() ? 'Song: drag to select, move, copy (mouse and pen)' : 'Song: drag to select, move, copy; right-click menu'; }, get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => touchUi() ? 'With a mouse or pen on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it. A finger taps and holds as usual. Off: clicks only, as before' : 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
-    {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'SECTIONS', ck:'Show section names', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'The SECT lane left of the row numbers names runs of rows (INTRO, DROP…): tap the + on the cursor’s row (or tap the empty lane, double-click it, right-click a block) to name the section from that row; click a name to go there; hold or right-click a name to rename, loop or remove it. The lane is only as wide as its names. Needs a wide screen. Off hides the lane; the names stay in the song'},
-    {l:'SECTIONS BESIDE PHRASE', ck:'Arrange beside the phrase: the SECT lane too', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+    {l:'SECTIONS BESIDE PHRASE', ck:'Show SECT in Arrange', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
-    {l:'ROW COLOR IN PATTERN', get ck(){ return touchUi() ? 'Pattern view: press and hold a row number to color the song row' : 'Pattern view: right-click a row number to color the song row'; }, get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'ROW COLOR IN PATTERN', get ck(){ return touchUi() ? 'Allow press and hold to color song row' : 'Allow right-click to color song row'; }, get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => touchUi() ? 'In Pattern view, press and hold a row number (or SONG ROW in its bar) to color this pattern’s song row; SONG ROW then shows in that color. Off: the usual menu opens instead' : 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
-    {l:'UNIQUE PER TRACK', ck:'A pattern brought onto a track that doesn’t have it yet gets its own copy. Moving or repeating a pattern on its own track never copies.', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'UNIQUE PER TRACK', ck:'Create unique pattern numbers on new tracks', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
@@ -28790,10 +28793,10 @@ function projRows(){
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'PLAYHEAD OFFSET', get:() => phOff, set:v => setPhOff(v), min:-100, max:300, step:5, big:25, d:0, fmt:v => v ? sgn(v) + ' ms' : '0 ms',
       info:() => 'Moves the playhead to match what you hear, on this device: + later (Bluetooth headphones, a slow screen), − earlier. The app already allows for the output latency it is told about'},
-    {l:'LOW POWER DISPLAY', ck:'Low power display (saves battery): the picture is a little less smooth, and the audio engine sleeps after 30 s of silence, so the first note after that can start a moment late', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
+    {l:'LOW POWER DISPLAY', ck:'Enable low power mode', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
       info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. It also switches to the Low power (black) skin, and back when turned off. The audio engine also sleeps after 30 s of silence and wakes on the next note, which can start a moment late. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
-    {l:'METERS WHILE PLAYING', segs:true, get:() => MTR_MODES.indexOf(mtrMode), set:v => setMeters(MTR_MODES[v]), min:0, max:2, d:0, fmt:v => ['SMOOTH', 'LIGHT', 'OFF'][v] || 'SMOOTH',   // METERS (M.RATE)
-      info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. SMOOTH (the default): as before. LIGHT: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
+    {l:'METER ANIMATION QUALITY', segs:true, get:() => MTR_MODES.indexOf(mtrMode), set:v => setMeters(MTR_MODES[v]), min:0, max:2, d:0, fmt:v => ['HIGH', 'LOW', 'OFF'][v] || 'HIGH',   // METERS (M.RATE)
+      info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. HIGH (the default): every frame. LOW: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
     {l:'ARRANGE LOOK-AHEAD', get:() => ARR_AHEADS.indexOf(arrAhead), set:v => setArrAhead(v), min:0, max:ARR_AHEADS.length - 1, d:3, fmt:v => ARR_AHEADS[v] + ' ROWS',
       info:() => 'How many rows from the bottom of Arrange the page turns, for the playhead and for the cursor when you move it down with the keys or the wheel: the view turns once, so the row lands near the top and the next phrases are in sight. 16 by default; never more than half of what Arrange shows (a short view uses a quarter). A click never turns the page'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
@@ -32376,7 +32379,7 @@ function paintMeters(){
   const hold = meterHold(), bs = rt && !hold ? rt.pl.buses : null;   // METERS: OFF while playing: painted empty
   const lv = b => b.lvA > b.lv ? b.lvA : b.lv;   // the highest since the last paint (LIGHT), which is the latest at SMOOTH
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
-    const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
+    const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('tlh', lit[i] === 1); e.classList.toggle('tlc', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
   document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = Math.round(bs ? lvl(lv(bs[t])) * 100 : 0) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written (METERS: whole per cent, finer than the bar's pixels)
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
   meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(lv(bs[t])) : 0) * MH * 8 - (MH - 1 - k) * 8;
@@ -38077,7 +38080,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.', 'Fixed: CLN↓ (clone down) now keeps a block’s mute: a muted block clones as a muted block.']],
+  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.', 'Menu wording: View and Settings items renamed (Show SECT in Arrange, Allow right-click to color song row, Create unique pattern numbers on new tracks, Enable low power mode, Show Arrange left of phrase, Show section names); Meters while playing is now Meter animation quality: HIGH, LOW, OFF.', 'Arrange with FOLLOW off: when the song loops back to the top, Arrange goes back with it 4 s after you last touched it (it waited a minute).', 'Fixed: the Mixer’s TRIM number no longer shifts when its level light comes on.', 'Fixed: CLN↓ (clone down) now keeps a block’s mute: a muted block clones as a muted block.']],
   [700, '27 Nov', ['Fixed: offline, the CHAINS and WAVES pages now have their own icon and app manifest (they were left out of the offline copy).']],
   [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
   [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],

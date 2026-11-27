@@ -39,7 +39,12 @@ test('after the hold the page keeps the cursor row in view when the playhead and
 });
 test('the hold does not outlast its time: FOLLOW ON 4 s, FOLLOW OFF a minute (3 Nov)', () => {
   const a = rig({ follow: 2 }); a.nav(); a.at(a.now() + 3900); a.play(2); a.c.followPlay(); assert.equal(a.c.cs.song.top, 15, '3.9 s: held');
-  const b = rig({ follow: 0 }); b.nav(); b.at(b.now() + 59000); b.play(2); b.c.followPlay(); assert.equal(b.c.cs.song.top, 15, '59 s: held'); b.at(b.now() + 2000); b.c.followPlay(); assert.equal(b.c.cs.song.top, 2, '61 s: pages');
+  const b = rig({ follow: 0 }); b.nav(); b.at(b.now() + 59000); b.play(45); b.c.followPlay(); assert.equal(b.c.cs.song.top, 15, '59 s, playhead below the view: held'); b.at(b.now() + 2000); b.c.followPlay(); assert.notEqual(b.c.cs.song.top, 15, '61 s: pages');
+});
+// LOOP BACK (27 Nov, owner: "I'd like loop to loop back with follow off after a wait"): a playhead that wrapped above the view pages after the short hold, FOLLOW OFF too
+test('FOLLOW OFF: the playhead looped back above the view pages after 4 s, not a minute', () => {
+  const b = rig({ follow: 0 }); b.nav(); b.at(b.now() + 3900); b.play(2); b.c.followPlay(); assert.equal(b.c.cs.song.top, 15, '3.9 s: held');
+  b.at(b.now() + 200); b.c.followPlay(); assert.equal(b.c.cs.song.top, 2, '4.1 s: back at the top');
 });
 test('FOLLOW PATTERN with Arrange holding the keys, the cursor track HAS a block on song row 0 and the song wraps: the cursor is not pulled to row 000 while you work', () => {
   const r = rig({ follow: 1, y: 30, top: 15 }); r.c.apF = 'arr'; r.c.tv = 'phrase'; r.play(40); r.nav();
