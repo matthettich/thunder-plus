@@ -162,6 +162,9 @@ svg.cables .cln.gate{stroke-width:3px; stroke-linecap:round; stroke-dasharray:.1
 /* FEEDBACK CABLE (14 Nov, audit M2): the cable that closes a loop keeps its kind's colour and is drawn long dash, dot, long dash (a third pattern: control is
    short dashes, gate round dots), with a small tag by its target end. Both only through the skin's own variables (--ink, --panel). */
 svg.cables .cln.fb{stroke-linecap:round; stroke-dasharray:14 4 .1 4}
+/* CROSS-CHAIN CABLE (15 Nov): a cable from one track's chain into another track's carries no signal (each track runs its own chain). Drawn as short dashes with a gap and a
+   faded line (a fourth pattern: control 6 4, gate dots, feedback dash-dot), with a "no signal" tag by its target end. */
+svg.cables .cln.xc{stroke-linecap:butt; stroke-dasharray:2 7; opacity:.6}
 svg.cables .fbtag{pointer-events:none}
 svg.cables .fbtag rect{fill:var(--panel); stroke:var(--ink); stroke-width:1; vector-effect:non-scaling-stroke}
 svg.cables .fbtag text{fill:var(--ink); font-size:11px; font-weight:600; font-family:var(--font); text-anchor:middle; dominant-baseline:central}
@@ -223,6 +226,9 @@ svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.ca
 .node.collapsed{min-height:64px}
 .node.collapsed > header{padding:4px 8px 2px 12px; border-bottom:0}
 .node.collapsed > header .x{width:22px; height:22px}
+/* HELP BUTTON SIZE (15 Nov, owner): the ? is exactly the size of the x, expanded and collapsed (button.mq outranks the shared .mq rule, which is added later) */
+.node > header button.mq{width:26px; height:26px}
+.node.collapsed > header button.mq{width:22px; height:22px}
 .csum{display:none}
 .node.collapsed > .csum{display:flex; align-items:center; gap:6px; position:relative; padding:2px 12px 5px; font-size:12.5px; line-height:16px; min-height:22px}
 .cs-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink)}
@@ -260,7 +266,7 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 @media (pointer: coarse){
   .node > header .fold::before{inset:0 -10px}   /* 40 x 40: the button is 40 tall now, so the touch area grows sideways only */
   .node > header{gap:2px; padding-top:3px; padding-bottom:3px}
-  .node > header button.mq{width:32px; height:40px; margin-right:0}
+  .node > header button.mq, .node.collapsed > header button.mq{width:36px; height:40px; margin-right:0}   /* the same as button.x below */
   .node > header button.x, .node.collapsed > header button.x{width:36px; height:40px}
   .node > header button.fold{height:40px}
   .node > header button.byp{height:40px; min-width:40px}
@@ -829,6 +835,10 @@ Object.assign(SHARED_MODULES, {
   const:{ label:'Constant', scope:'mono', inputs:{}, outputs:{ out:'cv' },
     params:{ value:[0,-1,1,.01], fine:[0,-.01,.01,.0001] }, ui:{ value:{l:'Value', f:v => v.toFixed(2)}, fine:{l:'Fine', f:v => (v > 0 ? '+' : '') + v.toFixed(4)} },
     about:'Constant: a steady number you set yourself, with Fine for tiny steps. Use it as a fixed threshold, an offset or a set level to patch into anything that takes a control signal.' },
+  knob:{ label:'Knob', scope:'mono', inputs:{}, outputs:{ out:'cv' },
+    params:{ n:[1,1,8,1], value:[0,0,1,.01], min:[0,-1,1,.01], max:[1,-1,1,.01] },
+    ui:{ n:{l:'Knob', f:v => 'K' + Math.round(v)}, value:{l:'Value', f:v => Math.round(v * 100) + '%'}, min:{l:'Min', f:v => v.toFixed(2)}, max:{l:'Max', f:v => v.toFixed(2)} },
+    about:'Knob: a control the track plays. Out is this patch’s knob K1–K8 as the tracker sets it (KN1–KN8, 00–FF), or Value while the song hasn’t set it (stopping hands it back to Value), scaled into Min..Max. Patch Out into any purple jack: a filter’s cutoff, a mix, a delay’s feedback. Several Knob modules can share one number.' },
   rect:{ label:'Invert / rectify', scope:'mono', inputs:{ in:'cv' }, outputs:{ inv:'cv', abs:'cv', pos:'cv', neg:'cv' }, params:{}, ui:{},
     about:'Invert / rectify: one control signal in. Invert flips it upside down, Absolute folds the negative half up so it is always positive, Positive keeps only the upper half and Negative only the lower half (as positive values).' },
   scale:{ label:'Scale / map', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
@@ -927,12 +937,12 @@ Object.assign(SHARED_MODULES, {
   expr:{ label:'Expression', scope:'mono', display:'expr', text:true, inputs:{ a:'audio', b:'audio', c:'cv', d:'cv' }, outputs:{ out:'audio' },
     plabels:{ a:'A', b:'B', c:'C', d:'D' },
     params:{ k1:[1,-4,4,.001], k2:[0,-4,4,.001] }, ui:{ k1:{l:'K1', f:v => v.toFixed(3)}, k2:{l:'K2', f:v => v.toFixed(3)} },
-    about:'Expression: type a line of maths and its answer is the sound, one sample at a time. A and B are the two audio inputs, C and D the two control inputs, and K1 and K2 the two sliders. Names: a, b, c, d, k1, k2, t (seconds since the song started, or since the module was made), y (this module’s own output one sample ago, so one line can be a filter or a counter), rnd (a new random number from −1 to 1 every sample), pi and sr (the sample rate). Operators: + − * / % ^, the comparisons < <= > >= == !=, && || !, and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq, which are waves from −1 to 1 that repeat every 1 (saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths: it is never run as a program, and a formula that cannot be read gives silence and says where the trouble is. 200 characters at most. Enter (or tapping away) applies it and Escape puts back the last one; Examples fills the field with a working formula to start from. A single Expression can be a ring modulator, a soft clipper, a crossfade, a bit crusher or a small filter.' }
+    about:'Expression: type a line of maths and its answer is the sound, one sample at a time. A and B are the two audio inputs, C and D the two control inputs, and K1 and K2 the two sliders. Names: a, b, c, d, k1, k2, t (seconds since the song started, or since the module was made), y (this module’s own output one sample ago, so one line can be a filter or a counter), rnd (a new random number from −1 to 1 every sample), pi and sr (the sample rate). Operators: + − * / % ^, the comparisons < <= > >= == !=, && || !, and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq, which are waves from −1 to 1 that repeat every 1 (saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths: it is never run as a program, and a formula that cannot be read gives silence and says where the trouble is. 200 characters at most. Enter (or tapping away) applies it and Escape puts back the last one; Examples fills the field with a working formula to start from. Worked examples are listed below: a sine, saw, FM, a chord, a filter and more. A single Expression can be a ring modulator, a soft clipper, a crossfade, a bit crusher or a small filter.' }
 });
 Object.assign(SHARED_FAMILY, { onepole:'afx', allpass:'afx', dcblock:'afx', midside:'afx', dline:'afx', expr:'util' });
 Object.assign(SHARED_FAMILY, { meter:'util', scope:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
-  rect:'mod', scale:'mod', compare:'mod', const:'mod', switch:'util', xfade:'util',
+  rect:'mod', scale:'mod', compare:'mod', const:'mod', knob:'mod', switch:'util', xfade:'util',
   clkmul:'mod', chance:'mod', counter:'mod', stepsw:'util', burst:'mod', gatedly:'mod', flipflop:'mod',   // (Steps and Clock stay out: …chains has always drawn them in the default family)
   envfol:'mod', gateex:'mod', pitchfol:'mod', pitchtrk:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
@@ -949,7 +959,7 @@ const SHARED_PALETTE = [
   ['Utilities', [['meter','Meter'],['scope','Scope'],['limiter','Limiter'],['utility','Utility']], 'audio'],
   ['Stereo', [['width','Width']], 'audio'],
   ['Audio followers', [['envfol','Envelope follow'],['gateex','Gate extract'],['pitchfol','Pitch follow'],['pitchtrk','Pitch track']], 'control'],
-  ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math'],['const','Constant'],['rect','Invert / rectify'],['scale','Scale / map'],['compare','Comparator'],['switch','Switch'],['xfade','Crossfade'],['expr','Expression']], 'control'],
+  ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math'],['const','Constant'],['knob','Knob'],['rect','Invert / rectify'],['scale','Scale / map'],['compare','Comparator'],['switch','Switch'],['xfade','Crossfade'],['expr','Expression']], 'control'],
   ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['clkmul','Clock multiplier'],['chance','Chance gate'],['counter','Counter'],['stepsw','Step switch'],['burst','Burst'],['gatedly','Gate delay'],['flipflop','Flip-flop'],['logic','Logic']], 'control']
 ];
 Object.assign(SHARED_PORT_LABEL, { lp:'Low', hp:'High' });   // (One-pole filter's two outputs; Building blocks, 14 Nov)
@@ -1389,12 +1399,12 @@ const PAL_LAYOUT = [
   ['Modulation sources', '#6e4fc0', ['lfo', 'adsr', 'tides', 'random', 'marbles', 'chaos', 'steps']],
   ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'euclid', 'logic', 'life']],
   ['Audio to control', '#4f6f9f', ['envfol', 'gateex', 'pitchfol', 'pitchtrk']],
-  ['Control utilities', '#9a8fb8', ['atten', 'math', 'const', 'rect', 'scale', 'compare', 'switch', 'xfade', 'expr', 'slew', 'snh', 'quant']]
+  ['Control utilities', '#9a8fb8', ['atten', 'math', 'const', 'knob', 'rect', 'scale', 'compare', 'switch', 'xfade', 'expr', 'slew', 'snh', 'quant']]
 ];
 const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
 // ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
 // brackets after a name ("Resonator (chord)") is this tooltip text now.
-const PAL_HINT = { onepole:'6 dB/oct', allpass:'phaser, diffuser', dline:'comb, echo', expr:'type a formula', dcblock:'remove offset', midside:'centre / sides', osc:'tone, LFO, FM', wnoise:'white, pink, brown', blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
+const PAL_HINT = { onepole:'6 dB/oct', allpass:'phaser, diffuser', dline:'comb, echo', expr:'type a formula', dcblock:'remove offset', midside:'centre / sides', osc:'tone, LFO, FM', wnoise:'white, pink, brown', blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', knob:'tracker KN1–KN8', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
   meter:'VU', scope:'see a signal', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', morph:'two sounds as one', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
@@ -1560,6 +1570,7 @@ const MODULE_USE = {
   // Control utilities
   atten:'Between an LFO and a filter’s Cutoff jack: Amount 30% for a gentle wobble, or negative so the LFO sweeps the other way.',
   math:'Multiply an LFO (A) by an envelope (B) and use the × output: the wobble only happens while the note is held.',
+  knob:'Knob 1 into a filter’s Cutoff jack, Min 0, Max 1; then KN1 00 on one row and KN1 FF a few rows later in the phrase opens the filter in steps (RNL after it for a random walk).',
   const:'Patch it into a Comparator’s B and type the threshold to the hundredth, or into a slider’s purple jack for a fixed offset.',
   rect:'An Envelope follow into In, then Invert into a pad’s level jack: the slider sets the level and every drum hit pulls it down, so the pad ducks.',
   scale:'A −1..1 LFO into In and Out into a level jack: the default Out 0..1 gives a tremolo that never goes below silence.',
@@ -1588,6 +1599,37 @@ const MODULE_USE = {
 };
 const modAbout = t => (typeof PAGE_ABOUT !== 'undefined' && PAGE_ABOUT[t]) || SHARED_ABOUT[t] || (MODULES[t] && MODULES[t].about) || '';
 const modUse = t => (typeof PAGE_USE !== 'undefined' && PAGE_USE[t]) || MODULE_USE[t] || '';
+/* Worked examples shown in a module's ? help under the Try line, and on the Help page: [what it is, the formula, its name in the module's Examples menu], one formula per line (the formula in a monospace line of its own, selectable to copy).
+   The Examples menu (EXPR_EXAMPLES, in the same order) must hold the same formulas: tests/modules-expr-help.test.js checks it. Every formula is compiled and run by that test in both engines at 44100 and 48000, so a line that stops working fails the tests. No quote marks in the texts (use ’ and −). */
+const MODULE_EXAMPLES = {
+  expr:[
+    ['Sine wave at 220 Hz (full level, so turn the volume down first).', 'sin(2 * pi * 220 * t)', 'Sine 220 Hz'],
+    ['Saw wave at 220 Hz, the short way. These plain saw and square waves are harsh on high notes.', 'saw(220 * t)', 'Saw 220 Hz'],
+    ['Triangle wave at 220 Hz.', 'tri(220 * t)', 'Triangle 220 Hz'],
+    ['Square wave at 220 Hz.', 'sq(220 * t)', 'Square 220 Hz'],
+    ['K1 as the pitch: 110 Hz at 0, 220 Hz at 1, 550 Hz at 4. Moving K1 while it sounds makes the tone jump, because the pitch is multiplied by the time.', 'sin(2 * pi * (110 + k1 * 110) * t)', 'Sine pitch from K1'],
+    ['A pitch you can glide, part 1 of 2: a ramp that climbs 0 to 1 over and over, 220 Hz at K1 = 1. Cable its Out to A of a second Expression.', 'fract(y + (110 + k1 * 110) / sr)', 'Glide pitch, part 1: ramp'],
+    ['Glide, part 2 of 2: turns that ramp into a sine. Now moving K1 slides the pitch with no jump.', 'sin(2 * pi * a)', 'Glide pitch, part 2: sine'],
+    ['FM in one line: a 110 Hz sine bends a 220 Hz sine. K1 is the amount, 0 is plain, 1 to 4 gets brighter.', 'sin(2 * pi * 220 * t + k1 * sin(2 * pi * 110 * t))', 'FM sine (K1 = amount)'],
+    ['A chord (A, C sharp and E) from three sines.', '(sin(2 * pi * 220 * t) + sin(2 * pi * 277.2 * t) + sin(2 * pi * 329.6 * t)) / 3', 'Chord, A major'],
+    ['A sine that fades in over the 2 seconds after the song starts.', 'sin(2 * pi * 220 * t) * min(t / 2, 1)', 'Fade-in sine, 2 s'],
+    ['A sine at K1 kilohertz: 1000 Hz at 1, 4000 Hz at 4. Moving K1 while it sounds makes the tone jump.', 'sin(2 * pi * 1000 * k1 * t)', 'Sine at K1 kHz'],
+    ['Noise, with K1 as the level.', 'rnd * k1', 'Noise'],
+    ['The simplest one: A comes through and K1 is the level. A new Expression starts like this.', 'a * k1', 'Pass A (K1 = level)'],
+    ['Ring modulation: A times B, for metallic and bell-like tones.', 'a * b', 'Ring modulate A by B'],
+    ['Tremolo: the level of A wobbles 4 times a second.', 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))', 'Tremolo 4 Hz'],
+    ['Soft clip: rounds off the peaks of A. K1 is the drive, higher is harder.', 'tanh(a * (1 + k1 * 4))', 'Soft clip'],
+    ['Fold: loud peaks of A turn back over instead of clipping. K1 is how hard.', 'tri(a * (1 + k1 * 4) / 4 + 0.25)', 'Fold'],
+    ['Wavefolder: bends A back on itself. K1 is how hard, 0 is almost clean.', 'sin(a * (1 + k1 * 8))', 'Wavefold sine (K1)'],
+    ['Rectify: the negative half of A is flipped up, which adds an octave of buzz.', 'abs(a)', 'Rectify'],
+    ['Crossfade from A to B with a control signal in C: 0 is all A, 1 is all B (a slow LFO into C).', 'mix(a, b, clip(c, 0, 1))', 'Crossfade by C'],
+    ['Low-pass filter for A. K1 is how open it is: 1 lets everything through, 0.1 is dull (about 800 Hz), 0.01 is very dark. The clip keeps it from blowing up above 1.', 'y + (a - y) * clip(k1, 0, 1)', 'One-pole lowpass (K1)'],
+    ['Sample and hold: A is followed while C is above 0.5 and held (frozen) when C drops below it.', 'c > 0.5 ? a : y', 'Sample and hold on C'],
+    ['Bit crusher: A rounded to steps. K1 0 is rough (steps of one half), 1 is fine (one thirty-second), 4 is nearly clean.', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)', 'Bit crush (K1)'],
+    ['Gate: A comes through only while B is louder than K1, otherwise silence.', 'abs(b) > k1 ? a : 0', 'Gate A when B is loud']
+  ]
+};
+const modExamples = t => (typeof PAGE_EXAMPLES !== 'undefined' && PAGE_EXAMPLES[t]) || MODULE_EXAMPLES[t] || null;
 {
   const css = `.node > header .mq{border:0; background:none; color:var(--muted); font-size:14px; font-weight:700; line-height:1; width:20px; height:24px; padding:0; flex:none; margin-right:-4px}
 .node > header .mq:hover, .node > header .mq[aria-expanded="true"]{background:var(--panel-2); color:var(--ink)}
@@ -1596,7 +1638,8 @@ const modUse = t => (typeof PAGE_USE !== 'undefined' && PAGE_USE[t]) || MODULE_U
 .mhelp h4{margin:0 0 5px; font-size:14px; font-weight:600}
 .mhelp p{margin:0}
 .mhelp .use{margin-top:8px; padding-top:8px; border-top:1px solid color-mix(in srgb, var(--ink) 18%, transparent)}
-.mhelp .use b{display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px}`;
+.mhelp .use b{display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px}
+.mhelp .exs .ex{margin:0 0 7px} .mhelp .exs .ex p{font-size:12.5px; line-height:1.35} .mhelp .exs code{display:block; margin-top:1px; padding:2px 5px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12.5px; line-height:17px; overflow-wrap:anywhere; background:var(--panel-2)}`;
   const st = document.createElement('style'); st.textContent = css; document.head.append(st);
 }
 let mhelpEl = null, mhelpBtnOn = null, mhelpPinned = false, mhelpT = 0;
@@ -1615,7 +1658,9 @@ function mhelpShow(btn, type, title, pin){
   }
   if (mhelpBtnOn && mhelpBtnOn !== btn){ mhelpBtnOn.setAttribute('aria-expanded', 'false'); mhelpBtnOn.removeAttribute('aria-describedby'); }
   const about = modAbout(type), use = modUse(type);
-  mhelpEl.replaceChildren(h('h4', {text:title}), h('p', {text:about || 'No description yet.'}), use ? h('div', {class:'use'}, h('b', {text:'Try'}), h('p', {text:use})) : null);
+  const exs = modExamples(type);
+  mhelpEl.replaceChildren(h('h4', {text:title}), h('p', {text:about || 'No description yet.'}), use ? h('div', {class:'use'}, h('b', {text:'Try'}), h('p', {text:use})) : null,
+    exs ? h('div', {class:'use exs'}, h('b', {text:'Worked examples'}), ...exs.map(([what, f]) => h('div', {class:'ex'}, h('p', {text:what}), h('code', {text:f})))) : null);
   const c = CAT_COLOR[type]; if (c) mhelpEl.style.setProperty('--cat', c); else mhelpEl.style.removeProperty('--cat');
   mhelpEl.hidden = false; mhelpBtnOn = btn; mhelpPinned = !!pin;
   btn.setAttribute('aria-expanded', 'true'); btn.setAttribute('aria-describedby', 'mhelp');
@@ -1670,6 +1715,7 @@ function buildShow(n){
   const kind = MODULES[n.m.type].display;
   if (kind === 'scope') return buildScope(n);
   if (kind === 'expr') return buildExpr(n);
+  if (kind === 'srlab') return buildSrLab(n);
   if (kind === 'dyn' || kind === 'dynlv'){ const box = h('div', {class:'shw dyn'}); buildDyn(n, box, kind); return box; }
   if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
   const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
@@ -1678,6 +1724,7 @@ function buildShow(n){
     const r = h('div', {class:'ch'}, h('span', {text:lbl}), tr, v); box.append(r); rows.push({r, i, b, v, hold:-200, ht:0}); };
   if (kind === 'meter'){ mk('L'); mk('R'); box.title = 'Bars: average (VU) level. Tick: peak (held 1.5 s). Number: peak in dB. The red line is 0 dB.'; }
   else if (kind === 'scin'){ mk('IN'); mk('ENV'); rows[1].b.hidden = true; box.classList.add('sci'); box.title = 'IN: the level of what Source picks (peak, dB). ENV: the envelope its hits make (what Env and Duck send out).'; }
+  else if (kind === 'mixout'){ mk('OUT'); box.classList.add('sci'); rows[0].i.style.background = 'var(--audio)'; box.title = 'The level this mixer is sending out (peak, dB; held 1.5 s at the tick). \u2212\u221e means nothing is passing through it.'; }
   else if (kind === 'scout'){ mk('SEND'); box.classList.add('sci'); box.title = 'What this Sidechain Out sends (peak, dB).'; }
   else { mk('GR'); rows[0].b.hidden = true; box.title = 'Gain reduction: how much it is turning the sound down.'; }
   n.show = { kind, rows, seen:0 };
@@ -1702,7 +1749,7 @@ function paintShows(list){
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
     if (S.kind === 'scope'){ if (v.length >= 2 + SCOPE_W * 4 && v[0] !== S.seq){ S.seq = v[0]; S.data = v; drawScope(n); } continue; }   // a new picture only when a whole sweep is done
     if (S.kind === 'expr'){ exprPaint(n, v); continue; }   // Expression: the engine's [error code, position]
-    if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
+    if (S.kind === 'scout' || S.kind === 'mixout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
       A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); if (n.lvl) setLvl(n, showPos(pk)); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
       const R = S.rows[c], vu = v[c], pk = v[c + 2];
@@ -1792,10 +1839,31 @@ setInterval(() => { if (napping()) return; const now = performance.now();
 // A module's text: kept (cut to 200 characters) only on a module whose definition takes text; on any other module it is dropped. (Also run on a pasted copy and on every load.)
 function textFix(m){ if (!m || typeof m !== 'object' || !('text' in m)) return; const d = MODULES[m.type]; if (d && d.text === true && typeof m.text === 'string') m.text = m.text.slice(0, 200); else delete m.text; }
 const EXPR_MAX = 200, EXPR_DEFAULT = 'a * k1', EXPR_HOLD = 450;
-const EXPR_EXAMPLES = [
-  ['Pass A (K1 = level)', 'a * k1'], ['Ring modulate A by B', 'a * b'], ['Soft clip', 'tanh(a * (1 + k1 * 4))'], ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'],
-  ['Rectify', 'abs(a)'], ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'], ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'], ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'],
-  ['Sample and hold on C', 'c > 0.5 ? a : y'], ['Noise', 'rnd * k1'], ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'], ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']
+const EXPR_EXAMPLES = [   // [menu name, formula]: tones first, then effects; the same formulas, in the same order, as MODULE_EXAMPLES.expr (a test compares them)
+  ['Sine 220 Hz', 'sin(2 * pi * 220 * t)'],
+  ['Saw 220 Hz', 'saw(220 * t)'],
+  ['Triangle 220 Hz', 'tri(220 * t)'],
+  ['Square 220 Hz', 'sq(220 * t)'],
+  ['Sine pitch from K1', 'sin(2 * pi * (110 + k1 * 110) * t)'],
+  ['Glide pitch, part 1: ramp', 'fract(y + (110 + k1 * 110) / sr)'],
+  ['Glide pitch, part 2: sine', 'sin(2 * pi * a)'],
+  ['FM sine (K1 = amount)', 'sin(2 * pi * 220 * t + k1 * sin(2 * pi * 110 * t))'],
+  ['Chord, A major', '(sin(2 * pi * 220 * t) + sin(2 * pi * 277.2 * t) + sin(2 * pi * 329.6 * t)) / 3'],
+  ['Fade-in sine, 2 s', 'sin(2 * pi * 220 * t) * min(t / 2, 1)'],
+  ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'],
+  ['Noise', 'rnd * k1'],
+  ['Pass A (K1 = level)', 'a * k1'],
+  ['Ring modulate A by B', 'a * b'],
+  ['Tremolo 4 Hz', 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))'],
+  ['Soft clip', 'tanh(a * (1 + k1 * 4))'],
+  ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'],
+  ['Wavefold sine (K1)', 'sin(a * (1 + k1 * 8))'],
+  ['Rectify', 'abs(a)'],
+  ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'],
+  ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'],
+  ['Sample and hold on C', 'c > 0.5 ? a : y'],
+  ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'],
+  ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']
 ];
 // What the module has as its formula: its own text, or the default when it has none (a string of any length is cut to the 200 the engine keeps).
 const exprText = m => m && typeof m.text === 'string' ? m.text.slice(0, EXPR_MAX) : EXPR_DEFAULT;
@@ -2038,7 +2106,7 @@ function chainsStereoUp(d){
 const SUMMARY_KEYS = {
   mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
   smixer:['level', 'l1'],
-  scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'], expr:['$text'],   // Expression: its formula is what Compact shows (a pseudo key, not a parameter)
+  scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'], expr:['$text'], knob:['n', 'value'],   // Expression: its formula is what Compact shows (a pseudo key, not a parameter)
   onepole:['freq'], allpass:['mode', 'freq'], dline:['time', 'fb'], dcblock:['freq'], midside:['mode'], osc:['wave', 'freq'], wnoise:['color', 'level'], morph:['mode', 'morph'],
   scope:['time', 'trig'], clkmul:['mul', 'width'], chance:['prob', 'seed'], counter:['mode', 'steps'], stepsw:['fade', 'steps'], burst:['count', 'time'], gatedly:['delay'],   // Scale / map: where it lands, Crossfade: the mix first
 };
@@ -2066,7 +2134,7 @@ const NODE_W = 250;
 const NARROW_S = 168, NARROW_M = 190;   // the two small sizes: S for a one-word title, M for a two-word one
 const MODULE_WIDTH = {
   atten:NARROW_S, random:NARROW_S, quant:NARROW_S, logic:NARROW_S, math:NARROW_S,   // Attenuverter, Random, Quantizer, Logic, Math
-  const:NARROW_S, rect:NARROW_M, scale:216, compare:216, switch:NARROW_S, xfade:NARROW_M,   // Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade
+  const:NARROW_S, knob:NARROW_M, rect:NARROW_M, scale:216, compare:216, switch:NARROW_S, xfade:NARROW_M,   // Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade
   onepole:NARROW_M, allpass:216, dline:232, expr:300, dcblock:216, midside:216,
   scope:300, clkmul:216, chance:216, counter:NARROW_S, stepsw:NARROW_M, burst:216, gatedly:NARROW_M, flipflop:NARROW_S,   // Clock multiplier, Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop
   slew:NARROW_M, snh:NARROW_M, divider:NARROW_M, gateex:NARROW_M,   // Slew limiter, Sample & hold, Clock divider, Gate extract
@@ -2335,7 +2403,7 @@ function addNote(wx, wy){
 async function renameModule(id){
   const n = nodes.get(id); if (!n || playBlocked()) return;
   const def = MODULES[n.m.type], cur = n.m.label || def.label;
-  const nm = await askDialog('Name this module (leave it empty to go back to “' + def.label + '”):', { input:cur, ok:'Rename', label:'Module name' });
+  const nm = await askDialog('Module name (empty restores “' + def.label + '”)', { input:cur, ok:'Rename', label:'Module name' });
   if (nm == null || !nodes.has(id)) return;
   const t = String(nm).trim().slice(0, 40), next = t && t !== def.label ? t : '';
   if (next === (n.m.label || '')) return;
@@ -2387,6 +2455,84 @@ window.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter' && !e.shiftKey && !e.repeat && selected.size === 1 && !playMode && !(t && t.closest && t.closest('button, a, summary')) && ctx.hidden){ e.preventDefault(); renameModule([...selected][0]); return; }
 });
+/* SEND / RECEIVE (15 Nov, owner): an invisible cable. A Send takes In / In R, and every Receive with the same label outputs what its Send gets. The engine turns the pair into
+   ordinary cables when the patch is compiled (srResolve in the worklet), so nothing about ordering or feedback changes. Label: lab 1-8 is A-H, 0 is the module's own text
+   (kept trimmed and not case sensitive, as in the engine). The colour chip is the label's colour; a Receive with no Send, or a Send with no Receive, says so. Within one
+   track's chain only: a pair that joins two tracks' chains carries nothing (each track runs its own chain), and its cable is drawn with the cross-chain warning. */
+const SR_LAB = 'ABCDEFGH', SR_COL = ['#d6336c', '#2b8a3e', '#1c7ed6', '#e8590c', '#7048e8', '#0b7285', '#a68a00', '#7d5a3c'];
+function srKeyOf(m){
+  const l = Math.round(m && m.params && m.params.lab) || 0;
+  if (l >= 1 && l <= 8) return SR_LAB[l - 1];
+  const t = m && typeof m.text === 'string' ? m.text.trim().toLowerCase() : '';
+  return t ? 't:' + t : '';
+}
+const srName = m => { const k = srKeyOf(m); return !k ? '' : k.startsWith('t:') ? m.text.trim() : k; };
+function srColor(k){
+  if (!k) return '#777777'; const i = SR_LAB.indexOf(k); if (i >= 0 && k.length === 1) return SR_COL[i];
+  let x = 7; for (let i = 0; i < k.length; i++) x = (x * 31 + k.charCodeAt(i)) % 360; return 'hsl(' + x + ' 55% 38%)';
+}
+Object.assign(SHARED_MODULES, {
+  send:{ label:'Send', scope:'mono', display:'srlab', text:true, inputs:{ in:'audio', inR:'audio' }, outputs:{}, plabels:{ in:'In L', inR:'In R' },
+    params:{ lab:[1,0,8,1] }, ui:{ lab:{ l:'Label', fixed:true, c:[[0, 'Custom text'], ...Array.from(SR_LAB, (c, i) => [i + 1, c])] } } },
+  recv:{ label:'Receive', scope:'mono', display:'srlab', text:true, inputs:{}, outputs:{ out:'audio', outR:'audio' }, plabels:{ out:'Out L', outR:'Out R' },
+    params:{ lab:[1,0,8,1] }, ui:{ lab:{ l:'Label', fixed:true, c:[[0, 'Custom text'], ...Array.from(SR_LAB, (c, i) => [i + 1, c])] } } }
+});
+Object.assign(SHARED_FAMILY, { send:'util', recv:'util' });
+Object.assign(SHARED_ABOUT, {
+  send:'Send: an invisible cable, sending end. Patch a sound into In L and In R, pick a Label (A to H, or Custom text and type a name), and every Receive with the same label outputs that sound. Use it to carry a signal across a busy patch without drawing the cable. Two Sends with one label add together. It works inside one track’s chain: to carry a sound to another track’s chain, use a Sidechain Out and a Source of Send 1 to 8.',
+  recv:'Receive: an invisible cable, receiving end. Pick the same Label as a Send and its Out L and Out R carry what that Send gets. Several Receives can share one Send. With no Send of that label it is silent and says "no Send named …". It works inside one track’s chain: to bring in a sound from another track’s chain, use a Sidechain In or a Source of Send 1 to 8.'
+});
+Object.assign(MODULE_USE, {
+  send:'Patch the reverb’s output into a Send labelled A. Far away, a Receive labelled A gives the same sound into a mixer, with no cable across the patch.',
+  recv:'Set the Label to the Send’s, then patch Out L and Out R where you need the sound. Several Receives can use one Send.'
+});
+SHARED_PALETTE.push(['Utilities', [['send', 'Send'], ['recv', 'Receive']], 'audio']);
+{ const g = PAL_LAYOUT.find(r => r[0] === 'In and out'); if (g && !g[2].includes('send')) g[2].splice(g[2].indexOf('resample') >= 0 ? g[2].indexOf('resample') : g[2].length, 0, 'send', 'recv'); }
+let srCss = false;
+function buildSrLab(n){
+  if (!srCss){ srCss = true; const st = document.createElement('style'); st.textContent = `.srbox{display:grid; gap:4px; padding:2px 0 4px}
+.srbox .srrow{display:flex; align-items:center; gap:8px}
+.srchip{display:inline-block; min-width:26px; height:20px; padding:0 6px; box-sizing:border-box; border:1.5px solid var(--ink); background:var(--src, #777); color:#fff; font:600 12px/17px var(--font); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px}
+.srbox input.srtext{flex:1; min-width:0; box-sizing:border-box; padding:3px 6px; font:inherit; font-size:12.5px; background:var(--panel); color:var(--ink); border:1px solid var(--muted); border-radius:0}
+.node.sr > header{box-shadow:inset 0 6px 0 var(--src, transparent)}`; document.head.append(st); }
+  const m = n.m, chip = h('span', { class:'srchip', 'aria-hidden':'true' });
+  const inp = h('input', { class:'srtext', type:'text', maxlength:'40', spellcheck:'false', autocomplete:'off', 'aria-label':'Custom label', placeholder:'Custom label', title:'A name of your own (used when Label is Custom text; typing one switches Label to it). Enter applies it. Not case sensitive.' });
+  inp.value = typeof m.text === 'string' ? m.text : '';
+  const apply = () => {
+    if (!doc.modules.includes(m) || !inp.isConnected) return;
+    const v = inp.value.replace(/[\r\n\t\u2028\u2029]+/g, ' ').slice(0, 40); inp.value = v;
+    if (v === (typeof m.text === 'string' ? m.text : '')) return;
+    if (playBlocked()){ inp.value = typeof m.text === 'string' ? m.text : ''; return; }
+    store.snapshot(); m.text = v; exprSend(m, v);
+    if (v.trim() && (Math.round(m.params.lab) || 0) !== 0){ setParam(n, 'lab', 0); }
+    paintSr(); try { paintXc(); } catch (e) {} if (m.collapsed) paintSum(n); store.touch();
+  };
+  inp.addEventListener('keydown', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); apply(); inp.blur(); } else if (e.key === 'Escape'){ e.preventDefault(); inp.value = typeof m.text === 'string' ? m.text : ''; inp.blur(); } });
+  inp.addEventListener('keyup', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); });
+  inp.addEventListener('focus', () => { inp.readOnly = !!playMode; });
+  inp.addEventListener('blur', apply);
+  n.show = { kind:'srlab', chip, inp, seen:0 };
+  return h('div', { class:'srbox', title:'The Label pairs this ' + (m.type === 'send' ? 'Send with the Receives' : 'Receive with the Send') + ' of the same label. The colour chip is the same on both ends.' }, h('div', { class:'srrow' }, chip, inp));
+}
+// Chips, the colour strip on the title bar and the status line of every Send and Receive; run after any change to the patch or a label.
+function paintSr(){
+  const need = new Map(), have = new Map();
+  for (const m of doc.modules){ if (m.type !== 'send' && m.type !== 'recv') continue; const k = srKeyOf(m); if (!k) continue; (m.type === 'send' ? have : need).set(k, ((m.type === 'send' ? have : need).get(k) || 0) + 1); }
+  for (const n of nodes.values()){
+    const m = n.m; if (m.type !== 'send' && m.type !== 'recv') continue;
+    const k = srKeyOf(m), col = srColor(k), S = n.show; n.el.classList.toggle('sr', !!k); n.el.style.setProperty('--src', col);
+    if (S && S.chip){ S.chip.textContent = k ? srName(m) : '?'; S.chip.style.setProperty('--src', col); if (document.activeElement !== S.inp){ const t = typeof m.text === 'string' ? m.text : ''; if (S.inp.value !== t) S.inp.value = t; } }
+    paintNote(n);
+  }
+}
+// What a Send or Receive says about its pair ('' when all is well).
+function srStatus(m){
+  const k = srKeyOf(m); if (!k) return m.type === 'send' ? 'No label: nothing is sent. Pick A to H or type a name.' : 'No label: silent. Pick A to H or type a name.';
+  const label = srName(m); let sends = 0, recvs = 0;
+  for (const q of doc.modules){ if (q === m || (q.type !== 'send' && q.type !== 'recv') || srKeyOf(q) !== k) continue; if (q.type === 'send') sends++; else recvs++; }
+  if (m.type === 'recv') return sends ? (sends > 1 ? 'Hears ' + sends + ' Sends of this label, added together.' : '') : 'no Send named ' + label;
+  return recvs ? '' : 'No Receive named ' + label + ' yet.';
+}
 /* ===SHARED EDITOR END=== */
 /* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect, so the track
    reached the chain as its left channel, played as mono. A patch made before (ti2 not set) gets, once, for each Track In
@@ -2417,7 +2563,7 @@ function mixDef(label, scope, stereo){
     if (stereo){ params['p' + k] = [0,-1,1,.01]; ui['p' + k] = { l:'Pan ' + k, f:panTxt }; }
   }
   params.level = [1,0,2,.01]; ui.level = { l:'Master', f:pct };
-  return { label, scope, inputs, outputs: stereo ? { out:'audio', outR:'audio' } : { out:'audio' }, params, ui };
+  return { label, scope, inputs, outputs: stereo ? { out:'audio', outR:'audio' } : { out:'audio' }, params, ui, display:'mixout' };
 }
 // Which channel a port or control belongs to (In 5, In 5 R, Level 5, Pan 5, and their modulation jacks), 0 for none.
 const mixChan = k => { const r = /^(?:p:)?(?:in|l|p)(\d+)R?$/.exec(k); return r ? +r[1] : 0; };
@@ -2614,6 +2760,7 @@ const NOTES = {
 };
 for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects. This module passes sound through unchanged.';
 NOTES.rings = NOTES.rings || NOTES.eq; NOTES.clouds = NOTES.clouds || NOTES.eq;
+NOTES.send = NOTES.recv = m => srStatus(m) || null;   // SEND / RECEIVE: what the label does not find
 let WASM_OK = { tfx:true };
 
 /* ---------- helpers ---------- */
@@ -2741,7 +2888,7 @@ class PatchStore {
   importFrom(file){
     return file.text().then(txt => {
       const d = JSON.parse(txt);
-      if (d.format !== 'chains.patch' && d.format !== 'waves.patch') throw new Error('That file isn’t a chains patch.');
+      if (d.format !== 'chains.patch' && d.format !== 'waves.patch') throw new Error('Not a chains patch');
       this.snapshot(); this._restore(JSON.stringify(d));
     });
   }
@@ -2838,11 +2985,11 @@ class ChainsBridge {
   /* The effects code from Thunder (tfx.wasm). A worklet can't fetch, so the page does. */
   static wasm(){
     const get = u => fetch(u).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
-    return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm'), get('../pump/pump.wasm?v=7')]));   // PUMP MODULES: pump's effects
+    return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm'), get('../pump/pump.wasm?v=9')]));   // PUMP MODULES: pump's effects
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=57';
+    const url = opts.url || './chains-worklet.js?v=60';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes, pumpBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -3021,7 +3168,7 @@ function routeTrackChange(n, v){
   const N = Math.max(1, Math.min(TRK_N, Math.round(+v) || 1)), { ins, outs } = chainTrackLists(), old = n.m.params.track | 0;
   if (n.m.type === 'trackIn'){
     // A track that already has a chain: stay here (no jump to the other chain, which was disorienting) and say so.
-    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '. Pick a free track (the list marks the used ones).'); return { reject:true }; }
+    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain: staying on track ' + old + '. Pick a free track (used ones are marked).'); return { reject:true }; }
     for (const o of outs) if ((o.params.track | 0) === old && !o.bus) applyChainTrack(o, N);   // this pair's Chain Out follows (a bus's stays)
     return { v:N };
   }
@@ -3029,8 +3176,8 @@ function routeTrackChange(n, v){
   // no Track In is on, it is a bus (m.bus, kept with the patch): the tracks whose Track Ins feed it play through that track,
   // after their own faders, and its fader and effects level them all. Back on a Track In's track, it's an insert again.
   const bus = !ins.some(m => (m.params.track | 0) === N);
-  if (!bus && outs.some(m => m !== n.m && !m.bus && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '.'); return { reject:true }; }
-  if (bus && !n.m.bus) toast('Chain Out is now a bus on track ' + N + '. The tracks feeding it play through track ' + N + ' after their own faders. Track ' + N + '’s fader and effects level them all.', 6000);
+  if (!bus && outs.some(m => m !== n.m && !m.bus && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain: staying on track ' + old); return { reject:true }; }
+  if (bus && !n.m.bus) toast('Chain Out is a bus on track ' + N + ': its tracks play through it, after their own faders.', 6000);
   if (!bus && n.m.bus) toast('Chain Out is back on track ' + N + ' as an insert.');
   n.m.bus = bus ? 1 : 0;
   return { v:N };
@@ -3049,7 +3196,7 @@ function setParam(n, key, v, fromUser){
     n.m.params[key] = v;
     if (bridge) bridge.setParam(n.m.id, key, v);
     else if (EMBED && TW && TW.param) TW.param(n.m.id, key, v);
-    if (c) c.show(); paintNote(n); store.touch();
+    if (c) c.show(); paintNote(n); try { paintXc(); } catch (e) {} store.touch();
     return;
   }
   n.m.params[key] = v;
@@ -3059,6 +3206,7 @@ function setParam(n, key, v, fromUser){
   if (key === 'chans' && MIXT.has(n.m.type)){ mixResize(n); return; }
   const c = n.ctl[key]; if (c && !fromUser) c.show();
   if (IO_KEY[n.m.type] === key) ioTitle(n);
+  if (key === 'lab' && (n.m.type === 'send' || n.m.type === 'recv')){ try { paintSr(); paintXc(); } catch (e) {} }   // SEND / RECEIVE: the chips, the status lines and the cross-chain marks follow the label
   if (n.m.collapsed) paintSum(n);
   store.touch();
 }
@@ -3353,12 +3501,12 @@ function preMenu(n, btn){
   if (fac.length){ items.push(['§Factory']); for (const [nm, v] of fac) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
   if (mine.length){ items.push(['§Yours']); for (const [nm, v] of mine) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
   items.push(['Save as a preset…', async () => {
-    const nm0 = await askDialog('Name this ' + (n.m.label || def.label) + ' preset (kept on this device for every patch, and in this patch so it goes with the song):', { input:cur && !PRESETS[t]?.some(p => p[0] === cur) && cur !== 'Default' ? cur : '', ok:'Save' });
+    const nm0 = await askDialog((n.m.label || def.label) + ' preset name (saved on this device and in this patch)', { input:cur && !PRESETS[t]?.some(p => p[0] === cur) && cur !== 'Default' ? cur : '', ok:'Save' });
     const nm = nm0 && nm0.trim().slice(0, 40); if (!nm) return;
     const vals = {}; for (const k in def.params) if (!PRE_SKIP.has(k)) vals[k] = n.m.params[k];
     const list = preUserOf(t).filter(x => x[0] !== nm); list.push([nm, vals]); list.sort((a, b) => a[0].localeCompare(b[0])); preUserSet(t, list.filter(x => !prePatchOf(t).some(p => p === x)));
     prePatchSet(t, prePatchOf(t).filter(x => x[0] !== nm).concat([[nm, vals]]));
-    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”. It shows in every ' + def.label + ' preset list, and travels with this patch.');
+    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved preset “' + nm + '”: in every ' + def.label + ' list and in this patch');
   }]);
   if (mine.length) items.push(['Delete one of yours…', () => showMenu(r.left, r.bottom + 2, mine.map(([nm]) => ['Delete “' + nm + '”', () => {
     store.snapshot(); preUserSet(t, preUser()[t] ? preUserOf(t).filter(x => x[0] !== nm && !prePatchOf(t).includes(x)) : []); prePatchSet(t, prePatchOf(t).filter(x => x[0] !== nm)); store.touch(); for (const x of nodes.values()) if (x.m.type === t && x.m.pre === nm) paintPre(x); toast('Deleted the preset “' + nm + '”.'); }]))]);
@@ -3455,7 +3603,7 @@ function buildNode(m){
   if (m.type === 'chainOut' || m.type === 'trackIn'){ n.meter = h('span'); const io = m.type === 'trackIn' ? 'IN' : 'OUT';
     kids.push(h('div', {class:'iom', title:(io === 'IN' ? 'Level the track sends into this chain' : 'Level coming out of this chain') + ' (track ' + ((m.params.track | 0) || 1) + ')'},
       h('b', {text:io}), h('div', {class:'prog'}, n.meter))); }
-  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
+  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr') kids.unshift(sh); else if (def.display === 'mixout') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
@@ -3494,8 +3642,9 @@ function buildNode(m){
       const an = start.find(q => q[0] === n) || start[0], sx2 = snapOn && an ? snapV(an[1] + dx) - an[1] : dx, sy2 = snapOn && an ? snapV(an[2] + dy) - an[2] : dy;
       for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + sx2), Math.round(oy + sy2)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
       groupsFollow(start.map(q => q[0].m.id));   // M6: a group's box follows its modules
+      clearTimeout(store._timer);   // no autosave in the middle of a drag: held 1.2 s (at the window's edge, say) it handed the half-dragged state to the song as a second undo step; the drop's touch() saves it
     };
-    nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); }; nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };
+    nodeDragging = v => { extra[0] += v[0]; extra[1] += v[1]; place(); }; nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };   // the view moved by v on screen, so the module has to move by v with it (17 Nov: the sign was wrong, the module ran away from the pointer at twice the pan speed) nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };
     let pend = 0;
     const mv = ev => { lastEv = ev; if (moved || Math.hypot(ev.clientX - sx, ev.clientY - sy) > thr) autoPanAt(ev); markScene();   // (a press near the window's edge does not start the auto-pan until it is a real drag)
  if (!pend) pend = requestAnimationFrame(() => { pend = 0; place(); }); };
@@ -3558,7 +3707,7 @@ function buildSummary(n){
   });
   n.sumM = h('span', {class:'cs-m'});
   const kids = [h('span', {class:'cs-t'}, n.sumIt.map(i => i.el)), n.sumM];
-  if (n.meter || def.display === 'scout' || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
+  if (n.meter || def.display === 'scout' || def.display === 'mixout' || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
   n.sum = h('div', {class:'csum'}, kids);
 }
 // The summary line: each key value as its control would read it (a modulated one at its live value, in the modulation colour).
@@ -3706,11 +3855,11 @@ window.addEventListener('keydown', e => {
   e.preventDefault();
   if (e.shiftKey){
     const k = setAllMini() || setAllCollapsed(false);
-    if (k) toast((k === 1 ? '1 module' : k + ' modules') + ' changed (Alt+Shift+C again reverses it, ' + MOD + '+Z undoes it).');
+    if (k) toast((k === 1 ? '1 module' : k + ' modules') + ' changed · ' + MOD + '+Z undoes it');
     return;
   }
   const open = [...nodes.values()].some(n => !n.m.collapsed), k = setAllCollapsed(open);
-  if (k) toast((open ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (Alt+C does the reverse, ' + MOD + '+Z undoes it).');
+  if (k) toast((open ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it');
 });
 
 function renderAll(){
@@ -3778,7 +3927,15 @@ function addItem(type, x, y){
   x = snapV(x); y = snapV(y);   // M11: a new module lands on the grid
   store.snapshot();
   if (type.startsWith('c:')){ const ids = addCustom(type.slice(2), [x, y]); clearSel(); ids.forEach(id => setSel(id, true)); afterAdd(ids); return; }
-  const m = addModule(type, x, y); if (m){ clearSel(); setSel(m.id, true); afterAdd([m.id]); }
+  const m = addModule(type, x, y); if (m){ if (type === 'knob') knobToDeck(m); clearSel(); setSel(m.id, true); afterAdd([m.id]); }
+}
+// S4 (patch knobs): a Knob added from the palette puts its Value on the bottom panel, labelled K<n> (as "Add to the bottom panel" would, but in the
+// same undo step as the add, which addItem has already snapshotted). Only here: load, undo, paste and duplicate never add one. The label is stored
+// (like any deck entry), so changing the Knob's n later leaves it; the owner can remove and re-add it.
+function knobToDeck(m){
+  if (deckHas(m.id, 'value')) return;
+  const d = deckDesc(m, 'value'); d.l = 'K' + Math.round(m.params.n || 1);
+  doc.deck = (doc.deck || []).concat([d]); store.touch(); markDeck(); if (EMBED && TW && TW.deck) TW.deck();
 }
 // T3 (13 Nov, audit T3): on a narrow screen the module list covers the patch, so it closes once a module is added, and the view pans to
 // the new module if it is not wholly in view. (On a wide screen the list stays open: several modules are often added in a row.)
@@ -3819,7 +3976,7 @@ window.addEventListener('keydown', e => {
   if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.ctrlKey || e.metaKey || e.altKey || typing(e) || !selected.size || playMode) return;
   if ((learn && learn.on) || document.querySelector('.dlgov')) return;
   e.preventDefault(); store.snapshot(); const ids = [...selected]; for (const x of ids) removeModule(x); clearSel();
-  toast(ids.length === 1 ? 'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).');
+  toast(ids.length === 1 ? 'Module removed · Undo brings it back' : ids.length + ' modules removed · Undo brings them back');
 });
 function setSel(id, on){ const n = nodes.get(id); if (on && n && n.gcol) return; on ? selected.add(id) : selected.delete(id); if (on) clearCableSel(); relDirty = true; if (n) n.el.classList.toggle('selected', on); }
 function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); relDirty = true; }
@@ -3849,7 +4006,7 @@ window.addEventListener('keydown', e => {
   if ((learn && learn.on) || document.querySelector('.dlgov')) return;
   const c = selCable; clearCableSel(); e.preventDefault();
   if (!doc.cables.includes(c)) return;
-  store.snapshot(); disconnect(c); toast('Cable removed (Undo brings it back).');
+  store.snapshot(); disconnect(c); toast('Cable removed');
 });
 function cableKind(c){
   const src = modById(c.from[0]); const k = src && MODULES[src.type] && MODULES[src.type].outputs[c.from[1]];
@@ -3894,7 +4051,7 @@ function syncCableEls(){
       if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); return; }
       if (ev.pointerType === 'touch'){
         const now = performance.now(), lt = hit._tap;
-        if (lt && now - lt.t < 450 && Math.hypot(ev.clientX - lt.x, ev.clientY - lt.y) < 30){ hit._tap = null; cableDblAt = performance.now(); store.snapshot(); disconnect(c); toast('Cable removed.'); }
+        if (lt && now - lt.t < 450 && Math.hypot(ev.clientX - lt.x, ev.clientY - lt.y) < 30){ hit._tap = null; cableDblAt = performance.now(); store.snapshot(); disconnect(c); toast('Cable removed'); }
         else { hit._tap = { t:now, x:ev.clientX, y:ev.clientY }; toast('Double-tap a cable to remove it.'); }
       }
     });
@@ -3903,6 +4060,7 @@ function syncCableEls(){
     hit.addEventListener('mouseenter', () => el.g.classList.add('hov')); hit.addEventListener('mouseleave', () => el.g.classList.remove('hov')); hit.addEventListener('mouseenter', ev => cabHover(c, ev)); hit.addEventListener('mousemove', ev => cabPlace(ev)); hit.addEventListener('mouseleave', () => cabHover(null));   // M8: the value readout
     svg.append(el.g); cableEls.set(c, el);
   }
+  try { paintSr(); paintXc(); } catch (e) {}
   compactAll(); secMarks(); groupBlocks(); markScene();
 }
 function jackPos(id, dir, port, wr){
@@ -3941,6 +4099,9 @@ function placeCable(el, a, b, pts, c){
     const q = pts && pts.length ? pts[pts.length - 1] : a, qx = q.x != null ? q.x : q[0], qy = q.x != null ? q.y : q[1], dx = qx - b.x, dy = qy - b.y, L = Math.hypot(dx, dy) || 1, k = Math.min(34, L / 2);
     const t = fbDet ? 'translate(' + Math.round(fbDet[0]) + ' ' + Math.round(fbDet[1]) + ')' : 'translate(' + Math.round(b.x + dx / L * k) + ' ' + Math.round(b.y + dy / L * k - 12) + ')';
     if (el.tagT !== t){ el.tagT = t; el.tag.setAttribute('transform', t); }
+  }  if (el.xc && el.xtag){   // CROSS-CHAIN: the tag sits mid-way along the cable, above the line
+    const t = 'translate(' + Math.round((a.x + b.x) / 2) + ' ' + Math.round((a.y + b.y) / 2 - 12) + ')';
+    if (el.xtagT !== t){ el.xtagT = t; el.xtag.setAttribute('transform', t); }
   }
 }
 const FB_TIP = 'Feedback cable: one block late. Click to select (Delete removes it), double-click or right-click to remove';
@@ -3953,6 +4114,67 @@ function paintFb(c, el){
   }
   if (el.tag){ el.tag.style.display = on ? '' : 'none'; el.tagT = ''; }
   if (el.ttl) el.ttl.textContent = on ? FB_TIP : 'Click to select (Delete removes it), double-click or right-click to remove';
+}
+/* CROSS-CHAIN CABLES (15 Nov): inside Thunder Plus every track runs its own chains node, which runs only the modules that lead to ITS Chain Out and has only its own
+   track's audio on its Track In (plus the tracks a bus takes in: a Chain Out with no Track In of its own). A cable that brings another track's Track In into a chain that has
+   a Track In of its own (a bus's mixer cabled into a Sidechain comp's SC on track 15) therefore carries silence. xcCables() finds those cables: for each track T that has
+   a Track In, the "native" modules are those T's Track In reaches that reach T's Chain Out; a cable into a native module from a module that is not native, whose own inputs
+   include a Track In of another track, is a crossing. Returns Map cable -> {from: tracks it brings in, to: T}. */
+function xcCables(){
+  const out = new Map(), mods = doc.modules, cables = doc.cables.filter(fbOk);
+  const trk = m => (m.params && m.params.track) | 0, ins = mods.filter(m => m.type === 'trackIn' && trk(m) > 0), outs = mods.filter(m => m.type === 'chainOut' && trk(m) > 0);
+  if (!ins.length || !outs.length) return out;
+  // The edges the engine runs: a cable out of a Receive is one edge from every source cabled into the Send of its label (both drawn cables are what gets marked).
+  const by = new Map(mods.map(m => [m.id, m])), edges = [], sends = new Map(), per = new Map();   // same port choice as the worklet's srResolve: Out takes In, Out R takes In R (In when it has none, Send by Send), a Receive cabled into a Send is followed through
+  for (const c of cables){ const d = by.get(c.to[0]); if (d && d.type === 'send'){ const k = srKeyOf(d); if (k){ if (!sends.has(k)) sends.set(k, []); let e = per.get(d.id); if (!e){ per.set(d.id, e = { in:[], inR:[] }); sends.get(k).push(e); } if (c.to[1] === 'in') e.in.push(c); else if (c.to[1] === 'inR') e.inR.push(c); } } }
+  const memo = new Map(); let cuts = 0;   // per label and port, as in the worklet's srResolve: linear in the stages, identical sources kept once (their marks merged)
+  const feeds = (lab, port, seen) => {
+    const key = lab + '.' + port, hit = memo.get(key); if (hit) return hit;
+    if (seen.has(key)){ cuts++; return []; }
+    seen.add(key); const before = cuts, got = new Map();
+    for (const e of sends.get(lab) || []){
+      for (const q of port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : []){
+        const sm = by.get(q.from[0]), part = sm && sm.type === 'recv' ? feeds(srKeyOf(sm), q.from[1], seen) : [{ a:q.from[0], marks:[] }];
+        for (const f of part){ let o = got.get(f.a); if (!o) got.set(f.a, o = { a:f.a, marks:new Set() }); o.marks.add(q); for (const m of f.marks) o.marks.add(m); }
+      }
+    }
+    seen.delete(key); const res = [...got.values()].map(o => ({ a:o.a, marks:[...o.marks] })); if (cuts === before) memo.set(key, res); return res;
+  };
+  const eseen = new Map();
+  for (const c of cables){
+    const s = by.get(c.from[0]), d = by.get(c.to[0]);
+    if (d && d.type === 'send') continue;
+    if (s && s.type === 'recv'){ for (const f of feeds(srKeyOf(s), c.from[1], new Set())){ const k = f.a + '>' + c.to[0], o = eseen.get(k); if (!o){ const e = { a:f.a, b:c.to[0], marks:[...f.marks, c] }; eseen.set(k, e); edges.push(e); } else for (const m of [...f.marks, c]) if (!o.marks.includes(m)) o.marks.push(m); } continue; }
+    edges.push({ a:c.from[0], b:c.to[0], marks:[c] });
+  }
+  const fwd = new Map(), back = new Map(), add = (M, a, b) => { if (!M.has(a)) M.set(a, []); M.get(a).push(b); };
+  for (const e of edges){ add(fwd, e.a, e.b); add(back, e.b, e.a); }
+  const walk = (M, starts) => { const seen = new Set(starts), w = [...starts]; while (w.length){ const x = w.pop(); for (const y of M.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return seen; };
+  const tin = new Map(); for (const m of ins) tin.set(m.id, trk(m));
+  const coneIns = new Map();   // module -> the tracks of the Track Ins behind it (itself included)
+  const coneOf = id => { let r = coneIns.get(id); if (!r){ const s = walk(back, [id]); r = new Set(); for (const x of s) if (tin.has(x)) r.add(tin.get(x)); coneIns.set(id, r); } return r; };
+  for (const T of new Set(ins.map(trk))){
+    const own = walk(fwd, ins.filter(m => trk(m) === T).map(m => m.id)), toOut = walk(back, outs.filter(m => trk(m) === T).map(m => m.id));
+    for (const e of edges){
+      const a = e.a, b = e.b; if (!(own.has(b) && toOut.has(b)) || (own.has(a) && toOut.has(a))) continue;
+      const foreign = [...coneOf(a)].filter(t => t !== T); if (!foreign.length) continue;
+      for (const c of e.marks){ const o = out.get(c); if (o){ for (const t of foreign) if (!o.from.includes(t)) o.from.push(t); } else out.set(c, { from:foreign.slice(), to:T }); }
+    }
+  }
+  return out;
+}
+function xcTip(x){ return 'No signal: this cable crosses from track ' + x.from.slice().sort((p, q) => p - q).join(', ') + '\'s chain into track ' + x.to + '\'s. Each track runs its own chain, so it carries silence. Use a Sidechain Out (Send 1\u20138) in the first chain and Source: Send N on the module that listens, or a Send / Receive pair in one chain.'; }
+let xcToldOnce = false;
+function paintXc(){
+  const X = xcCables();
+  for (const [c, el] of cableEls){
+    const x = X.get(c), on = !!x; if (!!el.xc === on && (!on || el.xcFrom === x.from.join())) continue;
+    el.xc = on; el.xcFrom = on ? x.from.join() : ''; el.line.classList.toggle('xc', on);
+    if (on && !el.xtag){ el.xtag = svgEl('g', { class:'fbtag' }); const r = svgEl('rect', { x:-30, y:-8, width:60, height:16 }), t = svgEl('text', {}); t.textContent = 'no signal'; el.xtag.append(r, t); el.g.append(el.xtag); }
+    if (el.xtag){ el.xtag.style.display = on ? '' : 'none'; el.xtagT = ''; }
+    if (el.ttl) el.ttl.textContent = on ? xcTip(x) : (el.fb ? FB_TIP : 'Click to select (Delete removes it), double-click or right-click to remove');
+  }
+  return X;
 }
 function drawCables(){
   const wr = world.getBoundingClientRect();
@@ -4030,7 +4252,8 @@ function connect(from, to, pts, snap){
   if (bridge) bridge.connect(from, to, loop);
   else if (EMBED && TW && TW.mod) TW.mod(loop ? { op:'connect', a:from, b:to, fb:true } : { op:'connect', a:from, b:to });
   syncCableEls(); store.touch();
-  if (loop) fbToast(); else if (had) toast('Two cables now feed this input: they add together (Undo takes the new one off). Drag the old one off to replace it.', 4200);
+  if (!xcToldOnce && xcCables().has(c)){ xcToldOnce = true; toast('A cable can’t cross tracks, so it carries no signal. Use a Sidechain Out (Send 1\u20138) with Source: Send N, or a Send / Receive pair.', 6000); }
+  else if (loop) fbToast(); else if (had) toast('Two cables feed this input and add together. Undo removes the new one; drag the old one off to replace it.', 4200);
   return true;
 }
 function disconnect(c, quiet){
@@ -4093,9 +4316,9 @@ function onJackDown(e, jack){
     const d = drag; drag = null; d.el.g.remove(); autoPanV = [0, 0];
     if (ev.type === 'pointercancel') return;
     const t = findTarget(ev);
-    if (!t){ if (snapped) toast('Cable removed.'); return; }
+    if (!t){ if (snapped) toast('Cable removed'); return; }
     const tt = { id: t.dataset.id, port: t.dataset.port, dir: t.dataset.dir };
-    if (tt.dir === d.anchor.dir){ if (snapped) toast('Cable removed.'); return; }
+    if (tt.dir === d.anchor.dir){ if (snapped) toast('Cable removed'); return; }
     const out = d.anchor.dir === 'out' ? d.anchor : tt, inp = d.anchor.dir === 'out' ? tt : d.anchor;
     connect([out.id, out.port], [inp.id, inp.port], d.anchor.dir === 'out' ? d.pts : d.pts.slice().reverse(), !snapped);   // (the undo step is taken inside, once the cable is accepted: a refused one leaves none)
   };
@@ -4124,11 +4347,42 @@ function syncHandles(el, c){
   el.hdl.forEach((r, i) => { r.setAttribute('x', pts[i][0] - 5); r.setAttribute('y', pts[i][1] - 5); });
 }
 // Drag a bend point. Option/Alt-click a point without moving it to remove it.
+/* RIGHT ANGLES (15 Nov, owner): dragging a bend point snaps it square to the points either side of it (the previous bend or the source jack, the next bend or the target jack):
+   within SNAP_PX screen pixels of the same x (or y) as a neighbour, it takes that x (or y), so the segment on that side is vertical (or horizontal). Alt turns the snap off.
+   "Square up" (cable menu) makes every segment horizontal or vertical, adding a corner where the last one would still be slanted. Both are pure: ends are [x, y] world points. */
+const SNAP_PX = 8;
+function snapBendPt(ends, pts, i, P, tol){
+  const prev = i > 0 ? pts[i - 1] : ends[0], next = i < pts.length - 1 ? pts[i + 1] : ends[1], out = [P[0], P[1]];
+  for (const k of [0, 1]){ let best = tol + 1e-9; for (const q of [prev, next]){ const d = Math.abs(P[k] - q[k]); if (d < best){ best = d; out[k] = q[k]; } } }
+  return out;
+}
+function squareUpPts(ends, pts){
+  const a = ends[0], b = ends[1], out = []; let last = [a[0], a[1]], horiz = null;
+  for (const p of pts || []){
+    const dx = p[0] - last[0], dy = p[1] - last[1], h = Math.abs(dx) >= Math.abs(dy);
+    const q = h ? [p[0], last[1]] : [last[0], p[1]];
+    if (q[0] === last[0] && q[1] === last[1]) continue;   // (no length: dropped)
+    out.push(q); last = q; horiz = h;
+  }
+  if (last[0] !== b[0] && last[1] !== b[1]){
+    if (!out.length){ const mx = Math.round((a[0] + b[0]) / 2); out.push([mx, a[1]], [mx, b[1]]); }   // no bends: a Z, out of the jack and into the next one level
+    else out.push(horiz ? [last[0], b[1]] : [b[0], last[1]]);
+  }
+  return out;
+}
+function cableEndPts(c){ const wr = world.getBoundingClientRect(), a = jackPos(c.from[0], 'out', c.from[1], wr), b = jackPos(c.to[0], 'in', c.to[1], wr); return a && b ? [[a.x, a.y], [b.x, b.y]] : null; }
+function squareUpCable(c){
+  if (!doc.cables.includes(c)) return;
+  const ends = cableEndPts(c); if (!ends){ toast('That cable is hidden: open its group first.'); return; }
+  const pts = squareUpPts(ends, c.pts); store.snapshot();
+  if (pts.length) c.pts = pts; else delete c.pts;
+  drawCables(); store.touch(); toast('Cable squared up');
+}
 function bendDrag(ev, c, idx, lazy){
   ev.stopPropagation(); ev.preventDefault();
   const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false, snapped = !lazy;
   if (!lazy) store.snapshot();
-  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } c.pts[i] = worldPt(e); } };
+  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } let P = worldPt(e); if (!e.altKey){ const en = cableEndPts(c); if (en) P = snapBendPt(en, c.pts, i, P, SNAP_PX / view().zoom); } c.pts[i] = P; } };   // (right angles: Alt-drag leaves the point where it is put)
   const up = e => {
     window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
     if (!moved && e.altKey){ if (!snapped) store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; snapped = true; }
@@ -4419,7 +4673,7 @@ function renderGroups(){
     fold.addEventListener('pointerdown', e => e.stopPropagation());
     x.addEventListener('click', () => { store.snapshot(); doc.groups = doc.groups.filter(q => q !== g); renderGroups(); store.touch(); });
     fold.addEventListener('click', () => { if (playBlocked()) return; store.snapshot(); g.collapsed = !g.collapsed; renderGroups(); store.touch(); });
-    label.addEventListener('dblclick', async () => { const nm = await askDialog('Name this group:', { input:g.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); g.name = nm.trim(); renderGroups(); } });
+    label.addEventListener('dblclick', async () => { const nm = await askDialog('Group name', { input:g.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); g.name = nm.trim(); renderGroups(); } });
     label.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       e.stopPropagation(); e.preventDefault(); label.setPointerCapture(e.pointerId);
@@ -4601,11 +4855,12 @@ function ctxMenu(target, x, y, o = {}){
   // A CABLE (mouse audit, 3 Nov): right-click it to remove it (double-click still does); it had no menu of its own.
   const hc = target.closest && target.closest('.hit'), cab = hc && hc._cable;
   if (cab && doc.cables.includes(cab)){
-    const its = [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed.'); }]];
+    const its = [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed'); }]];
     if (o.touch) its.unshift(['Add a bend here', () => { if (doc.cables.includes(cab)){ selectCable(cab); addBendAt(cab, worldPt({ clientX:x, clientY:y })); } }]);   // T8: the bend a mouse makes with Option-drag
+    its.splice(its.length - 1, 0, ['Square up', () => squareUpCable(cab)]);   // (right angles: before Remove cable)
     showMenu(x, y, its); return; }
   const hb = target.closest && target.closest('.bend');
-  if (hb && hb._cable && doc.cables.includes(hb._cable)){ const c = hb._cable, i = hb._el.hdl.indexOf(hb); showMenu(x, y, [['Remove this bend', () => { if (!doc.cables.includes(c) || i < 0 || !c.pts) return; store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; store.touch(); }]]); return; }
+  if (hb && hb._cable && doc.cables.includes(hb._cable)){ const c = hb._cable, i = hb._el.hdl.indexOf(hb); showMenu(x, y, [['Square up this cable', () => squareUpCable(c)], ['Remove this bend', () => { if (!doc.cables.includes(c) || i < 0 || !c.pts) return; store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; store.touch(); }]]); return; }
   const el = target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ if (!(o.touch && selMode)) clearSel(); setSel(id, true); }   // (with Select on, a long press adds the module to the selection)
   const sel = [...selected], n = sel.length, items = [];
@@ -4628,8 +4883,8 @@ function ctxMenu(target, x, y, o = {}){
   }
   const these = n === 1 ? 'this module' : 'these ' + n + ' modules';
   if (n) items.push(['Make custom module from ' + these + '…', async () => {
-    const nm = await askDialog('Name the new custom module:', { input:'My voice', ok:'Make it' }); if (!nm || !nm.trim()) return;
-    const def = captureCustom(nm.trim(), sel); if (def) toast('“' + def.name + '” is in the module list under Custom.');
+    const nm = await askDialog('Custom module name', { input:'My voice', ok:'Make it' }); if (!nm || !nm.trim()) return;
+    const def = captureCustom(nm.trim(), sel); if (def) toast('“' + def.name + '” added under Custom');
   }]);
   if (n === 1) items.push(['Rename module… (Enter)', () => renameModule(sel[0])]);
   if (n === 1 && nodes.get(sel[0])) items.push(['About this module', () => { const q = nodes.get(sel[0]); if (q) mhelpShow(q.head, q.m.type, q.title, true); }]);   // (narrow and Mini modules have no ? button)
@@ -4642,12 +4897,12 @@ function ctxMenu(target, x, y, o = {}){
   items.push(['Select all (' + MOD + '+A)', () => { for (const k of nodes.keys()) setSel(k, true); }]);
   { // COLLAPSE ALL / EXPAND ALL (C4), each one undo step
     const all = [...nodes.values()], open = all.filter(x => !x.m.collapsed).length, shut = all.length - open, picked = sel.map(x => nodes.get(x)).filter(Boolean);
-    const say = (k, c) => toast((c ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).');
+    const say = (k, c) => toast((c ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it');
     if (picked.some(x => !x.m.collapsed)) items.push(['Collapse ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(true, sel), true)]);
     else if (picked.length && picked.some(x => x.m.collapsed)) items.push(['Expand ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(false, sel), false)]);
-    if (picked.some(x => viewOf(x.m) !== 'mini')) items.push(['Mini ' + (picked.length === 1 ? 'this module' : 'selected modules') + ' (title bar only)', () => { const k = setAllMini(sel); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).'); }]);
+    if (picked.some(x => viewOf(x.m) !== 'mini')) items.push(['Mini ' + (picked.length === 1 ? 'this module' : 'selected modules') + ' (title bar only)', () => { const k = setAllMini(sel); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it'); }]);
     if (open) items.push(['Collapse all modules (Alt+C)', () => say(setAllCollapsed(true), true)]);
-    if (all.length > all.filter(x => viewOf(x.m) === 'mini').length) items.push(['Mini all modules (Alt+Shift+C)', () => { const k = setAllMini(); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).'); }]);
+    if (all.length > all.filter(x => viewOf(x.m) === 'mini').length) items.push(['Mini all modules (Alt+Shift+C)', () => { const k = setAllMini(); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it'); }]);
     if (shut) items.push(['Expand all modules' + (open ? '' : ' (Alt+C)'), () => say(setAllCollapsed(false), false)]);
   }
   if (!id) items.push(['Add a comment here', () => addNote(...worldPt({ clientX:x, clientY:y }))], ['Fit all modules (F)', () => fitAll()], ['Tidy up (by signal flow)', () => tidy()], ['Snap to grid: ' + (snapOn ? 'on (turn off)' : 'off (turn on)'), () => { snapOn = !snapOn; settings.snap = snapOn; saveSettings(); toast(snapOn ? 'Snap to grid on: modules land on a 10 px grid.' : 'Snap to grid off.'); }]);
@@ -4805,7 +5060,7 @@ function renderCustom(){
   customUI.grid.replaceChildren(...(doc.custom.length ? doc.custom.map(c => {
     const b = paletteItem('c:' + c.id, c.name, false);
     b.addEventListener('contextmenu', e => { e.preventDefault(); showMenu(e.clientX, e.clientY, [
-      ['Rename “' + c.name + '”…', async () => { const nm = await askDialog('Rename this custom module:', { input:c.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); c.name = nm.trim(); renderCustom(); } }],
+      ['Rename “' + c.name + '”…', async () => { const nm = await askDialog('Custom module name', { input:c.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); c.name = nm.trim(); renderCustom(); } }],
       ['Delete “' + c.name + '”', () => { store.snapshot(); doc.custom = doc.custom.filter(x => x !== c); renderCustom(); store.touch(); }]]); });
     return h('div', {class:'pwrap'}, b);
   }) : [h('div', {class:'qempty', text:'Select modules (click, Shift-click or drag a box), right-click and choose Make custom module.'})]));
@@ -4859,15 +5114,15 @@ window.addEventListener('pointerdown', e => { if (!setMenu.hidden && !setMenu.co
    the tracker, the synth and this patch (the app puts the patch back here, setDoc). On its own the patch keeps its own. */
 const sharedUndo = () => !!(EMBED && TW && TW.undo);
 function flushToHost(){ if (store && store.dirty){ clearTimeout(store._timer); store.save(); } }
-function undo(){ if (sharedUndo()){ flushToHost(); TW.undo(-1); return; } if (store.back()) toast('Undone.'); }
-function redo(){ if (sharedUndo()){ flushToHost(); TW.undo(1); return; } if (store.forward()) toast('Redone.'); }
+function undo(){ if (sharedUndo()){ flushToHost(); TW.undo(-1); return; } if (store.back()) toast('Undone'); }
+function redo(){ if (sharedUndo()){ flushToHost(); TW.undo(1); return; } if (store.forward()) toast('Redone'); }
 const canUndo = () => sharedUndo() ? !!(TW.canUndo && TW.canUndo()) : !!store.undo.length;
 const canRedo = () => sharedUndo() ? !!(TW.canRedo && TW.canRedo()) : !!store.redo.length;
 function newPatch(){
   store.snapshot();
   const b = blankDoc(); for (const k of Object.keys(doc)) delete doc[k]; Object.assign(doc, b);
   clearSel(); renderAll(); loadIntoEngine(); store.touch();
-  toast('New empty patch. Press ' + MOD + '+Z to get the previous one back.');
+  toast('New empty patch · ' + MOD + '+Z brings the old one back');
 }
 const fileLoad = document.getElementById('fileload');
 let loadMode = 'patch';
@@ -4876,12 +5131,12 @@ fileLoad.addEventListener('change', () => {
   const f = fileLoad.files[0]; if (!f) return;
   const p = loadMode === 'custom'
     ? store.importCustom(f).then(k => { renderCustom(); store.touch(); toast('Imported ' + k + ' custom module' + (k === 1 ? '' : 's') + '.'); })
-    : store.importFrom(f).then(() => toast('Opened “' + doc.meta.name + '”.'));
+    : store.importFrom(f).then(() => toast('Loaded “' + doc.meta.name + '”'));
   p.catch(err => toast(err.message || 'Couldn’t open that file.'));
 });
 async function savePatch(as){
   let name = doc.meta.name || 'Untitled';
-  if (as){ const nm = await askDialog('Save the patch as:', { input:name, ok:'Save' }); if (!nm || !nm.trim()) return; name = nm.trim(); doc.meta.name = name; document.getElementById('pname').value = name; }
+  if (as){ const nm = await askDialog('Patch name', { input:name, ok:'Save' }); if (!nm || !nm.trim()) return; name = nm.trim(); doc.meta.name = name; document.getElementById('pname').value = name; }
   store.dirty = true; store.save(); store.exportTo(name); toast('Saved “' + name + '”.');
 }
 document.getElementById('fnew').addEventListener('click', newPatch);
@@ -4890,7 +5145,7 @@ document.getElementById('fsave').addEventListener('click', () => savePatch(false
 document.getElementById('fsaveas').addEventListener('click', () => savePatch(true));
 document.getElementById('undobtn').addEventListener('click', undo);
 document.getElementById('redobtn').addEventListener('click', redo);
-document.getElementById('fexpmods').addEventListener('click', () => { if (!doc.custom.length){ toast('No custom modules yet.'); return; } store.exportCustom(); });
+document.getElementById('fexpmods').addEventListener('click', () => { if (!doc.custom.length){ toast('No custom modules yet'); return; } store.exportCustom(); });
 document.getElementById('fimpmods').addEventListener('click', () => pickFile('custom'));
 const pnameEl = document.getElementById('pname');
 {
@@ -4907,7 +5162,7 @@ const pnameEl = document.getElementById('pname');
       file:{
         new(){ newPatch(); }, open(){ pickFile('patch'); }, save(){ savePatch(false); }, saveAs(){ savePatch(true); },
         undo(){ undo(); }, redo(){ redo(); }, canUndo(){ return canUndo(); }, canRedo(){ return canRedo(); },
-        exportCustom(){ if (!doc.custom.length){ toast('No custom modules yet.'); return; } store.exportCustom(); },
+        exportCustom(){ if (!doc.custom.length){ toast('No custom modules yet'); return; } store.exportCustom(); },
         importCustom(){ pickFile('custom'); }
       },
       patchSettings(){
@@ -5000,7 +5255,7 @@ function renderBackups(){
   host.replaceChildren(...(list.length ? list.map(b => {
     let info = ''; try { const d = JSON.parse(b.p); info = ', ' + ((d.meta && d.meta.name) || 'Untitled') + ', ' + (d.modules || []).length + ' modules'; } catch (e) {}
     const r = h('button', {class:'btn', text:'Restore'});
-    r.addEventListener('click', () => { store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored the version from ' + fmt(b.t) + '. Press ' + MOD + '+Z to undo.'); });
+    r.addEventListener('click', () => { store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored the version from ' + fmt(b.t) + ' · ' + MOD + '+Z undoes it'); });
     return h('div', {class:'bkrow'}, h('span', {text: fmt(b.t) + info}), r);
   }) : [h('span', {class:'setsub', text:'Backups appear here while you work.'})]));
 }
@@ -5072,7 +5327,7 @@ function helpDoc(){
     ['Clocks and triggers', 'Clocks and rhythm in the Modules list has the pulse tools. Clock makes the pulses and Steps plays a row of values; both follow the song’s tempo, and Reset restarts them. Clock divider and Clock multiplier slow a clock down or speed it up (×3 for triplets). Counter counts pulses, and its Step output is a staircase. Chance gate lets pulses through by chance (the same Seed gives the same pattern every time), Burst turns one pulse into a quick roll, Gate delay moves a gate later for a flam, Flip-flop turns a pulse into on and off, and Step switch passes four sounds in turn.'],
     ['Seeing signals', 'Meter (in Mix and level in the Modules list) shows how loud a sound is and Scope draws a signal as it moves, with a sound or an LFO patched into A and a second signal such as an envelope into B so you can watch them together, Trigger on Rising to hold a steady wave still and Freeze to keep the picture, and both only work while this editor is open.'],
     ['Building blocks', 'Building blocks in the Modules list are the small parts bigger effects are made of, each one channel (patch two for stereo). One-pole filter is the gentlest tone control, and it smooths a control signal. Allpass turns the phase (four in a row, mixed with the dry sound, make a phaser) or, in Echo, makes the short echoes a reverb is built from. Delay line is a bare delay from one sample to two seconds with exact feedback of its own: short it rings at a pitch (a comb, a plucked string), long it echoes, and you mix it with the dry sound yourself. DC blocker takes a steady offset out of a signal. Mid / side splits left and right into centre and width, so you can treat them differently, and puts them back. Sound sources also has an Oscillator (down to 0.1 Hz as a control wave, with FM and Sync) and Noise (white, pink or brown).'],
-    ['Expression', 'Expression (in Control utilities in the Modules list) is a module you type into: a line of maths whose answer is the sound, worked out one sample at a time. Names: a and b are its two audio inputs, c and d its two control inputs, k1 and k2 its two sliders, t the seconds since the song started (or since the module was made), y this module’s own output one sample ago (so one line can be a filter or a counter), rnd a new random number from −1 to 1 every sample, and pi and sr (the sample rate). Operators: + − * / % ^ < <= > >= == != && || ! and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq (waves from −1 to 1 that repeat every 1, so saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths, never run as a program, and a formula that cannot be read gives silence and a short message under the field saying where. 200 characters at most. Enter or tapping away applies it and Escape puts back the last one; Examples fills the field with a working formula (a soft clipper, a ring modulator, a bit crusher, a sample and hold).'],
+    ['Expression', 'Expression (in Control utilities in the Modules list) is a module you type into: a line of maths whose answer is the sound, worked out one sample at a time. Names: a and b are its two audio inputs, c and d its two control inputs, k1 and k2 its two sliders, t the seconds since the song started (or since the module was made), y this module’s own output one sample ago (so one line can be a filter or a counter), rnd a new random number from −1 to 1 every sample, and pi and sr (the sample rate). Operators: + − * / % ^ < <= > >= == != && || ! and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq (waves from −1 to 1 that repeat every 1, so saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths, never run as a program, and a formula that cannot be read gives silence and a short message under the field saying where. 200 characters at most. Enter or tapping away applies it and Escape puts back the last one; Examples fills the field with a working formula (a soft clipper, a ring modulator, a bit crusher, a sample and hold). The ? on the module’s title bar also lists worked examples to copy: a sine, saw, triangle and square, a pitch from K1 and a smooth glide, FM, a chord, tremolo, a low-pass filter, a wavefolder and noise.'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control and gate inputs are not limited.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],
@@ -5087,7 +5342,7 @@ function helpDoc(){
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = CAT_COLOR[t] || EDGE[famOf(t)];   // U9 (13 Nov): the card wears the module's own category colour, as the module on the patch does
     const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i' + (KIND[k] === 'gate' ? ' class="g"' : '') + ' style="background:' + KC[KIND[k]] + '"></i>' + esc((d.plabels && d.plabels[p]) || ((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : ''))) + '</span>').join('') + '</div>' : '';
-    return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
+    return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + ((modExamples(t) || []).map(([what, f]) => '<div class="ex"><p>' + esc(what) + '</p><code>' + esc(f) + '</code></div>').join('')) + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     "@font-face{font-family:Jost;src:url('./fonts/Jost-400.woff') format('woff');font-weight:400}@font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600}" +
@@ -5099,6 +5354,7 @@ function helpDoc(){
     '.guide{background:#fff; border:3px solid #111; padding:4px 24px 10px; margin-bottom:22px} .guide h2{font-size:17px; margin:22px 0 8px; font-weight:600}' +
     '.guide p{font-size:14px; line-height:1.55; max-width:78ch} .mgroup h3{font-size:17px; margin:28px 0 12px; font-weight:600; border-bottom:3px solid #111; padding-bottom:6px}' +
     '.mgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px} .mcard{background:color-mix(in srgb, #fff 88%, var(--ed) 12%); border:3.5px solid var(--ed); padding:12px 14px}' +
+    '.mcard .ex{margin:0 0 8px} .mcard .ex p{font-size:12.5px; margin:0} .mcard code{display:block; padding:2px 5px; background:#fff; font:12.5px/17px ui-monospace,Menlo,Consolas,monospace; overflow-wrap:anywhere}' +
     '.mcard h4{margin:0 0 6px; font-size:17px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12.5px; min-width:62px}' +
     '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block} .pt i.g{width:8px; height:8px; border-radius:1px; transform:rotate(45deg)}' +
@@ -5216,6 +5472,7 @@ function paintJacks(list){
       if (a !== L.shown){ L.shown = a; L.el.classList.toggle('on', a > 0); L.el.style.setProperty('--a', a); } L.v *= .6; }
     if (n.show && n.show.kind === 'scin' && n.show.seen && performance.now() - n.show.seen > 400){ n.show.seen = 0; scinPaint(n.show, -120, 0, performance.now()); }   // stopped: fall back
     if (n.show && n.show.kind === 'scout' && n.show.seen && performance.now() - n.show.seen > 400){ n.show.seen = 0; if (n.lvl) setLvl(n, 0); }   // Sidechain Out, stopped: its Compact level strip falls to nothing (the generic reset leaves it out)
+    if (n.show && n.show.kind === 'mixout' && n.show.seen && performance.now() - n.show.seen > 400){ const A = n.show.rows[0]; n.show.seen = 0; A.i.style.transform = 'scaleX(0)'; A.hold = -200; A.b.style.left = '0%'; A.v.textContent = '\u2212\u221e'; if (n.lvl) setLvl(n, 0); }   // a Mixer's OUT meter, stopped: falls back to nothing
     if (!n.pms) continue;
     let lv = 0;
     for (const k in n.pms){
@@ -5224,7 +5481,7 @@ function paintJacks(list){
       if (w !== q.shown){ q.shown = w; q.el.style.transform = 'scaleY(' + w + ')'; }
       q.v *= .6;
     }
-    if (n.lvl && !n.meter && !(n.show && n.show.kind === 'scout')) setLvl(n, lv);   // COMPACT: the level strip
+    if (n.lvl && !n.meter && !(n.show && (n.show.kind === 'scout' || n.show.kind === 'mixout'))) setLvl(n, lv);   // COMPACT: the level strip
   }
 }
 setInterval(() => { if (doc && Date.now() - jackSeen > 250) paintJacks(null); }, 120);
@@ -5298,7 +5555,7 @@ function setMode(play, quiet){
     if (drag && drag.armed) window.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape' }));
     if (!drawer.classList.contains('collapsed')) setDrawer(false);
   }
-  if (!quiet){ settings.mode = play ? 'play' : 'edit'; saveSettings(); toast(play ? 'Play: touch plays the patch; modules and cables are locked. Tap Edit to change them.' : 'Edit: modules, cables and menus work.'); }
+  if (!quiet){ settings.mode = play ? 'play' : 'edit'; saveSettings(); toast(play ? 'Play: touch plays; the patch is locked. Tap Edit to change it.' : 'Edit: modules, cables and menus work.'); }
 }
 for (const k in modeBtns) modeBtns[k].addEventListener('click', () => setMode(k === 'play'));
 window.addEventListener('keydown', e => {
@@ -5310,7 +5567,7 @@ const selBtn = document.getElementById('selbtn');
 function setSelMode(on, quiet){
   on = !!on && !playMode; selMode = on; document.body.classList.toggle('selmode', on);
   selBtn.classList.toggle('on', on); selBtn.setAttribute('aria-pressed', String(on));
-  if (!quiet) toast(on ? 'Select on: tap modules to pick them, drag the background for a box. Hold a module for Group, Copy or Delete.' : 'Select off.');
+  if (!quiet) toast(on ? 'Select: tap modules, or drag a box. Hold a module for Group, Copy, Delete.' : 'Select off');
 }
 selBtn.addEventListener('click', () => { if (playBlocked()) return; setSelMode(!selMode); });
 /* THE NARROW BAR (T12): at 640 px and below, File, Settings, Help, MIDI learn, Select, the CPU readout and the zoom buttons move into the overflow menu (the same elements, so their handlers and ids stay). */
@@ -5375,7 +5632,7 @@ function wireBridge(b){
   bridge = b;
   b.telemetry(true);
   b.on('meter', onMeter);
-  b.on('shed', s => toast(s && s.recovered ? 'CPU is free again: back to full quality.' : 'The CPU is busy: switched to draft quality.'));
+  b.on('shed', s => toast(s && s.recovered ? 'CPU is free: full quality' : 'CPU is busy: draft quality'));
   b.on('error', e => toast(e.message));
   b.loadPatch(doc);
   if (doc.quality) b.setQuality(doc.quality);

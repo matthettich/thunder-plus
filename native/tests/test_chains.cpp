@@ -114,6 +114,8 @@ static Rec runScn(Json c, bool* ok, Json patchOverride = Json()) {
   auto applyEv = [&](ChainsEngine& E, Json x, double* byp) {
     const std::string_view op = x.at(1).asStr();
     if (op == "bsw") { const int n = (int)x.at(2).asNum(); if (byp) byp[n - 1] = x.at(3).asNum(); else E.setBypassSwitch(n, x.at(3).asNum()); return; }
+    if (op == "kn") { const int n = (int)x.at(2).asNum(); if (byp) byp[kBypSwitches + n - 1] = x.at(3).asNum(); else E.setBypassSwitch(kBypSwitches + n, x.at(3).asNum()); return; }   // patch knobs: k1..k8 (the node's params, or the engine's knobs[n])
+    if (op == "text") { E.setText(x.at(2).asStr(), x.at(3).asStr()); return; }
     if (op == "param") { Json v = x.at(4); E.setParam(x.at(2).asStr(), x.at(3).asStr(), v.isStr() ? (double)NAN : v.asNum()); return; }   // JSON has no NaN: the "nan" rows carry the string "nan"
     if (op == "connect") { E.connect(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asStr(), x.at(5).asStr(), x.at(6).isBool() && x.at(6).asBool()); return; }
     if (op == "disconnect") { E.disconnect(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asStr(), x.at(5).asStr()); return; }
@@ -144,7 +146,7 @@ static Rec runScn(Json c, bool* ok, Json patchOverride = Json()) {
     ChainsNode n(48000, (int)c.num("track"), opts(-1, false), &host); if (!n.engine().loadPatch(c.get("patch"))) { *ok = false; return r; }
     if (bmj.isArr()) { Doc m("{\"op\":\"busmap\",\"value\":" + ser(bmj) + "}"); n.engine().handleMessage(m.r); }
     if (tm.isArr()) { Doc m("{\"op\":\"tapmap\",\"value\":" + ser(tm) + "}"); n.engine().handleMessage(m.r); }
-    r.assign(10, std::vector<float>((size_t)N * B)); double byp[15]; for (double& v : byp) v = -1;
+    r.assign(10, std::vector<float>((size_t)N * B)); double byp[kBypSwitches + kKnobs]; for (double& v : byp) v = -1;
     std::vector<const float*> tp((size_t)ntaps), sp((size_t)nsends), fp((size_t)nfeeds * 2); std::vector<std::vector<float>> so(8, std::vector<float>((size_t)N)); std::vector<float*> sop(8); std::vector<float> oL((size_t)N), oR((size_t)N);
     for (int k = 0; k < 8; k++) sop[(size_t)k] = so[(size_t)k].data();
     for (int b = 0; b < B; b++) {
@@ -153,7 +155,7 @@ static Rec runScn(Json c, bool* ok, Json patchOverride = Json()) {
       if (ntaps) { for (int j = 0; j < ntaps; j++) tp[(size_t)j] = &taps[(size_t)j][o]; in.taps = tp.data(); in.nTaps = ntaps; }
       if (nsends) { for (int j = 0; j < nsends; j++) sp[(size_t)j] = &sends[(size_t)j][o]; in.sends = sp.data(); in.nSends = nsends; }
       if (nfeeds) { for (int j = 0; j < nfeeds * 2; j++) fp[(size_t)j] = &feeds[(size_t)j][o]; in.feeds = fp.data(); in.nFeeds = nfeeds; }
-      in.byp = byp; NodeOut out; out.L = oL.data(); out.R = oR.data(); out.sends = sop.data(); out.nSends = 8;
+      in.byp = byp; in.kn = byp + kBypSwitches; NodeOut out; out.L = oL.data(); out.R = oR.data(); out.sends = sop.data(); out.nSends = 8;
       n.process(in, out, N);
       std::memcpy(&r[0][o], oL.data(), (size_t)N * 4); std::memcpy(&r[1][o], oR.data(), (size_t)N * 4); for (int k = 0; k < 8; k++) std::memcpy(&r[(size_t)(2 + k)][o], so[(size_t)k].data(), (size_t)N * 4);
     }

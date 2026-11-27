@@ -16,7 +16,7 @@ function rig({ cPhrase = 0, pend = { x: 0, y: 0, p: 0 }, notes = true, taken = [
   vm.createContext(c); vm.runInContext(fn[0] + '\nthis.placePending = placePending;', c); return c;
 }
 test('the ordinary case: a note in the open pending phrase puts it on its cell', () => {
-  const c = rig(); c.placePending(); assert.deepEqual(c.log.slice(0, 1), ['set 0,0,0']); assert.equal(c.pendPlace, null); assert.match(c.log[1], /is on the song: row R0, track T1/);
+  const c = rig(); c.placePending(); assert.deepEqual(c.log.slice(0, 1), ['set 0,0,0']); assert.equal(c.pendPlace, null); assert.match(c.log[1], /^toast Phrase P0 placed at row R0, track T1$/);
 });
 test('the cursor moved to another phrase before the microtask ran: the notes still go on the song (they used to be dropped)', () => {
   const c = rig({ cPhrase: 3 }); c.placePending(); assert.equal(c.log[0], 'set 0,0,0'); assert.equal(c.pendPlace, null);
@@ -39,7 +39,7 @@ test('no free row at all: a visible error, not a silent drop', () => {
   const c = rig({ taken: Array.from({ length: 256 }, (_, y) => [0, y]) }); c.placePending(); assert.equal(c.log.length, 1); assert.match(c.log[0], /^err Phrase P0 has notes but track T1 has no free song row/);
 });
 test('wiring: setSong forgets a phrase waiting in the old song; the three silent drops are gone', () => {
-  assert.match(src, /function setSong\(s, msg\)\{ tStop\(true\); tp\.paused = null; pendPlace = null;/);
+  assert.match(src, /function setSong\(s, msg\)\{ songRelease\('a song was opened'\); tStop\(true\); tp\.paused = null; pendPlace = null;/);
   const body = fn[0]; assert.doesNotMatch(body, /q\.p !== cPhrase\)\{ pendPlace = null; return; \}\n/);
 });
 test('nav(): SHIFT+▶ from an empty Arrange / Song cell does not let go() fill the cell before the pending phrase is made for it (reproduced: notes in a phrase on no block)', () => {

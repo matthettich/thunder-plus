@@ -102,6 +102,17 @@ int main(int argc, char** argv) {
       CHECK("nested past the limit: Structural for the same handle too (no identity shortcut)", chains_diff(x.root(), x.root()).kind == ChainsDiffKind::Structural); }
     JsonDoc e; CHECK("parse2", e.parse(t));
     CHECK("twin documents: an object-valued param is deep-equal, no op (departure from the page)", chains_diff(d.root(), e.root()).kind == ChainsDiffKind::Same); }
+  { // a Send / Receive `lab` change is Structural (control-thread diff; ChainsLive::apply drops a lab op); any other param change stays Params
+    auto mk = [](const char* ty, const char* lab, const char* gain) { return std::string("{\"format\":\"chains.patch\",\"modules\":[{\"id\":\"s1\",\"type\":\"") + ty + "\",\"params\":{\"lab\":" + lab + ",\"gain\":" + gain + "}}],\"cables\":[]}"; };
+    for (const char* ty : {"send", "recv"}) {
+      JsonDoc a1, a2, a3; std::string s1 = mk(ty, "1", "1"), s2 = mk(ty, "2", "1"), s3 = mk(ty, "1", "0.5");
+      CHECK("send/recv lab parse", a1.parse(s1) && a2.parse(s2) && a3.parse(s3));
+      CHECK("send/recv: lab change only -> Structural", chains_diff(a1.root(), a2.root()).kind == ChainsDiffKind::Structural);
+      CHECK("send/recv: gain change only -> Params", chains_diff(a1.root(), a3.root()).kind == ChainsDiffKind::Params);
+    }
+    JsonDoc b1, b2; std::string t1 = mk("gain", "1", "1"), t2 = mk("gain", "2", "1");
+    CHECK("other module: lab change stays Params", b1.parse(t1) && b2.parse(t2) && chains_diff(b1.root(), b2.root()).kind == ChainsDiffKind::Params);
+  }
   CHECK("missing, missing", chains_diff(Json(), Json()).kind == ChainsDiffKind::Same);
 
   // ---- bus_plan_equal ----

@@ -427,6 +427,27 @@ class Constant : public Module {
   void process(const IO& io, const Ctx&) override { outp(io, 0).fill(kBlock, io.p[0] + io.p[1]); }   // (fill(): the whole buffer, whatever ctx.block is)
 };
 
+// ---- Knob (22 Nov 2026, patch knobs) ---------------------------------------------------------------------------------------------------
+// Out is knob N's value from the tracker (KN1-KN8) while the song has set it, else Value; mapped into Min..Max. A change glides across the frames rendered this block (ctx.block).
+const ParamDef kKnP[] = {{"n", 1, 1, 8, 1}, {"value", 0, 0, 1, .01}, {"min", 0, -1, 1, .01}, {"max", 1, -1, 1, .01}};
+class Knob : public Module {
+ public:
+  Knob(double, Seeds&) {}
+  void process(const IO& io, const Ctx& c) override {
+    const double rn = io.p[0] == io.p[0] ? std::floor(io.p[0] + 0.5) : 0;   // Math.round(io.p.n) || 1  (NaN and 0 give 1)
+    const int n = (int)jmax(1, jmin(8, rn == 0 ? 1 : rn));
+    const double h = c.knobs ? (double)c.knobs[n] : -1;
+    const double v = h >= 0 ? jmin(1, h) : io.p[1], to = io.p[2] + (io.p[3] - io.p[2]) * v;
+    const int len = (int)jmax(1, jmin(kBlock, c.block ? c.block : kBlock));   // (ctx.block || o.length: the frames rendered this block, CodeRabbit on #289)
+    const Out o = outp(io, 0); const double from = y_;
+    if (!(from == from) || from == to) o.fill(kBlock, to);   // (NaN: the first block)
+    else { const double d = (to - from) / len; for (int i = 0; i < len; i++) o.p[i] = (float)(from + d * (i + 1)); for (int i = len; i < kBlock; i++) o.p[i] = (float)to; }
+    y_ = to;
+  }
+ private:
+  double y_ = kNaN;
+};
+
 // ---- Divider -------------------------------------------------------------------------------------------------------------------------
 const PortDef kDvOut[] = {{"d2", "gate"}, {"d4", "gate"}, {"d8", "gate"}, {"n", "gate"}};
 const ParamDef kDvP[] = {{"n", 3, 1, 32, 1}};
@@ -573,6 +594,7 @@ const Def kDefs[] = {
   {"switch", PD(kS2In), PD(kAudOut), PD(kS2P), mk<Switch2>},
   {"xfade", PD(kXfIn), PD(kAudOut), PD(kXfP), mk<Crossfade>},
   {"const", 0, kNone, PD(kCvOut), PD(kKP), mk<Constant>},
+  {"knob", 0, kNone, PD(kCvOut), PD(kKnP), mk<Knob>},
   {"divider", PD(kCmIn), PD(kDvOut), PD(kDvP), mk<Divider>},
   {"euclid", PD(kCmIn), PD(kEuOut), PD(kEuP), mk<Euclid>},
   {"pitchfol", PD(kEnvIn), PD(kPfOut), PD(kPfP), mk<PitchFol>},

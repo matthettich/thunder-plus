@@ -35,7 +35,7 @@ PY
 fail=0
 run() {  # label files...
   label=$1; shift
-  if ( cd "$T" && node --test "$@" >"$OUT/test-$(echo "$label" | tr ' /' '__').log" 2>&1 ); then echo "PASS  $label"; else echo "FAIL  $label   (log: $OUT/test-$(echo "$label" | tr ' /' '__').log)"; fail=1; fi
+  if ( cd "$T" && node --test "$@" >"$OUT/test-$(echo "$label" | tr ' /' '__').log" 2>&1 ); then echo "PASS  $label"; else echo "FAIL  $label   (log: $OUT/test-$(echo "$label" | tr ' /' '__').log)"; grep -E '^(not ok|# (tests|pass|fail))|^\s+not ok' "$OUT/test-$(echo "$label" | tr ' /' '__').log" | head -40; fail=1; fi
 }
 echo "== goldens rendered through the CMake-built wasm (tests run in a copy of the tree)"
 run "tests/golden/chains-modules.json (chains.test.js)" tests/chains.test.js

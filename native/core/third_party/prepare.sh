@@ -262,6 +262,7 @@ $SED -i 's#1.0f / (100.0f / 32000.0f)#1.0f / (100.0f / marbles_sample_rate_hz)#;
 T="$E/tides2/ramp/ramp_extractor.h"
 $SED -i 's#^  void Reset();#  void Reset();\n  void Restart() { reset_counter_ = 1; }#' "$T"
 grep -q 'void Restart()' "$T" || { echo "Tides ramp extractor patch failed" >&2; exit 1; }
+# Marbles LagProcessor::Process, second clause (PR #344, docs/port/MARBLES-OOB-NOTES.md): a phase <= 0 or NaN returned table[0] instead of reading table[-n] (the web's wasm reads the neighbouring 10.0 there).
 # Marbles LagProcessor::Process (found by AddressSanitizer in U21, 17 Nov): stmlib::Interpolate(lut_raised_cosine, phase, 256.0f) reads table[i] and table[i + 1]; the table has 257 entries and the phase is
 # exactly 1.0 (the wrapper's "every ramp at its top" first sample, and a clock ramp that reaches its top), so i = 256 and [257] is one float past the table. The fraction is then 0, so the result is
 # table[256] whatever finite number is read (mods.wasm has finite bytes after it). Now that value is returned without the read. The web's mods.wasm is built by dsp/mods/build.sh, which does not have this patch.
@@ -272,6 +273,7 @@ old="  float warped_phase = Interpolate(lut_raised_cosine, phase, 256.0f);\n"
 new="""  // Thunder: phase == 1 would read lut_raised_cosine[257], past the 257-entry table, times a fraction of 0 (prepare.sh)
   float warped_phase = phase >= 1.0f
       ? lut_raised_cosine[256]
+      : !(phase > 0.0f) ? lut_raised_cosine[0]   // phase <= 0 or NaN: table[-n] is out of bounds (a fast external clock makes the Bernoulli slave ramp negative; MARBLES-OOB-NOTES.md)
       : Interpolate(lut_raised_cosine, phase, 256.0f);
 """
 if s.count(old)!=1: sys.exit("Marbles lag_processor.cc patch failed")

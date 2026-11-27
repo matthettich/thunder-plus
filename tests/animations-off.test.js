@@ -38,3 +38,9 @@ for (const [name, o] of [['computer 1440x900', { width: 1440, height: 900, stora
     } finally { await B.close(); }
   });
 }
+test('source: MOD is a named stage screen (dogs), the dogs\' off control is always visible, ANIMATIONS off still hides them', () => {
+  assert.match(src, /project:'dogs', mod:'dogs', sect:'preview'/);
+  assert.match(src, /\.tstage\.dogk \.stgx\{opacity:\.6\}/);
+  assert.match(src, /box\.classList\.toggle\('dogk', dg\)/);
+  assert.match(src, /return animOn \|\| \(k !== 'dogs' && k !== 'drum'\) \? k : tv === 'phrase' \? 'piano' : ''/, 'off: mod (kind dogs) gives nothing');
+});

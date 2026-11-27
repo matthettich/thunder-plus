@@ -149,9 +149,18 @@ object LiveBridge {
 
 
     private fun hello(ctx: Context, h: BridgeTranslator.LiveCall.Hello) {
+        HelloDiag.hello.began(System.currentTimeMillis())
+        try { helloBody(ctx, h); if (HelloDiag.hello.lastResult == "running") HelloDiag.hello.ok() }
+        catch (e: Throwable) { Log.i(TAG, "hello: $e"); val why = "live engine did not start: exception: $e"; HelloDiag.hello.failed(why); err("hello", why); reply(h.id, JSONObject().put("t", "reply").put("v", 1).put("err", why).put("ok", false)) }
+    }
+
+    private fun helloBody(ctx: Context, h: BridgeTranslator.LiveCall.Hello) {
         session = h.live
         Recovery.tracker.onHello()   // a new page session
-        if (!LiveEngine.start(ctx)) { err("hello", "the live engine did not start"); reply(h.id, JSONObject().put("err", "live engine did not start")); return }
+        if (!LiveEngine.start(ctx)) {
+            val why = "live engine did not start: " + LiveEngine.lastStartError.ifEmpty { "unknown (up but not active)" }
+            HelloDiag.hello.failed(why); err("hello", why); reply(h.id, JSONObject().put("v", 1).put("err", why).put("ok", false)); return
+        }
         flag = h.live
         startPump()
         val caps = LiveNative.nativeCaps()

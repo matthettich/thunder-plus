@@ -38,6 +38,7 @@ constexpr int kChannels = 128;       // CHAN_COUNT: the tracks a patch can addre
 constexpr int kSends = 8;            // NSEND
 constexpr int kSckMax = kSends + kChannels;   // SCK_MAX
 constexpr int kBypSwitches = 15;     // the tracker's BYP switches b1..b15
+constexpr int kKnobs = 8;            // the tracker's KN1..KN8 (patch knobs, build 663): the node's k1..k8; as a switch number they are 16..23 (kBypSwitches + n)
 constexpr int kMaxFeeds = 32;        // ThunderChains: bus feeds from other tracks (inputs 4 and 5, 16 tracks each)
 constexpr int kMaxTaps = kChannels;  // input 2: one channel per track a Sidechain In listens to
 
@@ -90,7 +91,8 @@ class ChainsEngine {
   void removeModule(std::string_view id);
   void connect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort, bool fb = false);
   void disconnect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort);
-  void setParam(std::string_view id, std::string_view name, double v);   // (no allocation: the live runner calls it on the audio thread)
+  void setParam(std::string_view id, std::string_view name, double v, bool rt = false);   // (no allocation: the live runner calls it on the audio thread; rt = true: a Send / Receive `lab` is refused, since its recompile allocates; returns nothing, see paramRefusedRt)
+  bool paramNeedsRecompile(std::string_view id, std::string_view name) const;   // a Send / Receive `lab` (the graph's cables change): the live runner swaps a patch for it, it never recompiles on the audio thread
   void setText(std::string_view id, std::string_view text);
   void setTransport(const Transport& t);   // Object.assign, and startN + 1 when it starts playing
   void setTransportTempo(double t) { transport_.tempo = t; }
@@ -109,8 +111,8 @@ class ChainsEngine {
   void setTaps(const float* const* taps, int n);               // input 2: the tracks' own sounds, one channel each (null: none)
   void endStandaloneBlock();   // ChainsProcessor's p1 after process(): the sends of this block become the next block's Sidechain In input (one block late, as the JS)
   void setSendIn(const float* const* sends, int n);            // input 3: the sends of every chain, one channel each (null entries: silence)
-  double bypassSwitchState(int n) const { return n >= 1 && n <= kBypSwitches ? bsw_[n] : -1; }   // (diagnostics, tests)
-  void setBypassSwitch(int n, double v) { if (n >= 1 && n <= kBypSwitches) bsw_[n] = v; }   // the tracker's BYP switches: -1 the patch's own, 0 in, 1 bypassed, 2 flipped
+  double bypassSwitchState(int n) const { return n >= 1 && n <= kBypSwitches ? bsw_[n] : n > kBypSwitches && n <= kBypSwitches + kKnobs ? (double)knobs_[n - kBypSwitches] : -1; }   // (diagnostics, tests; 16..23: knobs)
+  void setBypassSwitch(int n, double v) { if (n >= 1 && n <= kBypSwitches) bsw_[n] = v; else if (n > kBypSwitches && n <= kBypSwitches + kKnobs) knobs_[n - kBypSwitches] = (float)v; }   // n 16..23: knob k(n-15), a float32 AudioParam value   // the tracker's BYP switches: -1 the patch's own, 0 in, 1 bypassed, 2 flipped
   bool process(int frames = kBlock);   // false: refused (frames outside 0..128) or a module failed (the buses are cleared, as the worklet's catch does)
   const float* bus(int slot) const { return busesL_.get() + (size_t)(slot - 1) * kBlock; }   // slot 1..128
   const float* busR(int slot) const { return busesR_.get() + (size_t)(slot - 1) * kBlock; }
@@ -163,7 +165,7 @@ class ChainsEngine {
   float sendOut_[kSends * kBlock] = {}; float zero_[kBlock] = {}; float scL_[kBlock] = {}, scR_[kBlock] = {}; bool scOn_ = false;
   const float* trackL_ = nullptr; const float* trackR_ = nullptr; int trackChans_ = 0;
   const float* sendIn_[kSends] = {}; const float* taps_[kMaxTaps] = {}; int nTaps_ = 0; int16_t tapMap_[kChannels]; bool hasTapMap_ = false;
-  std::vector<int> busMap_; double bsw_[kBypSwitches + 1];
+  std::vector<int> busMap_; double bsw_[kBypSwitches + 1]; float knobs_[kKnobs + 1];   // knobs_[1..8]: the tracker's KN1-KN8 as 0..1, -1 the Knob module's own Value (ChainsEngine.knobs)
   std::atomic<waves::PatchImpl*> curA_{nullptr};
   CCtx ctx_; Stats stats_; bool lastFailed_ = false; size_t memBudget_ = kDefaultMemoryBudget; mutable std::string lastError_;
   std::atomic<uint64_t> spareSwaps_{0}, audioRemakes_{0}; bool inlineService_ = true, carryFade_ = false;
@@ -183,6 +185,7 @@ struct NodeIn {
   const float* const* sends = nullptr; int nSends = 0;                    // input 3: the sends of every chain (a block late, from the host)
   const float* const* feeds = nullptr; int nFeeds = 0;                    // inputs 4 and 5: the other tracks this node takes in, a stereo pair each (feeds[2j], feeds[2j + 1]), in busMap's order
   const double* byp = nullptr;                                            // b1..b15 (15 values) or null
+  const double* kn = nullptr;                                             // k1..k8 (8 values: -1 the patch's own, else 0..1) or null
 };
 struct NodeOut { float* L = nullptr; float* R = nullptr; float* const* sends = nullptr; int nSends = 0; };   // L / R: this track's bus; sends: the Sidechain Outs
 class ChainsNode {
@@ -209,7 +212,7 @@ class ChainsNode {
 struct ChainsEvent {
   enum Kind : uint8_t { Param, Tempo, Playing, Bypass, Patch };
   Kind kind = Param; int64_t at = 0;   // at: the engine sample the event lands on
-  double a = 0, b = 0;                 // Param: a the value; Tempo: a bpm; Playing: a 1 or 0; Bypass: a the switch 1..15, b its value (-1 the patch's own, 0 in, 1 bypassed, 2 flipped); Patch: a the mailbox slot preparePatch gave
+  double a = 0, b = 0;                 // Param: a the value; Tempo: a bpm; Playing: a 1 or 0; Bypass: a the switch 1..15 (16..23: knob k1..k8), b its value (BYP: -1 the patch's own, 0 in, 1 bypassed, 2 flipped; knob: -1 the Knob's own Value, else 0..1); Patch: a the mailbox slot preparePatch gave
   char id[40] = {}; char name[24] = {};   // Param: the module id and the parameter name (a longer one is refused by post())
 };
 constexpr int kChainsLatency = 127, kChainsQueue = 1024, kChainsPending = 1024, kChainsSlots = 8, kChainsRing = 512, kChainsReserve = 256;   // kChainsReserve: places only an event that must not be lost may take
@@ -241,7 +244,7 @@ class ChainsLive {
   int latency() const { return kChainsLatency; }
   ChainsLiveStats stats() const;   // a snapshot (any thread)
   int64_t enginePos() const { return posPub_.load(std::memory_order_relaxed); }   // the engine sample the audio thread has rendered up to (a copy it publishes after each segment: any thread may read it)
-  double bypassSwitch(int n) const   /* (diagnostics: only while process() is not running: the audio thread writes it) */ { return n >= 1 && n <= kBypSwitches ? byp_[n - 1] : -1; }   // the value the last Bypass event gave switch n (1..15; -1: the patch's own)
+  double bypassSwitch(int n) const   /* (diagnostics: only while process() is not running: the audio thread writes it) */ { return n >= 1 && n <= kBypSwitches + kKnobs ? byp_[n - 1] : -1; }   // the value the last Bypass event gave switch n (1..15; 16..23 the knobs; -1: the patch's own)
   // (while the audio thread hands a patch over it holds one out of both arrays for a moment: the count can be one short then, which is why preparePatch() keeps two places spare)
   int patchesInFlight() const { int n = 0; for (int i = 0; i < kChainsSlots; i++) { if (slot_[i].load()) n++; if (retired_[i].load()) n++; } return n; }   // prepared and not yet swapped in, plus swapped out and not yet collected by service()
   // the same events rendered with no queue and no latency (control thread: allocates). in[c]: the host's channels in the order of the node's inputs: Track In L, R, then sc L, R (cfg.sc), taps, sends (cfg.sends: 8), feeds (2 each); each `frames` long
@@ -260,7 +263,7 @@ class ChainsLive {
   ChainsEvent q_[kChainsQueue]; std::atomic<uint32_t> qh_{0}, qt_{0};
   ChainsEvent pend_[kChainsPending]; int npend_ = 0;
   std::atomic<waves::PatchImpl*> slot_[kChainsSlots]; std::atomic<waves::PatchImpl*> retired_[kChainsSlots]; 
-  int64_t pos_ = 0, hostPos_ = 0; double byp_[kBypSwitches]; std::atomic<int64_t> posPub_{0};
+  int64_t pos_ = 0, hostPos_ = 0; double byp_[kBypSwitches + kKnobs]; std::atomic<int64_t> posPub_{0};   // byp_[0..14] b1..b15, byp_[15..22] k1..k8
   std::unique_ptr<float[]> inRing_, outRing_, seg_, oseg_;   // inRing_: nIn() x kChainsRing; outRing_: 10 x kChainsRing; seg_ / oseg_: the segment's contiguous copies (128 each)
   std::vector<const float*> ptrIn_; std::vector<float*> ptrOut_;
   friend struct ChainsLiveOffline;

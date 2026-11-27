@@ -7,14 +7,14 @@ const test = require('node:test'), assert = require('node:assert/strict'), vm = 
 const H = require('./helpers');
 const src = H.read('index.html');
 const cut = (re, what) => { const m = src.match(re); assert.ok(m, 'could not find ' + what + ': the code moved, this test needs updating'); return m[0]; };
-const code = [cut(/const handsOn = [^\n]*\n/, 'handsOn'), cut(/let navT = -1e9;\n/, 'navT'), cut(/const ARR_AHEAD = 8, ARR_KEEP = 4;[\s\S]*?\nfunction arrPageTop\([^\n]*\)\{[\s\S]*?\n\}\n/, 'arrPageTop (14 Nov: the early page turn)'), cut(/function arrFollowPage\(own\)\{[\s\S]*?\n\}\n/, 'arrFollowPage'),
+const code = [cut(/const handsOn = [^\n]*\n/, 'handsOn'), cut(/let navT = -1e9;\n/, 'navT'), cut(/const ARR_AHEADS = \[[\s\S]*?\nfunction arrPageTop\([^\n]*\)\{[\s\S]*?\n\}\n/, 'arrPageTop (14 Nov: the early page turn; 15 Nov: the look-ahead is a setting)'), cut(/function arrFollowPage\(own\)\{[\s\S]*?\n\}\n/, 'arrFollowPage'),
   cut(/function followPlay\(\)\{[\s\S]*?\n\}\n\/\/ ARRANGE PAGES/, 'followPlay').replace(/\n\/\/ ARRANGE PAGES$/, '')].join('\n');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function rig({ follow = 2, row = 2, y = 30, top = 15 } = {}) {
   let now = 100000;
-  const c = { performance: { now: () => now }, clamp, console, FOLLOW_HOLD: 4000, ARR_IDLE: 60000, followMode: follow, followOn: follow === 2, selA: null, sdrag: null, drag: null, tv: 'phrase', apF: null, apReady: true, cTrack: 0, cPhrase: 5, cSect: 0,
+  const c = { performance: { now: () => now }, clamp, console, FOLLOW_HOLD: 4000, ARR_IDLE: 60000, followMode: follow, followOn: follow === 2, selA: null, apSel: null, sdrag: null, drag: null, tv: 'phrase', apF: null, apReady: true, cTrack: 0, cPhrase: 5, cSect: 0,
     cs: { song: { x: 0, y, top, pg: false }, phrase: { y: 0, top: 0, pg: false }, sect: { y: 0 } }, tp: { on: true, mode: 'song', pos: [], loopV: '' }, fpHome: null, fpMem: null, workT: -1e9, arrHandT: -1e9, arrActT: -1e9, arrTouchT: -1e9,
-    asongOn: () => false, apPanel: () => true, arrWrapRow: () => 255, arrRows: () => 27, songRows: () => 20, pvActive: () => false, pvFollow() {}, plen: () => 32, FOLLOW: 0 };
+    localStorage: { getItem: () => '8', setItem() {} }, arrSig: '', draw() {}, view: 'tracker', asongOn: () => false, apPanel: () => true, arrWrapRow: () => 255, arrRows: () => 27, songRows: () => 20, pvActive: () => false, pvFollow() {}, plen: () => 32, FOLLOW: 0 };
   vm.createContext(c); vm.runInContext(code.replace(/^let navT/m, 'var navT').replace(/^let /gm, 'var ') + '\nthis.followPlay = followPlay; this.setNav = t => { navT = t; };', c);
   c.tp.pos = [{ row, phrase: 9, step: 0, sect: 1 }];
   return { c, at: t => { now = t; }, now: () => now, play(r, ph) { c.tp.pos = [{ row: r, phrase: ph == null ? 9 : ph, step: 0, sect: 1 }]; }, nav() { c.setNav(now); c.workT = now; c.arrActT = now; } };

@@ -6,12 +6,15 @@ const test = require('node:test'), assert = require('node:assert/strict'), vm = 
 const H = require('./helpers');
 const src = H.read('index.html');
 const cut = (re, what) => { const m = src.match(re); assert.ok(m, 'could not find ' + what + ': the code moved, this test needs updating'); return m[0]; };
-const rule = cut(/const ARR_AHEAD = 8, ARR_KEEP = 4;[\s\S]*?\nfunction arrPageTop\(top, VR, row, len, keep = -1, end = len - 1\)\{[\s\S]*?\n\}\n/, 'arrPageTop');
+const rule = cut(/const ARR_AHEADS = \[[\s\S]*?\nconst ARR_KEEP = 4;[\s\S]*?\nfunction arrPageTop\(top, VR, row, len, keep = -1, end = len - 1\)\{[\s\S]*?\n\}\n/, 'arrPageTop');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const P = (() => { const c = { clamp }; vm.createContext(c); vm.runInContext(rule + '\nthis.f = arrPageTop; this.AH = ARR_AHEAD; this.KP = ARR_KEEP;', c); return c; })();
+const P = (() => { const c = { clamp, localStorage: { getItem: () => null, setItem() {} }, arrSig: '', draw() {} }; vm.createContext(c); vm.runInContext(rule + '\nthis.f = arrPageTop; this.AH = () => arrAhead; this.KP = ARR_KEEP; this.set = i => setArrAhead(i);', c); return c; })();
 const pt = (top, VR, row, len = 256, keep = -1, end = len - 1) => P.f(top, VR, row, len, keep, end);
 
-test('the constants: 8 rows look-ahead, 4 rows kept', () => { assert.equal(P.AH, 8); assert.equal(P.KP, 4); });
+test('the setting: 16 rows look-ahead by default, 4 rows kept; the choices are 4 8 12 16 24 32', () => { assert.equal(P.AH(), 16); assert.equal(P.KP, 4); P.set(1); assert.equal(P.AH(), 8, 'index 1 is 8 rows (the rest of this file tests the old 8)'); P.set(99); assert.equal(P.AH(), 32); P.set(-5); assert.equal(P.AH(), 4); P.set(1); });
+test('look-ahead 16: a 40-row view turns at its 24th row; a 20-row view is clamped to half (10)', () => {
+  P.set(3); assert.equal(pt(0, 40, 23), 0); assert.equal(pt(0, 40, 24), 20); assert.equal(pt(0, 20, 9), 0); assert.equal(pt(0, 20, 10), 8, 'clamped to half the view: kept 2'); assert.equal(pt(0, 12, 7), 0, 'a short view keeps a third (build 628)'); assert.equal(pt(0, 12, 8), 7); P.set(5); assert.equal(pt(0, 40, 19), 0); assert.equal(pt(0, 40, 20), 16, '32 clamps to 20'); P.set(1);
+});
 test('32 rows in view: nothing turns until the playhead is within 8 rows of the bottom, then once, to 4 rows from the top', () => {
   for (let r = 0; r <= 23; r++) assert.equal(pt(0, 32, r), 0, 'row ' + r);
   assert.equal(pt(0, 32, 24), 20); assert.equal(pt(20, 32, 24), 20, 'after the turn the playhead sits at row 4 of the view: no more turns');
@@ -22,11 +25,12 @@ test('a turn happens once per page: walking the playhead down a 256-row song tur
   let top = 0, turns = 0; for (let r = 0; r < 200; r++){ const n = pt(top, 32, r); if (n !== top){ turns++; top = n; assert.ok(r - top === 4, 'the playhead lands 4 rows from the top (' + (r - top) + ')'); } }
   assert.ok(turns >= 8 && turns <= 10, 'turns ' + turns);   // 200 rows / 20 per page
 });
-test('a view of under 16 rows uses a quarter of it as the look-ahead and an eighth (at least 1) as the rows kept', () => {
-  assert.equal(pt(0, 12, 8), 0); assert.equal(pt(0, 12, 9), 8, '12 rows: 3 ahead, 1 kept');
-  assert.equal(pt(0, 8, 5), 0); assert.equal(pt(0, 8, 6), 5, '8 rows: 2 ahead, 1 kept');
-  assert.equal(pt(0, 15, 11), 0); assert.equal(pt(0, 15, 12), 11, '15 rows: 3 ahead, 1 kept');
-  assert.equal(pt(0, 16, 7), 0); assert.equal(pt(0, 16, 8), 6, '16 rows: the full 8 ahead, 2 kept');
+test('a view of under 16 rows uses a third of it (rounded up) as the look-ahead (build 628; it was a quarter) and an eighth (at least 1) as the rows kept', () => {
+  assert.equal(pt(0, 12, 7), 0); assert.equal(pt(0, 12, 8), 7, '12 rows: 4 ahead, 1 kept');
+  assert.equal(pt(0, 14, 8), 0); assert.equal(pt(0, 14, 9), 8, '14 rows: 5 ahead (was 3), 1 kept');
+  assert.equal(pt(0, 8, 4), 0); assert.equal(pt(0, 8, 5), 4, '8 rows: 3 ahead, 1 kept');
+  assert.equal(pt(0, 15, 9), 0); assert.equal(pt(0, 15, 10), 9, '15 rows: 5 ahead, 1 kept');
+  assert.equal(pt(0, 16, 7), 0); assert.equal(pt(0, 16, 8), 6, '16 rows: the full 8 ahead, 2 kept (half, as before)');
   assert.equal(pt(0, 2, 1), 0, 'the smallest view: no thrash');
 });
 test('the last page: one turn goes straight to the page that shows the end (no second turn a few rows on); never past the end', () => {
@@ -72,7 +76,7 @@ function rigFollow(o = {}) {
   const c = { clamp, performance: { now: () => now }, FOLLOW_HOLD: 4000, ARR_IDLE: 60000, arrHandT: -1e9, arrActT: -1e9, arrTouchT: -1e9, navT: -1e9, followMode: 2, apF: '', tv: 'phrase', tp: { mode: 'song' },
     cs: { song: { top: 0, y: 0, pg: false } }, asongOn: () => !!o.asong, apPanel: () => true, arrRows: () => 32, arrWrapRow: () => 255, ...o };
   vm.createContext(c);
-  vm.runInContext('const handsOn = (ms, ...ts) => performance.now() - Math.max(...ts) < ms;\n' + rule + '\n' + FP + '\nthis.go = own => arrFollowPage(own);', c); c.__dbg = () => c.__err;
+  vm.runInContext('const handsOn = (ms, ...ts) => performance.now() - Math.max(...ts) < ms;\n' + rule + '\narrAhead = 8;\n' + FP + '\nthis.go = own => arrFollowPage(own);', c); c.__dbg = () => c.__err;
   return { c, at: ms => { now += ms; }, go: row => c.go({ row }) };
 }
 test('arrFollowPage: pages early with FOLLOW ON, FOLLOW PATTERN and FOLLOW OFF, and sets pg', () => {
@@ -93,7 +97,20 @@ test('arrFollowPage: a wrap (loop, song) puts the playhead row first; the cursor
   const L = rigFollow({ arrWrapRow: () => 20 }); L.go(26); assert.equal(L.c.cs.song.top, 0, 'a loop that ends in view does not turn a page');
 });
 test('source: followPlay\'s page() (Song grid, Phrase, Pattern view) and Arrange use the one rule; the loop / song end is read, not asked of the sequencer', () => {
-  assert.match(src, /const page = \(c, row, VR, len, end\) => \{ if \(row < 0\) return; const top = c\.top \|\| 0, nt = arrPageTop\(top, VR, row, len, -1, end\);/);
+  assert.match(src, /const page = \(c, row, VR, len, end\) => \{ if \(row < 0 \|\| view !== 'tracker'\) return; const top = c\.top \|\| 0, nt = arrPageTop\(top, VR, row, len, -1, end\);/);
   assert.match(src, /page\(cs\.song, own\.row, songRows\(\), 256, arrWrapRow\(\)\)/); assert.match(src, /page\(cs\.phrase, mine\.step, pvr, pvActive\(\) \? 256 : plen\(cPhrase\), plen\(cPhrase\) - 1\)/);
   const w = cut(/function arrWrapRow\(\)\{[\s\S]*?\n\}\n/, 'arrWrapRow'); assert.doesNotMatch(w, /tp\.seq|setLoop|patLoopRow|postMessage/);
+});
+
+test('followPlay\'s page() does nothing off the tracker (build 609: the Synth page round trip with LOOP on left Arrange paged on the loop\'s row)', () => {
+  assert.match(src, /const page = \(c, row, VR, len, end\) => \{ if \(row < 0 \|\| view !== 'tracker'\) return;/);
+});
+test('source: the setting is saved per device, listed in Settings, and arrKeepRow gives the cursor the same look-ahead (not on a click)', () => {
+  assert.match(src, /localStorage\.setItem\(ARR_AHEAD_K, String\(arrAhead\)\)/); assert.match(src, /\{l:'ARRANGE LOOK-AHEAD', get:\(\) => ARR_AHEADS\.indexOf\(arrAhead\)/);
+  const m = src.match(/function arrKeepRow\(c, VR\)\{[\s\S]*?\n\}\n/)[0]; assert.match(m, /performance\.now\(\) - arrTouchT > 600/); assert.match(m, /arrAheadFor\(VR\)/);
+  assert.ok(src.indexOf('let arrAhead') < src.indexOf("{l:'ARRANGE LOOK-AHEAD'"), 'declared before the Settings row that reads it');
+});
+test('source: a look-ahead turn for the cursor is not read back over by the grid\'s lagging scroll (arrLookY), until the user scrolls', () => {
+  const m = src.match(/function arrKeepRow\(c, VR\)\{[\s\S]*?\n\}\n/)[0]; assert.match(m, /arrLookY !== c\.y && rh > 0/); assert.match(m, /arrLookY = c\.y; return; \}/);
+  assert.match(src, /arrIgnore = -1; arrUserT = performance\.now\(\); arrHandT = arrUserT; arrLookY = -1;/);
 });

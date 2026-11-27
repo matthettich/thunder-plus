@@ -109,6 +109,26 @@ inline int toU16(std::string_view s, uint16_t* out, int maxUnits) {
   return n;
 }
 
+
+// ---- Send / Receive (15 Nov, web build 633 on): an invisible cable, resolved in the compile step (srResolve of chains/chains-worklet.js and waves/waves-worklet.js, the same code in both) ----------------
+// A Send takes In / In R; every Receive with the same label outputs what its Send(s) get. Nothing runs in either module: compile() replaces each cable out of a Receive by the cables into the matching Send,
+// so the engine sees ordinary cables. Label: lab 1-8 is A-H; 0 is the module's own text (trimmed, not case sensitive: JS trim() / toLowerCase(), ASCII, Latin-1, Greek and Cyrillic letters here).
+inline bool srWs(uint16_t c) { return (c >= 9 && c <= 13) || c == 32 || c == 0xA0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200A) || c == 0x2028 || c == 0x2029 || c == 0x202F || c == 0x205F || c == 0x3000 || c == 0xFEFF; }
+inline uint16_t srLower(uint16_t c) {
+  if (c >= 'A' && c <= 'Z') return (uint16_t)(c + 32);
+  if (c < 0xC0) return c;
+  if ((c >= 0xC0 && c <= 0xDE && c != 0xD7)) return (uint16_t)(c + 32);
+  if (c >= 0x100 && c <= 0x137) return (c & 1) ? c : (uint16_t)(c + 1);
+  if (c >= 0x139 && c <= 0x148) return (c & 1) ? (uint16_t)(c + 1) : c;
+  if (c >= 0x14A && c <= 0x177) return (c & 1) ? c : (uint16_t)(c + 1);
+  if (c == 0x178) return 0xFF;
+  if (c >= 0x179 && c <= 0x17E) return (c & 1) ? (uint16_t)(c + 1) : c;
+  if (c >= 0x391 && c <= 0x3A9 && c != 0x3A2) return (uint16_t)(c + 32);
+  if (c >= 0x410 && c <= 0x42F) return (uint16_t)(c + 32);
+  if (c >= 0x400 && c <= 0x40F) return (uint16_t)(c + 80);
+  return c;
+}
+
 }  // namespace detail
 using namespace detail;
 
@@ -141,12 +161,82 @@ class PatchImpl {
   void destroyNodeSlots(ModNode& m) { for (Slot& s : m.slots) destroySlot(m, s); instances -= (int)m.slots.size(); weight -= (int)m.slots.size() * m.weight; m.slots.clear(); m.slotsMade = false; }
   void destroyAll() { for (auto& m : mods) destroyNodeSlots(*m); }
 
+  // ---- Send / Receive: the cables the engine runs (srResolve). The key of a module's label: "A".."H" for lab 1-8, else "t:" + its trimmed, lower-cased text ("" none). ----
+  bool isSr(const ModNode& m, bool recv) const { const std::string_view t = m.wi->type; return recv ? t == "recv" : t == "send"; }
+  std::u16string srKey(const ModNode& m) const {
+    const int k = wparam(*m.wi, "lab"); const double lv = k >= 0 && (size_t)k < m.base.size() ? m.base[(size_t)k] : 0;
+    const double r = lv == lv ? std::floor(lv + 0.5) : 0;   // Math.round(inst.params.lab) || 0
+    if (r >= 1 && r <= 8) return std::u16string(1, (char16_t)('A' + (int)r - 1));
+    if (m.textLen < 0) return std::u16string();
+    int a = 0, b = m.textLen; while (a < b && srWs(m.text[(size_t)a])) a++; while (b > a && srWs(m.text[(size_t)b - 1])) b--;
+    if (a == b) return std::u16string();
+    std::u16string t = u"t:"; for (int i = a; i < b; i++) t.push_back((char16_t)srLower(m.text[(size_t)i])); return t;
+  }
+  std::vector<CableRec> srResolve() const {
+    struct E { std::vector<const CableRec*> in, inR; };
+    struct Src { std::string a0, a1; bool fb; };
+    std::unordered_map<std::u16string, std::vector<int>> into; std::unordered_map<std::string, int> per; std::vector<E> ents;   // label -> its Sends (index into ents), each with its own In / In R cables
+    for (const CableRec& c : cables) {
+      ModNode* m = find(c.b0); if (!m || !isSr(*m, false)) continue;
+      const std::u16string k = srKey(*m); if (k.empty()) continue; auto& l = into[k];
+      auto pe = per.find(m->id); if (pe == per.end()) { pe = per.emplace(m->id, (int)ents.size()).first; ents.emplace_back(); l.push_back(pe->second); }
+      if (c.b1 == "in") ents[(size_t)pe->second].in.push_back(&c); else if (c.b1 == "inR") ents[(size_t)pe->second].inR.push_back(&c);
+    }
+    // What a Receive's port carries: the sources cabled into its label's Sends (In R falling back to In, Send by Send); a source that is itself a Receive is followed through, a loop of Receives cut.
+    // Memoised per label and port; a result worked out while a loop was cut is not kept.
+    std::unordered_map<std::u16string, std::vector<Src>> memo; int cuts = 0;
+    struct F { const PatchImpl* P; std::unordered_map<std::u16string, std::vector<int>>* into; std::vector<E>* ents; std::unordered_map<std::u16string, std::vector<Src>>* memo; int* cuts;
+      std::vector<Src> feeds(const std::u16string& lab, const std::string& port, std::vector<std::u16string>& seen) {
+        std::u16string key = lab; key.push_back(u'.'); for (char ch : port) key.push_back((char16_t)(unsigned char)ch);
+        auto hit = memo->find(key); if (hit != memo->end()) return hit->second;
+        for (const std::u16string& s : seen) if (s == key) { (*cuts)++; return {}; }
+        seen.push_back(key); const int before = *cuts; std::vector<Src> got; std::unordered_map<std::string, size_t> gi;
+        const auto put = [&](const std::string& a0, const std::string& a1, bool fb) { const std::string k = a0 + "." + a1; auto o = gi.find(k); if (o == gi.end()) { gi[k] = got.size(); got.push_back({a0, a1, fb}); } else if (got[o->second].fb && !fb) got[o->second].fb = false; };
+        auto il = into->find(lab);
+        if (il != into->end()) for (int ei : il->second) {
+          const E& e = (*ents)[(size_t)ei]; const std::vector<const CableRec*>& L = port == "outR" ? (e.inR.empty() ? e.in : e.inR) : port == "out" ? e.in : std::vector<const CableRec*>();
+          for (const CableRec* s : L) {
+            ModNode* sm = P->find(s->a0);
+            if (sm && P->isSr(*sm, true)) { for (const Src& f : feeds(P->srKey(*sm), s->a1, seen)) put(f.a0, f.a1, f.fb || s->fb); }
+            else put(s->a0, s->a1, s->fb);
+          }
+        }
+        seen.pop_back(); if (*cuts == before) (*memo)[key] = got; return got;
+      } };
+    F fx{this, &into, &ents, &memo, &cuts};
+    std::vector<CableRec> eff; std::vector<CableRec> virt; std::unordered_map<std::string, size_t> vseen;
+    for (const CableRec& c : cables) {
+      ModNode* sm = find(c.a0); ModNode* dm = find(c.b0);
+      if (dm && isSr(*dm, false)) continue;
+      if (sm && isSr(*sm, true)) {
+        std::vector<std::u16string> seen;
+        for (const Src& f : fx.feeds(srKey(*sm), c.a1, seen)) { const std::string k = f.a0 + "." + f.a1 + ">" + c.b0 + "." + c.b1; const bool fb = c.fb || f.fb; auto o = vseen.find(k);
+          if (o == vseen.end()) { CableRec v; v.a0 = f.a0; v.a1 = f.a1; v.b0 = c.b0; v.b1 = c.b1; v.fb = fb; vseen[k] = virt.size(); virt.push_back(v); } else if (virt[o->second].fb && !fb) virt[o->second].fb = false; }
+        continue;
+      }
+      eff.push_back(c);
+    }
+    std::unordered_map<std::string, std::vector<std::string>> adj; for (const CableRec& c : eff) if (!c.fb) adj[c.a0].push_back(c.b0);
+    const auto reach = [&](const std::string& a, const std::string& b) {
+      if (a == b) return true; std::vector<std::string> seen{a}, w{a};
+      while (!w.empty()) { const std::string x = w.back(); w.pop_back(); auto it = adj.find(x); if (it == adj.end()) continue;
+        for (const std::string& y : it->second) { if (y == b) return true; if (std::find(seen.begin(), seen.end(), y) == seen.end()) { seen.push_back(y); w.push_back(y); } } }
+      return false; };
+    for (CableRec& v : virt) {
+      if (!v.fb && reach(v.b0, v.a0)) v.fb = true;
+      if (!v.fb) adj[v.a0].push_back(v.b0);
+      eff.push_back(v);
+    }
+    return eff;
+  }
   // ---- Graph ----
   void compile() {
     const size_t n = mods.size();
     for (size_t i = 0; i < n; i++) { mods[i]->idx = (int)i; mods[i]->inc.clear(); for (bool& b : mods[i]->linked) b = false; mods[i]->exits.clear(); }
     indeg.assign(n, 0); adj.resize(n); for (auto& a : adj) a.clear();
-    for (const CableRec& c : cables) {
+    bool anySr = false; for (const auto& m : mods) if (isSr(*m, false) || isSr(*m, true)) { anySr = true; break; }
+    std::vector<CableRec> resolved; if (anySr) resolved = srResolve();   // SEND / RECEIVE: the cables as the engine runs them (the drawn ones when the patch has no pair)
+    for (const CableRec& c : anySr ? resolved : cables) {
       ModNode* a = find(c.a0); ModNode* b = find(c.b0); if (!a || !b) continue;
       GCable g; g.src = a; g.fb = c.fb; g.srcPort = wport_out(*a->wi, c.a1); g.srcAudio = g.srcPort >= 0 && std::string_view(a->wi->out[g.srcPort].kind) == "audio";
       if (isParamPort(c.b1)) { g.isParam = true; g.dstParam = wparam(*b->wi, std::string_view(c.b1).substr(2)); }

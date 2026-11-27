@@ -41,6 +41,7 @@ struct Ctx {
   double startN = 0;            // ctx.transport.startN || 0
   // ctx.key(sck) (U21): the Source's mono buffer of 128 floats, nullptr for Self (sck rounds to 0 or less). nullptr here: the JS's `ctx.key` undefined (the same as Self).
   const float* (*key)(void* user, double sck) = nullptr; void* keyUser = nullptr;
+  const float* knobs = nullptr;   // ctx.engine.knobs (patch knobs, build 663): knobs[1..8] the tracker's KN1-KN8 as 0..1, -1 the Knob module's own Value; nullptr: the engine has none (as a JS engine without them: Value)
   mutable bool fail = false;            // a module the JS would have thrown in (the engine abandons the block and clears the buses, as the worklet's catch does); set by a module, read by the engine
   const SongIR* const* irs = nullptr;   // globalThis.__thunderIR: four entries (a null one is an empty slot), or null for "no IRs at all" (U20: Convolve's Song IR 1 to 4)
 };

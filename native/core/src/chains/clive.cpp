@@ -125,10 +125,11 @@ void ChainsLive::dropPatch(const ChainsEvent& e) {
 void ChainsLive::apply(const ChainsEvent& e) {
   ChainsEngine& E = node_.engine();
   switch (e.kind) {
-    case ChainsEvent::Param: E.setParam(std::string_view(e.id), std::string_view(e.name), e.a); break;
+    case ChainsEvent::Param: if (E.paramNeedsRecompile(std::string_view(e.id), std::string_view(e.name))) { ctr_.droppedEvents.fetch_add(1, std::memory_order_relaxed); break; }   // a Send / Receive label changes the cables: the graph recompiles (allocates), so it is a patch swap here, never a live Param
+      E.setParam(std::string_view(e.id), std::string_view(e.name), e.a, true); break;
     case ChainsEvent::Tempo: E.setTransportTempo(e.a); break;
     case ChainsEvent::Playing: { Transport t = E.transport(); t.playing = e.a != 0; E.setTransport(t); break; }
-    case ChainsEvent::Bypass: { const int n = (int)e.a; if (n >= 1 && n <= kBypSwitches) byp_[n - 1] = e.b; break; }
+    case ChainsEvent::Bypass: { const int n = (int)e.a; if (n >= 1 && n <= kBypSwitches + kKnobs) byp_[n - 1] = e.b; break; }   // 16..23: the knobs k1..k8
     case ChainsEvent::Patch: {
       const int k = (int)e.a; if (k < 0 || k >= kChainsSlots) break;
       int r = -1; for (int i = 0; i < kChainsSlots; i++) if (!retired_[i].load()) { r = i; break; }
@@ -147,7 +148,7 @@ void ChainsLive::segment(int64_t end) {
   if (cfg_.sc) { in.scL = ptrIn_[(size_t)c++]; in.scR = ptrIn_[(size_t)c++]; }
   in.taps = cfg_.taps ? &ptrIn_[(size_t)c] : nullptr; in.nTaps = cfg_.taps; c += cfg_.taps;
   in.sends = cfg_.sends ? &ptrIn_[(size_t)c] : nullptr; in.nSends = cfg_.sends ? 8 : 0; if (cfg_.sends) c += 8;
-  in.feeds = cfg_.feeds ? &ptrIn_[(size_t)c] : nullptr; in.nFeeds = cfg_.feeds; in.byp = byp_;
+  in.feeds = cfg_.feeds ? &ptrIn_[(size_t)c] : nullptr; in.nFeeds = cfg_.feeds; in.byp = byp_; in.kn = byp_ + kBypSwitches;
   for (int k = 0; k < 10; k++) ptrOut_[(size_t)k] = oseg_.get() + (size_t)k * kBlock;
   NodeOut out; out.L = ptrOut_[0]; out.R = ptrOut_[1]; out.sends = &ptrOut_[2]; out.nSends = 8;
   ChainsEngine& E = node_.engine(); const uint64_t f0 = E.stats().failedBlocks;

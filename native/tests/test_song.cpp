@@ -176,7 +176,7 @@ static void testOlder() {
   { const std::string t = "{\"v\":2,\"phrases\":[[[60,100,2,3,4,5,6,7,8]]]}"; Song s; CHECK(s.load(t.data(), t.size(), &e), "v2 loads"); const int16_t* p = s.phrase(0);
     CHECK(p && p[0] == 60 && p[1] == -1 && p[2] == -1 && p[3] == -1 && p[4] == 100 && p[5] == 2 && p[6] == 3 && p[7] == 4 && p[8] == 5 && p[9] == 6 && p[10] == 7 && p[11] == 8, "v2: one note column widened to four"); }
   // clamps and what is empty: a command past FXC is dropped with its value; an empty phrase takes dlen; junk is -1
-  { const std::string t = "{\"v\":6,\"dlen\":8,\"plen\":[16,16,16],\"phrases\":[[[60,-1,-1,-1,-1,-1,200,5,81,7,80,9]],[],null,[[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]]],\"song\":[[0,\"x\",5000,null,1.5]],\"insts\":[null,{\"pad\":999,\"rev\":\"yes\",\"kf\":0}],\"smute\":[4294967295,\"7\"]}";
+  { const std::string t = "{\"v\":6,\"dlen\":8,\"plen\":[16,16,16],\"phrases\":[[[60,-1,-1,-1,-1,-1,200,5,90,7,80,9]],[],null,[[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]]],\"song\":[[0,\"x\",5000,null,1.5]],\"insts\":[null,{\"pad\":999,\"rev\":\"yes\",\"kf\":0}],\"smute\":[4294967295,\"7\"]}";
     Song s; CHECK(s.load(t.data(), t.size(), &e), "clamp song loads"); const int16_t* p = s.phrase(0);
     CHECK(p && p[6] == -1 && p[7] == -1 && p[8] == -1 && p[9] == -1 && p[10] == 80 && p[11] == 9, "commands past FXC dropped with their values");
     CHECK(s.plen[0] == 16 && s.plen[1] == 8 && s.plen[2] == 8 && s.plen[3] == 8, "plen: kept for a phrase with content, dlen for empty, null and all-negative");

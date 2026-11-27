@@ -26,7 +26,9 @@ static const PdcGolden kPdcGolden[] = {
   {"mode_legacy_off", 0xc569903c1cd151dfull, 0},
   {"mode_junk", 0xc569903c1cd151dfull, 0},
   {"mode_off_legacy_on", 0x1751b6c3c96aa06aull, 0},
+  {"file:BETA-TESTING-ELECTRO.thunder", 0x08509c441a484d75ull, 0},
+  {"file:BETA-TESTING-ELECTRO.thunder:all-on-lat", 0xccfc87a215d4b096ull, 0},
   {"file:ELECTRO.thunder", 0x08509c441a484d75ull, 0},
   {"file:ELECTRO.thunder:all-on-lat", 0x3ea15d26496e2271ull, 0},
 };
-static const int kPdcGoldenN = 26;
+static const int kPdcGoldenN = 28;

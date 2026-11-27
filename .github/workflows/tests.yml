@@ -24,7 +24,17 @@ jobs:
       - name: acorn (some tests cut functions out of index.html with it; they skip without it)
         run: npm i --no-save --no-audit --no-fund acorn@8 acorn-walk@8
       - name: Node tests (npm test)
-        run: npm test
+        run: npm test -- --test-reporter=tap | tee node-tests.tap
+      - name: Say loudly which tests SKIPPED (a skipped test checks nothing)
+        if: always()
+        run: |
+          # Several older tests compare with an old build read by `git show <commit>`; this checkout is shallow, so they skip.
+          # Their skips are listed here and in the run summary instead of passing silently.
+          grep -E '^\s*(not )?ok [0-9]+ - .*# SKIP' node-tests.tap | sed -E 's/^\s*(not )?ok [0-9]+ - //' | sort > skipped.txt || true
+          n=$(wc -l < skipped.txt)
+          echo "::warning title=Node tests skipped in CI::$n tests SKIPPED (history-based or acorn): see the run summary"
+          { echo "### Skipped Node tests: $n"; echo; sed 's/^/- /' skipped.txt; } >> "$GITHUB_STEP_SUMMARY"
+          cat skipped.txt
       - name: Playwright driver (no browser download; the image has Chrome)
         run: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i --no-save --no-audit --no-fund playwright@1.56.1
       - name: Sequencer goldens (page sequencer)

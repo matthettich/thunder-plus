@@ -85,7 +85,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CC_CMDS = ['CCA', 'CCB', 'CCC', 'CCD'];
 const NCC = CC_CMDS.length;
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8','FLZ'];
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
 const s8 = v => v > 127 ? v - 256 : v;
 const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};
@@ -209,7 +209,7 @@ const blockMuted = (Sx, y, t) => {
 const masterBlockMuted = (Sx, y) => !!(Sx && Array.isArray(Sx.smuteM) && Sx.smuteM.indexOf(y) >= 0);
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
-function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$/.test(id); }
+function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$|^kn:\d+:[1-8]$/.test(id); }
 const perfOf = (Sx = S) => Sx.perf || (Sx.perf = freshPerf());
 function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1], s:a[2] != null ? +a[2] : -1, p:a[3] != null ? +a[3] : -1, b:a[4] != null ? +a[4] : null}; }
 function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p], pu = isPumpT(f.type);
@@ -219,6 +219,7 @@ function tgtOwn(id, Sx = S){
   const g = tgtParse(id);
   if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : Sx.mout == null ? 255 : Sx.mout;   // the master: the OUT fader's own byte (S.mout; the song's own is never written)
   if (g.k === 'pan') return g.t < NT ? Sx.mix[g.t].pan : 128;
+  if (g.k === 'kn') return 128;   // PATCH KNOBS S3: the page can't see the Knob's own Value (it is in the patch): an LFO swings round the middle
   if (g.k === 'fx'){ const x = tgtFx(g, Sx); if (x && x.q.pb){ const p = TFX[x.f.type].pd[x.pi]; return clamp(pumpByte(p, x.f.pump && x.f.pump[p.s] !== undefined ? x.f.pump[p.s] : p.def), 0, 255); }
     return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
   // cut / dec: open (255); res: none (0). env / atk / sus / rel (live engines, 10 Nov): 0. Only the OFFSET from the engine's own value reaches the engine
@@ -239,6 +240,7 @@ function tgtEvs(id, v, at, pno){
   if (g.k === 'cut' || g.k === 'res' || g.k === 'dec' || g.k === 'tch'){ const o = pno.get(g.t) || {}; if (own) delete o[g.k]; else o[g.k] = v; pno.set(g.t, o); return []; }
   if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : g.t === MT ? [{type:'mout', t:at, track:MT, v:own ? tgtOwn(id) : v}] : [];   // the master: 'mout', the OUT fader (not 'mvol', the drive)
   if (g.k === 'pan') return g.t < NT ? [{type:'tpn', t:at, track:g.t, v:own ? S.mix[g.t].pan : v}] : [];
+  if (g.k === 'kn') return g.t < NT && g.s >= 1 && g.s <= 8 ? [{type:'chc', t:at, track:g.t, p:'k' + g.s, v:own ? -1 : clamp(v, 0, 255) / 255}] : [];   // PATCH KNOBS S3: as KN1–KN8 (own: the Knob's Value again)
   if (g.k === 'fx') return tgtFx(g) ? [g.b != null ? {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, b:g.b, v:own ? tgtOwn(id) : v} : {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, v:own ? tgtOwn(id) : v}] : [];
   return [];
 }
@@ -500,6 +502,7 @@ function makeSeq(S, mode, o){
         (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at2, track:t, p:'sw' + k, v:sw}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
+      if (fx.FLZ != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLZ ? 512 + fx.FLZ : 0}); slotWake('FLZ', fx.FLZ > 0); }   // FLZ (23 Nov): the third bank, 512 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
         if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
@@ -508,6 +511,8 @@ function makeSeq(S, mode, o){
       if (fx.BYP != null && t < MT){ const X = fx.BYP >> 4, Y = fx.BYP & 15;
         for (let k = X ? X : 1; k <= (X ? X : 15); k++){ evs.push({type:'chc', t:at, track:t, p:'b' + k, v:Y >= 2 ? 2 : Y});
           if (Y >= 2) evs.push({type:'chc', t:at + Y * line, track:t, p:'b' + k, v:-1}); } }
+      // KN1–KN8 (22 Nov, patch knobs): knob N of the track's chains patch, 00–FF as 0–1, on k1–k8 of its thunder-chains node (STOP: −1, the Knob's own Value)
+      if (t < MT) for (let k = 1; k <= 8; k++){ const v = fx['KN' + k]; if (v != null) evs.push({type:'chc', t:at, track:t, p:'k' + k, v:v / 255}); }
     };
     // GGR on a row due now (any track, often the master column, which comes last) grooves every track's step from this one
     for (let t = 0; t <= MT; t++){ const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
@@ -602,8 +607,8 @@ function makeSeq(S, mode, o){
           }
           T.last = {c, v}; cmds.push({c, v});
         }
-        // FLX and FLY share one Flex, so on one row the rightmost of the two is the one that plays (8 Nov)
-        const fx = {}; for (const q of cmds){ if (q.c === 'FLX') delete fx.FLY; else if (q.c === 'FLY') delete fx.FLX; fx[q.c] = q.v; }
+        // FLX, FLY and FLZ share one Flex, so on one row the rightmost of the three is the one that plays (8 Nov; FLZ 23 Nov)
+        const fx = {}; for (const q of cmds){ if (q.c === 'FLX'){ delete fx.FLY; delete fx.FLZ; } else if (q.c === 'FLY'){ delete fx.FLX; delete fx.FLZ; } else if (q.c === 'FLZ'){ delete fx.FLX; delete fx.FLY; } fx[q.c] = q.v; }
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
@@ -821,7 +826,7 @@ function makeSeq(S, mode, o){
 let fxRestartN = 0;
 const ntr = () => S.ntr || 16;
 const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
-const FX_NEEDS = {FLX:'flex', FLY:'flex', GAT:'sgate', RTG:'retrig'};
+const FX_NEEDS = {FLX:'flex', FLY:'flex', FLZ:'flex', GAT:'sgate', RTG:'retrig'};
 
 // FXV: the effects' map() functions, from TFX in index.html (45 of them)
 const TFX_MAP = {
@@ -1163,7 +1168,7 @@ const POLY = 4, FXP_CORE = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.engSt = new Array(NT).fill(null); this.engL = new Array(NT).fill(null); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.engSt = new Array(NT).fill(null); this.engL = new Array(NT).fill(null); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map(); this.knSt = new Array(NT).fill(null); this.knT = new Array(NT).fill(null); this.knTouched = new Set();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.mixReset();
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
@@ -1187,6 +1192,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
       if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
       for (const e of r.evs) if (e.type === 'eng') (c.eng || (c.eng = new Map())).set(e.track, e);   // ENGINE TARGETS: the state the silent steps left
+        else if (e.type === 'chc') (c.chc || (c.chc = new Map())).set(e.track + ':' + e.p, e);   // BYP / KN1–KN8 (CodeRabbit on #289): the last switch and knob values, as the page's chase keeps them
       if (ms != null && Date.now() - t0 >= ms) return;
     }
     c.done = true;
@@ -1292,6 +1298,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
       if (!c.done) this.chaseRun(c, null);
       seq = c.seq; const first = c.first;
+      if (c.chc) for (const e of c.chc.values()) if (!(e.v === 2)) this.ev(Object.assign({}, e, {t:d.t0}));   // (a momentary BYP flip, 2, is not carried over: its own −1 to end it may be past)
       if (c.eng) for (const e of c.eng.values()) this.engEv(Object.assign({}, e, {t:d.t0}));   // the steps run silently: the live engines' state they left, now (then the step it stopped on, below)
       if (first) for (const e of first.evs) if (e.type === 'eng') this.engEv(Object.assign({}, e, {t:e.t + (d.t0 - first.t)}));
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
@@ -1508,10 +1515,14 @@ class ThunderCore extends AudioWorkletProcessor {
       this.fxOv.set(key, ov); tcAt(proc, Math.max(ev.t, currentTime), m); return true;
     }
     // BYP (3 Nov): a …chains module's switch (b1–b15 on the track's thunder-chains node), as fxc above
+    // KN1–KN8 (22 Nov, patch knobs): k1–k8 on the same node, and (S2) on the track's …waves live nodes (proc.__wl); knSt keeps them for nodes met later (lnode)
     if (ev.type === 'chc'){
-      const proc = tcNodes().get('chn:' + ev.track); if (!proc) return false;
-      const ov = tcOver(proc), at = Math.max(ev.t, currentTime); ov.until = Infinity;
-      tcParam(ov, ev.p, at).set(ev.v, at); this.fxTouched.add('chn:' + ev.track); return true;
+      const proc = tcNodes().get('chn:' + ev.track), at = Math.max(ev.t, currentTime); let did = false;
+      if (proc){ const ov = tcOver(proc); ov.until = Infinity; tcParam(ov, ev.p, at).set(ev.v, at); this.fxTouched.add('chn:' + ev.track); did = true; }
+      if (ev.p[0] === 'k' && ev.track >= 0 && ev.track < NT){
+        const K = this.knSt[ev.track] || (this.knSt[ev.track] = new Float32Array(9).fill(-1)), KT = this.knT[ev.track] || (this.knT[ev.track] = new Float64Array(9)); K[+ev.p.slice(1)] = ev.v; KT[+ev.p.slice(1)] = at;   // (knT: its booked time, CodeRabbit on #298)
+        const pre = ev.track + ':'; for (const [key, p] of tcNodes()) if (p && p.__wl && key.startsWith(pre)){ this.knPut(p, key, ev.p, ev.v, at); did = true; } }
+      return did;
     }
     // A tempo change: …chains' transport, at its time (the page still sets its own tempo and the live engines' bpm)
     if (ev.type === 'tempo'){
@@ -1548,11 +1559,15 @@ class ThunderCore extends AudioWorkletProcessor {
     for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
       for (const A of ov.p.values()){ A.cancel(at); A.set(-1, at); } ov.until = at + 0.5; }   // FXO… (fx:) and BYP b1–b15 (chn:)
     this.fxTouched.clear();
+    for (const key of this.knTouched){ const proc = tcNodes().get(key), ov = proc && proc.__ov; if (!ov) continue;   // PATCH KNOBS: the …waves nodes' k1–k8 back to their Knob's Value
+      for (let k = 1; k <= 8; k++){ const A = ov.p.get('k' + k); if (A){ A.cancel(at); A.set(-1, at); } } if (ov.until === Infinity) ov.until = at + 0.5; }
+    this.knTouched.clear(); this.knSt.fill(null); this.knT.fill(null);
     // FXV: the slots' own settings again (makePlayer's resetSeq does the same for the ones the page moved)
     for (const [key, ov] of this.fxOv){ const [t, k] = key.split(':').map(Number), proc = tcNodes().get('fx:' + t), A = S && (t >= NT ? S.mfx : S.tfx && S.tfx[t]), f = A && A[k];
       const m = proc && f && (TFX[f.type] && TFX[f.type].pump ? (TFX[f.type].pd ? {pset:{slot:k, pv:pumpPv(TFX[f.type], f, null)}} : null) : fxvMsg(f, k, {}, S.bpm)); if (m){ if (proc.__q) proc.__q = proc.__q.filter(x => !(x[1].pset && x[1].pset.slot === k)); tcAt(proc, at, m); } }
     this.fxOv.clear(); }
 
+  knPut(proc, key, name, v, at){ const ov = tcOver(proc); ov.until = Infinity; tcParam(ov, name, at).set(v, at); this.knTouched.add(key); }   // PATCH KNOBS
   /* ---- live engines: makePlayer's bassNode / bassNote / polyVox / polyPs, driving the registered nodes ---- */
   lnode(t, pad, j){
     const k = this.kv[pad], lk = k && k.lk; if (!lk) return null;
@@ -1561,7 +1576,8 @@ class ThunderCore extends AudioWorkletProcessor {
       if (L.ps) L.lanes = [0, 1, 2, 3].map(q => ({L, lane:q, n:L.n + q * 1e5, lastOn:-1, cur:null}));
       if (old) for (const A of this.engL) if (A) A.delete(old);
       (this.engL[t] || (this.engL[t] = new Set())).add(L);   // ENGINE TARGETS: the track's live nodes
-      this.lnodes.set(key, L); }
+      this.lnodes.set(key, L);
+      const K = proc.__wl && this.knSt[t], KT = this.knT[t]; if (K) for (let k = 1; k <= 8; k++) if (K[k] >= 0) this.knPut(proc, key, 'k' + k, K[k], Math.max(currentTime, KT ? KT[k] : 0)); }   // (at its booked time, not early)   // PATCH KNOBS: a …waves node met after KN
     return L;
   }
   // the AudioParam names on this node (a …pump synth's lane j: r/g/t/l/v + j)

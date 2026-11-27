@@ -290,6 +290,8 @@ ChainsDiff chains_diff(Json prev, Json next) {
       const JV av = A.get(k);
       if (strict_eq(bv, av)) continue;
       if (bv.k == JV::Ref && av.k == JV::Ref && deep_eq(bv.ref, av.ref, 1)) continue;   // the departure above
+      // a Send / Receive label is part of the compiled bus plan: ChainsLive::apply drops a param op on it (a recompile on the audio thread), so a rename is a structural change
+      if (k == "lab") { Json ty = m.get("type"); if (ty.isStr() && (ty.asStr() == "send" || ty.asStr() == "recv")) return structural(); }
       if (bv.k != JV::Num || !std::isfinite(bv.d) || nm.keys[i][0] != 's') return structural();   // not a finite number, or an id that is not a string
       ChainsParamOp op; op.id = nm.keys[i].substr(1); op.name = k; op.v = bv.d; r.params.push_back(std::move(op));
     }

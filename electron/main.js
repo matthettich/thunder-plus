@@ -6,6 +6,7 @@ const { pathToFileURL } = require('url');
 const { setupUpdates } = require('./updater');
 const { linkSession } = require('./link-session');
 const { createRestartGate } = require('./io-helper');
+const { createAllowList, isProj, isAppUrl, isWebUrl } = require('./path-allow');
 /* ABLETON LINK (3 Nov; desktop only, off until the page turns it on): the native addon in ./link (built from the repo's link/
    folder, GPL-2.0-or-later, see link/NOTICE.md) is OPTIONAL. A build without it, or one whose file won't load on this
    computer, runs as before and the page says Link is not available in this build. Packaged, a .node file is read from
@@ -82,20 +83,30 @@ let win = null;
    until the page says it's ready, then goes to it. Closing the window asks the page first (it answers at once, then
    shows its own Save / Don't save / Cancel when the song has unsaved changes); a page that doesn't answer in 3 s, or
    one that crashed, doesn't stop the window closing. */
-const isProj = p => typeof p === 'string' && /\.(thunder|json)$/i.test(p);
+/* WHICH FILES THE PAGE MAY TOUCH (S-1, 26 Nov; the same rule as the native shell): the page is untrusted (a script in a shared .thunder
+   file would run in it), so file-read / file-save / out-write / out-show only take a path the person chose in a dialog this session,
+   a path the shell handed the page (opened from the desktop, a second launch, open-file, a file dropped on the window), or one of the
+   last 64 such paths kept in userData/allowed-paths.txt (so Open recent works across runs). Anything else gets {error:'not allowed: ...'}.
+   The page's autosave, recovery copy, sample folders and kits live in its own browser storage, not behind these channels. */
+const allow = createAllowList({ file: path.join(app.getPath('userData'), 'allowed-paths.txt') });
+// only the app's own top frame (app://thunder) may call the file channels (the preload is only in that frame, so this is belt and braces)
+const fromApp = e => { try { const f = e.senderFrame; return !!f && f === e.sender.mainFrame && isAppUrl(f.url); } catch (_) { return false; } };
+const NOT_APP = 'not allowed: not called from the app page';
 const argPath = argv => (argv || []).slice(1).find(a => /\.thunder$/i.test(a) && fs.existsSync(a)) || null;
-let pendingPath = argPath(process.argv), pageReady = false, closeOk = false, quitting = false, ackT = null;
-const sendPath = p => { if (pageReady && win) win.webContents.send('thunder:open-path', p); else pendingPath = p; };
+let pendingPath = allow.allow(argPath(process.argv)) || null, pageReady = false, closeOk = false, quitting = false, ackT = null;
+const sendPath = p => { allow.allow(p); if (pageReady && win) win.webContents.send('thunder:open-path', p); else pendingPath = p; };
 app.on('open-file', (e, p) => { e.preventDefault(); sendPath(p); if (win){ if (win.isMinimized()) win.restore(); win.focus(); } });
 app.on('before-quit', () => { quitting = true; });
 async function readProj(p){
   if (!isProj(p)) return { error: 'that isn’t a .thunder or .json file' };
+  const bad = allow.check(p, 'proj'); if (bad) return { error: bad };
   try { return { path: p, name: path.basename(p), text: await fsp.readFile(p, 'utf8') }; }
   catch (e) { return { error: e.code === 'ENOENT' ? 'it isn’t there any more' : e.message }; }
 }
 // Written next to the file first, then renamed over it, so a crash mid-save never leaves half a project.
 async function writeProj(p, text){
   if (!isProj(p) || typeof text !== 'string') return { error: 'not a project file' };
+  const bad = allow.check(p, 'proj'); if (bad) return { error: bad };
   const tmp = p + '.saving';
   try { await fsp.writeFile(tmp, text, 'utf8'); await fsp.rename(tmp, p); return { ok: true, path: p }; }
   catch (e) { try { await fsp.unlink(tmp); } catch (_) {} return { error: e.message }; }
@@ -123,9 +134,12 @@ function createWindow(){
     clearTimeout(ackT); ackT = setTimeout(() => { closeOk = true; if (win) win.close(); }, 3000);
   });
   // Links (help, licences) open in the normal browser rather than inside the app.
-  win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  // Never opens a window of its own (a new window would have no guard): http(s) goes to the browser, everything else is dropped.
+  win.webContents.setWindowOpenHandler(({ url }) => { if (isWebUrl(url)) shell.openExternal(url); return { action: 'deny' }; });
   // The window only ever shows the app: a dropped file (file://) or anything else must not navigate it away.
-  win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); });
+  win.webContents.on('will-navigate', (e, url) => { e.preventDefault(); if (isWebUrl(url)) shell.openExternal(url); });
+  // ... and neither may a frame inside it (the chains / waves editors are app:// frames): only the app's own pages load there.
+  win.webContents.on('will-frame-navigate', (e, url) => { if (e.isMainFrame) return; if (!isAppUrl(url) && url !== 'about:blank') { e.preventDefault(); if (isWebUrl(url)) shell.openExternal(url); } });
   win.on('closed', () => { win = null; if (link) link.off(); ioStop(); });
 }
 
@@ -151,18 +165,26 @@ app.whenReady().then(() => {
   ipcMain.handle('thunder:upd-check', () => updates.check());
   ipcMain.handle('thunder:upd-act', () => updates.act());
   // FILE SAFETY: the page's project files and the close / open hand-off.
-  ipcMain.handle('thunder:file-read', (e, p) => readProj(p));
-  ipcMain.handle('thunder:file-save', (e, p, text) => writeProj(p, text));
-  ipcMain.handle('thunder:file-open', async () => {
+  ipcMain.handle('thunder:file-read', (e, p) => fromApp(e) ? readProj(p) : { error: NOT_APP });
+  ipcMain.handle('thunder:file-save', (e, p, text) => fromApp(e) ? writeProj(p, text) : { error: NOT_APP });
+  ipcMain.handle('thunder:file-open', async e => {
+    if (!fromApp(e)) return { error: NOT_APP };
     const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: PROJ_FILTERS });
-    return r.canceled || !r.filePaths[0] ? null : readProj(r.filePaths[0]);
+    if (r.canceled || !r.filePaths[0]) return null;
+    allow.allow(r.filePaths[0]);   // chosen in the dialog
+    return readProj(r.filePaths[0]);
   });
+  // a file dropped on the window: the preload reads its path (webUtils.getPathForFile, which only a real dropped / picked File gives) and says so here
+  ipcMain.on('thunder:path-drop', (e, p) => { if (fromApp(e) && isProj(p)) allow.allow(p); });
   ipcMain.handle('thunder:file-saveas', async (e, name, text, near) => {
+    if (!fromApp(e)) return { error: NOT_APP };
     const base = String(name || 'Song.thunder').replace(/[\\/:*?"<>|]/g, '_');
     const dir = isProj(near) && fs.existsSync(path.dirname(near)) ? path.dirname(near) : app.getPath('documents');
     const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, base), filters: [{ name: 'Thunder Plus project', extensions: ['thunder'] }] });
     if (r.canceled || !r.filePath) return null;
-    return writeProj(isProj(r.filePath) ? r.filePath : r.filePath + '.thunder', text);
+    const out = isProj(r.filePath) ? r.filePath : r.filePath + '.thunder';
+    allow.allow(out);   // chosen in the dialog
+    return writeProj(out, text);
   });
   // RENDER TO (owner, 31 Oct: "I don't have any clue where render renders a file to"): renders and exports ask where to go
   // first, with the system Save dialog (starting where the last one went, else the project's folder, else Music), then the
@@ -170,22 +192,25 @@ app.whenReady().then(() => {
   let lastOut = '';
   const OUT_EXT = { wav: 'WAV audio', zip: 'Zip archive', mid: 'MIDI file' };
   ipcMain.handle('thunder:out-pick', async (e, name, near) => {
+    if (!fromApp(e)) return null;
     const base = String(name || 'Render.wav').replace(/[\\/:*?"<>|]/g, '_'), ext = (base.match(/\.(\w+)$/) || [])[1] || 'wav';
     if (!OUT_EXT[ext.toLowerCase()]) return null;
     const dir = lastOut && fs.existsSync(lastOut) ? lastOut : isProj(near) && fs.existsSync(path.dirname(near)) ? path.dirname(near) : app.getPath('music');
     const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, base), filters: [{ name: OUT_EXT[ext.toLowerCase()], extensions: [ext.toLowerCase()] }] });
     if (r.canceled || !r.filePath) return null;
     let f = r.filePath; if (!f.toLowerCase().endsWith('.' + ext.toLowerCase())) f += '.' + ext.toLowerCase();
-    lastOut = path.dirname(f); return f;
+    lastOut = path.dirname(f); allow.allow(f);   // chosen in the dialog
+    return f;
   });
   ipcMain.handle('thunder:out-write', async (e, f, data) => {
     try {
-      if (typeof f !== 'string' || !/\.(wav|zip|mid)$/i.test(f)) return { error: 'not a render file' };
+      if (!fromApp(e)) return { error: NOT_APP };
+      const bad = allow.check(f, 'out'); if (bad) return { error: bad };
       await fs.promises.writeFile(f, Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data));
       return { ok: true, path: f };
     } catch (err) { return { error: String((err && err.message) || err) }; }
   });
-  ipcMain.handle('thunder:out-show', (e, f) => { if (typeof f === 'string' && fs.existsSync(f)) shell.showItemInFolder(f); return true; });
+  ipcMain.handle('thunder:out-show', (e, f) => { if (fromApp(e) && allow.has(f) && fs.existsSync(f)) shell.showItemInFolder(f); return true; });
   // ABLETON LINK: the session (link-session.js) and the page's calls. Every handler answers safely without the addon.
   ipcMain.on('thunder:link-avail', e => { e.returnValue = { available: !!link, why: link ? '' : LINK_WHY || 'not built' }; });
   ipcMain.handle('thunder:link-enable', (e, on, bpm) => link ? link.enable(on, bpm) : false);
@@ -199,8 +224,9 @@ app.whenReady().then(() => {
   // if it died, then {ok:false}. The helper's own hello (available or not, and why) comes to the page over the port.
   // ONE MICROPHONE ASK (owner, 7 Nov: "enable the microphone 28 times"): the app asks macOS once (thunder:io-mic, below), before
   // the helper opens an interface (the helper is the app's child, so it shares the answer).
-  ipcMain.handle('thunder:io-start', async () => {
+  ipcMain.handle('thunder:io-start', async e => {
     try {
+      if (!fromApp(e)) return { ok: false, why: NOT_APP };
       if (!win || win.isDestroyed()) return { ok: false, why: 'no window' };
       if (!ioChild) {
         if (!ioGate.canStart()) return { ok: false, why: 'helper stopped' };
@@ -229,7 +255,7 @@ app.whenReady().then(() => {
     require('child_process').execFile('defaults', ['read', '-g', 'com.apple.swipescrolldirection'], { timeout: 2000 }, (err, out) => res(err ? true : String(out).trim() !== '0'))));
   // "Apply (reload) did nothing" (8 Nov): the page's location.reload() raises will-navigate, which createWindow() preventDefaults for every
   // URL (so a dropped file can't replace the app). The shell reloads the sender's own window instead; webContents.reload() doesn't go through it.
-  ipcMain.on('thunder:reload', e => { try { if (!e.sender.isDestroyed()) e.sender.reload(); } catch (_) {} });
+  ipcMain.on('thunder:reload', e => { try { if (fromApp(e) && !e.sender.isDestroyed()) e.sender.reload(); } catch (_) {} });
   ipcMain.on('thunder:playing', (e, on) => setPlaying(!!on));   // APP NAP: held while the song plays
   ipcMain.on('thunder:page-ready', () => { pageReady = true; if (pendingPath && win){ const p = pendingPath; pendingPath = null; win.webContents.send('thunder:open-path', p); } });
   ipcMain.on('thunder:close-ack', () => clearTimeout(ackT));

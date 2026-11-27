@@ -6,8 +6,8 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 const H = require('./helpers');
 const src = H.read('index.html');
 
-test('view tabs: with 3 or more tabs on a phone (460 px and under) the switch is a full row of its own, never scrolls, and shares the row out', () => {
-  const m = src.match(/@media \(max-width:460px\)\{ body\.mob \.top\{flex-wrap:wrap\}\n\s*body\.mob \.top #segView:has\(button:nth-child\(3\)\)\{([^}]*)\}\n\s*body\.mob \.top #segView:has\(button:nth-child\(3\)\) button\{([^}]*)\} \}/);
+test('view tabs: with 3 or more tabs on a phone (599 px and under, build 637; 460 before) the switch is a full row of its own, never scrolls, and shares the row out', () => {
+  const m = src.match(/@media \(max-width:599px\)\{ body\.mob \.top\{flex-wrap:wrap\}\n\s*body\.mob \.top #segView:has\(button:nth-child\(3\)\)\{([^}]*)\}\n\s*body\.mob \.top #segView:has\(button:nth-child\(3\)\) button\{([^}]*)\} \}/);
   assert.ok(m, 'the full-row rule for 3+ tabs is there');
   assert.match(m[1], /flex:1 1 100%/); assert.match(m[1], /overflow:visible/); assert.match(m[2], /flex:1 1 auto/); assert.match(m[2], /padding-inline:6px!important/);
   // it comes after the older rules it must win over (same or lower specificity), and the two-tab switch is still left beside the bar

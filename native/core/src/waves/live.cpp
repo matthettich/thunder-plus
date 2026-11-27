@@ -72,6 +72,7 @@ void WavesLive::apply(const LiveEvent& e) {
     case LiveEvent::Tempo: eng_.setTransportTempo(e.a); break;
     case LiveEvent::Level: level_ = e.a; break;
     case LiveEvent::Drive: drive_ = e.a; break;
+    case LiveEvent::Knob: eng_.setKnob((int)e.a, e.b); break;   // PATCH KNOBS (S2): k1..k8
     case LiveEvent::Bus: { const int b = (int)std::min(8.0, std::max(1.0, std::floor(e.a))); bus_ = b; eng_.setOnly(b); break; }
     case LiveEvent::Patch: {
       const int k = (int)e.a; if (k < 0 || k >= kLiveSlots) break;

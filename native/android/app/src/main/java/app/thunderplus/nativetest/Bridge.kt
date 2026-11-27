@@ -48,15 +48,27 @@ class Bridge(private val activity: Activity, private val webView: WebView) {
                 onFileMessage(message.data ?: "", reply)
             }
         }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            // Hello fixes (26 Nov): the shim posts 'port' here once at document start: the port goes to the page as early as it can work (callback: main thread)
+            WebViewCompat.addWebMessageListener(webView, "thunderPortAsk", rules) { _, _, _, isMainFrame, _ -> if (isMainFrame) attach("ask") }
+        }
         ThunderHost.listeners.add(forward)
     }
 
+    /** A new page load begins: the next attach counts as the first of this load. */
+    fun pageStarted() { HelloDiag.port.onPageStarted() }
+
     fun close() { ThunderHost.listeners.remove(forward); port?.close(); port = null }
 
-    /** After each page load: a fresh channel; port 1 goes to the page. */
-    fun attach() {
+    /** A fresh channel; port 1 goes to the page. At most once per page load (the shim's ask or onPageFinished, whichever is first): a port the page already uses is never closed and replaced. [via]: "ask" or "pageFinished". Main thread. */
+    fun attach(via: String) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.CREATE_WEB_MESSAGE_CHANNEL) ||
             !WebViewFeature.isFeatureSupported(WebViewFeature.POST_WEB_MESSAGE)) return
+        if (!HelloDiag.port.claim(via, System.currentTimeMillis())) return
+        try { doAttach() } catch (e: Exception) { HelloDiag.port.release(); throw e }
+    }
+
+    private fun doAttach() {
         port?.close()
         SongFiles.pageAttached()
         val ports = WebViewCompat.createWebMessageChannel(webView)

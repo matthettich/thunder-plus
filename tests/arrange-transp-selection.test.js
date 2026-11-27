@@ -19,7 +19,7 @@ function rig({ cells = [], chains = {}, phrases = {}, sel = null, picks = [], cu
   for (const e of Object.values(els)) e.setAttribute = (k, v) => { e.attrs[k] = v; };
   const c = { tv: tvv || (side ? 'phrase' : 'song'), S: { song, chains: JSON.parse(JSON.stringify(chains)), phrases: JSON.parse(JSON.stringify(phrases)) },
     cs: { song: { x: cursor[1], y: cursor[0] } }, selA: null, apSel: null, apReady: true, apF: side ? 'arr' : null, sxPicks: picks, MT, NCOL, NOTE_COLS: [0, 1, 2, 3], isPolyT: poly, plen: p => (c.S.phrases[p] || []).length,
-    clamp: (v, a, b) => Math.max(a, Math.min(b, v)), hp: n => n.toString(16).toUpperCase().padStart(2, '0'), keyHint: s => s, onPset: () => false, mstView: () => false, $: id => els[id],
+    clamp: (v, a, b) => Math.max(a, Math.min(b, v)), hp: n => n.toString(16).toUpperCase().padStart(2, '0'), keyHint: s => s, onPset: () => false, mstView: () => false, busTrack: () => false, busSay: () => true, $: id => els[id],
     selRect: () => ({ x0: Math.min(sel.x, cursor[1]), x1: Math.max(sel.x, cursor[1]), y0: Math.min(sel.y, cursor[0]), y1: Math.max(sel.y, cursor[0]) }),
     songCells: () => { const r = c.selRect(), o = []; for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) o.push([y, t]); return o; },
     toast: t => log.toast.push(t), draw: () => { log.draws++; },

@@ -40,7 +40,7 @@ inline void event(std::string& o, const thunder::SeqEvent& e, const thunder::Seq
     case SEV_FXP: if (e.has & SH_BAND) w.n("b", e.band); w.n("pi", e.pi); w.n("slot", e.slot); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
     case SEV_STP: w.b("all", e.flag); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); break;
     case SEV_FXC: w.s("p", e.p < 8 ? "sw" + std::to_string(e.p) : e.p == 8 ? "flx" : e.p == 9 ? "gat" : "rtg"); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
-    case SEV_CHC: w.s("p", "b" + std::to_string(e.p)); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
+    case SEV_CHC: w.s("p", e.p > 15 ? "k" + std::to_string(e.p - 15) : "b" + std::to_string(e.p)); w.n("t", e.t); w.n("track", e.track); w.s("type", ty); w.n("v", e.v); break;
     case SEV_MVOL: w.n("t", e.t); w.s("type", ty); w.n("v", e.v); break;
     case SEV_ENG:   // (c and o are objects: corePlain drops them)
       if (full) { w.key("c"); W b(o); b.n("atk", e.engC[3]); b.n("cut", e.engC[0]); b.n("dec", e.engC[2]); b.n("rel", e.engC[4]); b.n("res", e.engC[1]); b.end();

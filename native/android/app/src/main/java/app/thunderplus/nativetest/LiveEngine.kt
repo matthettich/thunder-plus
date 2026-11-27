@@ -51,14 +51,24 @@ object LiveEngine {
         return worker.call { startOnWorker(ctx, gen) }
     }
 
+    /** Why the last start failed ("" after a good start): the hello's error reply and the debug panel say it. */
+    @Volatile var lastStartError: String = ""
+        private set
+
     private fun startOnWorker(ctx: Context, gen: Int): Boolean {
-        if (up) return active
-        if (synchronized(lifeLock) { shutdowns != gen }) return false   // a shutdown() came after this start was asked: nothing to open
+        if (up) {
+            if (active) return true
+            // Hello fixes (26 Nov): up but not active is stale (a racing shutdown, a stream that never finished starting): it would return false for ever. End the native side and start again in this call.
+            Log.i(TAG, "stale engine (up, not active): shutting it down to start again")
+            up = false
+            try { LiveNative.nativeShutdown() } catch (e: Throwable) { Log.i(TAG, "stale shutdown: $e") }
+        }
+        if (synchronized(lifeLock) { shutdowns != gen }) { lastStartError = "a shutdown came first"; return false }   // a shutdown() came after this start was asked: nothing to open
         starting = true
         try {
             ThunderHost.shutdown()   // the N0 test core and the live host would both open the output
             val sr = LiveNative.nativeStart(true)
-            if (sr <= 0) { Log.i(TAG, "start failed: $sr"); return false }
+            if (sr <= 0) { Log.i(TAG, "start failed: $sr"); lastStartError = "nativeStart returned $sr"; return false }
             up = true
             val ok = synchronized(lifeLock) {
                 if (shutdowns != gen) false else { sampleRate = sr; appCtx = ctx.applicationContext; active = true; true }
@@ -66,11 +76,17 @@ object LiveEngine {
             if (!ok) {   // A1: a shutdown() ran after the check above: its queued task sees `up == false` by the time it runs, so THIS thread ends the engine now (we are on the worker)
                 up = false
                 try { LiveNative.nativeShutdown() } catch (e: Throwable) { Log.i(TAG, "stale start shutdown: $e") }
+                lastStartError = "a shutdown came first"
                 return false
             }
             LiveMidi.engineUp()
             try { ctx.startForegroundService(Intent(ctx, ThunderService::class.java)) } catch (e: Exception) { Log.i(TAG, "service did not start: $e") }
+            lastStartError = ""
             return true
+        } catch (e: Throwable) {
+            Log.i(TAG, "start threw: $e")
+            lastStartError = "exception: $e"
+            return false
         } finally { starting = false }
     }
 
@@ -131,9 +147,10 @@ object LiveEngine {
 
     /** One line for the overlay. */
     fun statusText(): String {
-        if (!active) return "native live engine: off"
+        val diag = HelloDiag.text(System.currentTimeMillis(), lastStartError)
+        if (!active) return "native live engine: off" + (if (up) " (native side up but not active)" else "") + "\n" + diag
         val l = loaded
-        return "live $sampleRate Hz  " + (if (l == null) "no song loaded" else "$projectName: ${l.summary()}") + "\n" + status().line() + "\n" + gate.line() + (if (LiveSession.lastEvent.isEmpty()) "" else "\nlast device / focus event: " + LiveSession.lastEvent)
+        return diag + "\nlive $sampleRate Hz  " + (if (l == null) "no song loaded" else "$projectName: ${l.summary()}") + "\n" + status().line() + "\n" + gate.line() + (if (LiveSession.lastEvent.isEmpty()) "" else "\nlast device / focus event: " + LiveSession.lastEvent)
     }
 
     /** Runs [work] on a worker thread unless one is already running (the buttons and the notification can not queue two loads). */

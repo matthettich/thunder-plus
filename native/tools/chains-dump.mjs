@@ -55,7 +55,7 @@ const outDir = process.argv.find((a, i) => i > 1 && !a.startsWith('--'));
   }
   const gold = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/golden/chains-modules.json'), 'utf8'));
   for (const type of Object.keys(M).sort()) {
-    const m = M[type]; if (!m || !m.process || type === 'trackIn' || type === 'chainOut') continue;
+    const m = M[type]; if (!m || !m.process || type === 'trackIn' || type === 'chainOut' || type === 'send' || type === 'recv') continue;   // send, recv: never run, the graph's compile step resolves them (as tests/chains.test.js SKIP)
     for (const [set, over] of [['default', undefined], ['stressed', stress(m)], ['switches-on', switchesOn(m)]]) {
       const r = render(type, over), arrs = [r.L, r.R, ...r.ports.map(p => r.rec[p])], h = hashOf(arrs), key = `${type} @${set}`;
       if (gold[key] !== h) throw new Error(`the JS gives ${h} for "${key}", the committed golden has ${gold[key]}`);
@@ -157,6 +157,24 @@ S({ name: 'edit/live', patch: { modules: [TI('a', 1), P('g', 'vca', { gain: .5 }
 S({ name: 'edit/patch-replaced', patch: { modules: [TI('a', 1), CO('c', 1)], cables: [C(['a', 'out'], ['c', 'in'])] },
   events: [[30, 'patch', { modules: [TI('a', 1), P('f', 'vcf', { cutoff: .35 }), CO('c', 1)], cables: [C(['a', 'out'], ['f', 'in']), C(['f', 'out'], ['c', 'in'])], transport: { tempo: 90, playing: true } }]] });
 S({ name: 'edit/transport', patch: { modules: [TI('a', 1), P('l', 'lfo', { rate: 4, sync: 1 }), P('g', 'vca', {}), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['l', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] }, events: [[20, 'transport', { playing: false }], [40, 'transport', { playing: true, tempo: 133 }], [60, 'quality', 'draft']] });
+// patch knobs (22 Nov, build 663): a Knob module out of the tracker's KN1-KN8 (the engine's knobs[1..8], the node's k1..k8; -1 the module's own Value), glided across the block; Min / Max mapping
+S({ name: 'knob/engine-vca', patch: { modules: [TI('a', 1), P('k', 'knob', { n: 2, value: .25, min: 0, max: 1 }), P('g', 'vca', { gain: 1 }), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['k', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] },
+  events: [[10, 'kn', 2, .5], [25, 'kn', 2, 1], [40, 'kn', 3, .1], [55, 'kn', 2, -1], [70, 'kn', 2, 0], [80, 'kn', 2, 1.5]] });
+S({ name: 'knob/engine-range', patch: { modules: [TI('a', 1), P('k', 'knob', { n: 1, value: .5, min: -.5, max: .8 }), P('l', 'knob', { n: 8, value: 1, min: 1, max: 0 }), P('g', 'vca', { gain: 1 }), P('h', 'vca', { gain: 1 }), CO('c', 1)],
+  cables: [C(['a', 'out'], ['g', 'in']), C(['k', 'out'], ['g', 'cv']), C(['g', 'out'], ['h', 'in']), C(['l', 'out'], ['h', 'cv']), C(['h', 'out'], ['c', 'in'])] }, events: [[5, 'kn', 1, .9], [30, 'kn', 8, .3], [60, 'kn', 1, -1], [75, 'param', 'k', 'n', 8]] });
+S({ name: 'knob/node-params', mode: 'node', track: 0, standalone: false, patch: { modules: [TI('a', 1), P('k', 'knob', { n: 3, value: .1 }), P('g', 'vca', { gain: 1 }), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['k', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] },
+  events: [[10, 'kn', 3, .75], [40, 'kn', 3, 0], [70, 'kn', 3, -1]] });
+// Send / Receive (15 Nov): an invisible cable resolved in the graph's compile step (labels A-H, or the module's own text), pairs in series, several Receives, a loop closed through a pair, a relabel while playing
+const SR = (id, type, lab, text) => P(id, type, { lab }, text == null ? {} : { text });
+S({ name: 'sr/basic', patch: { modules: [TI('a', 1), SR('s', 'send', 1), SR('r', 'recv', 1), P('f', 'vcf', { cutoff: .4 }), CO('c', 1)], cables: [C(['a', 'out'], ['s', 'in']), C(['a', 'outR'], ['s', 'inR']), C(['r', 'out'], ['f', 'in']), C(['r', 'outR'], ['f', 'inR']), C(['f', 'out'], ['c', 'in']), C(['f', 'outR'], ['c', 'inR'])] } });
+S({ name: 'sr/in-only-fallback', patch: { modules: [TI('a', 1), SR('s', 'send', 2), SR('r', 'recv', 2), CO('c', 1)], cables: [C(['a', 'out'], ['s', 'in']), C(['r', 'out'], ['c', 'in']), C(['r', 'outR'], ['c', 'inR'])] } });
+S({ name: 'sr/two-sends-two-recvs', patch: { modules: [TI('a', 1), TI('b', 2), P('g', 'vca', { gain: .5 }), SR('s1', 'send', 3), SR('s2', 'send', 3), SR('r1', 'recv', 3), SR('r2', 'recv', 3), CO('c', 1), CO('d', 2)], cables: [C(['a', 'out'], ['s1', 'in']), C(['b', 'out'], ['s2', 'in']), C(['r1', 'out'], ['c', 'in']), C(['r2', 'out'], ['g', 'in']), C(['g', 'out'], ['d', 'in']), C(['b', 'outR'], ['s2', 'inR'])] } });
+S({ name: 'sr/series', patch: { modules: [TI('a', 1), SR('s1', 'send', 1), SR('r1', 'recv', 1), P('g', 'vca', { gain: .6 }), SR('s2', 'send', 2), SR('r2', 'recv', 2), CO('c', 1)], cables: [C(['a', 'out'], ['s1', 'in']), C(['r1', 'out'], ['g', 'in']), C(['g', 'out'], ['s2', 'in']), C(['r2', 'out'], ['c', 'in']), C(['r1', 'out'], ['s2', 'in'])] } });
+S({ name: 'sr/text-label', patch: { modules: [TI('a', 1), SR('s', 'send', 0, '  Verb Bus '), SR('r', 'recv', 0, 'verb BUS'), SR('q', 'recv', 0, 'other'), CO('c', 1)], cables: [C(['a', 'out'], ['s', 'in']), C(['r', 'out'], ['c', 'in']), C(['q', 'out'], ['c', 'inR'])] } });
+S({ name: 'sr/loop-through-pair', patch: { modules: [TI('a', 1), SR('s', 'send', 1), SR('r', 'recv', 1), P('g', 'vca', { gain: .7 }), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['g', 'out'], ['s', 'in']), C(['r', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] } });
+S({ name: 'sr/recv-no-send', patch: { modules: [TI('a', 1), SR('r', 'recv', 4), P('g', 'vca', {}), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['r', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] } });
+S({ name: 'sr/relabel-live', patch: { modules: [TI('a', 1), SR('s', 'send', 1), SR('r', 'recv', 1), SR('s2', 'send', 5), P('f', 'vcf', { cutoff: .3 }), CO('c', 1)], cables: [C(['a', 'out'], ['s', 'in']), C(['a', 'outR'], ['s2', 'in']), C(['r', 'out'], ['f', 'in']), C(['f', 'out'], ['c', 'in'])] },
+  events: [[20, 'param', 'r', 'lab', 5], [40, 'param', 'r', 'lab', 0], [50, 'text', 'r', 'x'], [60, 'text', 's2', 'x'], [70, 'param', 's2', 'lab', 7]] });
 // found by the mutation check: parts no row of chains-modules.json reaches (the Vocoder's spectral mode, a compressor ratio below 2, an unlinked modulator)
 S({ name: 'mod2/vocoder-spectral', patch: { modules: [TI('a', 1), TI('b', 2), P('v', 'vocoder', { mode: 6, mix: .8, level: 1.2 }), CO('c', 1)], cables: [C(['a', 'out'], ['v', 'in']), C(['b', 'out'], ['v', 'inR']), C(['v', 'out'], ['c', 'in'])] } });
 S({ name: 'mod2/vocoder-spectral-unlinked', patch: { modules: [TI('a', 1), P('v', 'vocoder', { mode: 6, mix: 1 }), CO('c', 1)], cables: [C(['a', 'out'], ['v', 'in']), C(['v', 'out'], ['c', 'in'])] } });
@@ -214,6 +232,8 @@ function runScn(c) {
     else if (op === 'params') E.handleMessage({ op: 'params', list: a[0] }); else if (op === 'patch') E.loadPatch(a[0]); else if (op === 'transport') E.handleMessage({ op: 'transport', value: a[0] });
     else if (op === 'quality') E.handleMessage({ op: 'quality', value: a[0] }); else if (op === 'telemetry') E.handleMessage({ op: 'telemetry', value: a[0] }); else if (op === 'tapmap') E.handleMessage({ op: 'tapmap', value: a[0] });
     else if (op === 'bsw') bsw(a[0], a[1]);
+    else if (op === 'kn') bsw(15 + a[0], a[1]);   // PATCH KNOBS: knob k1..k8 (engine: E.knobs[n], node: the k params); as a switch number 16..23
+    else if (op === 'text') E.handleMessage({ op: 'text', id: a[0], value: a[1] });
   };
   if (c.mode === 'engine') {
     const E = engineOf(ctx, c.focus); E.loadPatch(c.patch); if (c.tapmap) E.handleMessage({ op: 'tapmap', value: c.tapmap });
@@ -221,7 +241,7 @@ function runScn(c) {
     const mixL = new Float32Array(128 * B), mixR = new Float32Array(128 * B), snd = Array.from({ length: 8 }, () => new Float32Array(128 * B));
     let sendPrev = null;
     for (let b = 0; b < B; b++) {
-      for (const ev of c.events) if (ev[0] === b) apply(E, ev, (n, v) => { E.bsw[n] = v; });
+      for (const ev of c.events) if (ev[0] === b) apply(E, ev, (n, v) => { if (n > 15) E.knobs[n - 15] = v; else E.bsw[n] = v; });
       const tl = new Float32Array(128 * c.chans), tr = new Float32Array(128 * c.chans);
       for (let j = 0; j < c.chans; j++) { tl.set(chs[j].subarray(b * 128, (b + 1) * 128), j * 128); tr.set(chs[(j + 1) % c.chans].subarray(b * 128, (b + 1) * 128), j * 128); }
       E.setTrackInputs(tl, tr); E.taps = c.taps ? taps.map(t => t.subarray(b * 128, (b + 1) * 128)) : null;
@@ -241,7 +261,7 @@ function runScn(c) {
     const oL = new Float32Array(N * B), oR = new Float32Array(N * B), so = Array.from({ length: 8 }, () => new Float32Array(N * B));
     const params = {}; let bsw = null;
     for (let b = 0; b < B; b++) {
-      for (const ev of c.events) if (ev[0] === b) apply(node.engine, ev, (n, v) => { (bsw = bsw || {})['b' + n] = [v]; });
+      for (const ev of c.events) if (ev[0] === b) apply(node.engine, ev, (n, v) => { (bsw = bsw || {})[(n > 15 ? 'k' + (n - 15) : 'b' + n)] = [v]; });
       const sl = s => s.subarray(b * N, (b + 1) * N);
       const ins = [[sl(inS), sl(inS)], c.sc ? [sl(scL), sl(scL)] : [], c.taps ? taps.map(sl) : [], c.sends ? sends.map(sl) : [], [], []];
       for (let j = 0; j < c.feeds; j++) { const g = ins[4 + (j >> 4)]; g[(j & 15) * 2] = sl(feeds[2 * j]); g[(j & 15) * 2 + 1] = sl(feeds[2 * j + 1]); }

@@ -149,7 +149,7 @@ bool ChainsHost::event(const SeqEvent& e) {
   if (!ev_) { st_.droppedEvents++; return false; }   // not valid(): nothing can be queued
   Ev v; v.track = 0; v.p = 0; v.v = e.v; v.tks = e.tks;
   if (e.type == SEV_CHC) {
-    if (!(e.t == e.t) || e.track < 0 || e.track >= kSongNT || e.p < 1 || e.p > chains::kBypSwitches || !std::isfinite(e.v)) { st_.badEvents++; return false; }
+    if (!(e.t == e.t) || e.track < 0 || e.track >= kSongNT || e.p < 1 || e.p > chains::kBypSwitches + chains::kKnobs || !std::isfinite(e.v)) { st_.badEvents++; return false; }
     if (!node_[e.track]) { st_.chcNoNode++; return false; }   // no node for the track: nothing to switch (and nothing queued: the queue is for events that will be applied)
     v.type = SEV_CHC; v.track = (int8_t)e.track; v.p = (int8_t)e.p; v.due = chcDue(e.t);
   } else if (e.type == SEV_TEMPO) {

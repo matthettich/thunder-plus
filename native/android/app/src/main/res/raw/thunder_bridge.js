@@ -89,4 +89,6 @@
     }
   };
   window.thunderCore = tc;
+  /* Hello fixes (26 Nov): the 'message' listener above is registered; now ask the shell for the port at once (it would otherwise wait for onPageFinished) */
+  try { if (window.thunderPortAsk) window.thunderPortAsk.postMessage('port'); } catch (e) {}
 })();

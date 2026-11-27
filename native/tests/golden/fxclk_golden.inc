@@ -20,12 +20,20 @@ static const FxClkGolden kFxClkGolden[] = {
   {"flex_sweep5", 0xeef5f296b94359a1ull, 2457600},
   {"flex_sweep6", 0x6647e5eab6cd81e2ull, 2457600},
   {"flex_sweep7", 0xbd5c253198b8fe48ull, 2419200},
+  {"flex_sweep8", 0x1307ae1a7410d8daull, 2457600},
+  {"flex_sweep9", 0x37b92cbdfd99748full, 2457600},
+  {"flex_sweep10", 0xa2defdd4eb2630aaull, 2457600},
+  {"flex_sweep11", 0xeed7661550e44ecdull, 2419200},
   {"flex_bars_chaos", 0x786e6bd99b938997ull, 768000},
   {"flex_bars_mut", 0x0d79a48dc084095full, 768000},
   {"flex_bars_prob", 0x31ce3855875264daull, 768000},
   {"flex_bars_chaos2", 0xcd5374e84d8cdc49ull, 768000},
   {"flex_bars_grain", 0xf33d02d38ea539f1ull, 768000},
   {"flex_bars_tex", 0xad615a4a00fea88bull, 768000},
+  {"flex_bars_flz_stutter", 0x9771b2746c6b3512ull, 768000},
+  {"flex_bars_flz_juggle", 0xa93fbe9e6e756d98ull, 768000},
+  {"flex_bars_flz_echo3", 0xd13269f1fbf844aaull, 768000},
+  {"flex_bars_flz_chaos", 0x5dcbaa557ee16ac6ull, 768000},
   {"flex_tempo", 0x0475f4617ef1e9beull, 480000},
   {"flex_tempo_scr", 0xeba49faf069cf9a0ull, 384000},
   {"flex_stop", 0x13e04d3967d0d8e8ull, 300000},
@@ -76,4 +84,4 @@ static const FxClkGolden kFxClkGolden[] = {
   {"sleep_sgate_off", 0x5f5843c8a4a95e37ull, 1728000},
   {"sleep_rest", 0x631be6215e72e246ull, 192000},
 };
-static const int kFxClkGoldenN = 73;
+static const int kFxClkGoldenN = 81;

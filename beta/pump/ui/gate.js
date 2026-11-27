@@ -1,4 +1,4 @@
-/* …pump GATE pop-up (31 Oct 2026): plugins/gate/UIGate.cpp in the browser. The step grid is the main screen: one bar
+/* pump GATE pop-up (31 Oct 2026): plugins/gate/UIGate.cpp in the browser. The step grid is the main screen: one bar
    per step (height = level, slots as wide as their swung duration), the current step lit, beat and bar lines, the
    gate's envelope over the bars (left in ink, the offset right channel in the second colour), the playhead, and under
    the bars the output's level along the last cycle. Click a step = on / off, drag up / down = its level, drag across
