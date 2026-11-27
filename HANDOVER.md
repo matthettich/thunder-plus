@@ -543,6 +543,27 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### Pump code sent to the track-FX worklet over the port is lost in Chrome 153 (found 26 Nov, not fixed)
+
+Owner, 26 Nov: fix this in a new chat. Found while fixing the same bug in ...Spores (its Coil / Orbit / Fold / Boing were
+silent live; fixed there by sending the wasm bytes and compiling them in the worklet).
+- **The bug:** in Chrome 153, a compiled `WebAssembly.Module` sent with `node.port.postMessage` to an AudioWorklet never
+  arrives: the processor gets a `messageerror` instead, live and offline (checked with a minimal test page). A Module
+  passed in `processorOptions` at node creation still works, and posting one to a dedicated Worker works too, so most of
+  Thunder Plus is fine.
+- **Affected here (beta as of build 688):** `index.html` ~21920 `if (d.needPump){ … n.port.postMessage(pumpModOpt() ?
+  {pumpModule: pumpModOpt()} : {pumpBytes: pumpBin()}) … }` (a track-FX node asking for pump code after it was created),
+  and ~19113 `for (const n of pumpWait) … n.port.postMessage(pumpWasmMod ? {pumpModule: pumpWasmMod} : {pumpBytes: b})`
+  (nodes that were waiting for the wasm to load). With `WASM_PRECOMPILE = true` both send the Module, so those nodes never
+  get the pump code: a pump effect in a track's FX chain most likely passes dry or stays silent. Not yet heard in the app.
+- **Fix:** on the port, always send `{pumpBytes: …}` (the worklet's handler ~21100, `e.data.pumpBytes`, already compiles
+  them); keep Modules only in `processorOptions`. Grep for any other `port.postMessage` carrying a Module (tfx, pump-synth,
+  waves `dspModule` / `tfxModule`) and treat them the same.
+- **Test:** add a pump effect to a track's FX chain after the track exists, play live, check its slot level / output is
+  wet, and the same in a render; a check like ...Spores' `tests/live-sounds-check.mjs` (every engine played live, peak at
+  the output) would catch this class of bug.
+
+
 ### Time stretch: what is left (20 Nov; design `docs/STRETCH-DESIGN.md` on branch `beta-stretch-design`)
 
 Owner, 19 Nov: a synced stretch like Ableton's, pitch to fit, an "oldschool" ramp stretch, and many algorithms are fine. Steps 1 and 2 are built (PRs into `beta`, builds 659 and 660); the numbers are the design's section 10.
