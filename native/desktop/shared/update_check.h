@@ -2,8 +2,9 @@
 // native shells read the same feed and, when a newer version is out, fill the page's existing "update available" path: `thunder:upd-state` / the `thunder:upd` push carry `{version, avail, ready:false,
 // notifyOnly:true, dl:null, file:null}`, the page shows its Update button and toast, and Update (`thunder:upd-act`) opens the release page in the browser (the Mac / portable rule of Electron minus the
 // download: a silent install of an unsigned build is not offered).
-// WHAT IS OFFERED: a release that is not a draft, not a pre-release, and whose tag is v<digits>(.<digits>)* (so the rolling `android-beta-test` pre-release, and any other tag, can never be offered); the
-// highest version among those. Pure logic here (tested on Linux); the HTTPS GET, the browser and the message box come from IPlatform.
+// WHAT IS OFFERED: a release that is not a draft, not a pre-release, whose tag is v<digits>(.<digits>)* (so the rolling `android-beta-test` pre-release, and any other tag, can never be offered), AND that carries a
+// NATIVE desktop asset for this platform, named `Thunder-Plus-native-<version>-<platform>` (<version> = the tag without the v; <platform> = mac-universal.zip / win-x64.zip, kNativeAssetSuffix). Electron releases
+// (.dmg / Setup .exe / portable) have no such asset and are ignored until the first native release exists. The highest version among the eligible ones. Pure logic here (tested on Linux); the HTTPS GET, the browser and the message box come from IPlatform.
 #ifndef TPD_UPDATE_CHECK_H
 #define TPD_UPDATE_CHECK_H
 
@@ -22,9 +23,18 @@ bool versionNewer(const std::string& a, const std::string& b);
 // v<digit>(.<digit>)*, nothing else (no suffix): "v1.3.15" yes; "android-beta-test", "v1.4.0-rc1", "1.3.15", "v" no.
 bool tagIsVersion(const std::string& tag);
 
+constexpr const char* kNativeAssetPrefix = "Thunder-Plus-native-";   // the ONE place the asset name pattern is defined: <prefix><version>-<suffix>
+#if defined(_WIN32)
+constexpr const char* kNativeAssetSuffix = "win-x64.zip";
+#elif defined(__APPLE__)
+constexpr const char* kNativeAssetSuffix = "mac-universal.zip";
+#else
+constexpr const char* kNativeAssetSuffix = "linux-x64.zip";   // no native Linux shell: only the tests use this
+#endif
+
 struct ReleaseInfo { bool found = false; std::string version, tag, url; };   // version without the v; url = the release page (https://github.com/matthettich/thunder-plus/...), or kReleasesPage
 // The newest eligible release in the feed's JSON (an array of releases; one release object is accepted too).
-ReleaseInfo newestRelease(const std::string& json);
+ReleaseInfo newestRelease(const std::string& json, const std::string& assetSuffix = kNativeAssetSuffix);
 
 class UpdateChecker {
  public:

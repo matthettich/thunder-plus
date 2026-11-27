@@ -40,11 +40,19 @@ jobs:
           if (-not (Test-Path "$dir\build\native\include\WebView2.h")) { throw "WebView2.h not found in $dir" }
           "WEBVIEW2_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
           Get-ChildItem "$dir\build\native\x64"
+      # W-TFX fallback (a): the WebView2 headers do not compile under clang-cl, so the shell stays on cl.exe; the effects libraries (tfx / pe / mods, which cl.exe cannot compile) are built first
+      # by clang-cl (the VS ClangCL toolset) and linked as prebuilt static libraries (same /MD CRT and MSVC STL, Release, no /GL on either side). Docs: docs/port/W-TFX-NOTES.md.
+      - name: Effects libraries with clang-cl (tfx, pe, mods)
+        shell: pwsh
+        run: |
+          cmake -S native -B build-clang -A x64 -T ClangCL -DTHUNDER_BUILD_TESTS=OFF
+          cmake --build build-clang --config Release -j 4 --target thunder_dsp_tfx thunder_dsp_pe thunder_dsp_mods
+          Get-ChildItem build-clang\core\dsp\Release\*.lib | Format-Table Name, Length
       - name: Configure
         shell: pwsh
-        run: cmake -S native -B build -A x64 -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_WEBVIEW2_DIR=$env:WEBVIEW2_DIR" "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}"
+        run: cmake -S native -B build -A x64 -DCMAKE_CONFIGURATION_TYPES=Release -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_DSP_PREBUILT_DIR=$PWD\build-clang\core\dsp\Release" "-DTHUNDER_WEBVIEW2_DIR=$env:WEBVIEW2_DIR" "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}"
       - name: Build the shell and the library tests
-        run: cmake --build build --config Release -j 3 --target thunder_desktop_win test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session test_desktop_launch_args test_desktop_update_check
+        run: cmake --build build --config Release -j 3 --target thunder_desktop_win test_desktop_tfx test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session test_desktop_launch_args test_desktop_update_check
       - name: Library tests
         run: ctest --test-dir build -C Release --output-on-failure -R desktop_
       - name: Shell selftest (every channel answers; null audio device)
@@ -140,7 +148,7 @@ jobs:
       - name: Configure
         run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DTHUNDER_BUILD_TESTS=OFF -DTHUNDER_BUILD_DESKTOP_TESTS=ON -DTHUNDER_DESKTOP_SHELL=ON "-DTHUNDER_APP_VERSION=0.0.0-native.${{ github.run_number }}"
       - name: Build the shell and the library tests
-        run: cmake --build build -j3 --target ThunderPlus test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session test_desktop_midi_manager test_desktop_launch_args test_desktop_update_check
+        run: cmake --build build -j3 --target ThunderPlus test_desktop_app_scheme test_desktop_translator test_desktop_put_store test_desktop_desktop_api test_desktop_live_host test_desktop_session test_desktop_shell_core test_desktop_audio_devices test_desktop_midi_registry test_desktop_input_capture test_desktop_audio_session test_desktop_tfx test_desktop_midi_manager test_desktop_launch_args test_desktop_update_check
       - name: Library tests
         run: ctest --test-dir build --output-on-failure -R desktop_
       - name: "Sign: hardened runtime + entitlements, ad hoc (no Developer ID yet: mac/sign.sh with an identity does the real one)"

@@ -41,7 +41,7 @@ bool tagIsVersion(const std::string& t) {
   return true;
 }
 
-ReleaseInfo newestRelease(const std::string& json) {
+ReleaseInfo newestRelease(const std::string& json, const std::string& assetSuffix) {
   ReleaseInfo best;
   thunder::JsonDoc d; if (!d.parse(json)) return best;
   const thunder::Json root = d.root();
@@ -50,6 +50,10 @@ ReleaseInfo newestRelease(const std::string& json) {
     const std::string tag(r.str("tag_name"));
     if (!tagIsVersion(tag)) return;
     const std::string ver = tag.substr(1);
+    const std::string want = std::string(kNativeAssetPrefix) + ver + "-" + assetSuffix;   // a native desktop build for this platform must be attached
+    bool has = false; const thunder::Json as = r.arr("assets");
+    for (size_t i = 0; i < as.size(); i++) if (as.at(i).isObj() && as.at(i).str("name") == want) has = true;
+    if (!has) return;
     if (best.found && !versionNewer(ver, best.version)) return;
     best.found = true; best.tag = tag; best.version = ver;
     const std::string url(r.str("html_url"));

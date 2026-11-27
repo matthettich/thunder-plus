@@ -60,6 +60,11 @@ size_t ndiff(const std::vector<float>& a, const std::vector<float>& b) {
 }  // namespace
 
 int main() {
+#ifdef THUNDER_HAVE_TFX
+  std::printf("TFX: yes\n");   // W-TFX: CI greps this line for the Windows clang-cl job (no effects library = the plans below are not made)
+#else
+  std::printf("TFX: no\n");
+#endif
   const uint32_t C = THUNDER_LIVE_MK_CHLVL;
   {   // ---- (1) the call ----
     Host N(opts(THUNDER_LIVE_F_CHAINS, 4096)); thunder_live_meters_spec s = spec(C, 1);

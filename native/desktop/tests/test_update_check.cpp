@@ -9,8 +9,13 @@
 #include "update_check.h"
 using namespace tpd;
 
-static std::string rel(const char* tag, bool pre = false, bool draft = false, const char* url = nullptr) {
-  return std::string("{\"tag_name\":\"") + tag + "\",\"prerelease\":" + (pre ? "true" : "false") + ",\"draft\":" + (draft ? "true" : "false") +
+static std::string rel(const char* tag, bool pre = false, bool draft = false, const char* url = nullptr, bool native = true, bool electron = true) {
+  const std::string ver = std::string(tag).substr(1 < std::string(tag).size() ? 1 : 0), nat = std::string(kNativeAssetPrefix) + ver + "-" + kNativeAssetSuffix;
+  std::string assets = "[";
+  if (electron) assets += "{\"name\":\"Thunder-Plus-" + ver + "-portable.exe\"},{\"name\":\"Thunder-Plus-" + ver + ".dmg\"}";
+  if (native) assets += std::string(electron ? "," : "") + "{\"name\":\"" + nat + "\"}";
+  assets += "]";
+  return std::string("{\"tag_name\":\"") + tag + "\",\"assets\":" + assets + ",\"prerelease\":" + (pre ? "true" : "false") + ",\"draft\":" + (draft ? "true" : "false") +
          ",\"html_url\":\"" + (url ? url : (std::string("https://github.com/matthettich/thunder-plus/releases/tag/") + tag).c_str()) + "\"}";
 }
 struct Plat : IPlatform {
@@ -39,6 +44,13 @@ int main() {
     ReleaseInfo r = newestRelease(f); CHECK(r.found && r.version == "1.3.15" && r.tag == "v1.3.15" && r.url.find("/releases/tag/v1.3.15") != std::string::npos, "the newest NON-pre-release, NON-draft v-tag wins (got %s)", r.version.c_str()); }
   { ReleaseInfo r = newestRelease("[" + rel("android-beta-test", true) + "," + rel("android-beta-test", false) + "]"); CHECK(!r.found, "the rolling android-beta-test release is never offered, pre-release flag or not"); }
   { ReleaseInfo r = newestRelease("[" + rel("v1.3.15", false, false, "https://evil.example/x") + "]"); CHECK(r.found && r.url == kReleasesPage, "a release URL outside the repo is replaced by the releases page"); }
+  // NATIVE assets only: Electron releases are ignored until the first native release exists
+  { const std::string f = "[" + rel("v1.3.15", false, false, nullptr, false, true) + "," + rel("v1.3.14", false, false, nullptr, false, true) + "]";
+    CHECK(!newestRelease(f).found, "a list with only Electron assets offers nothing");
+    const std::string g = "[" + rel("v1.3.15", false, false, nullptr, false, true) + "," + rel("v1.4.0", false, false, nullptr, true, false) + "]";
+    ReleaseInfo r = newestRelease(g); CHECK(r.found && r.version == "1.4.0", "a release with a native asset of a higher version is offered (got %s)", r.version.c_str());
+    ReleaseInfo o = newestRelease(g, "other-platform.zip"); CHECK(!o.found, "a native asset for another platform does not count");
+    CHECK(!newestRelease("[{\"tag_name\":\"v2.0.0\",\"assets\":[{\"name\":\"Thunder-Plus-native-2.0.1-" + std::string(kNativeAssetSuffix) + "\"}]}]").found, "a native asset of another version than the tag does not count"); }
   CHECK(!newestRelease("").found && !newestRelease("not json").found && !newestRelease("[]").found && !newestRelease("{\"message\":\"rate limited\"}").found && !newestRelease("[1,null,\"x\"]").found, "garbage and empty feeds offer nothing");
   CHECK(newestRelease(rel("v9.0.0")).found, "a single release object is accepted");
 
