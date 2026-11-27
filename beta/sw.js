@@ -1,6 +1,6 @@
 // ...Thunder Plus offline support. The app page is fetched fresh when online (so updates show up)
 // and served from the cache when offline.
-const CACHE = 'thunderbeta-v689';
+const CACHE = 'thunderbeta-v694';
 const FILES = ['./', './index.html', './manifest.webmanifest?v=9', './master-worklet.js?v=8', './pump/pump-meta.js?v=7', './pump/pump.wasm?v=9', './pump/synth/pump-synth-meta.js?v=6', './pump/synth/pump-synth-engine.js?v=10', './pump/synth/pump-synth-worklet.js?v=14', './pump/synth/pump-synth.wasm?v=9', './pump/ui/kit.js?v=10', './pump/ui/eq.js?v=2', './pump/ui/comp.js?v=1', './pump/ui/limit.js?v=1', './pump/ui/meter.js?v=1', './pump/ui/multiband.js?v=1', './pump/ui/calm.js?v=1', './pump/ui/tone.js?v=1', './pump/ui/band.js?v=1', './pump/ui/wide.js?v=1', './pump/ui/heat.js?v=1', './pump/ui/master.js?v=3', './pump/ui/gate.js?v=1', './pump/ui/tune.js?v=2', './pump/ui/chop.js?v=1', '../sounds/ELECTRO.thunder?v=2', '../sounds/BETA-TESTING-ELECTRO.thunder?v=1', './icons/plus-icon-192.png?v=3', './icons/plus-icon-512.png?v=3', './icons/plus-icon-maskable-512.png?v=2', './icons/plus-apple-touch-icon.png?v=2',
   './fonts/Jost-400.woff', './fonts/Jost-500.woff', './fonts/Jost-600.woff', './fonts/Jost-700.woff', './fonts/JetBrainsMono-400.woff2', './fonts/JetBrainsMono-700.woff2', './fonts/ShareTechMono-400.woff',
   './waves/index.html', './waves/waves-worklet.js?v=50', './waves/dsp/thunder-dsp.wasm', './waves/dsp/tfx.wasm', './waves/fonts/Jost-400.woff', './waves/fonts/Jost-500.woff', './waves/fonts/Jost-600.woff', './waves/fonts/Jost-700.woff',
@@ -10,7 +10,10 @@ const FILES = ['./', './index.html', './manifest.webmanifest?v=9', './master-wor
 const OPTIONAL = ['./lxr/lxr-engine.js?v=2', './lxr/lxr.wasm?v=1', './thunder-core-client.js?v=9'];
 // cache:'reload': a new cache fills from the server, not from the HTTP cache (GitHub Pages serves 10-minute max-age), so a
 // rebuilt wasm or worklet can't be precached stale next to a new page.
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, {cache:'reload'})))
+// ONE FILE AT A TIME (review P1-3): addAll failed the whole install on one 404 or blip, so the old worker stayed on forever. A
+// file that fails is taken from the previous cache when it has the same URL (activate deletes that cache), and logged.
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => Promise.all(FILES.map(f => c.add(new Request(f, {cache:'reload'}))
+  .catch(err => caches.match(f).then(old => { if (old) return c.put(f, old); console.warn('[sw] could not precache ' + f, err); }))))
   .then(() => Promise.all(OPTIONAL.map(f => c.add(new Request(f, {cache:'reload'})).catch(() => {})))))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k.startsWith('thunderbeta-')).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
@@ -43,7 +46,7 @@ self.addEventListener('fetch', e => {
   if (isPage){
     // no-cache: always ask the server (a quick check when nothing changed), so a reload never shows an old copy.
     e.respondWith(fetch(req.url, {cache:'no-cache', credentials:'same-origin'}).then(res => { if (res.ok){ const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return res; })
-      .catch(() => caches.match(req)));
+      .catch(() => caches.match(req).then(hit => hit || caches.match(req, {ignoreSearch:true}))));   // (review P3-7: offline, ./?shared=1 is the precached ./)
     return;
   }
   // Everything else (icons, fonts): cache first, then the network.
