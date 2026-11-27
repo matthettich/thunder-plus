@@ -374,6 +374,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.18** (27 Nov 2026, a regular release; owner, 27 Nov 11:11: "Push to main and desktop"; PR #355 beta → main at build 699 (merge commit e29273a), Run workflow through the API from `main`, run 46047667178, all three platforms and 11 assets, the latest release): build 699, tempo-synced envelopes follow the song's tempo.
 - **v1.3.17** (27 Nov 2026, a regular release; owner, 27 Nov 10:01: "You can push to main and build a new desktop once you're done"; PR #354 beta → main at build 698 (merge commit da4d373), Run workflow through the API from `main`, run 46043714322, all three platforms and 11 assets, the latest release (checked 27 Nov)): the 27 Nov code review, builds 690–698 (see its entry under To-do).
 - **v1.3.16** (26 Nov 2026, a regular release; owner, 26 Nov 19:04: "Go ahead" (merge and build); PR #347 into `beta`, PR #348 beta → main at build 686 (merge commit 045d654), Run workflow through the API from `main`, run 45926543825, 11 assets, the latest release): build 686 (silent effect pick-up, own-Track-In bus toast, stronger in-use outline + tint, Pad preset ◀ ▶, CLN↓ during playback fix) and 685 (PC7).
 - **v1.3.15** (26 Nov 2026, a regular release; owner, 26 Nov 10:13: "Make a build please"; PR #341 beta → main at build 684 (merge commit bf02525), Run workflow through the API from `main`, run 45865888087, all three platforms (Mac, Windows, Linux) and 11 assets, the latest release (checked 26 Nov 10:25)): build 684 (the Electron file-access fix S-1: file channels only touch dialog-picked / opened / dropped paths or the last 64 kept in userData; recent projects from before 684 need one Open each) and 681–683 (native-engine client, inert with the switch off). Next is 1.3.16.
@@ -543,6 +544,17 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
    follows Ableton's guidelines (the name in full, Enabled / Disabled).
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
+
+### 27 Nov review, second pass: every finding re-verified on `beta`; build 700 closes P3-5
+
+Owner, 27 Nov: verify the review's findings and fix what is valid. Re-checked each package's fix on `beta` at `ea1fa86` (not from the notes above):
+- **Acceptance tests run:** `node --test` on updater-version, updater, backup-refs, precache, silent-catch, undo-budget, hidden-timers, startup-song, io, app-logic, core, fx-cores → 108 pass, 1 skip, 0 fail. `npm run lint` → 0 errors.
+- **The gates catch what they claim:** a wrong `?v=` in `index.html` (waves-worklet 50→51, eq 2→99) makes `tools/precache-check.mjs` exit 1; a misspelled `backupNow` makes `npm run lint` exit 1.
+- **P2-7 dismissal confirmed:** full `npm test` exits 0 in 5 min 1 s on 2 vCPU (2084 tests, 2027 pass, 0 fail, 57 skipped).
+- **P1-1 de-dup note (`told` keyed by raw string):** not a live bug: both paths into `announce()` pass a bare `1.3.17` (the GitHub path strips `v`, electron-updater's `info.version` has none). Left as is.
+- **Fixed, build 700 · P3-5:** the CHAINS and WAVES pages' own `icons/icon-192.png` **and `manifest.webmanifest`** (the review missed the manifests) were not precached; added to `sw.js` `OPTIONAL` (fault-tolerant), `CACHE` v700. `tools/precache-check.mjs` now also fails on any unversioned local `<link href>` / `<script src>` a page loads that `sw.js` does not precache (on the old `sw.js` it reports all four; now clean).
+- **Still dismissed (agree with the first pass):** P2-4's 60 s trim and 3-min backup timers; P3-6 (the activate step deletes old `thunderplus-` caches, so the runtime cache is bounded per build); P3-2/P3-3/P3-4 need the owner (CSP, `?seqtest` in packaged builds, a GENERATED banner + `.coderabbit.yaml`, which the fix prompt says to ask about first).
+- **Checks after build 700:** `precache-check` ok, `npm run lint` 0 errors, `tools/browser-check.mjs` exit 0, `tools/recorder-check.mjs` exit 0 (Chrome + playwright), full `npm test` 2084 tests, 2027 pass, 0 fail, 57 skipped, exit 0.
 
 ### 27 Nov code review implemented: builds 690–698 (`docs/audits/2026-11-27-code-review.md`, §8 packages 1–11)
 
@@ -958,6 +970,7 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 - [ ] **Phone or computer: a song at a tempo other than 120 (or other than 4 lines a beat) with a pad whose envelope is set in lines.** Pass: the envelope's length matches the song (e.g. 4 lines lasts 4 rows); the envelope editor's ms value matches that tempo; changing the tempo re-renders the pad within a moment of the change.
 
 **27 Nov review fixes (builds 690–698, desktop v1.3.17)**
+- [ ] **Phone: after build 700, open CHAINS or WAVES once online, then offline (airplane mode) open it again.** Pass: the page opens with its own icon (no broken icon) and can still be added to the home screen.
 - [ ] **Phone and computer: record or load a long sample, keep working past two backups (3 min each), then File → Restore a backup.** Pass: the backup opens with the sample's audio; Settings › App storage is not growing by the sample's size every 3 minutes.
 - [ ] **Desktop app (Mac): if the input helper ever says it stopped, press Settings › Audio › Reset audio engine.** Pass: native inputs / MIDI come back without quitting the app.
 - [ ] **Phone: open the app once online after this build, then offline (airplane mode) open a shared-project link or the app.** Pass: the app opens, not an error page.
