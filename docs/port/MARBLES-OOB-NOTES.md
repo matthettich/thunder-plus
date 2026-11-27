@@ -35,6 +35,10 @@ Reachable from a real patch? Only with a very fast clock into Marbles `clock` (a
 the ramp step exceeds roughly 0.004 per sample: index below -1 needs phase < -1/256). Musical clocks (a few Hz to tens of Hz) cannot. Not reachable
 through the parameter ranges (all clamped); only through the clock signal. The harness's noise clock is the unusual input.
 
+## Status
+Fix (a) applied to native/core/third_party/prepare.sh (lead approved). modfx / waves / chains / chains_alloc output before and after is identical (every dB figure and count, e.g. marbles_stress -144.5 dB, 380 of 50176 samples differ).
+WEB-MARBLES: the same clamp in dsp/mods/build.sh + rebuild mods.wasm, by PR into beta; until then web and native differ only when Marbles' clock input is driven at audio rate (the web reads 10.0 from the neighbouring table: a loud wrong value).
+
 ## 5. Fix (recommended: a, prepare.sh)
 One extra clause in the existing patch (also covers NaN, which fails `phase > 0`; `phase >= 1` was already handled). Tested in the scratch build:
 rt_harness passes under ASan+UBSan. Phases in 0..1 are untouched, so goldens do not move; only out-of-range phases change (from garbage reads to
