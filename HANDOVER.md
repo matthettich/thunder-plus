@@ -976,6 +976,9 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
+**Song sections (27 Nov; build 702)**
+- [ ] **Computer and phone (Fold open), Arrange beside Song: add three sections with the + (put the cursor inside VERSE and press +), then scroll Arrange with a trackpad / finger, slowly and fast.** Pass: each name box stays on its rows the whole time, and a new section can be started inside an existing one. If a box still drifts, say which device and how you scrolled: in headless Chrome (desktop and Fold widths) the old code stayed aligned too, so that report is not reproduced yet.
+
 **Tempo-synced envelopes follow the song (27 Nov; build 699 — changes how existing songs sound)**
 - [ ] **Phone or computer: a song at a tempo other than 120 (or other than 4 lines a beat) with a pad whose envelope is set in lines.** Pass: the envelope's length matches the song (e.g. 4 lines lasts 4 rows); the envelope editor's ms value matches that tempo; changing the tempo re-renders the pad within a moment of the change.
 
