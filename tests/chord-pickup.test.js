@@ -87,8 +87,8 @@ test('a bus or the master takes no chord (a bus refuses notes before this is rea
   const B = rig({ bus: true }); B.c.setChord(P.c.getChord()); B.c.last.note = 48; B.drop(0, 7); assert.equal(B.row(7)[1], -1); assert.match(B.log.toast.at(-1), /^Dropped a note/);
 });
 test('effect and volume columns pick up as before, and leave a chord current', () => {
-  const R = rig(); chordRow(R.row(2)); R.row(2)[FX0] = 1; R.row(2)[FX0 + 1] = 0x20; R.pick(0, 2); const ch = R.c.getChord(); R.pick(FX0, 2);
-  assert.match(R.log.toast.at(-1), /^Picked up: .*effect VOL 20/); assert.equal(R.c.getChord(), ch);
+  const R = rig(); chordRow(R.row(2)); R.row(2)[FX0] = 1; R.row(2)[FX0 + 1] = 0x20; R.pick(0, 2); const ch = R.c.getChord(), n = R.log.toast.length; R.pick(FX0, 2);
+  assert.equal(R.c.last.fxc, 1); assert.equal(R.c.last.fxv, 0x20); assert.equal(R.log.toast.length, n, 'build 686: an effect pick-up is silent: ' + R.log.toast.at(-1)); assert.equal(R.c.getChord(), ch);
 });
 test('EDIT+arrows on an empty note cell (bump) does not drop the chord: insertAt only drops it for Enter / EDIT', () => {
   const R = rig(); chordRow(R.row(2)); R.pick(0, 2); R.c.insertAt(0, 12, 'note'); assert.deepEqual([...R.row(12).slice(0, 3)], [52 - 4, -1, -1].map((v, i) => i ? v : R.c.last.note));
