@@ -7,7 +7,7 @@ const src = H.read('index.html');
 function cut(re, what){ const m = src.match(re); assert.ok(m, `index.html: could not find ${what}; the code moved, so this test needs updating`); return m[0]; }
 function ctxOf(){
   const lfo = cut(/function lfoAt\(sh, ph, cyc\)\{[\s\S]*?\n\}\n/, 'lfoAt');
-  const rates = cut(/var PLFO_MAX = 4, PLFO_RATES = [^\n]*\n/, 'PLFO_RATES');
+  const rates = cut(/^var PERF_SCENES = [^\n]*PLFO_RATES = [^\n]*\n/m, 'PLFO_RATES (set once, above the saved-song load: build 698)');
   const pure = cut(/var MS_CYC = 2[^\n]*\n[^\n]*function modWin[^\n]*\nfunction modMix[^\n]*\nfunction modScKey[^\n]*\n/, 'the scope maths');
   const c = vm.createContext({ Math, clamp: (v, a, b) => Math.min(b, Math.max(a, v)) });
   vm.runInContext(rates + 'var PLFO_SHAPES = ["Sine","Triangle","Saw up","Saw down","Square","Random"];\n' + lfo + pure, c); return c;

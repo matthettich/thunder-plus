@@ -9,7 +9,8 @@ const src = H.read('index.html');
 function cut(re, what){ const m = src.match(re); assert.ok(m, `index.html: could not find ${what}; the code moved or changed shape, so this test needs updating`); return m[0]; }
 
 function perfCtx(){
-  const blk = cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block');
+  const blk = cut(/^var PERF_SCENES = [^\n]*PLFO_SHAPES = [^\n]*\n/m, 'the PERFORM sizes, set once above the saved-song load (build 698)')   // the page sets them there, before PERFORM runs
+    + cut(/\/\* ===== PERFORM \(owner, 1 Nov[\s\S]*?\n(?=function makeSeq\(S, mode, o\)\{)/, 'the PERFORM block');
   const NT = 4, MT = 4;
   const c = vm.createContext({ Math, JSON, Object, Array, Map, Set, String, Number, isNaN, NT, MT,
     clamp: (v, a, b) => Math.min(b, Math.max(a, v)), int: (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d,

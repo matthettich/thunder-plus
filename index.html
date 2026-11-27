@@ -22327,7 +22327,7 @@ function demoSong(){
   for (let i = 0; i < 3; i++){ S.chains[i] = freshSect(); S.chains[i][0][0] = i; S.song[0][i] = i; }
   return S;
 }
-// PERFORM's sizes and LFO lists, set early (PERFORM below sets the same again): the saved song is read just below, before the
+// PERFORM's sizes and LFO lists, set early and only here (the PERFORM block below uses them): the saved song is read just below, before the
 // PERFORM block runs, and normSong saw them undefined then: scenes A / B came back empty, parts shrank to one, and a song with
 // a track LFO threw (PLFO_SHAPES.length), so the app opened the starter beat instead and autosaved it over the song.
 var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
@@ -22761,10 +22761,9 @@ const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wid
      lk  {track: [id, id, id, id]}: what LK1–LK4 on that track's rows set
      lfo {track: [{id, sh, rt, dp}, … up to PLFO_MAX]}: a track's LFOs (shape, rate as an index of PLFO_RATES in beats a cycle, depth)
    S.parts (saved in the song): 16 parts {n, insts, mix:[[vol, pan]…], fx:{'t:s':{k:v}}}: a sound setup PRT switches to. */
-// (var and function: normSong reads the saved song at start-up, before this line runs; the vars are also set before that: FIRST RUN)
-var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16;
-var PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
-var PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
+// (PERF_SCENES, PERF_MACROS, PERF_PARTS, PLFO_MAX, PLFO_RATES, PLFO_SHAPES are set once, above the saved-song load, where normSong
+// needs them at start-up: search "PERFORM's sizes". They were set here a second time until build 698; review P2-5.)
+var PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
 function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|tch|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$|^kn:\d+:[1-8]$/.test(id); }   // kn:t:k (22 Nov): knob K1–K8 of track t's patch
@@ -27579,7 +27578,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 697;
+const BUILD = 698;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38077,6 +38076,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],
   [697, '27 Nov', ['Behind the scenes: every change to the app is now checked for misspelled names and similar slips before it ships.']],
   [696, '27 Nov', ['Behind the scenes: with the app hidden and stopped, two timers that ran 10 and 20 times a second now sleep (better for the battery). Playing with the screen off is unchanged.']],
   [695, '27 Nov', ['Behind the scenes: undo still keeps 200 steps, but on a very large song it now drops the oldest ones once they add up to about 32 MB, so a long session can’t run the phone out of memory.']],
