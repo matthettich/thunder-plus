@@ -448,6 +448,7 @@ body:not(.nowv) .wvMobNote{display:none}
 .row output:hover{background:var(--panel2)}
 /* typed value box: double-click or double-tap a row's value; inherits the app's skin */
 .vtype{font:inherit; color:var(--ink); background:var(--inv); border:1px solid var(--line); width:11ch; padding:0 3px; text-align:right}
+.btnrow:has(> #appOpened){display:none}   /* (owner, 27 Nov) "Song at start" is no longer shown; the text is still set, for the playback report and tests */
 .segrow{display:flex; align-items:center; gap:6px; min-height:34px; font-size:var(--fs-3)}
 .segrow>span{color:var(--muted); width:70px; flex:none}
 /* AUDIO & MIDI tidy (menu audit, 2 Nov): labels on one line, Test sound beside Output, Reset as a small button whose note is
@@ -1067,7 +1068,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .mfbar.mobar::before{left:-6px; right:-6px; top:0; bottom:0}
 @media (pointer:coarse){ .mfbar.mobar::before{left:-19px; right:-19px} }
 /* the TRIM row's light: what the track sends in runs hot (above −6 dB) or near full scale (above −1 dB) */
-.tscr .trm.ih{box-shadow:inset 0 -3px var(--ts-hot)} .tscr .trm.ic{box-shadow:inset 0 -3px var(--ts-clip)}
+.tscr .trm.tlh{box-shadow:inset 0 -3px var(--ts-hot)} .tscr .trm.tlc{box-shadow:inset 0 -3px var(--ts-clip)}   /* (not .ih / .ic: .ic is the icon class, its size and baseline made the TRIM number jump when it lit; owner, 27 Nov) */
 .tscr .m1{color:var(--ts-ok)} .tscr .m2{color:var(--ts-hot)} .tscr .m3{color:var(--ts-clip)}
 .tscr .pl{background:var(--ts-pl-bg); color:var(--ts-pl)}
 .tscr .sel{background:var(--ts-sel)}
@@ -3334,7 +3335,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="note" id="coreWhy" hidden style="font-size:11px;word-break:break-word;margin:0 0 6px"></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your project is kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
-      <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span>RUNAWAY KICK (TEST)</span><div class="seg" id="segRk"></div></div>
+      <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span style="line-height:1.15">Runaway<br>kick (test)</span><div class="seg" id="segRk"></div></div>
       <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched. If the engine is stuck or the output is very late, it offers to reload the app (your project is saved first).">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play, Low power display and Meters. Projects, kits and your MIDI setup are kept.">Reset audio settings</button></div>
     </div>
   </section>
@@ -18651,7 +18652,7 @@ function lkUi(){
 let updLink = null, updLinkSync = null;
 if (LINKAPI && $('segLink')){
   updLink = makeSeg($('segLink'), [[false, 'Off'], [true, 'On']], () => !!aset.link, v => { aset.link = !!v; asetSave(); lkEnable(aset.link); });
-  updLinkSync = makeSeg($('segLinkSync'), [[true, 'On'], [false, 'Off']], () => aset.linkSync !== false, v => { aset.linkSync = !!v; asetSave(); if (LINKAPI.available) lkCall('sync', () => LINKAPI.sync(!!v)); });
+  updLinkSync = makeSeg($('segLinkSync'), [[false, 'Off'], [true, 'On']], () => aset.linkSync !== false, v => { aset.linkSync = !!v; asetSave(); if (LINKAPI.available) lkCall('sync', () => LINKAPI.sync(!!v)); });
   if (LINKAPI.available){ LINKAPI.onState(lkState); LINKAPI.onTime(lkTime); }
   lkUi();
   setTimeout(() => { if (aset.link && LINKAPI.available) lkEnable(true); }, 0);   // after the song (S) is loaded
@@ -27579,7 +27580,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 700;
+const BUILD = 701;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -27818,8 +27819,11 @@ function arrWrapRow(){
 function arrFollowPage(own){
   if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
-  if ((apF === 'arr' || asongOn()) && handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, arrActT, arrHandT)) return;
-  if (handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, navT)) return;
+  // LOOP BACK (owner, 27 Nov: "I'd like loop to loop back with follow off after a wait"): when the playhead has wrapped or jumped back above the view, FOLLOW OFF waits the short
+  // hold, not the minute: you are not working on rows that the playhead has left behind. Paging down past the view's bottom still keeps the minute.
+  const above = !!(own && own.row >= 0 && tp.mode === 'song' && own.row < (cs.song.top || 0)), idle = followMode || above ? FOLLOW_HOLD : ARR_IDLE;
+  if ((apF === 'arr' || asongOn()) && handsOn(idle, arrActT, arrHandT)) return;
+  if (handsOn(idle, navT)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
     // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
@@ -28704,7 +28708,7 @@ function projRows(){
       info:() => 'Pads: hold ALT and press an arrow to jump to the nearest block that way on the Song grid (▲▼ up and down the track, ◀▶ along the row). Works on the Song screen, in Arrange and in the phrase editor (which opens that block’s phrase). OFF: phrase ▲▼ jumps 16 patterns, Song ◀▶ moves one block, ▲▼ moves 16 rows. KEYS mode is not affected.'},
     {l:'SCALE MODE', ck:'Notes land on the song’s scale', get:() => scaleMode ? 1 : 0, set:v => setScaleMode(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'With a song SCALE set (Song settings → Key), the notes you type and play from the computer keyboard go to the nearest note of the scale, in the tracker and on the Synth page. Notes already in phrases don’t change'},
-    {l:'PLAY NOTE ON ENTRY', ck:'Play note on entry', get:() => pnoeOn ? 1 : 0, set:v => setPnoe(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'PLAY NOTE ON ENTRY', ck:'Pressing keys plays notes', get:() => pnoeOn ? 1 : 0, set:v => setPnoe(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Typing a note into the phrase editor plays that instrument’s sound on the spot, so you hear what you enter. Off makes note entry silent'},
     {l:'KEYS KEYPAD', ck:'Show on-screen keypad', get:() => kpOn ? 1 : 0, set:v => setKp(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'KEYS mode: show the on-screen keypad at the bottom for tapping in notes. Off hides it — the computer keyboard still types notes and hex, and the octave (OCT, top bar) stays. PAD mode is unchanged'},
@@ -28716,7 +28720,7 @@ function projRows(){
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:smallScr() ? 2 : 0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
-    {l:'ANIMATIONS', ck:'Animations: the dancing dogs, the FX bar’s effect pictures and the rainbow skin’s drift', get:() => animOn ? 1 : 0, set:v => setAnim(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'ANIMATIONS', ck:'Show animations', get:() => animOn ? 1 : 0, set:v => setAnim(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: the dancing dogs (Song, Project, Phrase), the pictures on the FX bar’s effects and the Simple rainbow dynamic skin’s moving colours. OFF: none of them is drawn and none of their work runs. Meters, scopes, playheads and the piano stay. You can also right-click (or long press) the dogs or an FX bar effect and choose Hide animations'},
     // REC, METRONOME AND COUNT-IN (kept on this device, like the rows above)
     {l:'METRONOME', sec:'Record & play', gap:true, opts:true, get:() => recS.met, set:v => setMet(v), min:0, max:2, d:1, fmt:v => ['OFF', 'WHILE RECORDING', 'ALWAYS'][v],
@@ -28738,20 +28742,20 @@ function projRows(){
       info:() => 'HIDDEN: the song opens straight into phrases, like patterns (each new song block gets its own sect with one phrase). SHOWN brings back the sect screen. Nothing is deleted either way'},
     {l:'ARRANGE', opts:true, get:() => arrMode, set:v => setArr(v), tap:() => setArr((arrMode + 1) % 3), min:0, max:2, d:1, fmt:v => ['OFF', 'AUTO', 'ON'][v],
       info:() => `Song overview beside the other screens (ARRANGE SIDE: left or right). AUTO shows it on wide screens (600 × 500 and up), ON at any size. This screen: ${innerWidth} × ${innerHeight}` + (arrMode === 1 && !arrEl.offsetWidth && !asongOn() ? ' (too small for AUTO)' : '') + (songGrid ? '' : '. The Song screen is Arrange whatever this says')},
-    {l:'ARRANGE SIDE', ck:'Arrange at the left', get:() => arrLeft ? 1 : 0, set:v => setArrLeft(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'LEFT' : 'RIGHT',
+    {l:'ARRANGE SIDE', ck:'Show Arrange left of phrase', get:() => arrLeft ? 1 : 0, set:v => setArrLeft(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'LEFT' : 'RIGHT',
       info:() => 'Which side of the screen Arrange sits on when it shows beside it. LEFT: SHIFT+◀ goes left to the song and SHIFT+▶ back right to the phrase. RIGHT: as before'},
     {l:'CLASSIC SONG', ck:'Show classic Song screen', get:() => songGrid ? 1 : 0, set:v => setSongGrid(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN (the default): the Song screen is Arrange, full width on any screen, with every Song key, pad command and the master column. SHOWN brings back the text grid, with Arrange beside it as before. The song is the same either way'},
     // SONG EXTRAS (each one off = the Song screen as it was before them)
     {l:'SONG MOUSE', get ck(){ return touchUi() ? 'Song: drag to select, move, copy (mouse and pen)' : 'Song: drag to select, move, copy; right-click menu'; }, get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => touchUi() ? 'With a mouse or pen on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it. A finger taps and holds as usual. Off: clicks only, as before' : 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
-    {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'SECTIONS', ck:'Show section names', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'The SECT lane left of the row numbers names runs of rows (INTRO, DROP…): tap the + on the cursor’s row (or tap the empty lane, double-click it, right-click a block) to name the section from that row; click a name to go there; hold or right-click a name to rename, loop or remove it. The lane is only as wide as its names. Needs a wide screen. Off hides the lane; the names stay in the song'},
-    {l:'SECTIONS BESIDE PHRASE', ck:'Arrange beside the phrase: the SECT lane too', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+    {l:'SECTIONS BESIDE PHRASE', ck:'Show SECT in Arrange', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
-    {l:'ROW COLOR IN PATTERN', get ck(){ return touchUi() ? 'Pattern view: press and hold a row number to color the song row' : 'Pattern view: right-click a row number to color the song row'; }, get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'ROW COLOR IN PATTERN', get ck(){ return touchUi() ? 'Allow press and hold to color song row' : 'Allow right-click to color song row'; }, get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => touchUi() ? 'In Pattern view, press and hold a row number (or SONG ROW in its bar) to color this pattern’s song row; SONG ROW then shows in that color. Off: the usual menu opens instead' : 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
-    {l:'UNIQUE PER TRACK', ck:'A pattern brought onto a track that doesn’t have it yet gets its own copy. Moving or repeating a pattern on its own track never copies.', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'UNIQUE PER TRACK', ck:'Create unique pattern numbers on new tracks', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
@@ -28790,10 +28794,10 @@ function projRows(){
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'PLAYHEAD OFFSET', get:() => phOff, set:v => setPhOff(v), min:-100, max:300, step:5, big:25, d:0, fmt:v => v ? sgn(v) + ' ms' : '0 ms',
       info:() => 'Moves the playhead to match what you hear, on this device: + later (Bluetooth headphones, a slow screen), − earlier. The app already allows for the output latency it is told about'},
-    {l:'LOW POWER DISPLAY', ck:'Low power display (saves battery): the picture is a little less smooth, and the audio engine sleeps after 30 s of silence, so the first note after that can start a moment late', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
+    {l:'LOW POWER DISPLAY', ck:'Enable low power mode', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
       info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. It also switches to the Low power (black) skin, and back when turned off. The audio engine also sleeps after 30 s of silence and wakes on the next note, which can start a moment late. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
-    {l:'METERS WHILE PLAYING', segs:true, get:() => MTR_MODES.indexOf(mtrMode), set:v => setMeters(MTR_MODES[v]), min:0, max:2, d:0, fmt:v => ['SMOOTH', 'LIGHT', 'OFF'][v] || 'SMOOTH',   // METERS (M.RATE)
-      info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. SMOOTH (the default): as before. LIGHT: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
+    {l:'METER ANIMATION QUALITY', segs:true, get:() => MTR_MODES.indexOf(mtrMode), set:v => setMeters(MTR_MODES[v]), min:0, max:2, d:0, fmt:v => ['HIGH', 'LOW', 'OFF'][v] || 'HIGH',   // METERS (M.RATE)
+      info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. HIGH (the default): every frame. LOW: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
     {l:'ARRANGE LOOK-AHEAD', get:() => ARR_AHEADS.indexOf(arrAhead), set:v => setArrAhead(v), min:0, max:ARR_AHEADS.length - 1, d:3, fmt:v => ARR_AHEADS[v] + ' ROWS',
       info:() => 'How many rows from the bottom of Arrange the page turns, for the playhead and for the cursor when you move it down with the keys or the wheel: the view turns once, so the row lands near the top and the next phrases are in sight. 16 by default; never more than half of what Arrange shows (a short view uses a quarter). A click never turns the page'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
@@ -29624,7 +29628,7 @@ function cloneDown(){
   if (typeof markHands === 'function') markHands();
   const c = cs.song, sel = selA && selA.v === 'song', r = sel ? selRect() : {x0:c.x, x1:c.x, y0:c.y, y1:c.y};
   const h = r.y1 - r.y0 + 1, d0 = r.y1 + 1, src = [];
-  for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ const v = getCell('song', x, y); if (v >= 0) src.push([x, y, v]); }
+  for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ const v = getCell('song', x, y); if (v >= 0) src.push([x, y, v, bmu(y, x)]); }   // [3]: the block's mute (Alt-click / M.PAT), copied to the clone (owner, 27 Nov: CLN↓ forgot it)
   if (!src.length) return toast(sel ? 'Nothing to clone in the selection.' : 'Move onto a filled block to clone it down.');
   // EMPTY ROW AFTER CLONE DOWN (12 Nov, owner: "Pressing clone down multiple times eventually inserts an empty row"): a block with notes on a bus is refused by newBlock
   // (build 569, busNo), but the row for its clone had already been inserted: a whole empty row, every track, and the cursor moved onto it. The refused cells now leave src
@@ -29638,9 +29642,9 @@ function cloneDown(){
   const clash = src.some(([x, y]) => getCell('song', x, d0 + y - r.y0) >= 0);
   if (clash && !songRowsInsert(d0, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty`);
   let made = 0, lastId = -1;
-  for (const [x, y, v] of src){
+  for (const [x, y, v, mu] of src){
     const p = {x, y:d0 + y - r.y0}; newBlock(p, v);
-    const id = getCell('song', p.x, p.y); if (id < 0) break; made++; lastId = id;
+    const id = getCell('song', p.x, p.y); if (id < 0) break; made++; lastId = id; setBlockMute(p.y, p.x, mu);
   }
   if (!made){ if (clash) songRowsRemove(d0, h); return; }   // nothing written: take the rows we put in out again (newBlock has said why)
   if (sel){ selA.y += h; c.y += h; } else c.y = d0;
@@ -32376,7 +32380,7 @@ function paintMeters(){
   const hold = meterHold(), bs = rt && !hold ? rt.pl.buses : null;   // METERS: OFF while playing: painted empty
   const lv = b => b.lvA > b.lv ? b.lvA : b.lv;   // the highest since the last paint (LIGHT), which is the latest at SMOOTH
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
-    const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
+    const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('tlh', lit[i] === 1); e.classList.toggle('tlc', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
   document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = Math.round(bs ? lvl(lv(bs[t])) * 100 : 0) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written (METERS: whole per cent, finer than the bar's pixels)
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
   meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(lv(bs[t])) : 0) * MH * 8 - (MH - 1 - k) * 8;
@@ -36399,7 +36403,7 @@ function cpuFill(){
   const key = JSON.stringify([r.head, r.list.map(x => [x.name, x.share]), r.screen.map(x => [x.name, x.share, x.extra]), r.keep, r.tip]); if (P.key2 === key) return; P.key2 = key;   // no layout work when nothing shown changed
   P.head.textContent = 'What is using the most right now'; P.sub.textContent = r.head;
   P.list.replaceChildren(...(r.list.length ? r.list.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name), el('b', null, x.share)); return li; }) : [el('div', 'cpuNone', tp.on ? 'Nothing measurable is running.' : 'Nothing is running. Press play to see what the song uses.')]));
-  P.scr.replaceChildren(...(r.screen.length ? [el('div', 'cpuNone', r.screenHead), ...r.screen.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name + (x.extra ? ' · ' + x.extra : '')), el('b', null, x.share)); return li; })] : []));
+  P.scr.replaceChildren(...(r.screen.length ? [...r.screen.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name + (x.extra ? ' · ' + x.extra : '')), el('b', null, x.share)); return li; })] : []));
   P.keep.textContent = r.keep; P.keep.classList.toggle('bad', r.bad); P.tip.textContent = r.tip;
 }
 $('tCpu').addEventListener('click', () => {
@@ -37320,7 +37324,7 @@ async function keyType(){
     const m = /^\s*([0-9a-f]{1,2})\s*$/i.exec(a); if (!m) { toast('Not a hex value: 00–FF'); return true; }
     const v = parseInt(m[1], 16); hexBuf = {key:'', n:0, v:0, t:0}; typeHex(v >> 4); typeHex(v & 15); return true;
   }
-  const r = rowsOf(tv)[c.y]; if (!r || r.act || r.tog || r.opts || r.show || !r.get || !r.set) return false;
+  const r = rowsOf(tv)[c.y]; if (!r || r.act || r.tog || r.opts || r.show || r.tap || !r.get || !r.set) return false;   // r.tap: an FX SLOT row: Enter opens the effect list (as EDIT), not a number prompt (owner, 27 Nov)
   const show = x => r.fmt ? r.fmt(x) : (r.min < 0 ? sgn(x) : hx(x));
   const a = await askText({title:r.l.trim(), body:'Now ' + show(r.get()) + '. Type it as it shows, or a number from ' + r.min + ' to ' + r.max + '.'}, '', 12, 'Set'); if (a == null) return true;
   const x = fbParse(a.trim(), {min:r.min, max:r.max}, show); if (x == null) { toast('Not a value for ' + r.l.trim()); return true; }
@@ -38077,6 +38081,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.', 'CPU panel: the screen list no longer has its long heading.', 'Settings: Show animations, Pressing keys plays notes, “Automatically checks for updates on launch”; the “Song at start” line is gone; Ableton Link’s Start/stop toggle reads Off | On like the one above it; Runaway kick’s label no longer runs under its toggle.', 'Menu wording: View and Settings items renamed (Show SECT in Arrange, Allow right-click to color song row, Create unique pattern numbers on new tracks, Enable low power mode, Show Arrange left of phrase, Show section names); Meters while playing is now Meter animation quality: HIGH, LOW, OFF.', 'Arrange with FOLLOW off: when the song loops back to the top, Arrange goes back with it 4 s after you last touched it (it waited a minute).', 'Fixed: the Mixer’s TRIM number no longer shifts when its level light comes on.', 'Fixed: CLN↓ (clone down) now keeps a block’s mute: a muted block clones as a muted block.']],
   [700, '27 Nov', ['Fixed: offline, the CHAINS and WAVES pages now have their own icon and app manifest (they were left out of the offline copy).']],
   [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
   [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],
@@ -39341,7 +39346,7 @@ function updBanner(){
 // The desktop app (Electron, served from app://) carries its own copy of these files: it updates by
 // installing a newer build, so the update check and the install offer are web-only.
 const DESKTOP_APP = location.protocol === 'app:';
-{ const u = document.getElementById('updBtn'); if (u){ if (DESKTOP_APP){ u.hidden = true; const n = el('span', 'lbl', 'Desktop app: it checks for a new version when it opens and offers to install it.'); u.after(n); } else u.addEventListener('click', () => checkUpdate(true)); } }
+{ const u = document.getElementById('updBtn'); if (u){ if (DESKTOP_APP){ u.hidden = true; const n = el('span', 'lbl', 'Automatically checks for updates on launch'); u.after(n); } else u.addEventListener('click', () => checkUpdate(true)); } }
 async function checkUpdate(manual){
   if (DESKTOP_APP) return;
   const sw = navigator.serviceWorker && location.protocol === 'https:';
