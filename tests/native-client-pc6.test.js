@@ -173,3 +173,52 @@ test('index.html: fxSlot gives the pump list (on a copy, pumpPv after pumpSync) 
   assert.ok(/restore:async \(text, name\) => \{ try \{ await backupNow\(true\); \} catch\(e\)\{\} return await loadProjText\(text, name, \{dirty:true\}\); \}/.test(src));
   assert.ok(/Restore unsaved changes\?/.test(src));
 });
+
+// ---- PC8: four small items (docs/plans/PC8-NOTES.md) ---------------------------------------------------------------------------------------
+test('PC8 item 1: the page\'s FX bar dynamics readers go to rest when the newest fx.dyn is older than FXD_AGE (600 ms): the slot-box bar and the three meter bars', () => {
+  const src = H.read('index.html');
+  assert.ok(/FXD_AGE = 600/.test(src)); assert.equal((src.match(/now - D\.t < FXD_AGE/g) || []).length, 2, 'both readers use the one constant');
+  assert.ok(!/now - D\.t < 600/.test(src));
+  // the real dkDynMeters with a recording canvas: a fresh report draws a GR bar, one 601 ms old draws none (the bars at rest), 599 ms still draws
+  const cut = (re, n) => { const m = src.match(re); assert.ok(m, n); return m[0]; };
+  const fills = []; const g = { setTransform() {}, clearRect() {}, fillRect: (...a) => fills.push([g.fillStyle, ...a]), fillText() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, save() {}, restore() {}, set font(v) {}, set textBaseline(v) {}, set textAlign(v) {}, set lineWidth(v) {}, set strokeStyle(v) {}, setLineDash() {}, fillStyle: '' };
+  const cv = { clientWidth: 90, clientHeight: 100, width: 0, height: 0, getContext: () => g };
+  const pg = { devicePixelRatio: 1, Math, getComputedStyle: () => ({ color: 'ink', fontFamily: 'x' }), FXLV: new Set(), FXD_AGE: 600, FXD_LO: -60, FXD_HI: 6, FXD_GR: 24, fxAc: () => 'AC', ctx: null, S: { bpm: 120 }, FXDYN: {}, TFX: {}, Number, Array };
+  vm.createContext(pg); vm.runInContext(cut(/function dkDynMeters\(cv, f, k, node, now\)\{[\s\S]*?\n\}\n/, 'dkDynMeters'), pg);
+  const node = { dyn: new Map([[0, { key: '0:comp', t: 1000, cur: [-12, -20, -18], hold: [-12, -20, -18] }]]) }; pg.cv = cv; pg.f = { type: 'comp' }; pg.node = node;
+  const grBars = now => { fills.length = 0; pg.now = now; vm.runInContext('dkDynMeters(cv, f, 0, node, now)', pg); return fills.filter(x => x[0] === 'AC' && x[4] > 0).length; };
+  pg.FXLV = new Set(['x']); pg.FXDYN = { comp: () => null };
+  assert.equal(grBars(1599) > 0, true, 'fresh (599 ms): the reduction bar is drawn'); assert.equal(grBars(1601), 0, 'older than 600 ms: no bar at all');
+});
+test('PC8 item 2: recovery.drop once the page\'s unsaved state clears (NC.dirtyOff), only after a put of this session, never while a copy awaits an answer, once per clear', async () => {
+  const r = rig(); await r.NC.attach(r.host); r.beat(); await r.ck.advance(300);
+  r.dirty = false; r.NC.dirtyOff(); await flush(); assert.equal(r.asked.filter(m => m.t === 'recovery.drop').length, 0, 'nothing was put: nothing to drop');
+  r.dirty = true; await r.ck.advance(10100); assert.equal(r.msgs('recovery.put').length, 1);
+  r.NC.dirtyOff(); await flush(); assert.equal(r.asked.filter(m => m.t === 'recovery.drop').length, 0, 'still dirty: no drop');
+  r.dirty = false; r.NC.dirtyOff(); await flush(); assert.deepEqual(r.asked.filter(m => m.t === 'recovery.drop'), [{ t: 'recovery.drop' }], 'saved: one drop, the shell\'s ask');
+  r.NC.dirtyOff(); await r.ck.advance(30000); await flush(); assert.equal(r.asked.filter(m => m.t === 'recovery.drop').length, 1, 'once per clear');
+  r.dirty = true; r.textN = 5; await r.ck.advance(10100); assert.equal(r.msgs('recovery.put').length, 2, 'a later unsaved change puts again'); r.dirty = false; await r.ck.advance(10100); await flush();
+  assert.equal(r.asked.filter(m => m.t === 'recovery.drop').length, 2, 'the 10 s look catches a clear the page did not announce');
+  const q = rig(); q.answer = -1; await q.NC.attach(q.host); q.beat(); await q.ck.advance(300); q.emit('recovery', { title: 'x', time: 1, file: null }); await q.ck.advance(2000); await flush();   // a copy awaits (prompt closed without an answer)
+  q.dirty = false; q.NC.dirtyOff(); await flush(); assert.equal(q.asked.filter(m => m.t === 'recovery.drop').length, 0, 'the held copy is not dropped');
+  const n = rig({ caps: { nativeAudio: true } }); await n.NC.attach(n.host); n.beat(); n.dirty = false; n.NC.dirtyOff(); await flush(); assert.equal(n.asked.filter(m => m.t === 'recovery.drop').length, 0, 'no cap, nothing');
+  assert.ok(/function setDirty\(on\)\{ projDirty = !!on; if \(!projDirty\)\{ smpNew = false; try \{ const c = natC\(\); if \(c && c\.dirtyOff\) c\.dirtyOff\(\); \} catch\(e\)\{\} \}/.test(H.read('index.html')), 'the page calls it from setDirty');
+});
+test('PC8 item 3: master.resetPeak only with caps.masterResetPeak and a native PLAY; today\'s shells say no such cap, so the PEAK click sends nothing; the page click calls it through natC()', async () => {
+  let r = await playing(); assert.equal(r.NC.mstResetPeak(), false); assert.equal(r.msgs('master.resetPeak').length, 0, 'no shell has the message yet (CORE-BRIDGE 7.2 Known gaps)');
+  r = rig({ caps: { nativeAudio: true, masterResetPeak: true } }); await r.NC.attach(r.host); r.beat(); await r.ck.advance(300);
+  assert.equal(r.NC.mstResetPeak(), false, 'not playing: nothing'); r.NC.start('song', { row: 0 }); await r.ck.advance(50); r.beat(); r.clear();
+  assert.equal(r.NC.mstResetPeak(), true); assert.deepEqual(r.msgs('master.resetPeak'), [{ t: 'master.resetPeak' }]);
+  assert.ok(/\$\('mwRead'\)\.addEventListener\('click', \(\) => \{ if \(rt && rt\.mst && rt\.mst\.wk\) rt\.mst\.wk\.port\.postMessage\(\{resetPeak:true\}\); try \{ const c = natC\(\); if \(c && c\.mstResetPeak\) c\.mstResetPeak\(\); \} catch\(e\)\{\} \}\);/.test(H.read('index.html')), 'the web engine\'s line is unchanged, the native call follows it');
+});
+test('PC8 item 4: a Send / Receive `lab` change is structural on the native path: no chain.edit, the song (a swap) carries it; other params of the same modules and other modules still go as chain.edit', async () => {
+  const r = rig(); r.S = Object.assign(mkS(), { chainPatch: { modules: [{ id: 's1', type: 'send', params: { lab: 1, gain: 1 } }, { id: 'r1', type: 'recv', params: { lab: 1 } }, { id: 'm1', type: 'vcf', params: { cut: 0.5, lab: 2 } }] } });
+  await r.NC.attach(r.host); r.beat(); await r.ck.advance(300); r.NC.start('song', { row: 0 }); await r.ck.advance(50); r.beat(); r.clear();
+  r.S.chainPatch.modules[0].params.lab = 3; r.NC.chainParam('s1', 'lab', 3); r.S.chainPatch.modules[1].params.lab = 0; r.NC.chainParam('r1', 'lab', 0);
+  await r.ck.advance(16); assert.equal(r.msgs('chain.edit').length, 0, 'lab on send / recv is never a Params edit');
+  await r.ck.advance(260); assert.equal(r.songLoads().length, 1, 'the whole song goes (the core swaps it)'); assert.equal(r.songLoads()[0].S.chainPatch.modules[0].params.lab, 3);
+  r.clear(); r.NC.chainParam('s1', 'gain', 0.5); r.NC.chainParam('m1', 'lab', 4); await r.ck.advance(16);
+  assert.deepEqual(r.msgs('chain.edit').map(m => m.ops), [[{ op: 'param', id: 's1', name: 'gain', value: 0.5 }, { op: 'param', id: 'm1', name: 'lab', value: 4 }]], 'only send / recv `lab` is structural');
+  // a module's text (the formula / label field) is not a chain.edit op at all: the editor's TW.mod -> saveS publishes the song
+  assert.ok(!/op: 'text'/.test(CLIENT));
+});
