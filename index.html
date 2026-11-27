@@ -15246,7 +15246,7 @@ function smpTidy(){
   try { const P = S.presets || {}; for (const p of P.voices || []) for (const l of (p.v && p.v.layers) || []) if (l.sample && l.sample.ref) used.add(l.sample.ref); for (const p of P.layers || []) if (p.l && p.l.sample && p.l.sample.ref) used.add(p.l.sample.ref); } catch(e){}
   try { for (const k of [KEY, TK]){ const j = localStorage.getItem(k) || ''; for (const m of j.matchAll(/"ref":"([^"]+)"/g)) used.add(m[1]); } } catch(e){}
   otherTabs().then(busy => { if (busy) return;
-    smpDb().then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
+    Promise.all([kvGet('bkIndex'), kvGet('rescueIndex')]).then(ix => { for (const l of ix) for (const e of l || []) for (const id of (e && e.refs) || []) used.add(id); return smpDb(); }).then(db => { const tx = db.transaction('smp', 'readwrite'), st = tx.objectStore('smp'), q = st.getAllKeys();
       q.onsuccess = () => { for (const k of q.result) if (!used.has(k)){ st.delete(k); smpStored.delete(k); } }; }).catch(() => {}); });
 }
 // Every autosave goes through here. localStorage is ~5 MB for the whole origin: when a write fails (storage full,
@@ -22387,7 +22387,7 @@ async function startRescue(){
     if (!idx.some(e => e.h === h)){
       const k = 'rescue' + Date.now(), nm = (parsed && typeof parsed.name === 'string' && parsed.name) || ((raw.match(/"name":"([^"]{1,40})"/) || [])[1]) || 'Song';
       const isSong = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed), text = isSong ? JSON.stringify({app:'thunder-project', v:1, build:typeof BUILD === 'number' ? BUILD : 0, song:parsed}) : raw;
-      await kvSet(k, text); idx.unshift({k, at:Date.now(), name:nm, kb:Math.round(text.length / 1024), h, text:isSong, err:START.note});
+      await kvSet(k, text); idx.unshift({k, at:Date.now(), name:nm, kb:Math.round(text.length / 1024), h, text:isSong, err:START.note, refs:[...new Set([...raw.matchAll(/"ref":"([^"]+)"/g)].map(m => m[1]))]});
       while (idx.length > 3){ const o = idx.pop(); await kvDel(o.k); }
       await kvSet('rescueIndex', idx);
     }
@@ -26788,7 +26788,7 @@ const isAndroid = /Android/i.test(navigator.userAgent);
 const DESK = (window.thunderDesktop && window.thunderDesktop.files) || null;   // the desktop app's file bridge (by path)
 const DESK_APP = (window.thunderDesktop && window.thunderDesktop.app) || null;
 const PJT = [{description:'Thunder Plus project', accept:{'application/json':['.thunder', '.json']}}];
-const projText = () => JSON.stringify({app:'thunder-project', v:1, build:BUILD, song:Object.assign({}, songOut(S), {presets:fullPresets(), irs:irsFull()}), kit:kitToJSON(false)});
+const projText = ref => JSON.stringify({app:'thunder-project', v:1, build:BUILD, song:Object.assign({}, songOut(S), {presets:ref ? SP() : fullPresets(), irs:ref ? (S.irs || []) : irsFull()}), kit:kitToJSON(ref ? 'ref' : false)});   // ref (backups only): samples by id, not inline audio; files and exports call it with no argument
 const projBlob = () => new Blob([projText()], {type:'application/json'});
 const projName = () => `${safe(S.name || 'Song')}.thunder`;
 // Sharing the project file: the share sheet on phones (Drive, Gmail, Quick Share, Nearby…), so a song started on the
@@ -26813,7 +26813,7 @@ async function kvGet(k){ try { const db = await kvDb(); return await new Promise
 // A failed write (storage full, blocked, private mode) fires the transaction's error or abort, which never reaches the
 // catch, so those log too. The promise still resolves either way: callers carry on exactly as before.
 const kvFail = (what, k, tx) => tpLog(what + ' "' + k + '" failed (is the browser storage full?)', tx && tx.error);
-async function kvSet(k, v){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('saving', k, tx); res(); }; }); } catch(e){ tpLog('saving "' + k + '" failed', e); } }
+async function kvSet(k, v){ try { const db = await kvDb(); return await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(true); tx.onerror = tx.onabort = () => { kvFail('saving', k, tx); res(false); }; }); } catch(e){ tpLog('saving "' + k + '" failed', e); return false; } }   // true when stored, false when not (callers that ignore it behave as before)
 async function kvDel(k){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('deleting', k, tx); res(); }; }); } catch(e){ tpLog('deleting "' + k + '" failed', e); } }
 // The project file: a handle (browser) or a path (desktop app). Remembered across restarts.
 let projFile = null, projPath = null;
@@ -27164,16 +27164,22 @@ async function openRecent(){
     try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
 }
 // BACKUPS: song + kit, every 3 minutes while something changed (and before anything replaces the song), the last 10.
-const BK_N = 10, BK_MS = 180000;
+const BK_N = 10, BK_MS = 180000; var bkBad = false;   // bkBad: the failure toast shows once, until a backup works again
 async function backupNow(force){
   if (!bkDirty && !force) return;
   try { bkDirty = false; flushS(); await presetSmpFill();
     if (!await smpSaveGate(10000, true)){ bkDirty = true; return; }   // a backup without its samples is skipped; the next one is tried in 3 minutes
-    const text = projText(), idx = (await kvGet('bkIndex')) || [], k = 'bk' + Date.now();
-    await kvSet(k, text); idx.unshift({k, at:Date.now(), name:S.name || 'Song', kb:Math.round(text.length / 1024)});
+    const ref = !!(sdbOk && smpStored), pend = [];   // a backup holds sample ids, not audio: the audio must be in the sample store first (no store: the old inline copy)
+    if (ref){ for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.data && !smpStored.has(L.sample.id)) pend.push(smpPut(L.sample));
+      for (const e of S.irs || []) if (e) for (const c of [e.L, e.R]) if (c && c.ref && IRDATA.has(c.ref) && !smpStored.has(c.ref)) pend.push(smpPut({id:c.ref, name:e.name, sr:e.sr, data:IRDATA.get(c.ref)}));
+      if (pend.length) await Promise.all(pend); }
+    const text = projText(ref), idx = (await kvGet('bkIndex')) || [], k = 'bk' + Date.now(), refs = ref ? [...new Set([...text.matchAll(/"ref":"([^"]+)"/g)].map(m => m[1]))] : [];   // refs: smpTidy keeps these samples
+    if (!await kvSet(k, text)) throw new Error('the browser would not store the backup');
+    idx.unshift({k, at:Date.now(), name:S.name || 'Song', kb:Math.round(text.length / 1024), refs});
     while (idx.length > BK_N){ const o = idx.pop(); await kvDel(o.k); }
-    await kvSet('bkIndex', idx);
-  } catch(e){}
+    if (!await kvSet('bkIndex', idx)) throw new Error('the browser would not store the backup list');
+    bkBad = false;
+  } catch(e){ bkDirty = true; tpLog('backup failed', e); if (!bkBad){ bkBad = true; toastErr('Backups are failing. Export a project file to keep your work (File → Save).', 8000); } }
 }
 setInterval(() => { if (!rendering && !tp.on) backupNow(false); }, BK_MS);   // not mid-render or while playing (a big kit takes a moment)
 async function restoreBackup(){
@@ -27568,7 +27574,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 689;
+const BUILD = 690;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38066,6 +38072,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [690, '27 Nov', ['Fixed: the automatic backups kept a full copy of every sample ten times over, which could fill the browser’s storage, and a backup that failed said nothing. Backups now keep only a reference to each sample, and if one fails you are told to save a project file.']],
   [689, '26 Nov', ['Fixed: a …pump effect added to a track that already existed (or waiting for pump to load) could get no pump code in Chrome 153, so it passed the sound dry. It now always gets it.']],
   [688, '26 Nov', ['Fixed: since build 677 the last script of the page stopped with an error on every load, so the app did not set itself up for offline use on a first visit, and on the Android app the native engine was never asked for. Both work again.']],
   [687, '26 Nov', ['Behind the scenes: on the Android app the playback report now has a `native:` line saying whether the native engine is on and why not, and Settings \u203a Audio \u203a Sequencer shows it when Native core (test) is picked but off. The page asks the shell again if its first hello came too early.']],
