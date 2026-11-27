@@ -461,3 +461,70 @@ jobs:
             --prerelease --latest=false \
             --title "Thunder Plus for Android, ${{ matrix.channel }} build ${{ github.run_number }} (native port): not the desktop app" \
             --notes "Android ${{ matrix.channel }} build ${{ github.run_number }} of the native port. Installs over the previous ${{ matrix.channel }} build of the same signing key and keeps its songs and settings. An APK named ...-DEBUGKEY.apk is signed with the public debug key and will not install over an owner-signed one. Commit: $GITHUB_SHA"
+
+  # APK-LINK: ONE fixed URL that always serves the newest beta test APK as a plain .apk (no login, no zip), for installing from the phone:
+  #   https://github.com/matthettich/thunder-plus/releases/download/android-beta-test/thunder-plus-beta-test.apk
+  # It is ONE rolling pre-release with the fixed tag `android-beta-test`, updated in place (gh release upload --clobber). The tag is NOT v<digit>: the desktop updater reads /releases/latest
+  # (never a pre-release) and electron/updater.js only follows tags of the form v<digit>; the Android app's Check for new build only matches ^native-android-(stable|beta|test)-<N>$. Never move this tag onto such a form.
+  # Runs for pull requests from THIS repository only (a fork's token cannot write), manual runs, and pushes to native.
+  android-beta-test-link:
+    name: Rolling beta test APK link
+    needs: android-release-build
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: android-beta-test-link
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: thunder-plus-android-beta-apk
+          path: out
+      - name: Publish the rolling pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TAG=android-beta-test
+          APK=$(ls out/thunder-plus-android-beta-*.apk | head -n1)
+          case "$APK" in *-DEBUGKEY.apk) KEY="signed with the PUBLIC DEBUG KEY (-DEBUGKEY): it will NOT install over an owner-signed build; uninstall that one first (its songs go with it)";; *) KEY="signed with the owner's key";; esac
+          BUILDNO=$(sed -n 's/^const BUILD = \([0-9][0-9]*\);.*/\1/p' index.html | head -n1)
+          mkdir -p pub
+          cp "$APK" pub/thunder-plus-beta-test.apk
+          {
+            echo "ANDROID BETA TEST BUILD (rolling): not the desktop app"
+            echo "branch: $BRANCH"
+            echo "pull request: ${PR_NUMBER:-none}"
+            echo "head sha: $HEAD_SHA"
+            echo "run: ${{ github.run_id }} $RUN_URL"
+            echo "page BUILD number (index.html): ${BUILDNO:-unknown}"
+            echo "built (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
+            echo "apk: $(basename "$APK") ($KEY)"
+            echo "sha256: $(sha256sum pub/thunder-plus-beta-test.apk | cut -d' ' -f1)"
+          } > pub/BUILD.txt
+          cat pub/BUILD.txt
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" pub/thunder-plus-beta-test.apk pub/BUILD.txt --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false --notes-file pub/BUILD.txt
+          else
+            gh release create "$TAG" pub/thunder-plus-beta-test.apk pub/BUILD.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --prerelease --latest=false --title "ANDROID BETA TEST BUILD (rolling): not the desktop app" --notes-file pub/BUILD.txt
+          fi
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/thunder-plus-beta-test.apk"
+          {
+            echo "### Beta test APK (tap on the phone to install)"
+            echo
+            echo "$URL"
+            echo
+            echo '```'
+            cat pub/BUILD.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
