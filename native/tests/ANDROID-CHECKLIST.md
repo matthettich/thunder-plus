@@ -12,6 +12,7 @@ app shows one) the line under "native live engine" in the dark panel. Press **CO
 
 ## 0. Set up
 
+0. Newest beta test APK (one tap on the phone, no login): https://github.com/matthettich/thunder-plus/releases/download/android-beta-test/thunder-plus-beta-test.apk (the release notes say which build it is).
 1. Open the app, load a song, press Play. Wait for the click or the song to be steady, with one hand note of the time.
 2. In the dark panel the line `native live engine:` shows `playing` (or the song name).
 
