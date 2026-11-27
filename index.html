@@ -5130,14 +5130,14 @@ function freshLayer(o){
 // Tempo sync for the mod LFOs and the mod sequence: the song's tempo (pads using it re-render when it changes).
 const SYNC_NAMES = ['Free', '1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars'];
 const SYNC_BEATS = [0, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16];
-function songBpm(){ try { return (S && S.bpm) || 120; } catch(e){ return 120; } }
+function songBpm(){ try { const s = typeof S !== 'undefined' ? S : globalThis.tpSongNow && globalThis.tpSongNow(); return (s && s.bpm) || 120; } catch(e){ return 120; } }   // the render worker has its own S (rwStart's glue); the page's S lives inside the app's IIFE, read through tpSongNow (build 699: this read 120 on the page, always)
 /* ENVELOPE TIMES IN LINES (build 658; owner, 19 Nov: noise swells that fit a pattern). An envelope may keep its times as a number of
    tracker lines instead of ms: the layer's amp (unit field `aU`, times atkL holdL decL relL), the layer's filter envelope (`fU`:
    fAtkL fDecL) and the pad amp (`gU`: gAtkL gHoldL gDecL gRelL). 'l' = lines; no unit field = ms, the old way, and a voice with
    none renders exactly as before. The engines stay in ms: renderVoice calls envLinesFit first, which turns the lines into ms at
    the song's CURRENT BPM and LPB (seconds = lines / LPB * 60 / BPM, one stage at most 64 s) and lengthens the pad to fit. A tempo
    command in the song does not re-time a rendered envelope. The page re-renders such a pad when the song's BPM or LPB changes (padBpm). */
-function songLpb(){ try { return Math.max(1, Math.round((S && S.lpb) || 4)); } catch(e){ return 4; } }
+function songLpb(){ try { const s = typeof S !== 'undefined' ? S : globalThis.tpSongNow && globalThis.tpSongNow(); return Math.max(1, Math.round((s && s.lpb) || 4)); } catch(e){ return 4; } }
 const ENVL_LAYER = [['aU', ['atk', 'hold', 'dec', 'rel']], ['fU', ['fAtk', 'fDec']]], ENVL_VOICE = [['gU', ['gAtk', 'gHold', 'gDec', 'gRel']]];
 const ENVL_MAXMS = 64000, ENVL_MAXLEN = 300;   // a stage at most 64 s; a pad at most 300 s (the Max len row's own top)
 const linesMs = (n, bpm, lpb) => Math.min(ENVL_MAXMS, Math.max(0, +n || 0) / Math.max(1, lpb) * 60 / Math.max(1, bpm) * 1000);
@@ -22408,6 +22408,7 @@ let sT = 0, sPend = false;   // sPend (12 Nov): a change is waiting for its auto
 // Undo: every saved change keeps the state before it (up to 200 steps). Changes made by one key or tap
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
 const undo = {past:[], future:[], cur:JSON.stringify(S), busy:false, pend:false};
+globalThis.tpSongNow = () => S;   // (build 699) the ENGINE block's songBpm / songLpb sit outside this IIFE and cannot see S: they ask here
 var recTake = false;   // REC: a live take is under way; its notes become one undo step when it ends (recEndTake)
 let arrKeepOff = 0;   /* 1: keep the scroll as it is, 2: use cs.song.top as set */   /* UNDO KEEPS ARRANGE'S VIEW (build 609): undoStep's redraw does not scroll Arrange back to the selection / cursor */
 const UNDO_MAX = 200, UNDO_BYTES = 32e6;   /* UNDO BYTE BUDGET: the 200-step count cap stays; also drop the oldest steps while the past stack's JSON is over ~32 MB (always keeping the newest) */
@@ -27578,7 +27579,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 698;
+const BUILD = 699;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38076,6 +38077,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
   [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],
   [697, '27 Nov', ['Behind the scenes: every change to the app is now checked for misspelled names and similar slips before it ships.']],
   [696, '27 Nov', ['Behind the scenes: with the app hidden and stopped, two timers that ran 10 and 20 times a second now sleep (better for the battery). Playing with the screen off is unchanged.']],

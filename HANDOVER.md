@@ -559,7 +559,7 @@ Owner, 27 Nov: work through the review's §8, may dismiss findings, then merge t
 - **7 · P2-5 (build 698)** PERFORM sizes / LFO lists declared once; `tests/startup-song.test.js` now fails on any var/function declared twice in a top-level scope.
 - **Dismissed:** P2-7 (`npm test` completes: 5 min 10 s here on 2 vCPU, ~3 min in CI, which already has a 20-minute timeout; the review killed it at 4 min), so package 9 is not needed. The 60 s trim and 3-min backup timers stay as they are (P2-4: deliberate in the battery audit; a backup while hidden is the last chance to keep recent edits). P3-6 (each build's new `CACHE` replaces the runtime cache). P3-2, P3-3, P3-4 are notes or need the owner (CSP, `?seqtest`, a GENERATED banner / `.coderabbit.yaml`).
 - **Checks run:** full `npm test` 2080 tests, 2027 pass, 0 fail, 53 skipped (with acorn, as CI); `npm run lint` 0 errors; `make-core` / `make-fx-cores --check` up to date; `tools/browser-check.mjs` all ok.
-- **Open, not from this review:** `tools/recorder-check.mjs` fails 2 lines on the sample-rate toast **before these changes too** (it expects the old wording "… kHz and the app at …"; the app now says "Test interface is 48 kHz, the app 44.1 kHz: …"): the check needs its regex updated. `songBpm()` / `wavesPre()` sit in the ENGINE block, outside the app's IIFE, so on the page they cannot see `S` and fall back to 120 BPM (in the render worker the glue declares `S`): check whether any page-side caller (envelope ms in the UI, `envMs`) shows a wrong time at other tempos. `tpLog` stops after 200 distinct entries in a session (it never rotates).
+- **Fixed after the review (build 699, owner 27 Nov: "Do both"):** `songBpm()` / `songLpb()` read 120 / 4 on the page (they sit outside the app's IIFE and could not see `S`), so line-synced envelopes were rendered for 120 BPM, never re-rendered on a tempo change, and the envelope editor's times were for 120 BPM. They now read the song through `globalThis.tpSongNow` (the worker still uses its own `S`); `tests/song-tempo-page.test.js`. `tools/recorder-check.mjs`'s sample-rate toast regex took the current wording (34 ok, exit 0). Still open: `tpLog` stops after 200 distinct entries in a session (it never rotates).
 
 ### Pump code sent to the track-FX worklet over the port is lost in Chrome 153: FIXED in build 689 (26 Nov)
 
@@ -953,6 +953,9 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 **Decided 25 Nov (nothing to do):** pad removal fix pushed; on the new engine the effect and chains level meters come first, then the pad flashes / dogs, then the metronome click; hand-played pads and keys stay on the old engine for the first Android beta; the fallback message shows on the first PLAY of each song; Resume restarts the row; no verdict within 5 s = the old engine plays; Claude merges PRs without asking once CI and the lead's review pass.
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
+
+**Tempo-synced envelopes follow the song (27 Nov; build 699 — changes how existing songs sound)**
+- [ ] **Phone or computer: a song at a tempo other than 120 (or other than 4 lines a beat) with a pad whose envelope is set in lines.** Pass: the envelope's length matches the song (e.g. 4 lines lasts 4 rows); the envelope editor's ms value matches that tempo; changing the tempo re-renders the pad within a moment of the change.
 
 **27 Nov review fixes (builds 690–698, desktop v1.3.17)**
 - [ ] **Phone and computer: record or load a long sample, keep working past two backups (3 min each), then File → Restore a backup.** Pass: the backup opens with the sample's audio; Settings › App storage is not growing by the sample's size every 3 minutes.
