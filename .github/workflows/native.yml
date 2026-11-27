@@ -212,10 +212,17 @@ jobs:
           grep -h -o "<ExceptionHandling>[A-Za-z]*</ExceptionHandling>" -r build/core/dsp --include=*.vcxproj | sort | uniq -c
       # live_meters2 parts (3) to (7) expect the pump COMP slot (type 201) in the chain: there is no pump on Windows until W-PUMP, so it fails here for that reason only (see the separate step below, kept visible).
       - run: ctest --test-dir build -C Release --output-on-failure -E "^live_meters2$"
-      - name: "live_meters2 (needs pump; expected to fail on Windows until W-PUMP; its TFX line and failures are shown)"
+      - name: "live_meters2: gate on everything except the three known pump-only checks (until W-PUMP)"
         shell: bash
-        continue-on-error: true
-        run: ctest --test-dir build -C Release -R "^live_meters2$" -V 2>&1 | grep -E "TFX:|FAIL|checks|Passed|Failed" | cut -c1-300
+        run: |
+          ctest --test-dir build -C Release -R "^live_meters2$" -V > lm2.log 2>&1 || true
+          grep -E "TFX:|FAIL|checks" lm2.log | cut -c1-300
+          [ "$(grep -c 'TFX: yes' lm2.log)" -eq 1 ] || { echo "TFX: yes missing"; exit 1; }
+          [ "$(grep -c 'FAIL .*test_live_meters2.cpp' lm2.log)" -eq 3 ] || { echo "expected exactly 3 FAIL lines"; exit 1; }
+          grep -q 'FAIL .*badSlots == 0: slots mask is 0b111 for a chain of 3' lm2.log || { echo "pump check 1 (slots mask) not among the failures"; exit 1; }
+          grep -q 'FAIL .*ntype == 2 \* dy.size(): both dynamics slots carry their core type id' lm2.log || { echo "pump check 2 (type ids) not among the failures"; exit 1; }
+          grep -q 'FAIL .*nred > 0 && minRed < -3: the pump COMP slot' lm2.log || { echo "pump check 3 (COMP reduction) not among the failures"; exit 1; }
+          grep -q 'live_meters2: [0-9]* checks, 3 failed' lm2.log || { echo "summary is not '3 failed'"; exit 1; }
       - name: The effects must RUN here, not skip (TFX macro, fx / padfx / modfx figures)
         shell: bash
         run: |
