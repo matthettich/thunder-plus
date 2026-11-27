@@ -59,3 +59,13 @@ test('with nothing below the selection the clones go straight under it (no row i
   const c = rigSel({ below: 0 }); for (let n = 1; n <= 4; n++) { c.cloneDown(); for (let y = 8 * n; y < 8 * n + 8; y++) assert.ok(c.song[y][0] >= 1000, 'pass ' + n + ' row ' + y); }
   assert.ok(c.song[40][0] < 0, 'and nothing past the last clone');
 });
+
+// CLN↓ DURING PLAYBACK (build 686, owner: "pressing clone down on arrange while the song plays, and it wraps the arrange screen around, the clone down inserts an
+// empty pattern"): FOLLOW PATTERN had moved the cursor to the row playing at the wrap, so CLN↓ cloned that block instead. A cursor last moved by playback goes back.
+test('a cursor moved by playback (FOLLOW) clones the block you left it on; one you moved yourself is used as is', () => {
+  const c = rig(); let marked = 0; c.markHands = () => { marked++; c.arrHandT = 99; };
+  c.song[5][0] = 7; c.cs.song.y = 0; c.arrHandT = 1; c.songFollowFrom = { x: 0, y: 5, to: 0, t: 10 };   // you were on row 5; the wrap moved the cursor to row 0
+  c.cloneDown(); assert.equal(c.song[6][0], 107, 'row 5 cloned below itself'); assert.equal(c.song[1][0], 2, 'nothing changed at the top'); assert.equal(c.cs.song.y, 6); assert.equal(marked, 1); assert.equal(c.songFollowFrom, null);
+  const d = rig(); d.markHands = () => {}; d.song[5][0] = 7; d.arrHandT = 20; d.songFollowFrom = { x: 0, y: 5, to: 0, t: 10 };   // you moved after the follow: your row (0) counts
+  d.cloneDown(); assert.equal(d.song[1][0], 101); assert.equal(d.cs.song.y, 1);
+});
