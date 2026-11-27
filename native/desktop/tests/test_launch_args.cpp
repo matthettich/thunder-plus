@@ -32,7 +32,7 @@ int main() {
     CHECK(!handoffDecode("hello", 5, &p) && !handoffDecode("TPD2\nx", 6, &p) && !handoffDecode(nullptr, 0, &p), "foreign data is not ours");
     const std::string bad = handoffEncode((dir / "x.wav").u8string()); CHECK(!handoffDecode(bad.data(), bad.size(), &p), "a hand-off naming a non-project file is refused");
     const std::string big = "TPD1\n" + std::string(kHandoffMax, 'a'); CHECK(!handoffDecode(big.data(), big.size(), &p), "an oversized hand-off is refused");
-    const std::string inner = std::string("TPD1\n") + "a\0b.thunder"; CHECK(!handoffDecode(inner.data(), 5 + 12, &p), "a NUL inside the path is refused"); }
+    const std::string inner = std::string("TPD1\n") + std::string("a\0b.thunder", 11); CHECK(!handoffDecode(inner.data(), inner.size(), &p), "a NUL inside the path is refused"); }
   // file association: per-user keys, the open command quotes the exe and %1
   { const auto e = fileAssocEntries("C:\\Program Files\\Thunder Plus\\Thunder Plus.exe");
     bool ext = false, cmd = false, icon = false, mime = false;
