@@ -27579,7 +27579,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 700;
+const BUILD = 701;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -37320,7 +37320,7 @@ async function keyType(){
     const m = /^\s*([0-9a-f]{1,2})\s*$/i.exec(a); if (!m) { toast('Not a hex value: 00–FF'); return true; }
     const v = parseInt(m[1], 16); hexBuf = {key:'', n:0, v:0, t:0}; typeHex(v >> 4); typeHex(v & 15); return true;
   }
-  const r = rowsOf(tv)[c.y]; if (!r || r.act || r.tog || r.opts || r.show || !r.get || !r.set) return false;
+  const r = rowsOf(tv)[c.y]; if (!r || r.act || r.tog || r.opts || r.show || r.tap || !r.get || !r.set) return false;   // r.tap: an FX SLOT row: Enter opens the effect list (as EDIT), not a number prompt (owner, 27 Nov)
   const show = x => r.fmt ? r.fmt(x) : (r.min < 0 ? sgn(x) : hx(x));
   const a = await askText({title:r.l.trim(), body:'Now ' + show(r.get()) + '. Type it as it shows, or a number from ' + r.min + ' to ' + r.max + '.'}, '', 12, 'Set'); if (a == null) return true;
   const x = fbParse(a.trim(), {min:r.min, max:r.max}, show); if (x == null) { toast('Not a value for ' + r.l.trim()); return true; }
@@ -38077,6 +38077,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [701, '27 Nov', ['FX screen: Enter on a slot opens the effect list (as EDIT does) instead of asking for a number.']],
   [700, '27 Nov', ['Fixed: offline, the CHAINS and WAVES pages now have their own icon and app manifest (they were left out of the offline copy).']],
   [699, '27 Nov', ['Fixed: pads whose envelopes are set in lines (tempo-synced) were rendered as if the song were at 120 BPM and 4 lines a beat, and did not re-render when the tempo changed; the envelope editor showed times for 120 BPM too. They now follow the song’s tempo and lines per beat. Songs at another tempo will sound different on those pads: now as set.']],
   [698, '27 Nov', ['Behind the scenes: the PERFORM sizes and LFO lists are set in one place instead of two, so the two copies can never disagree.']],

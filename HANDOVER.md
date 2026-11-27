@@ -545,6 +545,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### 27 Nov (11:22): build 701, Enter on an FX slot opens the effect list
+
+- Owner: "pressing enter on an empty fx slot opens the fx menu rather than popping up a prompt to type a number". `keyType` now declines rows with `tap` (the FX screen's SLOT rows), so Enter falls through to `editTap` → the slot's `tap` → `fxsOpen`, as EDIT. Applies to filled slots too (a number prompt there made no sense either). Other values on FX / INST / Mixer still type on Enter. `CACHE` v701, changelog 701.
+
 ### 27 Nov review, second pass: every finding re-verified on `beta`; build 700 closes P3-5
 
 Owner, 27 Nov: verify the review's findings and fix what is valid. Re-checked each package's fix on `beta` at `ea1fa86` (not from the notes above):
@@ -970,6 +974,7 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 - [ ] **Phone or computer: a song at a tempo other than 120 (or other than 4 lines a beat) with a pad whose envelope is set in lines.** Pass: the envelope's length matches the song (e.g. 4 lines lasts 4 rows); the envelope editor's ms value matches that tempo; changing the tempo re-renders the pad within a moment of the change.
 
 **27 Nov review fixes (builds 690–698, desktop v1.3.17)**
+- [ ] **Computer: build 701, FX screen, cursor on an empty SLOT, press Enter.** Pass: the effect list opens (no "type a number" box); Enter on a filled slot opens the list too.
 - [ ] **Phone: after build 700, open CHAINS or WAVES once online, then offline (airplane mode) open it again.** Pass: the page opens with its own icon (no broken icon) and can still be added to the home screen.
 - [ ] **Phone and computer: record or load a long sample, keep working past two backups (3 min each), then File → Restore a backup.** Pass: the backup opens with the sample's audio; Settings › App storage is not growing by the sample's size every 3 minutes.
 - [ ] **Desktop app (Mac): if the input helper ever says it stopped, press Settings › Audio › Reset audio engine.** Pass: native inputs / MIDI come back without quitting the app.
