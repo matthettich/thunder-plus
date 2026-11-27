@@ -19,7 +19,7 @@ std::string under(const std::string& dir, const char* leaf) { if (dir.empty()) r
 ShellCore::ShellCore(IPlatform* plat, Options opt)
     : opt_(std::move(opt)), recovery_(under(opt_.dataDir, "recovery")),
       api_(plat, [this](const std::string& j) { toPage(j); }, [&] {
-        DesktopApi::Config c; c.version = opt_.version; c.asyncIo = true;   // T-1: the disk work is off the UI thread
+        DesktopApi::Config c; c.version = opt_.version; c.asyncIo = true; c.autoUpdateCheck = opt_.autoUpdateCheck;   // T-1: the disk work is off the UI thread
         c.allowFile = under(opt_.dataDir, "allowed-paths.txt");
         c.onSaved = [this] { recovery_.drop(); };   // a saved project makes the last recovery copy older than the file
         return c; }()) {

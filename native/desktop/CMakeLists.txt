@@ -21,7 +21,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_
 find_package(Threads REQUIRED)
 add_library(thunder_desktop_shared STATIC
   shared/app_scheme.cpp shared/put_store.cpp shared/bridge_translator.cpp shared/live_host.cpp shared/bridge_session.cpp shared/desktop_api.cpp shared/text_util.cpp shared/audio_null.cpp shared/shell_core.cpp shared/recovery_store.cpp
-  shared/audio_devices.cpp shared/input_capture.cpp shared/midi_registry.cpp
+  shared/audio_devices.cpp shared/input_capture.cpp shared/midi_registry.cpp shared/launch_args.cpp shared/file_assoc.cpp shared/update_check.cpp
   ${TPA_CPP}/live_engine.cpp ${TPA_CPP}/live_events.cpp ${TPA_CPP}/songfit.cpp ${TPA_CPP}/pad_filler.cpp)
 # UBSan's vptr check cannot work across the -fno-rtti core: the shared_ptr control blocks the core makes (Song, SeqSession) are released in code built WITH rtti (this library, its tests), and the check calls them
 # "not a _Sp_counted_base" (a false positive: the Core (Linux, sanitizers) job, desktop_live_host and desktop_session). Off for this library and its tests, as for test_seq_takeover and the other tests that hold a Seq.
@@ -53,7 +53,7 @@ else()
 endif()
 
 if(THUNDER_BUILD_DESKTOP_TESTS)
-  set(TPD_TESTS app_scheme translator put_store desktop_api live_host session shell_core audio_devices midi_registry input_capture audio_session)
+  set(TPD_TESTS app_scheme translator put_store desktop_api live_host session shell_core audio_devices midi_registry input_capture audio_session launch_args update_check)
   if(NOT MSVC)
     list(APPEND TPD_TESTS midi_manager)
   endif()

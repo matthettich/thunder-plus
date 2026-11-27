@@ -39,6 +39,7 @@ class ShellCore {
     std::function<std::shared_ptr<MidiBackend>()> midi;       // the MIDI backend (CoreMIDI)
     std::string a5LogPath;                                    // --a5-log <file>: the A5 clock-drift logger's snapshot every 10 s, one line each (the 30-minute gate of WORKPLAN H7)
     int devWatchMs = 1000;
+    bool autoUpdateCheck = false;                             // H8: look for a newer release 8 s after start and every 4 h (the shell sets it for a release build only: not for --selftest / --null-audio / a dev version)
     std::string dataDir;                                      // the app's data folder (UTF-8): recovery copy and the list of picked file paths live under it; "" = neither is kept
   };
   ShellCore(IPlatform* plat, Options opt);

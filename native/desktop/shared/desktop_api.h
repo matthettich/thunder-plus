@@ -2,7 +2,7 @@
 // dispatcher. The platform (WebView2 / WKWebView shell) supplies the few things that need a window: the system dialogs, "show in folder", reload, the sleep guard, closing the window.
 // Transport: page -> shell: text "D:" + {"ch":"thunder:...","id":N,"a":[args]}; shell -> page: {"t":"dreply","id":N,"v":value} (or "err":text) for a `handle` channel, {"t":"dpush","ch":...,"v":...} for main -> page.
 // The page's bootstrap (js/desktop_bridge.js) builds window.thunderDesktop from the same table. REAL: files, dialogs, show-in-folder, reload, playing, natural-scroll, the close and open-path hand-offs.
-// "NOT YET" (a clear reply, never silence): Link (H8 / later), the updater (H8), the Electron io helper (replaced by thunderCore + H7). docs/port/H6-NOTES.md lists each.
+// "NOT YET" (a clear reply, never silence): Link (later), the Electron io helper (replaced by thunderCore + H7). docs/port/H6-NOTES.md lists each.
 #ifndef TPD_DESKTOP_API_H
 #define TPD_DESKTOP_API_H
 
@@ -10,11 +10,14 @@
 #include <condition_variable>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
+
+#include "update_check.h"
 
 namespace tpd {
 
@@ -44,6 +47,11 @@ class IPlatform {
   virtual bool naturalScroll() = 0;
   virtual void closeWindow(bool quit) = 0;     // the page said yes (or did not answer): close for good
   virtual std::string knownDir(const std::string& which) = 0;   // "documents" | "music"
+  // H8 (the updater; defaults = no network / no browser, so a shell or test that has none simply cannot check). httpGet and notify are called from the updater's own thread: they must be thread-safe.
+  virtual bool canHttp() { return false; }                                   // false: upd-check answers false at once (headless / selftest / a test)
+  virtual bool httpGet(const std::string& url, std::string* body) { (void)url; (void)body; return false; }   // HTTPS GET, follows redirects, a few seconds' timeout; true on HTTP 200
+  virtual void openUrl(const std::string& url) { (void)url; }               // the system browser (only github.com/matthettich/thunder-plus/ URLs are ever passed)
+  virtual void notify(const std::string& title, const std::string& message) { (void)title; (void)message; }   // a message box the person closes (the result of "Check for updates")
 };
 
 class DesktopApi {
@@ -54,6 +62,7 @@ class DesktopApi {
     bool asyncIo = false;                      // T-1: file reads / writes and base64 decoding run on a worker thread and the reply is emitted from there (Emit must then be thread-safe); false: inline (tests)
     std::function<void()> onSaved;             // a project file was written (any thread): the recovery copy is older than the save
     std::vector<std::string> allowDirs;        // S-1: folders whose files the page may read / write without a dialog (the app's own songs folder, if there is one; none today)
+    bool autoUpdateCheck = false;              // H8: look for a newer release 8 s after start and every 4 h (a release build only; the shells leave it off for dev builds, --selftest and --null-audio)
     std::string allowFile;                     // S-1: where the list of picked paths is kept between runs (so "Open recent" works); "" = this run only
   };
   DesktopApi(IPlatform* plat, Emit emit, Config cfg);
@@ -90,6 +99,7 @@ class DesktopApi {
   void saveAllowed();
   bool handleImpl(const std::string& json);
   IPlatform* plat_; Emit emit_; Config cfg_;
+  std::unique_ptr<UpdateChecker> upd_; int64_t nextAuto_ = 0;
   bool pageReady_ = false, closeOk_ = false, quitting_ = false;
   int64_t closeDeadline_ = 0;
   std::string pendingPath_, lastOut_;
