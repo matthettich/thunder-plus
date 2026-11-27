@@ -15,10 +15,18 @@ const fs = require('fs'), path = require('path'), crypto = require('crypto');
 let au = null;
 try { au = require('electron-updater').autoUpdater; } catch (e) { au = null; }
 
-// '1.2.10' > '1.2.9'
+// Semver order: '1.2.10' > '1.2.9', '1.3.0' > '1.3.0-beta.2' > '1.3.0-beta.1' (a prerelease is below its final release; numeric ids compare as numbers, below text ids).
 function newer(a, b){
-  const A = String(a).split('.').map(n => parseInt(n, 10) || 0), B = String(b).split('.').map(n => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(A.length, B.length); i++){ const d = (A[i] || 0) - (B[i] || 0); if (d) return d > 0; }
+  const parse = v => { const s = String(v).trim().replace(/^v+/i, '').split('+')[0], i = s.indexOf('-'), core = i < 0 ? s : s.slice(0, i), pre = i < 0 ? '' : s.slice(i + 1);
+    return { n: core.split('.').map(n => parseInt(n, 10) || 0), pre: pre ? pre.split('.') : [] }; };
+  const A = parse(a), B = parse(b);
+  for (let i = 0; i < Math.max(A.n.length, B.n.length); i++){ const d = (A.n[i] || 0) - (B.n[i] || 0); if (d) return d > 0; }
+  if (!A.pre.length || !B.pre.length) return !A.pre.length && B.pre.length > 0;
+  for (let i = 0; i < Math.max(A.pre.length, B.pre.length); i++){
+    const x = A.pre[i], y = B.pre[i]; if (x === y) continue; if (x === undefined) return false; if (y === undefined) return true;
+    const xn = /^\d+$/.test(x), yn = /^\d+$/.test(y);
+    if (xn && yn) return Number(x) > Number(y); if (xn !== yn) return yn; return x > y;
+  }
   return false;
 }
 
@@ -109,7 +117,7 @@ function setupUpdates({ name, page, repo }){
     try {
       const r = await net.fetch('https://api.github.com/repos/' + repo + '/releases/latest', { headers: GH });
       if (!r.ok) return false;
-      const v = String((await r.json()).tag_name || '').replace(/^v/, '');
+      const v = String((await r.json()).tag_name || '').replace(/^v+/i, '');
       if (v && newer(v, app.getVersion())){ announce(v, byHand); return true; }
       if (byHand) box({ type: 'info', buttons: ['OK'], title: name, message: 'You have the newest ' + name + ' (' + app.getVersion() + ').' });
       return true;
