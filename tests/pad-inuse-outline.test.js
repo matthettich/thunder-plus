@@ -68,7 +68,7 @@ test('info text: on-song notes, and what only unplaced phrases do', () => {
 test('source: classes on the right tiles, the legend, the instrument list, a thin outline that moves nothing, and the cursor and drop styles still win', () => {
   assert.match(src, /p\.classList\.toggle\('uOn', us === 1\); p\.classList\.toggle\('uOff', us === 2\)/);
   assert.match(src, /id="padKey" hidden/); assert.match(src, /k\.hidden = !anyUse/);
-  assert.match(src, /\.pad\.uOn, \.pad\.uOff\{outline:1\.5px solid color-mix\(in srgb, currentColor 72%, transparent\); outline-offset:-3px\}/);
+  assert.match(src, /\.pad\.uOn, \.pad\.uOff\{outline:2px solid currentColor; outline-offset:-3px\}/);   // build 686: thicker, plus a tint (owner: hard to see)
   assert.match(src, /\.pad\.uOff\{outline-style:dotted\}/); assert.match(src, /\.pad\.sel\.uOn, \.pad\.sel\.uOff\{outline-offset:-5px\}/);
   const css = src.match(/\.pad\.uOn, \.pad\.uOff\{[^\n]*/)[0]; assert.ok(!/border|margin|padding|box-shadow/.test(css), 'no box-model change');
   assert.ok(src.indexOf('.pad.uOn, .pad.uOff{') < src.indexOf('.pad.droptgt{outline:3px dashed'), 'the file-drop outline comes later and wins');

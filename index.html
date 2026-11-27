@@ -685,7 +685,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .pad.syn.hit b::after{color:var(--inv)}
 /* IN USE OUTLINE (19 Nov, owner): a pad or slot that a note on the song plays has a thin solid line just inside its edge, one only phrases that are not on the song play has the same line dotted; free ones have nothing.
    An outline (the box-shadow is the pad's offset block, the border is the cursor's): no layout shift. currentColor so it is the tile's own text colour in every skin (ink on paper, light on the dark skins, the accent's text on the cursor pad). */
-.pad.uOn, .pad.uOff{outline:1.5px solid color-mix(in srgb, currentColor 72%, transparent); outline-offset:-3px}
+.pad.uOn, .pad.uOff{outline:2px solid currentColor; outline-offset:-3px}
+.pad.uOn:not(.sel){background-image:linear-gradient(color-mix(in srgb, currentColor 14%, transparent), color-mix(in srgb, currentColor 14%, transparent))}   /* (26 Nov, build 686; owner: in-use was hard to see) a tint over the skin's fill */
 .pad.uOff{outline-style:dotted}
 .pad.sel.uOn, .pad.sel.uOff{outline-offset:-5px}   /* inside the cursor pad's thick border */
 .padkey{font-size:var(--fs-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0} .padkey[hidden]{display:none}
@@ -923,6 +924,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .vengine .engstep{min-height:36px; min-width:36px; padding:0 8px; font-size:var(--fs-3)}
 .enggrp.prestep{display:inline-flex; flex:none} .enggrp.prestep > button{margin:0} .enggrp.prestep > button + button{border-left:0}
 .enggrp.prestep .engstep{padding:0 8px}
+.vrow.vact .vprestep{flex:1 1 auto; min-width:0} .vrow.vact .vprestep .presel{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}   /* PAD PRESET STEP: the arrows hug the pad presets button */
 .enggrp.prestep .engpre{max-width:12em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .vengine .enggrp .engbtn{width:var(--engw, 9.5em); padding-inline:6px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}   /* one width for every engine, so ◀ ▶ stay put */
 .updb.storeb{background:#c0392b; color:#fff; white-space:normal; max-width:calc(100vw - 32px); z-index:21}
@@ -1109,7 +1111,8 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .tinl button i{font-style:normal; font-weight:600; opacity:.55; margin-right:6px}
 .tinl button.on{background:var(--ink); color:var(--inv)} .tinl button.on i{opacity:.8}
 .tinl button.mo i{opacity:1}
-.tinl button.uOn, .tinl button.uOff{outline:1px solid color-mix(in srgb, currentColor 60%, transparent); outline-offset:-2px} .tinl button.uOff{outline-style:dotted}   /* IN USE OUTLINE: as the Synth page's pads */
+.tinl button.uOn, .tinl button.uOff{outline:2px solid currentColor; outline-offset:-3px} .tinl button.uOff{outline-style:dotted}   /* IN USE OUTLINE: as the Synth page's pads */
+.tinl button.uOn:not(.on){background-image:linear-gradient(color-mix(in srgb, currentColor 14%, transparent), color-mix(in srgb, currentColor 14%, transparent))}   /* (26 Nov, build 686; owner: in-use was hard to see) a tint over the skin's own fill, plus the thicker line */
 .tinlp{flex:1 1 0; max-width:440px; align-self:stretch; align-content:center; overflow:hidden; padding:0 4px}
 @media (max-width:560px){ .tinlp{display:none!important} }
 .mtr{min-height:0; padding:0; border:1px solid var(--line); background:var(--panel); height:58px; display:flex; flex-direction:column; align-items:stretch; gap:0}
@@ -12604,7 +12607,16 @@ function preStep(kind, d){
   const at = preAt.get(preKey(kind)), i = at == null ? (d > 0 ? 1 % n : n - 1) : ((at + d) % n + n) % n;   // the first step from nothing skips Init
   prePick(kind, i); fn(i);
 }
+function vPreStep(d){
+  const L = []; for (const [gn, es] of presetEntries('voice')) if (gn !== 'Recent' && gn !== 'Favorites') for (const e of es) L.push(e);
+  const n = L.length; if (!n) return; const k = cur + '|voice', at = preAt.get(k), was = at && L.findIndex(e => e.key === at.key);
+  const j = at == null || was < 0 ? (d > 0 ? 0 : n - 1) : ((was + d) % n + n) % n, e = L[j];
+  preAt.set(k, {key:e.key, name:e.name}); e.apply(); vPreLabel();
+}
+function vPreLabel(){ const b = $('vPre'); if (!b) return; const at = preAt.get(cur + '|voice'), t = at ? at.name : 'Pad presets…';
+  if (b.textContent !== t){ b.textContent = t; b.title = at ? 'Pad preset: ' + t + ' (tap for the list)' : 'Presets: factory sounds and your own, saved in this project.'; } }
 function preLabels(){
+  vPreLabel();
   for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const b = $(id + 'Btn'); if (!b) continue;
     const [L] = preSpec(kind), i = preAt.get(preKey(kind)), t = i != null && L[i] ? L[i][0] : 'Engine presets…'; if (b.textContent !== t){ b.textContent = t; b.title = i != null ? 'Preset: ' + t + ' (tap for the list)' : 'Presets for this engine'; } }
 }
@@ -12642,7 +12654,7 @@ function presetSheet(kind){
   const row = e => {
     const it = el('div', 'pit'), pn = el('button', 'pn', e.name), pp = el('button', 'pp'); pn.type = pp.type = 'button'; pn.title = 'Use this preset';
     pp.innerHTML = '<svg class="ic" aria-hidden="true" style="width:12px;height:12px;fill:currentColor"><use href="#ic-play"/></svg>'; pp.title = 'Preview this preset'; pp.setAttribute('aria-label', 'Preview ' + e.name);
-    pn.addEventListener('click', () => { if (early()) return; recentPresets.add(rkind, e.key); done(); e.apply(); });
+    pn.addEventListener('click', () => { if (early()) return; recentPresets.add(rkind, e.key); done(); if (kind === 'voice'){ preAt.set(cur + '|voice', {key:e.key, name:e.name}); } e.apply(); if (kind === 'voice') vPreLabel(); });   // PAD PRESET STEP: ◀ ▶ carry on from the one picked
     pp.addEventListener('click', () => { if (e.prev) return e.prev(pp); try { previewVoice(e.make(), pp); } catch(err){ toastErr('Couldn’t preview that preset'); } });
     it.append(pn, pp);
     if (e.fid) it.append(favBtn('p:' + rkind, e.fid, e.name, () => { G = presetEntries(kind); const fo = G[0] && G[0][0] === 'Favorites'; if (fo !== hadFav){ openCat += fo ? 1 : -1; hadFav = fo; } render(); }));   // FAVOURITES
@@ -12672,6 +12684,10 @@ function presetSheet(kind){
 }
 (function presetInit(){
   $('vPre').addEventListener('click', () => presetSheet('voice'));
+  // PAD PRESET STEP (26 Nov, build 686; owner: "navigation arrows to the pad presets menu, like the other presets menus"): ◀ ▶ step through
+  // every pad preset (this song's, then the factory groups; Recent / Favorites skipped so nothing repeats), wrapping, remembered per pad.
+  { const vp = $('vPre'), arr = (d, t, lab) => { const a = el('button', 'sm engstep', t); a.type = 'button'; a.title = lab; a.setAttribute('aria-label', lab); a.addEventListener('click', () => vPreStep(d)); return a; };
+    const grp = el('span', 'enggrp prestep vprestep'); vp.before(grp); grp.append(arr(-1, '◀', 'Previous pad preset'), vp, arr(1, '▶', 'Next pad preset')); }
   $('lPre').addEventListener('click', () => presetSheet('layer'));
   // Each engine card's <select> is hidden behind a button that opens the sheet on click, like vPre / lPre. (It used to
   // open on pointerdown over the select: on touch the tap's click then landed on whichever row of the new sheet was
@@ -38037,7 +38053,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
-  [686, '26 Nov', ['Picking up an effect command with Enter no longer shows a message.', 'chains: a message when a bus has a Track In set to its own track (that stops it being a bus, so the tracks feeding it go quiet).']],
+  [686, '26 Nov', ['Picking up an effect command with Enter no longer shows a message.', 'Synth page: ◀ ▶ beside Pad presets step through the pad presets, like the engine presets.', 'Instruments in use on the song (sidebar and Synth page) have a thicker line and a light tint, so they stand out from free ones.', 'chains: a message when a bus has a Track In set to its own track (that stops it being a bus, so the tracks feeding it go quiet).']],
   [685, '26 Nov', ['Behind the scenes: in the Mac and Windows desktop app\u2019s native shell, Settings \u203a Audio now picks the output and input device, the buffer and the device\u2019s own sample rates, and shows the latency; Record a sample records every input of the interface; Settings \u203a MIDI lists the shell\u2019s ports and plays notes in.', 'Nothing changes in the Electron app, the website or the Android app.']],
   [684, '26 Nov', ['Desktop app security fix: the app now only reads or writes a project, render or export file that you picked in its Open / Save as / Render to dialogs, opened from the desktop, dropped on the window, or opened from Open recent. Nothing else on your computer can be reached from inside a song file.', 'If an old recent project says it can\u2019t open, pick it once with Open and it works from the list again.']],
   [681, '25 Nov', ['Behind the scenes: with the Android app\u2019s native engine playing, the knobs of a pump or modular (…chains / …waves) effect now reach the sound at once, and the app keeps a copy of your unsaved project for the shell; after the app was swiped away with unsaved work, the next start asks \u201cRestore unsaved changes?\u201d.', 'Nothing changes while the native engine is off.']],
