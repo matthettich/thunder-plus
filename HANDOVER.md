@@ -919,6 +919,10 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
+**Quiet effect pick-up + own-Track-In bus toast (26 Nov; build 686, branch `fx-pickup-quiet`)**
+- [ ] **Phone or computer: Enter on a filled effect command picks it up with no toast.** Pass: no message; Enter on an empty effect cell drops it; note pick-ups still say "Picked up".
+- [ ] **Computer: in a bus's …chains patch, set one Track In to the bus's own track.** Pass: one toast says that track is not a bus and names the tracks no longer heard; setting it back clears it, no repeat toast.
+
 **Native-core client loader, switch off (25 Nov; build 677, PR #321)** (nothing should change; the file is fetched only by the Android app)
 - [x] **Phone (Fold, Chrome): build 677 plays as before** (owner, 25 Nov 12:40).
 - [ ] **Computer: update to build 677 (Settings → App) and play a song as usual.** Pass: opens and plays exactly as on 676; no new toast or message.
