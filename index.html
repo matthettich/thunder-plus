@@ -8945,7 +8945,7 @@ function lnTempo(){
     if (!near){ lnT.bpm = b; lnT.lpb = l; lnT.gen++; } }
   return lnT; }
 /* LN TEMPO END */
-setInterval(() => { try { if (!kit.voices.some(voiceLines)) return; const g = lnT.gen; lnTempo(); if (lnT.gen !== g) prerender(); } catch(e){ tpLog('line tempo / prerender timer', e); } }, 100);   // the trailing call
+setInterval(() => { try { if (document.hidden && !tp.on) return; if (!kit.voices.some(voiceLines)) return; const g = lnT.gen; lnTempo(); if (lnT.gen !== g) prerender(); } catch(e){ tpLog('line tempo / prerender timer', e); } }, 100);   // the trailing call
 const padBpm = i => { const v = kit.voices[i]; if (voiceLines(v)){ const t = lnTempo(); return t.bpm + t.lpb / 100; } return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
 function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; if (typeof coreBuf === 'function') try { coreBuf(i); } catch(e){} }
@@ -24491,7 +24491,7 @@ function rtBufPlain(pad, rev){
   }
   return e.b;
 }
-setInterval(() => { try { if (stq.bpm && S === stq.S) stqSee(performance.now()); } catch(e){} }, 50);   // stamps when the tempo or LPB changed (the settle window counts from here)
+setInterval(() => { try { if (document.hidden && !tp.on) return; if (stq.bpm && S === stq.S) stqSee(performance.now()); } catch(e){} }, 50);   // BATTERY: not while hidden and stopped (hidden but playing it still stamps a tempo change); stamps when the tempo or LPB changed (the settle window counts from here)
 function mkLimiter(ac){ const c = ac.createDynamicsCompressor(); c.threshold.value = -2; c.knee.value = 0; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.1; return c; }
 /* The safety limiter (Project → LIMITER, and everything played live on the Synth page): the mastering worklet's brickwall
    limiter on its own — 3 ms lookahead, true-peak, nothing past −1 dBFS. The Web Audio compressor above isn't a limiter:
@@ -27579,7 +27579,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 695;
+const BUILD = 696;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -38077,6 +38077,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [696, '27 Nov', ['Behind the scenes: with the app hidden and stopped, two timers that ran 10 and 20 times a second now sleep (better for the battery). Playing with the screen off is unchanged.']],
   [695, '27 Nov', ['Behind the scenes: undo still keeps 200 steps, but on a very large song it now drops the oldest ones once they add up to about 32 MB, so a long session can’t run the phone out of memory.']],
   [694, '27 Nov', ['Fixed: opening the app offline from a link with something after the address (a shared project, for one) could show an error page instead of the app.']],
   [693, '27 Nov', ['Behind the scenes: failures in saving, the sample store, the audio engine and its workers, which used to pass silently, now go to the log in Copy playback report, so a bug report says what went wrong.']],
