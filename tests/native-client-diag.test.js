@@ -15,7 +15,7 @@ function rig(replies) {   // replies: array of functions/values, one per hello a
   const sb = { Promise, Error, JSON, Object, Array, Map, Math, isFinite, setTimeout, clearTimeout, setInterval, clearInterval, Float32Array, Date, thunderCore: tc };
   sb.window = sb; vm.createContext(sb); vm.runInContext(H.read('thunder-core-client.js'), sb, { filename: 'thunder-core-client.js' });
   const t0 = Date.now(), changed = [];
-  const host = { tpLog: () => {}, pbLog: s => pb.push(s), nativeChanged: () => changed.push(1), build: () => 686, prerender: () => {}, now: () => Date.now() - t0 + 1000, S: () => ({}), songVer: () => 1, aset: { core: 'native' }, toast: () => {}, vars: () => ({}), title: () => 't', lxp: () => 0, perf: () => null, blocked: () => '' };
+  const host = { tpLog: () => {}, pbLog: s => pb.push(s), nativeChanged: () => changed.push(1), build: () => 687, prerender: () => {}, now: () => Date.now() - t0 + 1000, S: () => ({}), songVer: () => 1, aset: { core: 'native' }, toast: () => {}, vars: () => ({}), title: () => 't', lxp: () => 0, perf: () => null, blocked: () => '' };
   return { NC: sb.__thunderClient, host, pb, emit, get asks() { return asks; }, changed };
 }
 

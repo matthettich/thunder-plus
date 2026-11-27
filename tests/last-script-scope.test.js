@@ -1,4 +1,4 @@
-// Build 687: the page's last inline script runs OUTSIDE the main script's scope. From build 677 to 686 it named `aset` and
+// Build 688: the page's last inline script runs OUTSIDE the main script's scope. From build 677 to 687 it named `aset` and
 // `loadClient` (both inside that scope) and threw a ReferenceError on every load: no native client on the Android app, and the
 // service worker lines after it never ran. This test keeps every later inline script free of the main script's names.
 const test = require('node:test'), assert = require('node:assert'), fs = require('node:fs'), path = require('node:path');
