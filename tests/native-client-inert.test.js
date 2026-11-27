@@ -12,7 +12,7 @@ const cut = (re, what) => { const m = src.match(re); assert.ok(m, 'not found: ' 
 const LOADER = cut(/\/\* NATIVE CORE CLIENT \(PC1[\s\S]*?document\.head\.appendChild\(s\); \};\n/, 'the NC / NCON / loadClient block');
 const SRGUESS = cut(/let srGuess = 48000;\ntry \{[\s\S]*?\n\} catch\(e\)\{\}\n/, 'the srGuess block');
 const PADSR = cut(/const padSR = [^\n]*\n/, 'padSR');
-// build 687: the call site is a boot function the main script defines (the page's last script, outside that scope, calls it: tests/last-script-scope.test.js)
+// build 688: the call site is a boot function the main script defines (the page's last script, outside that scope, calls it: tests/last-script-scope.test.js)
 const CALL = cut(/\nwindow\.__ncBoot = \(\) => \{ if \(window\.thunderCore \|\| aset\.core === 'native'\) loadClient\(\); \};[^\n]*\n/, 'the loadClient call site').trim() + '\nwindow.__ncBoot();';
 
 // A page-like sandbox: `window` is the sandbox itself, so window.thunderCore / window.__thunderClient are plain properties of it.
