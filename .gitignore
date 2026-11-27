@@ -12,3 +12,4 @@ electron/io/
 
 # agent worktrees made by Claude sessions (never part of the app)
 .claude/worktrees/
+.lint/
