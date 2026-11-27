@@ -2,7 +2,8 @@
 // WebResourceRequested), the page bridges in shell_core.h (window.thunderCore, window.thunderDesktop), audio through the core's live host and miniaudio (WASAPI). UNSIGNED.
 // Options: --selftest (run the page's selftest, write the verdict, exit 0 / 1 / 2), --null-audio (no sound device), --web <dir> (serve another web folder), --cdp-port <n> (DevTools Protocol for the UI sweeps), --report <file> (the selftest verdict as a file:
 // a GUI-subsystem exe has no console on a CI runner). UNVERIFIED on a PC: this box cannot build it; the Windows runner of .github/workflows/native-desktop.yml is the compile check and runs --selftest.
-// NOT HERE (H8): single instance, .thunder association, updater, signing. The WebView2 loader is the DLL (WebView2Loader.dll, copied next to the exe), the Evergreen runtime is on Windows 11 and most Windows 10.
+// H8: single instance (a named mutex; a second launch sends its file to the running window with WM_COPYDATA and exits), the .thunder association (`--register-file-type` / `--unregister-file-type`, per user), the check-only
+// updater (WinHTTP). NOT HERE: signing. The WebView2 loader is the DLL (WebView2Loader.dll, copied next to the exe), the Evergreen runtime is on Windows 11 and most Windows 10.
 #ifndef UNICODE
 #define UNICODE
 #endif
@@ -14,17 +15,21 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <shlwapi.h>
+#include <winhttp.h>
 #include <wrl.h>
 
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "WebView2.h"
 #include "WebView2EnvironmentOptions.h"
 #include "app_scheme.h"
 #include "audio_out.h"
 #include "bootstrap_js.h"
+#include "file_assoc.h"
+#include "launch_args.h"
 #include "shell_core.h"
 #include "text_util.h"
 
@@ -65,7 +70,16 @@ std::unique_ptr<tpd::ShellCore> g_core;
 std::string g_webDir, g_report;
 int g_cdpPort = 0;   // --cdp-port N: the DevTools Protocol on 127.0.0.1:N, for the UI sweeps (tests/sweep/ui-lib-shell.mjs)
 bool g_selftest = false, g_nullAudio = false, g_selfTestStarted = false, g_devtools = false;
-std::string g_pendingOpen;
+std::string g_pendingOpen, g_openLog;   // g_openLog (--open-log <file>, a test hook): every path handed to the page is appended to this file
+constexpr wchar_t kClassName[] = L"ThunderPlusNative";
+constexpr wchar_t kMutexName[] = L"Local\\ThunderPlusNative.SingleInstance";
+
+// A file the OS or a second launch asked us to open (H8): S-1 allows exactly that path (DesktopApi::openPath), the page gets it when it is ready.
+void openFromOs(const std::string& p) {
+  if (!g_openLog.empty()) { FILE* f = _wfopen(W(g_openLog).c_str(), L"ab"); if (f) { const std::string l = p + "\n"; fwrite(l.data(), 1, l.size(), f); fclose(f); } }
+  if (g_core) g_core->api().openPath(p); else g_pendingOpen = p;
+}
+void bringForward(HWND h) { if (IsIconic(h)) ShowWindow(h, SW_RESTORE); SetForegroundWindow(h); }
 
 void finishSelfTest(bool ok, const std::string& rep) {
   const std::string text = std::string("SELFTEST ") + (ok ? "PASS" : "FAIL") + "\n" + rep;
@@ -107,6 +121,42 @@ class WinPlatform : public tpd::IPlatform {
     if (SUCCEEDED(SHGetKnownFolderPath(which == "music" ? FOLDERID_Music : FOLDERID_Documents, 0, nullptr, &p))) { r = U(p); CoTaskMemFree(p); }
     return r;
   }
+  // ---- H8: the check-only updater (update_check.h). WinHTTP: HTTPS only, redirects followed, short timeouts, at most 4 MiB.
+  bool canHttp() override { return !g_selftest; }
+  bool httpGet(const std::string& url, std::string* body) override {
+    const std::wstring wu = W(url);
+    URL_COMPONENTSW uc{}; uc.dwStructSize = sizeof uc; uc.dwSchemeLength = uc.dwHostNameLength = uc.dwUrlPathLength = uc.dwExtraInfoLength = (DWORD)-1;
+    if (!WinHttpCrackUrl(wu.c_str(), (DWORD)wu.size(), 0, &uc) || uc.nScheme != INTERNET_SCHEME_HTTPS) return false;
+    const std::wstring host(uc.lpszHostName, uc.dwHostNameLength), path(uc.lpszUrlPath, uc.dwUrlPathLength + uc.dwExtraInfoLength);
+    bool ok = false;
+    HINTERNET ses = WinHttpOpen(L"thunder-plus-desktop", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!ses) ses = WinHttpOpen(L"thunder-plus-desktop", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET con = nullptr, req = nullptr;
+    if (ses) {
+      WinHttpSetTimeouts(ses, 5000, 5000, 6000, 8000);
+      con = WinHttpConnect(ses, host.c_str(), uc.nPort, 0);
+      if (con) req = WinHttpOpenRequest(con, L"GET", path.c_str(), nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+    }
+    if (req && WinHttpSendRequest(req, L"Accept: application/vnd.github+json\r\n", (DWORD)-1L, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) && WinHttpReceiveResponse(req, nullptr)) {
+      DWORD code = 0, len = sizeof code;
+      if (WinHttpQueryHeaders(req, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &code, &len, WINHTTP_NO_HEADER_INDEX) && code == 200) {
+        std::string out; DWORD avail = 0; ok = true;
+        while (WinHttpQueryDataAvailable(req, &avail) && avail > 0) {
+          if (out.size() + avail > ((size_t)4 << 20)) { ok = false; break; }
+          std::string chunk(avail, '\0'); DWORD got = 0;
+          if (!WinHttpReadData(req, &chunk[0], avail, &got) || got == 0) { ok = false; break; }
+          out.append(chunk, 0, got);
+        }
+        if (ok) *body = std::move(out);
+      }
+    }
+    if (req) WinHttpCloseHandle(req);
+    if (con) WinHttpCloseHandle(con);
+    if (ses) WinHttpCloseHandle(ses);
+    return ok;
+  }
+  void openUrl(const std::string& url) override { if (url.rfind(tpd::kReleasesPrefix, 0) == 0) ShellExecuteW(nullptr, L"open", W(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL); }
+  void notify(const std::string& title, const std::string& message) override { MessageBoxW(nullptr, W(message).c_str(), W(title).c_str(), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND); }
 };
 WinPlatform g_plat;
 
@@ -173,7 +223,7 @@ void onControllerReady() {
     return S_OK;
   }).Get(), &tok);
   g_web->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>([](ICoreWebView2*, ICoreWebView2NavigationCompletedEventArgs*) -> HRESULT {
-    if (!g_pendingOpen.empty() && g_core) { g_core->api().openPath(g_pendingOpen); g_pendingOpen.clear(); }
+    if (!g_pendingOpen.empty() && g_core) { const std::string p = g_pendingOpen; g_pendingOpen.clear(); openFromOs(p); }
     if (g_selftest && !g_selfTestStarted) { g_selfTestStarted = true; SetTimer(g_hwnd, TIMER_SELFTEST, 3000, nullptr); }   // after the page has had a moment to run its own start-up
     return S_OK;
   }).Get(), &tok);
@@ -214,11 +264,46 @@ void createWebView() {
   if (FAILED(hr)) { if (g_selftest) finishSelfTest(false, "CreateCoreWebView2EnvironmentWithOptions failed: " + std::to_string((long)hr) + "\n"); MessageBoxW(g_hwnd, L"WebView2 could not start. Install the Microsoft Edge WebView2 Runtime.", L"Thunder Plus", MB_ICONERROR); }
 }
 
+// ---- H8: the .thunder file association, per user (HKCU\\Software\\Classes): `Thunder Plus.exe --register-file-type` / `--unregister-file-type`. An installer runs the first one (or writes the same keys, see file_assoc.h).
+bool setReg(const tpd::RegValue& v) {
+  HKEY k = nullptr;
+  if (RegCreateKeyExW(HKEY_CURRENT_USER, W(v.key).c_str(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &k, nullptr) != ERROR_SUCCESS) return false;
+  const std::wstring val = W(v.value), name = W(v.name);
+  const LSTATUS r = RegSetValueExW(k, v.name.empty() ? nullptr : name.c_str(), 0, REG_SZ, (const BYTE*)val.c_str(), (DWORD)((val.size() + 1) * sizeof(wchar_t)));
+  RegCloseKey(k);
+  return r == ERROR_SUCCESS;
+}
+std::wstring selfPath() { wchar_t exe[MAX_PATH * 2]; const DWORD n = GetModuleFileNameW(nullptr, exe, (DWORD)(sizeof exe / sizeof exe[0])); return std::wstring(exe, n); }
+int registerFileType(bool on) {
+  bool ok = true;
+  if (on) {
+    const auto entries = tpd::fileAssocEntries(U(selfPath()));
+    if (entries.empty()) return 1;
+    for (const auto& v : entries) ok = setReg(v) && ok;
+  } else {
+    // our ProgID tree always goes; the extension key only when it still points at us (another app may own .thunder by now)
+    const std::wstring cls = L"Software\\Classes\\", prog = cls + W(tpd::kProgId);
+    RegDeleteTreeW(HKEY_CURRENT_USER, prog.c_str());
+    wchar_t cur[256] = L""; DWORD len = sizeof cur;
+    const std::wstring ext = cls + L".thunder";
+    if (RegGetValueW(HKEY_CURRENT_USER, ext.c_str(), nullptr, RRF_RT_REG_SZ, nullptr, cur, &len) == ERROR_SUCCESS && W(tpd::kProgId) == cur) RegDeleteTreeW(HKEY_CURRENT_USER, ext.c_str());
+    else RegDeleteKeyValueW(HKEY_CURRENT_USER, (ext + L"\\OpenWithProgids").c_str(), W(tpd::kProgId).c_str());
+  }
+  SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+  return ok ? 0 : 1;
+}
+
 LRESULT CALLBACK wndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   switch (m) {
     case WM_SIZE: resizeWeb(); return 0;
     case WM_GETMINMAXINFO: { auto* mm = (MINMAXINFO*)l; mm->ptMinTrackSize.x = 380; mm->ptMinTrackSize.y = 500; return 0; }
     case WM_FLUSH: if (g_core) g_core->flush(); return 0;
+    case WM_COPYDATA: {   // H8: a second launch hands over its file (single instance). Only our own message (magic + "TPD1\n" + an existing .thunder / .json path) is accepted.
+      const COPYDATASTRUCT* cds = (const COPYDATASTRUCT*)l;
+      std::string p;
+      if (cds && cds->dwData == tpd::kHandoffMagic && tpd::handoffDecode((const char*)cds->lpData, cds->cbData, &p)) { bringForward(h); if (!p.empty()) openFromOs(p); return TRUE; }
+      return FALSE;
+    }
     case WM_TIMER:
       if (w == TIMER_TICK) { if (g_core) g_core->tick(); }
       else if (w == TIMER_SELFTEST) { KillTimer(h, TIMER_SELFTEST); if (g_web) g_web->ExecuteScript(W(tpd::ShellCore::selfTestCall()).c_str(), nullptr); }
@@ -243,6 +328,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   int argc = 0; LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+  bool regType = false, unregType = false, anyInstance = false; std::vector<std::string> positional;
   for (int i = 1; i < argc; i++) {
     const std::wstring a = argv[i];
     if (a == L"--selftest") g_selftest = true;
@@ -251,11 +337,40 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     else if (a == L"--report" && i + 1 < argc) g_report = U(argv[++i]);
     else if (a == L"--devtools") g_devtools = true;
     else if (a == L"--cdp-port" && i + 1 < argc) g_cdpPort = _wtoi(argv[++i]);
-    else if (a.size() > 8 && a.compare(a.size() - 8, 8, L".thunder") == 0) g_pendingOpen = U(a);
+    else if (a == L"--open-log" && i + 1 < argc) g_openLog = U(argv[++i]);   // test hook: log every path handed to the page
+    else if (a == L"--register-file-type") regType = true;
+    else if (a == L"--unregister-file-type") unregType = true;
+    else if (a == L"--allow-multiple") anyInstance = true;
+    else positional.push_back(U(a));
+  }
+  if (regType || unregType) {   // H8: the association (no window)
+    const int rc = registerFileType(regType);
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) { FILE* o; freopen_s(&o, "CONOUT$", "w", stdout); std::fputs(rc == 0 ? (regType ? "file type registered\n" : "file type removed\n") : "file type change failed\n", stdout); std::fflush(stdout); }
+    return rc;
+  }
+  g_pendingOpen = tpd::projectFromArgs(positional);   // a double-clicked .thunder file arrives as an argument (the association's "%1")
+  // H8: ONE COPY AT A TIME (Electron: requestSingleInstanceLock): a named mutex per login session; a second launch hands its file to the running window (WM_COPYDATA) and leaves. Not for --selftest / --cdp-port / --allow-multiple (CI and dev runs).
+  static HANDLE s_mutex = nullptr;
+  if (!g_selftest && g_cdpPort == 0 && !anyInstance) {
+    s_mutex = CreateMutexW(nullptr, FALSE, kMutexName);
+    if (s_mutex && GetLastError() == ERROR_ALREADY_EXISTS) {
+      const std::string msg = tpd::handoffEncode(g_pendingOpen);
+      for (int i = 0; i < 60; i++) {   // the first copy may still be opening its window: wait up to 6 s for it
+        HWND other = FindWindowW(kClassName, nullptr);
+        if (other) {
+          AllowSetForegroundWindow(ASFW_ANY);
+          COPYDATASTRUCT cds{}; cds.dwData = tpd::kHandoffMagic; cds.cbData = (DWORD)msg.size(); cds.lpData = (PVOID)msg.data();
+          DWORD_PTR res = 0;
+          if (SendMessageTimeoutW(other, WM_COPYDATA, 0, (LPARAM)&cds, SMTO_ABORTIFHUNG, 5000, &res) && res) return 0;
+        }
+        Sleep(100);
+      }
+      // no window answered (the first copy is stuck or closing): carry on as a copy of our own rather than do nothing
+    }
   }
   if (g_webDir.empty()) { wchar_t exe[MAX_PATH]; GetModuleFileNameW(nullptr, exe, MAX_PATH); PathRemoveFileSpecW(exe); g_webDir = U(std::wstring(exe) + L"\\web"); }
 
-  WNDCLASSEXW wc{}; wc.cbSize = sizeof wc; wc.lpfnWndProc = wndProc; wc.hInstance = inst; wc.hCursor = LoadCursor(nullptr, IDC_ARROW); wc.hbrBackground = CreateSolidBrush(RGB(0xf0, 0xe6, 0xf4)); wc.lpszClassName = L"ThunderPlusNative";
+  WNDCLASSEXW wc{}; wc.cbSize = sizeof wc; wc.lpfnWndProc = wndProc; wc.hInstance = inst; wc.hCursor = LoadCursor(nullptr, IDC_ARROW); wc.hbrBackground = CreateSolidBrush(RGB(0xf0, 0xe6, 0xf4)); wc.lpszClassName = kClassName;
   RegisterClassExW(&wc);
   g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"Thunder Plus", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1400, 900, nullptr, nullptr, inst, nullptr);
 
@@ -264,6 +379,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
   o.deliver = [](const std::string& text) { if (g_web) g_web->PostWebMessageAsString(W(text).c_str()); };
   o.selfTest = g_selftest;   // S-3: the page's "S:" verdict ends the process only under --selftest
   o.onSelfTest = [](bool ok, const std::string& rep) { finishSelfTest(ok, rep); };
+  o.autoUpdateCheck = !g_selftest && !g_nullAudio && std::string(THUNDER_APP_VERSION).find('-') == std::string::npos;   // H8: a release build looks for a newer release by itself; dev builds (0.0.0-native.N) and CI runs do not (the Update menu item still works)
   { PWSTR local = nullptr; if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &local))) { o.dataDir = U(std::wstring(local) + L"\\Thunder Plus Native\\data"); CoTaskMemFree(local); } }   // recovery copy, picked-paths list
   g_core.reset(new tpd::ShellCore(&g_plat, o));
 

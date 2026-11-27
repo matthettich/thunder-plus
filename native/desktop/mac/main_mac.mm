@@ -1,7 +1,8 @@
 // H6: the Mac shell. A minimal Cocoa app: one NSWindow with a WKWebView that loads app://thunder/index.html (served by a WKURLSchemeHandler from the bundled web/ folder), the page bridges in
 // shell_core.h (window.thunderCore, window.thunderDesktop), audio through the core's live host and miniaudio (Core Audio). UNSIGNED (the owner has no Apple Developer membership; H8 signs).
 // Options: --selftest (run the page's selftest, print the verdict, exit 0 / 1), --null-audio (no sound device), --web <dir> (a web folder to serve instead of the bundled one), --a5-log <file> (H7: the A5 clock-drift logger, a snapshot every 10 s).
-// NOT HERE (H8): the real Mac menu, .thunder file association (application:openFile: is wired), single instance, updater. A minimal menu (Quit, Edit, Window) is here so the keys work.
+// H8: one copy at a time (a second launch asks the running copy to open its file through LaunchServices and leaves), .thunder files (application:openURLs: / openFile:, the document type is in Info.plist, mac/Info-extra.plist), the
+// check-only updater (NSURLSession). Signing: mac/sign.sh with mac/Thunder.entitlements (hardened runtime + audio input). NOT HERE: the real Mac menu. A minimal menu (Quit, Edit, Window) is here so the keys work.
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
@@ -10,11 +11,13 @@
 #include <unistd.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "app_scheme.h"
 #include "audio_out.h"
 #include "midi_backend.h"
 #include "bootstrap_js.h"
+#include "launch_args.h"
 #include "shell_core.h"
 #include "text_util.h"
 
@@ -25,6 +28,9 @@
 // R-2: UTF8String is nil for a string with a lone surrogate: an empty string then, never a crash
 static std::string S(NSString* s) { const char* c = s ? [s UTF8String] : nullptr; return c ? std::string(c) : std::string(); }
 static NSString* N(const std::string& s) { NSString* r = [NSString stringWithUTF8String:s.c_str()]; return r ? r : @""; }
+
+static std::string g_openLog;   // --open-log <file> (a test hook): every path handed to the page is appended to this file
+static void logOpen(const std::string& p) { if (g_openLog.empty()) return; FILE* f = std::fopen(g_openLog.c_str(), "ab"); if (f) { const std::string l = p + "\n"; std::fwrite(l.data(), 1, l.size(), f); std::fclose(f); } }
 
 @class TPDApp;
 
@@ -75,6 +81,32 @@ class MacPlatform : public tpd::IPlatform {
     else if (!on && activity) { [[NSProcessInfo processInfo] endActivity:activity]; activity = nil; }
   }
   bool naturalScroll() override { id v = [[NSUserDefaults standardUserDefaults] objectForKey:@"com.apple.swipescrolldirection"]; return v ? [v boolValue] : true; }
+  // ---- H8: the check-only updater (update_check.h). NSURLSession, HTTPS only, short timeout, at most 4 MiB; called from the updater's own thread.
+  bool canHttp() override { return !selftest; }
+  bool httpGet(const std::string& url, std::string* body) override {
+    NSURL* u = [NSURL URLWithString:N(url)];
+    if (!u || ![u.scheme isEqualToString:@"https"]) return false;
+    NSMutableURLRequest* rq = [NSMutableURLRequest requestWithURL:u cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:8];
+    [rq setValue:@"application/vnd.github+json" forHTTPHeaderField:@"Accept"]; [rq setValue:@"thunder-plus-desktop" forHTTPHeaderField:@"User-Agent"];
+    __block bool ok = false; __block std::string got;
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    NSURLSessionDataTask* t = [[NSURLSession sharedSession] dataTaskWithRequest:rq completionHandler:^(NSData* d, NSURLResponse* r, NSError* e) {
+      if (!e && d && [r isKindOfClass:[NSHTTPURLResponse class]] && ((NSHTTPURLResponse*)r).statusCode == 200 && d.length <= (4u << 20)) { got.assign((const char*)d.bytes, d.length); ok = true; }
+      dispatch_semaphore_signal(sem);
+    }];
+    [t resume];
+    if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC))) != 0) { [t cancel]; return false; }
+    if (ok) *body = std::move(got);
+    return ok;
+  }
+  void openUrl(const std::string& url) override {
+    if (url.rfind(tpd::kReleasesPrefix, 0) != 0) return;
+    NSURL* u = [NSURL URLWithString:N(url)]; if (u) dispatch_async(dispatch_get_main_queue(), ^{ [[NSWorkspace sharedWorkspace] openURL:u]; });
+  }
+  void notify(const std::string& title, const std::string& message) override {
+    NSString* t = N(title); NSString* m = N(message);
+    dispatch_async(dispatch_get_main_queue(), ^{ NSAlert* al = [[NSAlert alloc] init]; al.messageText = t; al.informativeText = m; [al runModal]; });
+  }
   void closeWindow(bool quit) override { if (quit) [NSApp terminate:nil]; else [window close]; }
   std::string knownDir(const std::string& which) override {
     NSArray* a = NSSearchPathForDirectoriesInDomains(which == "music" ? NSMusicDirectory : NSDocumentDirectory, NSUserDomainMask, YES);
@@ -88,7 +120,7 @@ class MacPlatform : public tpd::IPlatform {
 @implementation TPDApp {
   NSWindow* _win; WKWebView* _web; TPDScheme* _scheme; NSTimer* _timer;
   std::unique_ptr<MacPlatform> _plat; std::unique_ptr<tpd::ShellCore> _core;
-  bool _selftest, _nullAudio, _selfTestStarted, _devtools; std::string _webDir; std::string _pendingOpen; std::string _a5Log;
+  bool _selftest, _nullAudio, _selfTestStarted, _devtools, _allowMultiple; std::vector<std::string> _launchArgs; std::string _webDir; std::string _pendingOpen; std::string _a5Log;
 }
 - (instancetype)init {
   if ((self = [super init])) {
@@ -99,8 +131,11 @@ class MacPlatform : public tpd::IPlatform {
       else if ([args[i] isEqualToString:@"--devtools"]) _devtools = true;
       else if ([args[i] isEqualToString:@"--a5-log"] && i + 1 < args.count) _a5Log = S(args[++i]);   // H7: the clock-drift logger's snapshot every 10 s into this file (WORKPLAN H7's 30-minute gate)
       else if ([args[i] isEqualToString:@"--web"] && i + 1 < args.count) _webDir = S(args[++i]);
-      else if ([args[i] hasSuffix:@".thunder"]) _pendingOpen = S(args[i]);
+      else if ([args[i] isEqualToString:@"--open-log"] && i + 1 < args.count) g_openLog = S(args[++i]);
+      else if ([args[i] isEqualToString:@"--allow-multiple"]) _allowMultiple = true;
+      else if ([args[i] hasSuffix:@".thunder"]) _launchArgs.push_back(S(args[i]));
     }
+    _pendingOpen = tpd::projectFromArgs(_launchArgs);   // a .thunder file named on the command line (a double-click arrives as openURLs / openFile instead)
     if (_webDir.empty()) _webDir = S([[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"web"]);
   }
   return self;
@@ -110,6 +145,7 @@ class MacPlatform : public tpd::IPlatform {
   tpd::ShellCore::Options o; o.nullAudio = _nullAudio; o.version = THUNDER_APP_VERSION; o.audio = [] { return tpd::makeMiniaudioOut(); };
   o.devices = tpd::makeMiniaudioEnumerator(); o.input = [] { return tpd::makeMiniaudioIn(); }; o.midi = [] { return tpd::makeCoreMidiBackend(); };   // H7: device list, every input channel, CoreMIDI (the backend is made on the main thread: CoreMIDI delivers hot-plug notifications on its run loop)
   o.a5LogPath = _a5Log;
+  { NSString* ver = @THUNDER_APP_VERSION; o.autoUpdateCheck = !_selftest && !_nullAudio && [ver rangeOfString:@"-"].location == NSNotFound; }   // H8: a release build looks for a newer release by itself; dev builds (0.0.0-native.N) and CI runs do not
   TPDApp* me = self;
   o.requestFlush = [me] { dispatch_async(dispatch_get_main_queue(), ^{ [me flushToPage]; }); };
   o.deliver = [me](const std::string& text) { [me runInPage:"window.__thunderRecv(" + tpd::jsonQuote(text) + ")"]; };
@@ -182,7 +218,7 @@ class MacPlatform : public tpd::IPlatform {
 }
 - (void)webView:(WKWebView*)w didStartProvisionalNavigation:(WKNavigation*)nav { _core->api().onLoadStart(); }
 - (void)webView:(WKWebView*)w didFinishNavigation:(WKNavigation*)nav {
-  if (!_pendingOpen.empty()) { _core->api().openPath(_pendingOpen); _pendingOpen.clear(); }
+  if (!_pendingOpen.empty()) { logOpen(_pendingOpen); _core->api().openPath(_pendingOpen); _pendingOpen.clear(); }
   if (_selftest && !_selfTestStarted) {
     _selfTestStarted = true;   // after the page has had a moment to run its own start-up
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self runInPage:tpd::ShellCore::selfTestCall()]; });
@@ -220,12 +256,38 @@ class MacPlatform : public tpd::IPlatform {
 - (BOOL)windowShouldClose:(NSWindow*)s { return _core->api().requestClose(false) ? YES : NO; }
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)a { return _core->api().requestClose(true) ? NSTerminateNow : NSTerminateCancel; }
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)a { return YES; }
-- (BOOL)application:(NSApplication*)a openFile:(NSString*)f { if (_core) _core->api().openPath(S(f)); else _pendingOpen = S(f); return YES; }
+// H8: a .thunder file double-clicked in the Finder, dropped on the Dock icon, or handed over by a second launch (LaunchServices sends it to THIS copy). Only an existing .thunder / .json file is taken (S-1 then allows exactly that path).
+- (void)openOne:(NSString*)path {
+  const std::string p = tpd::openablePath(S(path)); if (p.empty()) return;
+  if (_core) { logOpen(p); _core->api().openPath(p); }   // openPath holds it until the page is ready
+  else _pendingOpen = p;                                  // before the core exists: given at didFinishNavigation
+  [_win deminiaturize:nil]; [NSApp activateIgnoringOtherApps:YES];
+}
+- (BOOL)application:(NSApplication*)a openFile:(NSString*)f { [self openOne:f]; return YES; }
+- (void)application:(NSApplication*)a openURLs:(NSArray<NSURL*>*)urls { for (NSURL* u in urls) if (u.isFileURL) [self openOne:u.path]; }
 - (void)applicationWillTerminate:(NSNotification*)n { if (_core && !_core->shutdown(3000)) _exit(0); }   // L-2: a worker inside a long load is waited for 3 s at most
 @end
 
+// H8: ONE COPY AT A TIME (Electron: requestSingleInstanceLock). LaunchServices already keeps one copy of an app opened from the Finder; a copy started from a terminal or `open -n` is a second one: it asks the running copy to
+// open its file (`open -a <that app> <file>` reaches it as application:openURLs:) or just brings it forward, and leaves. Not for --selftest / --allow-multiple (CI and dev runs).
+static bool handedToRunningCopy(int argc, const char* argv[]) {
+  std::vector<std::string> args; for (int i = 1; i < argc; i++) { const std::string a = argv[i]; if (a == "--selftest" || a == "--allow-multiple") return false; args.push_back(a); }
+  NSString* bid = [[NSBundle mainBundle] bundleIdentifier]; if (!bid) return false;
+  NSRunningApplication* other = nil;
+  for (NSRunningApplication* r in [NSRunningApplication runningApplicationsWithBundleIdentifier:bid]) if (r.processIdentifier != getpid() && !r.terminated) { other = r; break; }
+  if (!other || !other.bundleURL) return false;
+  const std::string file = tpd::projectFromArgs(args);
+  if (!file.empty()) {
+    NSTask* t = [[NSTask alloc] init]; t.executableURL = [NSURL fileURLWithPath:@"/usr/bin/open"]; t.arguments = @[ @"-a", other.bundleURL.path, N(file) ];
+    NSError* err = nil; if ([t launchAndReturnError:&err]) [t waitUntilExit];
+  }
+  [other activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+  return true;
+}
+
 int main(int argc, const char* argv[]) {
   @autoreleasepool {
+    if (handedToRunningCopy(argc, argv)) return 0;
     NSApplication* app = [NSApplication sharedApplication];
     [app setActivationPolicy:NSApplicationActivationPolicyRegular];
     TPDApp* d = [[TPDApp alloc] init];

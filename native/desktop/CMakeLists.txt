@@ -21,7 +21,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_
 find_package(Threads REQUIRED)
 add_library(thunder_desktop_shared STATIC
   shared/app_scheme.cpp shared/put_store.cpp shared/bridge_translator.cpp shared/live_host.cpp shared/bridge_session.cpp shared/desktop_api.cpp shared/text_util.cpp shared/audio_null.cpp shared/shell_core.cpp shared/recovery_store.cpp
-  shared/audio_devices.cpp shared/input_capture.cpp shared/midi_registry.cpp
+  shared/audio_devices.cpp shared/input_capture.cpp shared/midi_registry.cpp shared/launch_args.cpp shared/file_assoc.cpp shared/update_check.cpp
   ${TPA_CPP}/live_engine.cpp ${TPA_CPP}/live_events.cpp ${TPA_CPP}/songfit.cpp ${TPA_CPP}/pad_filler.cpp)
 # UBSan's vptr check cannot work across the -fno-rtti core: the shared_ptr control blocks the core makes (Song, SeqSession) are released in code built WITH rtti (this library, its tests), and the check calls them
 # "not a _Sp_counted_base" (a false positive: the Core (Linux, sanitizers) job, desktop_live_host and desktop_session). Off for this library and its tests, as for test_seq_takeover and the other tests that hold a Seq.
@@ -53,7 +53,7 @@ else()
 endif()
 
 if(THUNDER_BUILD_DESKTOP_TESTS)
-  set(TPD_TESTS app_scheme translator put_store desktop_api live_host session shell_core audio_devices midi_registry input_capture audio_session tfx)
+  set(TPD_TESTS app_scheme translator put_store desktop_api live_host session shell_core audio_devices midi_registry input_capture audio_session tfx launch_args update_check)
   if(NOT MSVC)
     list(APPEND TPD_TESTS midi_manager)
   endif()
@@ -113,7 +113,7 @@ if(THUNDER_DESKTOP_SHELL)
     set(WV2_DLL "${THUNDER_WEBVIEW2_DIR}/build/native/${WV2_ARCH}/WebView2Loader.dll")
     add_executable(thunder_desktop_win WIN32 win/main_win.cpp)
     target_include_directories(thunder_desktop_win PRIVATE "${THUNDER_WEBVIEW2_DIR}/build/native/include" ${TPD_GEN})
-    target_link_libraries(thunder_desktop_win PRIVATE thunder_desktop_audio "${WV2_LIB}" user32 ole32 shell32 comdlg32 shlwapi advapi32 oleaut32 runtimeobject)
+    target_link_libraries(thunder_desktop_win PRIVATE thunder_desktop_audio "${WV2_LIB}" user32 ole32 shell32 comdlg32 shlwapi advapi32 oleaut32 runtimeobject winhttp)
     target_compile_definitions(thunder_desktop_win PRIVATE THUNDER_APP_VERSION="${THUNDER_APP_VERSION}" UNICODE _UNICODE)
     target_compile_options(thunder_desktop_win PRIVATE /EHsc /utf-8 /W3)
     set_target_properties(thunder_desktop_win PROPERTIES OUTPUT_NAME "Thunder Plus")
@@ -132,6 +132,8 @@ if(THUNDER_DESKTOP_SHELL)
     # H7: the audio input needs NSMicrophoneUsageDescription in Info.plist (macOS asks the person the first time an input opens; without the key the open is refused). PlistBuddy runs after the plist is written.
     add_custom_command(TARGET ThunderPlus POST_BUILD
       COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/mac/add_mic_key.sh" "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>"
-      COMMENT "Info.plist: NSMicrophoneUsageDescription" VERBATIM)
+      # H8: the .thunder document type + UTI (mac/Info-extra.plist). The hardened-runtime audio-input entitlement (mac/Thunder.entitlements) is applied at signing time by mac/sign.sh.
+      COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/mac/plist_extras.sh" "$<TARGET_BUNDLE_CONTENT_DIR:ThunderPlus>" "${CMAKE_CURRENT_SOURCE_DIR}/mac/Info-extra.plist"
+      COMMENT "Info.plist: NSMicrophoneUsageDescription, .thunder document type" VERBATIM)
   endif()
 endif()

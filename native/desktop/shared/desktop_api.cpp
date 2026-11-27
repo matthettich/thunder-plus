@@ -108,10 +108,16 @@ DesktopApi::DesktopApi(IPlatform* plat, Emit emit, Config cfg) : plat_(plat), em
       while (allowed_.size() > kAllowMax) allowed_.erase(allowed_.begin());
     } catch (...) {}
   }
+  UpdateChecker::Hooks h;
+  h.httpGet = [plat](const std::string& u, std::string* b) { return plat->httpGet(u, b); };
+  h.openUrl = [plat](const std::string& u) { plat->openUrl(u); };
+  h.notify = [plat](const std::string& t, const std::string& m) { plat->notify(t, m); };
+  h.pushState = [this](const std::string& st) { push("thunder:upd", st); };
+  upd_.reset(new UpdateChecker(cfg_.version, std::move(h)));
   if (cfg_.asyncIo) io_ = std::thread([this] { ioLoop(); });
 }
 
-DesktopApi::~DesktopApi() { stopIo(); }
+DesktopApi::~DesktopApi() { upd_.reset(); stopIo(); }
 void DesktopApi::stopIo() {
   { std::lock_guard<std::mutex> g(ioM_); ioStop_ = true; }
   ioCv_.notify_all();
@@ -246,14 +252,15 @@ bool DesktopApi::handleImpl(const std::string& json) {
     return true;
   }
   if (ch == "thunder:out-show") { const std::string p = argStr(a, 0); std::error_code ec; if (!p.empty() && fs::exists(u8(p), ec)) plat_->showInFolder(p); return done("true"); }
-  if (ch == "thunder:link-enable" || ch == "thunder:link-sync" || ch == "thunder:link-tempo" || ch == "thunder:link-stop") return done("false");   // NOT YET (H8): Link off
+  if (ch == "thunder:link-enable" || ch == "thunder:link-sync" || ch == "thunder:link-tempo" || ch == "thunder:link-stop") return done("false");   // NOT YET: Link off
   if (ch == "thunder:link-start" || ch == "thunder:link-now") return done("0");
   if (ch == "thunder:io-start") return done("{\"ok\":false,\"why\":\"the Electron I/O helper is replaced by thunderCore in the native shell (audio and MIDI devices: H7)\"}");
   if (ch == "thunder:io-mic") return done("{\"ok\":false,\"why\":\"audio input is H7 (not in the H6 shell skeleton)\"}");
   if (ch == "thunder:natural-scroll") return done(plat_->naturalScroll() ? "true" : "false");
-  if (ch == "thunder:upd-state") return done("{\"version\":" + jsonQuote(cfg_.version) + ",\"avail\":null,\"ready\":false,\"notifyOnly\":true,\"dl\":null,\"file\":null}");
-  if (ch == "thunder:upd-check") return done("false");   // NOT YET (H8): the updater
-  if (ch == "thunder:upd-act") return done("null");
+  // H8: the updater is check-only (update_check.h): state / check / act answer for real; the page's Update button opens the release page
+  if (ch == "thunder:upd-state") return done(upd_->stateJson());
+  if (ch == "thunder:upd-check") { if (!plat_->canHttp()) return done("false"); upd_->check(true, [this, id](bool ok) { reply(id, ok ? "true" : "false"); }); return true; }
+  if (ch == "thunder:upd-act") { upd_->act(); return done("true"); }
   return done("null");
 }
 
@@ -266,6 +273,11 @@ bool DesktopApi::requestClose(bool quitting) {
 }
 
 void DesktopApi::tick() {
+  if (cfg_.autoUpdateCheck && plat_->canHttp()) {   // H8: Electron checks 8 s after it opens and every 4 hours
+    const int64_t now = cfg_.nowMs();
+    if (!nextAuto_) nextAuto_ = now + 8000;
+    else if (now >= nextAuto_) { nextAuto_ = now + 4LL * 3600 * 1000; upd_->check(false, nullptr); }
+  }
   if (closeDeadline_ && cfg_.nowMs() >= closeDeadline_) { closeDeadline_ = 0; closeOk_ = true; plat_->closeWindow(quitting_); }   // a page that does not answer in 3 s does not stop the window closing
 }
 
