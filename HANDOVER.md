@@ -543,6 +543,23 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### 27 Nov code review implemented: builds 690–698 (`docs/audits/2026-11-27-code-review.md`, §8 packages 1–11)
+
+Owner, 27 Nov: work through the review's §8, may dismiss findings, then merge to `main` and build a desktop. One commit per package on `beta`:
+- **1 · P1-1** `electron/updater.js` `newer()`: real semver (1.3.0 > 1.3.0-beta.2; leading `v`s stripped, so the stray `vv1.2.23` tag reads right). `tests/updater-version.test.js`.
+- **2 · P1-2 (build 690)** backups store sample refs, not base64 audio (`projText(ref)`; files and exports unchanged); refs listed in `bkIndex` / `rescueIndex` and kept by `smpTidy`; `kvSet` returns true/false; a failing backup logs and toasts once. `tests/backup-refs.test.js`.
+- **8 · P2-6 (build 691)** Reset audio engine gives a twice-crashed input helper another start (`ioGate.reset`, `thunder:io-reset`, `io.reset` in preload). `tests/io.test.js`.
+- **3 · P1-3 (build 692)** `sw.js` installs file by file (a failure is filled from the old cache), `tools/precache-check.mjs` (run by `tests/precache.test.js`, so by CI).
+- **11 · P3-1, P3-8** permissions only for `app://thunder`; no allow-list disk write when nothing changed. **P3-7 (build 694)** offline `?query` navigations fall back with `ignoreSearch`.
+- **4 · P2-1 (build 693)** 30 consequential empty catches now `tpLog`; Copy playback report ends with the last 20 tpLog entries (part of P3-9). `tests/silent-catch.test.js` keeps a ceiling (186) on empty catches on those paths.
+- **5 · P2-2 (build 695)** undo `undoTrim()`: the 200 cap plus a 32e6-char budget, newest always kept. `tests/undo-budget.test.js`.
+- **6 · P2-4 (build 696)** the 100 ms tempo/prerender and 50 ms settle timers sleep while hidden **and stopped** (background play unchanged). `tests/hidden-timers.test.js`.
+- **10 · P2-8 (build 697)** lint gate: `npm run lint` (`tools/lint.mjs`, `eslint.config.mjs`; no-undef, dupe keys, unreachable, fallthrough…), a CI step before the Node tests. Its one finding: chains' duplicate `adsr` help key (same text), removed.
+- **7 · P2-5 (build 698)** PERFORM sizes / LFO lists declared once; `tests/startup-song.test.js` now fails on any var/function declared twice in a top-level scope.
+- **Dismissed:** P2-7 (`npm test` completes: 5 min 10 s here on 2 vCPU, ~3 min in CI, which already has a 20-minute timeout; the review killed it at 4 min), so package 9 is not needed. The 60 s trim and 3-min backup timers stay as they are (P2-4: deliberate in the battery audit; a backup while hidden is the last chance to keep recent edits). P3-6 (each build's new `CACHE` replaces the runtime cache). P3-2, P3-3, P3-4 are notes or need the owner (CSP, `?seqtest`, a GENERATED banner / `.coderabbit.yaml`).
+- **Checks run:** full `npm test` 2080 tests, 2027 pass, 0 fail, 53 skipped (with acorn, as CI); `npm run lint` 0 errors; `make-core` / `make-fx-cores --check` up to date; `tools/browser-check.mjs` all ok.
+- **Open, not from this review:** `tools/recorder-check.mjs` fails 2 lines on the sample-rate toast **before these changes too** (it expects the old wording "… kHz and the app at …"; the app now says "Test interface is 48 kHz, the app 44.1 kHz: …"): the check needs its regex updated. `songBpm()` / `wavesPre()` sit in the ENGINE block, outside the app's IIFE, so on the page they cannot see `S` and fall back to 120 BPM (in the render worker the glue declares `S`): check whether any page-side caller (envelope ms in the UI, `envMs`) shows a wrong time at other tempos. `tpLog` stops after 200 distinct entries in a session (it never rotates).
+
 ### Pump code sent to the track-FX worklet over the port is lost in Chrome 153: FIXED in build 689 (26 Nov)
 
 Both port messages now send `{pumpBytes}` (see the 26 Nov build 689 entry). Left for later: none known; `tests/port-no-module.test.js`
@@ -935,6 +952,13 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 **Decided 25 Nov (nothing to do):** pad removal fix pushed; on the new engine the effect and chains level meters come first, then the pad flashes / dogs, then the metronome click; hand-played pads and keys stay on the old engine for the first Android beta; the fallback message shows on the first PLAY of each song; Resume restarts the row; no verdict within 5 s = the old engine plays; Claude merges PRs without asking once CI and the lead's review pass.
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
+
+**27 Nov review fixes (builds 690–698, desktop v1.3.17)**
+- [ ] **Phone and computer: record or load a long sample, keep working past two backups (3 min each), then File → Restore a backup.** Pass: the backup opens with the sample's audio; Settings › App storage is not growing by the sample's size every 3 minutes.
+- [ ] **Desktop app (Mac): if the input helper ever says it stopped, press Settings › Audio › Reset audio engine.** Pass: native inputs / MIDI come back without quitting the app.
+- [ ] **Phone: open the app once online after this build, then offline (airplane mode) open a shared-project link or the app.** Pass: the app opens, not an error page.
+- [ ] **Desktop app (beta tester on a -beta build): when v1.3.17 is out, Check for update.** Pass: it offers v1.3.17 (a -beta was wrongly ranked above its release before).
+- [ ] **Phone: a song with PERFORM scenes, macros and track LFOs opens and plays as before.** Pass: scenes A/B, parts and LFOs are intact.
 
 **…pump effects that get their code late (26 Nov; build 689, branch `fix/pump-port-bytes`)**
 - [ ] **Computer (Chrome / desktop app) and phone: open a song with a …pump effect on a track (TUBE, CRUSH, SPRING…) and press PLAY straight away.** Pass: the effect is heard from the first bars (before, in Chrome 153, a track whose effects were set up before pump had loaded could stay dry until reload).
