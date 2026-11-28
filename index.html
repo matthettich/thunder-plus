@@ -27634,7 +27634,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 704;
+const BUILD = 705;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30529,6 +30529,12 @@ function optDir(dir, grid){
   // next number on Sect, Inst and FX); ◀ is earlier, ▶ later. dn: the step in number for this key.
   const dn = big ? -d : d;
   if (tv === 'phrase' && !(grid && patNavOn) && pvActive()){ phShownGo(); return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d); }   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
+  /* PAD ALT = THE ARRANGEMENT (build 705; owner, 28 Nov: "I'd love alt + arrows to navigate around the arrangement always, just as it does
+     when phrase is in focus"; "step through empty cells"; computers unchanged). PAD mode (the on-screen pad, and a keyboard in PAD mode) with
+     PATTERN NAV on: ALT + any arrow on every screen moves the song cursor one cell, empty cells included (padArrStep), and the screen follows.
+     Phrase keeps phraseGrid (the same move, which also opens the pattern). KEYS mode never gets here with grid off Phrase. PATTERN NAV off:
+     every screen as before. To undo: delete this line (HANDOVER, 28 Nov "build 705: pad ALT + arrows"). */
+  if (grid && patNavOn && tv !== 'phrase') return padArrStep(dir);
   // Mixer FX row: ALT+▲ turns effects on in order (up to eight), ALT+▼ turns the last one back off.
   // ALT arrows on the Mixer go to another track, as on FX (owner, 8 Nov); only ▲▼ on the FX row keep turning effects on and off.
   if (tv === 'mixer'){ if (big && cs.mixer.y === 5) fxActiveStep(cs.mixer.x, d); else move(dn, 0); return; }
@@ -30627,6 +30633,25 @@ function otherPatStep(dir){
   if (x === MT || (x >= 0 && x < ntr())) c.x = x;
   if (patNavOn) songGridDir(dir); else c.y = clamp(c.y + (dir === 'down' ? 16 : -16), 0, 255);
   selA = null;
+  if (apArrOk()) try { apTop(); } catch(_){}
+  const h = apHost; apHost = tv; apLastKey = ''; try { apFollow(); } finally { apHost = h; }
+  draw();
+}
+// PAD ALT = THE ARRANGEMENT (build 705, see optDir): one cell up / down / left / right on the Song grid, empty cells included (the master column
+// where it is shown), from this screen's track on Mixer / FX / MOD / INST; at the edge it stays. Then the screen follows the cell, as it follows
+// Arrange (apFollow: Phrase its pattern, FX / MOD / Mixer the track, INST the block's instrument), and Sect shows the cell's sect.
+function padArrStep(dir){
+  const c = cs.song, n = ntr(), mst = apF !== 'arr' || arrSideMst();
+  if (PATSTEP_V.has(tv)){ const x = tv === 'mixer' ? (cs.mixer.y === 7 ? MT : cs.mixer.x) : tv === 'inst' ? cTrack : (cFxT >= NT ? MT : cFxT); if (x === MT || (x >= 0 && x < n)) c.x = x; }
+  navT = performance.now(); c.pg = false;
+  if (dir === 'left' || dir === 'right'){ const u = (c.x === MT ? n : c.x) + (dir === 'right' ? 1 : -1), last = mst ? n : n - 1;
+    if (u >= 0 && u <= last) c.x = u === n ? MT : u; }
+  else { const y = c.y + (dir === 'down' ? 1 : -1); if (y >= 0 && y <= 255) c.y = y; }
+  selA = null;
+  const VR = songViewRows(), top = c.top || 0;
+  if (c.y < top) c.top = c.y; else if (c.y > top + VR - 1) c.top = c.y - VR + 1;
+  c.top = clamp(c.top, 0, 256 - VR);
+  if (tv === 'sect'){ const cid = S.song[c.y] ? S.song[c.y][c.x] : -1; if (cid >= 0) cSect = cid; }
   if (apArrOk()) try { apTop(); } catch(_){}
   const h = apHost; apHost = tv; apLastKey = ''; try { apFollow(); } finally { apHost = h; }
   draw();
@@ -31786,19 +31811,23 @@ grid.addEventListener('scroll', e => { if (e.target.classList && e.target.classL
 let CW = 0.6, meterEls = [], masterEls = [], trimEls = [], trimLit = '';
 const MH = 8, MW = 36;
 const HINT = {
-  song:'EDIT add · EDIT×2 new sect · ALT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · ALT+arrows next block',
-  songP:'EDIT add · EDIT×2 new phrase (on a block: unique copy) · ALT+EDIT clear · EDIT+◀▶ ±1 · SHIFT+▶ open phrase · ALT+arrows next block',
-  sect:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · ALT+◀▶ other sect',
+  song:'EDIT add · EDIT×2 new sect · ALT+EDIT clear · EDIT+◀▶ ±1 ▲▼ ±16 · SHIFT+▶ open · ALT+arrows one cell',
+  songP:'EDIT add · EDIT×2 new phrase (on a block: unique copy) · ALT+EDIT clear · EDIT+◀▶ ±1 · SHIFT+▶ open phrase · ALT+arrows one cell',
+  sect:'EDIT add phrase · EDIT×2 new · EDIT+arrows change · SHIFT+▶ open · SHIFT+◀ song · ALT+arrows move in the song',
   phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · ALT+EDIT clear',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · ALT+EDIT clear · ALT+arrows go to phrase · SHIFT+▶ inst',
-  inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · ALT+◀▶ other instrument · SHIFT+◀ phrase',
-  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · ALT+arrows other track · FX row: ALT+▲ FX on (up to 8), ALT+▼ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · ALT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
-  fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · ALT+EDIT remove or reset · ALT+◀▶ other track · SHIFT+◀ mixer',
-  mod:'EDIT on TARGET picks what it moves · EDIT+◀▶ ±1 ▲▼ ±more · ALT+EDIT removes the LFO · ALT+◀▶ other track · SHIFT+◀ fx · SHIFT+▶ project',
-  project:'EDIT on › runs it · EDIT+◀▶ change · ALT+EDIT reset · SHIFT+▼ back',
+  inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · ALT+arrows move in the song (the block’s instrument follows) · SHIFT+◀ phrase',
+  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · ALT+arrows move in the song (◀▶ other track) · FX row: EDIT+▲▼ FX on (up to 8) / off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · ALT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
+  fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · ALT+EDIT remove or reset · ALT+arrows move in the song (◀▶ other track) · SHIFT+◀ mixer',
+  mod:'EDIT on TARGET picks what it moves · EDIT+◀▶ ±1 ▲▼ ±more · ALT+EDIT removes the LFO · ALT+arrows move in the song (◀▶ other track) · SHIFT+◀ fx · SHIFT+▶ project',
+  project:'EDIT on › runs it · EDIT+◀▶ change · ALT+EDIT reset · ALT+arrows move in the song · SHIFT+▼ back',
 };
+// PATTERN NAV off (build 705): the pad's ALT keys are the old ones on these screens, so are their hints
+const HINT_OLD = {sect:HINT.sect.replace('ALT+arrows move in the song', 'ALT+◀▶ other sect'), inst:HINT.inst.replace('ALT+arrows move in the song (the block’s instrument follows)', 'ALT+◀▶ other instrument'),
+  fx:HINT.fx.replace('ALT+arrows move in the song (◀▶ other track)', 'ALT+◀▶ other track'), mod:HINT.mod.replace('ALT+arrows move in the song (◀▶ other track)', 'ALT+◀▶ other track'),
+  mixer:HINT.mixer.replace('ALT+arrows move in the song (◀▶ other track) · FX row: EDIT+▲▼ FX on (up to 8) / off', 'ALT+arrows other track · FX row: ALT+▲ FX on (up to 8), ALT+▼ off'), project:HINT.project.replace(' · ALT+arrows move in the song', '')};
 // PATTERN NAV off: the Song hint names the old ALT keys (◀▶ previous/next block, ▲▼ page 16 rows).
-const songHintOld = t => t.replace('ALT+arrows next block', 'ALT+◀▶ next block ▲▼ page');
+const songHintOld = t => t.replace('ALT+arrows one cell', 'ALT+◀▶ next block ▲▼ page');
 function info(){
   const c = cs[tv];
   if (selA){
@@ -31836,7 +31865,7 @@ function info(){
     if (c.y === 6){ const U = sckUsesOf(c.x);
       return `${trkLab(c.x)}${trkKind(c.x)} · SIDECHAIN SOURCE ` + (U.length ? 'for ' + U.map(u => u.where).join(', ') : 'for nothing yet · pick this track as Source on a compressor, gate, envelope filter or Sidechain In'); }
     if (c.y === 5){ const A = S.tfx[c.x], n = fxCount(A);
-      return `${trkLab(c.x)}${trkKind(c.x)} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · ALT+▲▶ turn effects on, ALT+▼◀ off (settings kept) · EDIT opens FX'; }
+      return `${trkLab(c.x)}${trkKind(c.x)} · ${n}/${FXSLOTS} active` + (A.some(Boolean) ? ' · ' + fxList(A) : '') + ' · ' + (inMode !== 'keys' && patNavOn ? 'EDIT' : 'ALT') + '+▲▶ turn effects on, ' + (inMode !== 'keys' && patNavOn ? 'EDIT' : 'ALT') + '+▼◀ off (settings kept) · EDIT opens FX'; }
     const m = S.mix[c.x];
     // GAIN STAGING: on TRIM, what it sends in (its light) and where VOL is
     if (c.y === 0){ const b = rt && rt.pl.buses[c.x], ip = b && b.ipk > 0.00002 ? (20 * Math.log10(b.ipk)).toFixed(1) + ' dB' : '';
@@ -32231,6 +32260,7 @@ function draw(){
   let hintTxt = (tv === 'song' && !sectsOn) ? (inMode === 'keys' ? HINTK.songP : HINT.songP) : (inMode === 'keys' ? HINTK : HINT)[tv];
   if (tv === 'phrase' && inMode !== 'keys' && !patNavOn) hintTxt = hintTxt.replace('ALT+arrows go to phrase', 'ALT+▲▼ page');
   if (tv === 'song' && inMode !== 'keys' && !patNavOn) hintTxt = songHintOld(hintTxt);   // PATTERN NAV off: the old ALT keys
+  if (inMode !== 'keys' && !patNavOn && HINT_OLD[tv]) hintTxt = HINT_OLD[tv];
   if (asongOn()) hintTxt += inMode === 'keys' ? ' · double-click opens · Alt-click mutes' : ' · tap twice opens · hold mutes';
   const mstP = tv === 'phrase' && mstView();
   if (mstP) hintTxt = inMode === 'keys' ? 'Master phrase: commands only · letters pick a command (V F G R T…) · type hex for its value · Del cell · Ctrl+Shift+↑↓ lines · Ctrl+C/V' : HINT.phraseM;
@@ -38147,6 +38177,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [705, '28 Nov', ['Mobile (the on-screen pad): ALT + arrows now move around the song on every screen, one cell at a time, empty cells too, as they already did on Phrase, and the screen follows: FX, MOD and the Mixer show the new track, INST the block\u2019s instrument, Sect its sect. On the Mixer\u2019s FX row, EDIT + arrows turn effects on and off (as before; ALT + ▲▼ did it too). ‹ PREV / NEXT › still step instruments, tracks and sects. Computers in KEYS mode are unchanged; with PATTERN NAV off, the pad is as before.']],
   [704, '28 Nov', ['Nine new tracker commands, after the OP-Z and OP-XY step components: RUP and RDN (each play of a row\u2019s note climbs or falls, by scale steps on a KEY FOLLOW instrument with a scale, else semitones, then back), MUL (Y even hits across the step, whatever the ticks), SWP (a row\u2019s TVL, TPN and FXV glide to their value), GTO (go on from row XX of the phrase), PUL and HLD (the row plays Y times before the track moves on; HLD lets the note ring), SPK (whether a condition decides the note, the commands or the whole row) and RST (start the pass counters again). Type them in an FX column; the manual and the command list describe each.']],
   [703, '27 Nov', ['PLY on live synths (Bass, Voice, Acid, Machine, pump and …waves engines): a reversed note swells up from silence and stops dead, as a sample played backwards does. It lasts until KIL or OFF on the row, else PLY X1 lasts X lines (PLY 01: 4). Samples and rendered pads still play backwards as before.', 'FOLLOW and Arrange paging: a track that played a stray block and then went quiet no longer freezes the follow on its old row (the cursor on that track, or a stray pattern on a track before the playing ones, stopped Song / Arrange following the playhead).']],
   [702, '27 Nov', ['Arrange and Song: the + to name a section now shows on any row that doesn’t already start one, so you can add as many as you like (inside a section it splits it). The section names follow the rows exactly while you scroll.']],

@@ -4,8 +4,9 @@ Pick-up notes for continuing this work in a later session. Read this together wi
 [`README.md`](README.md) (the app's own docs) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 Keep this file up to date at the end of a work session.
 
-## PICK UP HERE (28 Nov 2026, 10:50): beta = main = build 704, desktop v1.3.22
+## PICK UP HERE (28 Nov 2026, 11:10): beta = build 705 (PR from `alt-arrange`); main = build 704, desktop v1.3.22
 
+- **Build 705 (28 Nov, PR from `alt-arrange` into `beta`):** pad ALT + arrows move around the song on every screen. **Everything it changes and how to undo it: the 28 Nov entry "build 705: pad ALT + arrows" under To-do.**
 - **Build 704 (28 Nov; PR #362 into `beta`, PR #363 beta → main; desktop v1.3.22; the owner's tests are in the punch list):** nine new tracker commands after the OP-Z / OP-XY step components, all in `makeSeq` (so `core/seq-core.js`, regenerated): RST RUP RDN MUL SWP GTO SPK PUL HLD (details in the 28 Nov entry under To-do; tests `tests/step-components.test.js`; punch list "Step components"). UI: command list groups, tooltips, value descriptions, manual, README, changelog. Not wired: the master column (`MST_FXC` unchanged), the native engine port (`docs/port/ENGINE-INVENTORY.md` has a line).
 - **Build 703 (27 Nov, 14:30):** FOLLOW froze on a track that had played one stray block and gone quiet (tp.pos kept its old row; `posLive` in followPlay now goes by tracks that played in the last 16 lines). PLY on live engines: a reversed note swells up from silence and stops dead (bassNote, `rvd` from the sequencer: until KIL / OFF, else PLY X1 = X lines, 01 = 4). Not heard by the lead: on the punch list.
 - **Shipped 27 Nov:** the 27 Nov code review (builds 690–698, its entry under To-do), tempo-synced envelopes follow the song
@@ -567,6 +568,42 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### 28 Nov: build 705: pad ALT + arrows move around the song on every screen (branch `alt-arrange`; REVERT NOTE)
+
+Owner, 28 Nov: "I'd love alt + arrows to navigate around the arrangement always, just as it does (at least up and down) when phrase is in
+focus"; "we should step through empty cells"; "I don't want to change the behavior on a computer"; "I'm trying to make keyboard and mobile
+match more. Without breaking or changing the desktop behavior"; "make a note of everything in handover and if I want to revert this behavior,
+I will reference that note".
+
+**What changed (PAD input mode only, with PATTERN NAV on, the default):** ALT + any arrow on Song, Sect, Inst, Mixer, FX, MOD and Project
+moves the song cursor one cell up / down / left / right, empty cells included (the master column where the screen shows it; at the grid's edge it
+stays), and the screen follows the cell the way it follows Arrange (`apFollow` with that screen as host). Phrase is unchanged (it already did
+this, `phraseGrid`, and it also opens the pattern). PAD input mode covers the on-screen pad and a computer keyboard set to PAD mode (it routes
+through the same `optDir(dir, true)`); a computer in KEYS mode is untouched.
+
+| Screen | Pad ALT + arrows before 705 | From 705 |
+|---|---|---|
+| Song (and Arrange holding the keys) | ▲▼◀▶ the nearest FILLED block that way (`songGridDir`; one cell only when there was none) | one cell, empty or not |
+| Sect | ◀▶ other sect, ▲▼ ±16 sects | move in the song; the sect shown is the cell's (when it has one) |
+| Inst | ◀▶ other instrument (▲▼ too) | move in the song from this track; the instrument is the block's (when it has a phrase) |
+| Mixer | arrows: other track; FX row ALT+▲▼ effects on / off (`fxActiveStep`) | move in the song from this track; ◀▶ change the Mixer's track (master column = master row); FX row: use EDIT + arrows (already did the same `fxActiveStep`) |
+| FX, MOD | ◀▶ (▲▼) other track, wrapping through the master | ◀▶ other track via the song column (stops at the edges, no wrap; the master column only on the Song screen / where Arrange shows it); ▲▼ move song rows |
+| Project | nothing | moves the song cursor (nothing on screen changes unless Arrange is beside it) |
+
+Still the same: ‹ PREV / NEXT › on the command row (they call `optDir` without `grid`), `[` `]`, every KEYS-mode key (⌥▲▼ on Phrase / Song /
+Mixer / FX / MOD / Inst, ⌥◀▶ change screen), SHIFT + arrows, EDIT + arrows. PATTERN NAV off (Settings): the pad's ALT keys and hints are all as
+before 705.
+
+**Code:** `optDir` (one line, just after the Pattern view line: `if (grid && patNavOn && tv !== 'phrase') return padArrStep(dir);`), the new
+`padArrStep` (after `otherPatStep`), the pad hints `HINT.song / songP / sect / inst / mixer / fx / mod / project` with `HINT_OLD` (PATTERN NAV off)
+and its line in the hint code, the Mixer FX row's info line (says EDIT in PAD mode with PATTERN NAV on), the 705 changelog entry, BUILD 705,
+sw.js v705, `tests/pad-alt-arrange.test.js`.
+
+**To revert:** delete that one line in `optDir` and the pad goes back to the old behaviour on every screen. Then, for tidiness: set the hint
+strings back (or just make the `HINT_OLD` line always apply: drop `!patNavOn &&` from it, and set `HINT.song / songP`'s "ALT+arrows one cell"
+back to "ALT+arrows next block" with `songHintOld` to match), put the Mixer FX info line back to "ALT+▲▶ … ALT+▼◀", delete `padArrStep` and
+`tests/pad-alt-arrange.test.js`, and add a changelog line. Or `git revert` the 705 commit (it touches nothing else).
+
 ### 28 Nov: build 704, step components (RST RUP RDN MUL SWP GTO SPK PUL HLD; branch `step-components`, from `beta`, PR into `beta`)
 
 - Owner's idea: the OP-Z and OP-XY step components as tracker commands. Nine new names on the end of `FXC` after FLZ (saved songs keep their numbers; `tests/patch-knobs.test.js` pins the tail). All in `makeSeq`; `core/seq-core.js` regenerated. Not in `MST_FXC`.
@@ -1003,6 +1040,13 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 **Decided 25 Nov (nothing to do):** pad removal fix pushed; on the new engine the effect and chains level meters come first, then the pad flashes / dogs, then the metronome click; hand-played pads and keys stay on the old engine for the first Android beta; the fallback message shows on the first PLAY of each song; Resume restarts the row; no verdict within 5 s = the old engine plays; Claude merges PRs without asking once CI and the lead's review pass.
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
+
+**Pad ALT + arrows (28 Nov; build 705)**
+- [ ] Phone, Song: ALT+▼ from a block with an empty row under it lands on the empty row (it used to skip to the next block); ALT+◀▶ go track by track, the master column last.
+- [ ] Phone, FX and MOD: ALT+◀▶ change track (and the effects / LFOs shown); ALT+▲▼ move song rows (Arrange beside it, if shown, moves too).
+- [ ] Phone, Mixer: ALT+◀▶ change track; on the FX row EDIT+▲▼ turns effects on / off; ALT+▲▼ there now moves song rows instead.
+- [ ] Phone, Inst: ALT+▲▼ to a block of another instrument: INST shows it. Sect: ALT onto a block shows its sect. ‹ PREV / NEXT › still step instruments / tracks / sects.
+- [ ] Computer in KEYS mode: Option+arrows exactly as before on every screen.
 
 **Step components (28 Nov; build 704, branch `step-components`: not merged until you have tried them)**
 - [ ] **Phone or computer, ramps: on a one-row pattern repeated (or a loop) type a note with `RUP 14`, then `RDN 23`; then give the track a KEY FOLLOW instrument, set SCA (or the song's scale) to major and try `RUP 13` again.** Pass: with `RUP 14` the note climbs a semitone each pass for 4 passes, then starts over (C C# D D# C ...); `RDN 23` falls 2 semitones for 3 passes; with KEY FOLLOW and a scale the same steps are scale steps (C D E, never a note outside the scale).
