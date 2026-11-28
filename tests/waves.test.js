@@ -50,23 +50,29 @@ function patchFor(M, type, params) {
     if (aIn.includes('in')) cab.push({ from: ['g', 'out'], to: ['b', 'in'] }); if (aIn.includes('inR')) cab.push({ from: ['g', 'out'], to: ['b', 'inR'] });
     outs.slice(0, 2).forEach((p, i) => cab.push({ from: ['b', p], to: ['o', ['in', 'inR'][i]] }));
     if (!aIn.length) cab.push({ from: ['g', 'out'], to: ['o', 'in'] });
+    if (m.probe === true) cab.push({ from: ['g', 'out'], to: ['b', 'a'] }, { from: ['e', 'out'], to: ['b', 'b'] });   // a probe (the Scope) watches the voice and its envelope; nothing comes out of it
   }
   return { modules: mods, cables: cab };
 }
 function renderModule(D, type, over) {
   const m = D.MODULES[type], params = Object.assign(defaults(m), over);
   const E = new D.WavesEngine(48000, { maxVoices: 4, quality: 'full', seed: 7, transport: TRANSPORT }); E.loadPatch(patchFor(D.MODULES, type, params));
+  const probe = D.MODULES[type].probe === true; if (probe) E.handleMessage({ op: 'telemetry', value: true });
   const L = new Float32Array(128 * BLOCKS), R = new Float32Array(128 * BLOCKS);
   for (let b = 0; b < BLOCKS; b++) { if (b === 0) { E.noteOn(60, 1); E.noteOn(67, .7); } if (b === 70) E.noteOff(60); E.process(128); L.set(E.bus(1), b * 128); R.set(E.busR(1), b * 128); }
   // Under load the engine sheds to 'draft' quality, which changes the DSP; a golden hash taken then would be wrong.
   if (E.quality !== 'full') throw new Error('engine shed to draft quality while rendering ' + type + ' (machine too slow for a stable hash)');
-  return { L, R };
+  let extra = null;   // a probe's show() list (the Scope has no output): hashed with the sound, so its picture is under a golden too
+  if (probe) { const sh = E.telemetry().shows.find(x => x[0] === 'b'); extra = new Float32Array(sh ? sh[1] : 2 + 512); }
+  return extra ? { L, R, extra } : { L, R };
 }
 const finite = a => { for (const v of a) if (!Number.isFinite(v)) return false; return true; };
 const energy = a => { let e = 0; for (const v of a) e += v * v; return e; };
-const SKIP = new Set(['hostIn', 'out']);
+// lverb (Lite reverb) is not rendered here: its golden hashes are in chains-modules.json and tests/lverb.test.js tests the shared code (and checks the waves copy is identical).
+// Rendering it here would also move every later module's hash: the hashes depend on how many renders came before them in this one wasm instance (found 12 Nov).
+const SKIP = new Set(['hostIn', 'out', 'lverb', 'send', 'recv']);   // send, recv: never run, the graph's compile step resolves them into cables (tests/chains-sendrecv.test.js)
 /* Modules that are silent in this harness, and why. A silent hash proves "unchanged", not "working", so the list is explicit. */
-const NEEDS_OWN_INPUT = new Set(['beads', 'mixer']);   // beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`
+const NEEDS_OWN_INPUT = new Set(['beads', 'mixer', 'compare', 'rect', 'clkmul', 'chance', 'burst', 'gatedly', 'flipflop', 'dline', 'expr']);   // expr: its default formula (a * k1) needs input A, which the harness does not feed (tests/modules-expr.test.js tests its sound); dline: the stressed Time (1.4 s) is longer than the 1.07 s render, so it is silent (tests/modules-delay.test.js tests its sound); beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`; compare, rect: control maths that need a control signal patched in (their gates and halves are 0 on the harness's input); clkmul, chance, burst, gatedly, flipflop: gate tools that need a pulse patched in (the default input holds no gate)
 
 test('waves: the engine loads and exposes its public surface', () => {
   const { D } = engine({ wasm: false });
@@ -80,11 +86,14 @@ test('waves: the real wasm (Plaits/Elements and the effects) loads, and records 
 
 test('waves: every module renders finite audio and matches its golden hash (defaults, stressed, switches on)', () => {
   const { D } = engine(), actual = {}, bad = [];
-  for (const type of Object.keys(D.MODULES).sort()) {
+  // The hashes depend on how many renders came before them in this one wasm instance (see SKIP below), so a module added later is
+  // rendered after all the existing ones (LATE, in this order): that way no existing hash moves. Add new modules to LATE, not into the sorted run.
+  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock', 'scope', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'expr'];
+  for (const type of Object.keys(D.MODULES).filter(t => !LATE.includes(t)).sort().concat(LATE)) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type)) continue;
     const d = renderModule(D, type), s = renderModule(D, type, stress(m)), w = renderModule(D, type, switchesOn(m));
-    for (const r of [d, s, w]) if (!finite(r.L) || !finite(r.R)) bad.push(type);
-    actual[type + ' @default'] = H.hashFloats([d.L, d.R]); actual[type + ' @stressed'] = H.hashFloats([s.L, s.R]); actual[type + ' @switches-on'] = H.hashFloats([w.L, w.R]);
+    for (const r of [d, s, w]) if (!finite(r.L) || !finite(r.R) || (r.extra && !finite(r.extra))) bad.push(type);
+    actual[type + ' @default'] = H.hashFloats([d.L, d.R].concat(d.extra ? [d.extra] : [])); actual[type + ' @stressed'] = H.hashFloats([s.L, s.R].concat(s.extra ? [s.extra] : [])); actual[type + ' @switches-on'] = H.hashFloats([w.L, w.R].concat(w.extra ? [w.extra] : []));
   }
   assert.deepEqual([...new Set(bad)], [], 'modules producing NaN/Infinity');
   const g = H.golden('waves-modules', actual);
@@ -162,4 +171,53 @@ test('waves: soft() is exact where the app depends on it (identity below the kne
   for (const x of [.81, 1, 2, 10, 1e6]) assert.ok(soft(x) > .8 && soft(x) < 1.0000001);
   assert.ok(Math.abs(soft(.8) - soft(.8 + 1e-9)) < 1e-6); for (const x of [.3, .9, 1.7]) assert.equal(soft(-x), -soft(x));
   assert.ok(Math.abs(soft(1) - 0.9523) < 1e-3, 'pinned value at 1.0 (' + soft(1).toFixed(5) + ')');
+});
+
+/* …WAVES LIVE (8 Nov): a node plays one Out bus and runs only what feeds it (setOnly). The bus must come out the same, sample for
+   sample, and whatever can't be proven safe must keep running. */
+function twoBusDoc(extra = {}) {
+  const v = (id, wave) => ({ id, type: 'vco', scope: 'poly', params: { wave, tune: 0, fine: 0 } });
+  return { format: 'waves.patch', version: 1, modules: [
+    { id: 'h', type: 'hostIn', scope: 'poly', params: { transpose: 0 } },
+    v('a', 1), { id: 'ea', type: 'adsr', scope: 'poly', params: { a: .005, d: .2, s: .7, r: .05 } }, { id: 'ga', type: 'vca', scope: 'poly', params: { gain: 1 } }, { id: 'o1', type: 'out', scope: 'mono', params: { slot: 1, level: 1 } },
+    v('b', 2), { id: 'gb', type: 'vca', scope: 'poly', params: { gain: 1 } }, { id: 'o2', type: 'out', scope: 'mono', params: { slot: 2, level: 1 } },
+    ...(extra.modules || [])],
+  cables: [
+    { from: ['h', 'pitch'], to: ['a', 'pitch'] }, { from: ['h', 'gate'], to: ['ea', 'gate'] }, { from: ['a', 'out'], to: ['ga', 'in'] }, { from: ['ea', 'out'], to: ['ga', 'cv'] }, { from: ['ga', 'out'], to: ['o1', 'in'] },
+    { from: ['h', 'pitch'], to: ['b', 'pitch'] }, { from: ['b', 'out'], to: ['gb', 'in'] }, { from: ['ea', 'out'], to: ['gb', 'cv'] }, { from: ['gb', 'out'], to: ['o2', 'in'] },
+    ...(extra.cables || [])] };
+}
+function playBus(D, doc, bus, only) {
+  const e = new D.WavesEngine(48000, { maxVoices: 4, transport: TRANSPORT, seed: 1234, costCeiling: Infinity });
+  e.loadPatch(doc); if (only) e.setOnly(only);
+  const k = e.voices.on(-12, 1), out = [];
+  for (let b = 0; b < 300; b++) { if (b === 200) { e.voices.rows[k].gate = 0; e.voices.rows[k].offAt = e.voices.now; } e.process(128); out.push(...e.bus(bus), ...e.busR(bus)); }
+  const r = { out, only: e.only && [...e.only].sort(), cull: () => e._cull() }; e.dispose(); return r;
+}
+test('…waves live: running one bus sounds the same and skips what only feeds the others', () => {
+  const { D, ctx } = engine(), doc = twoBusDoc();
+  ctx.Math.random = () => .25;   // oscillators start at a random phase; skipped ones would take fewer of the random numbers
+  for (const bus of [1, 2]) {
+    const full = playBus(D, doc, bus, 0), one = playBus(D, doc, bus, bus);
+    assert.ok(full.out.some(x => Math.abs(x) > .01), 'it plays');
+    let at = -1; for (let i = 0; i < full.out.length && at < 0; i++) if (one.out[i] !== full.out[i]) at = i;
+    assert.equal(at, -1, 'bus ' + bus + ' is identical, sample for sample');
+    assert.equal(full.only, null, 'without setOnly everything runs');
+  }
+  assert.deepEqual(playBus(D, doc, 1, 1).only, ['a', 'ea', 'ga', 'h', 'o1']);
+  assert.deepEqual(playBus(D, doc, 2, 2).only, ['b', 'ea', 'gb', 'h', 'o2']);
+});
+test('…waves live: what can\'t be skipped safely keeps running', () => {
+  const { D } = engine();
+  const seq = twoBusDoc({ modules: [{ id: 's', type: Object.keys(D.MODULES).find(k => D.MODULES[k].playsNotes), scope: 'mono', params: {} }] });
+  assert.ok(playBus(D, seq, 1, 1).only.includes('s'), 'the Sequencer plays voices with no cable, so it stays');
+  const lfoDoc = twoBusDoc({ modules: [{ id: 'l', type: 'lfo', scope: 'mono', params: {} }], cables: [{ from: ['l', Object.keys(D.MODULES.lfo.outputs)[0]], to: ['o1', 'p:slot'] }] });
+  assert.equal(playBus(D, lfoDoc, 1, 1).only, null, 'an Out whose slot is modulated: everything runs');
+  const noExit = twoBusDoc(); noExit.cables = noExit.cables.filter(c => c.to[0] !== 'o1');
+  assert.equal(playBus(D, noExit, 1, 1).only, null, 'no voice audio left on this bus: everything runs');
+  const e = new D.WavesEngine(48000, { maxVoices: 4, transport: TRANSPORT, costCeiling: Infinity });
+  e.loadPatch(twoBusDoc()); e.setOnly(1); e.process(128); assert.ok(e.only.has('a'));
+  e.setOnly(2); e.process(128); assert.ok(!e.only.has('a') && e.only.has('b'), 'changing the Bus follows');
+  e.setParam('o1', 'slot', 2); e.process(128); assert.ok(e.only.has('a') && e.only.has('b'), 'an Out moved onto this bus is picked up');
+  e.setOnly(0); e.process(128); assert.equal(e.only, null, 'off again'); e.dispose();
 });

@@ -20,6 +20,7 @@ make the timing checks unreliable on a small machine.
 | `node tests/sweep/menus.mjs` | 6–10 min | Every top-bar menu item and every right-click menu on every screen, with the real mouse. Options: `--only=file,edit,view,aud,set,tabs,ctx`, `--screens=…`. |
 | `node tests/sweep/keys.mjs` | 3–5 min | Every documented shortcut on the screen it belongs to, checked against the app's state. |
 | `node tests/sweep/mouse.mjs` | ~5 min | The one rule for value controls on every kind of control (double-click reset, right-click Reset / Type / Learn, Shift ×0.1, Ctrl ×4, wheel only after the pointer rests), Alt-drag copy and track-number clicks. |
+| `node tests/sweep/resize-playing.mjs` | ~5 min per skin | The window resized in steps (wide to narrow and back, short heights) while ELECTRO plays, on Phrase, Pattern view, the master phrase (SIGNAL chain), Song, Mixer, Sect: long tasks during the drag, the stage over the grid's text mid-drag (`--sample=1`) and settled, a stale layout (the same after a forced refit). Options: `--skins=`, `--screens=`, `--steps=`, `--w0=`, `--w1=`, `--h0=`. |
 | `node tests/sweep/layout.mjs` | ~20 min | Every screen at desktop and Galaxy Z Fold 6 sizes (folded and unfolded, Mobile setup), and every skin with its contrast. Screenshots go to `tests/sweep/out/` (gitignored). Options: `--sizes`, `--skins`. |
 
 \* Measured on a quiet 2-CPU Linux machine. A desktop is faster.
@@ -44,3 +45,56 @@ Chrome keeps each offline render's worklet wasm memories until it tears that thr
 space, only about 100–125 wasm memories fit in one page, so `effects.mjs` opens a fresh page for each batch of 32 effect
 nodes. Desktop Chrome has far more room. In the live engine the audio thread frees dropped effect nodes itself (150 add and
 remove cycles checked).
+
+## Soak test (`soak.mjs`)
+
+`node tests/sweep/soak.mjs --minutes=10 --seq=page|core [--song=sounds/ELECTRO.thunder] [--phone] [--only=stopplay,tour,panels,reload]`
+plays the song in a loop in real time (not offline) and, every 5 s, samples: the JS heap (after a forced GC every 30 s, over CDP),
+DOM nodes, event listeners and documents (CDP `Performance.getMetrics` / `Memory.getDOMCounters`), renderer and browser RSS (from
+`/proc`), live AudioNode / AudioWorkletNode / AudioBuffer wrappers (`Runtime.queryObjects`, at the 30 s mark), the app's own counts
+(`rt.pl.aliveN()`, `bassLive`, `padSrcs`, `VAR.map` / `VAR.bytes`, `tp.q`, `MOB.q`, `MOLED`, `PB.log`, undo, localStorage size, live
+intervals and pending timeouts in the page and in the waves / chains frames) and the audio health (`ctx.currentTime` against the wall
+clock, `playbackStats`, the app's dropout counter, the CPU meter, `PB.late` / `PB.drop` / `PB.skips`, the page ticks' lead, moved-on
+and held counts, long tasks over 50 ms, rAF rate). Every sample also records `os.loadavg()`.
+
+It does what a user does, on a schedule: STOP then PLAY every 60 s, a tour of all screens, Synth, Waves and Chains every 2 min,
+Settings, the …pump window and the waves / chains frames every 3 min, and a reload of the song (`__seqTest.load`, the `setSong` path)
+at half time. After the run it fits a line to each series (per minute, after a 2-minute warm-up, `--warm=N`) and prints PASS / FAIL /
+NOTE: a count FAILs when its slope is over a stated bound **and** it is still rising in the second half of the run (a step is not
+growth); DOM nodes and listeners are judged on the lowest value of each minute, because a screen's DOM comes and goes. Audio-health
+series are timing, so they are only ever a NOTE. Raw samples go to `tests/sweep/out/soak-<seq>-<timestamp>.json` (gitignored); score a
+file again with `--rescore=<file>`. `--phone` is touch + Mobile setup + a 412 x 915 window + a 4x CPU throttle: it is not a phone's
+audio stack. Run it on a quiet machine, one browser at a time; on a shared one read the trends, not the numbers. Report:
+[`docs/audits/2026-11-10-soak.md`](../../docs/audits/2026-11-10-soak.md).
+
+## Redraw churn (`redraw-churn.mjs`)
+
+`node tests/sweep/redraw-churn.mjs [--secs=5] [--screens=song,phrase,mixer,fx,inst,project] [--top=12] [--json]` plays `sounds/ELECTRO.thunder` in
+headless Chrome and, per tracker screen, counts the DOM writes the page makes in a few seconds (a MutationObserver on the page) and how many of
+them leave the value as it was (a text node replaced by the same text, an attribute set to what it was). The redraw paths that run while a song
+plays should write only what changed (`setText`, 10 Nov; `tests/redraw-churn.test.js`). About 1 minute for six screens. After the change the
+same-value text / node writes are 0 on every screen (before: 1,100 to 2,100 in 5 s); same-value attribute writes (`hidden`, `title`, `aria-*`)
+remain and are not counted as garbage (an identical attribute is not stored again).
+
+## render-vs-live.mjs (14 Nov, "renders should sound like the playback")
+
+`node tests/sweep/render-vs-live.mjs --song=/path/to/song.thunder --from=72 --rows=4 --tracks=0,2,13,9 --full` renders a stretch of a
+song offline (the app's own `renderOut`) and captures the same stretch played live by the audio-thread sequencer, track by track, and
+prints PASS / FAIL for level, left and right level and balance (stereo), octave spectrum, timing (INCONCLUSIVE when the envelope has no timing information; exit 2 if every row is, or if nothing was compared) and envelope (`ri-lib.mjs` holds the session, alignment and band maths). It warms
+the engine up with a PLAY / STOP first and retries when the core skipped; it needs a quiet machine (a starved capture reads as a
+difference). Waveform correlation is NOT a pass criterion: the synth engines' oscillator phase depends on when the note starts.
+
+## render-stereo.mjs and render-many.mjs (15 Nov, stereo pads in renders; renders silent after about 32)
+
+`node tests/sweep/render-stereo.mjs [--live]` loads a stereo WAV (left 440 Hz sine, right noise) into pad 2 through the app's own loader and
+renders one note with `renderOut`: PASS when the render's left / right correlation is near 0 (it was 1: the render handed the player only
+the left channel) and a mono control sample still renders identically on both channels. `--live` adds the audio-thread and page
+sequencers played live (about 25 s each; the table then reads render / live core / live page). About 30 s without `--live`.
+
+`node tests/sweep/render-many.mjs [--n=40] [--stems] [--fx=0] [--exhaust]` renders one song `n` times in ONE page (six tracks, each with a
+plate reverb, the safety limiter on) and checks that every render has sound. A render that writes a silent file always FAILs. Cause of the old
+failure: the browser allows about 100 WebAssembly memories in a page and Chrome never frees an offline render's audio thread, so each effect
+node of each render used one for good (before the fix: 17 renders with sound, then silent files). Effect nodes of one render now share
+instances; when the browser really is out of room the render stops with "Render failed: An effect couldn't start in this render…", nothing
+written. `--exhaust` runs 3 x `n` and only checks that no silent file was ever written and every refusal came with a message. About 1.5 s
+per render.

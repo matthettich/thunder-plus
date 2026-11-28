@@ -1,4 +1,4 @@
-/* …pump CALM pop-up (stage 3): plugins/calm/UICalm.cpp in the browser. The display: input spectrum (dim),
+/* pump CALM pop-up (stage 3): plugins/calm/UICalm.cpp in the browser. The display: input spectrum (dim),
    output spectrum (neon), the live reduction hanging from the top (one or two detectors), the sensitivity curve with
    its six draggable nodes, the focus range with draggable edges, Alt-listen and Alt-hold node solo (PumpFX.hold
    kind 1, the audition filter with its region), and the suppression / timing / stereo panels. */

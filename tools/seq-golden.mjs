@@ -74,7 +74,15 @@ try {
     failed = true;
     const i = now.rowHashes.findIndex((h, k) => h !== was.rowHashes[k]);
     console.log(`FAIL ${S.id}: rows ${was.rows} → ${now.rows}, events ${was.events} → ${now.events}; first difference at step ${i < 0 ? Math.min(was.rows, now.rows) : i}`);
-    if (i >= 0) console.log('  now: ' + JSON.stringify(rows[i]).slice(0, 600));
+    // (reporting only) the goldens keep counts and row hashes, not the streams, so say what can be said from those
+    const delta = Object.keys({ ...was.counts, ...counts }).map(k => [k, (counts[k] || 0) - (was.counts?.[k] || 0)]).filter(([, d]) => d).map(([k, d]) => `${k} ${d > 0 ? '+' : ''}${d}`);
+    const bad = now.rowHashes.map((h, k) => h !== was.rowHashes[k] ? k : -1).filter(k => k >= 0);
+    console.log(`  events by type, golden → now: ${delta.length ? delta.join(', ') : '(counts equal: values, order or times differ)'}; ${bad.length} of ${now.rows} rows differ, first steps: ${bad.slice(0, 10).join(' ')}`);
+    if (i >= 0) {   // the first differing row, one short line per event (notes: track, pad, mn, rate; others: type, p, track, v), with its step and time
+      const short = e => e.type === 'note' ? `note t${e.track} pad${e.pad} mn${e.mn} rate${e.rate}` : `${e.type}${e.p ? ':' + e.p : ''} t${e.track ?? '-'} ${e.v ?? e.b ?? ''}@${e.t}`;
+      console.log(`  now, step ${i} (t=${rows[i].t}): ${rows[i].evs.map(short).join(' | ').slice(0, 900)}`);
+    }
+    console.log('  (the golden has no events to diff against: to see exactly what changed, run the last good commit and diff the two out/*.jsonl files)');
     console.log(`  full stream: tests/golden/out/seq-${S.id}.jsonl (compare with a run of the last good commit)`);
   }
   if (TIMING) {   // plan section 12: how far ahead notes are booked, idle and with the main thread stalled

@@ -17,10 +17,11 @@ export async function openApp(opts = {}){
   await new Promise(ok => srv.listen(0, ok));
   const port = srv.address().port;
   const browser = await chromium.launch({ ...(CHROME ? { executablePath: CHROME } : {}), args: ['--autoplay-policy=no-user-gesture-required', ...(opts.args || [])] });
-  const page = await browser.newPage({ viewport: { width: opts.w || 1400, height: opts.h || 900 } });
+  const page = await browser.newPage({ viewport: { width: opts.w || 1400, height: opts.h || 900 }, ...(opts.page || {}) });   // opts.page: more newPage options (a phone's user agent...)
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console.error: ' + m.text()); });
+  if (opts.route) await page.route(opts.route[0], opts.route[1]);   // opts.route: [url glob, handler], set before the page loads (e.g. to hold back a file)
   await page.goto(`http://localhost:${port}/${opts.path || 'index.html?seqtest=1'}`);
   if (!opts.path){
     await page.waitForFunction(() => !!window.__seqTest, null, { timeout: 60000 });

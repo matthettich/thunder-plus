@@ -116,7 +116,7 @@ test('pump synths live: plays exactly what the pad renders (same values, same no
   }
 });
 
-test('pump synths live: Settings → Audio → …pump live (this device): Rendered keeps them off, Auto lets them (and undoes the safety net)', () => {
+test('pump synths live: Settings → Audio → Live engines (this device): Rendered keeps them off, Auto lets them (and undoes the safety net)', () => {
   const src = H.read('index.html');
   assert.match(src, /psLive:'auto'/, 'the device setting, Auto by default');
   assert.match(src, /\(ac === ctx && \(psLive\.off \|\| aset\.psLive === 'render'\)\)\) return null;/, 'a live node is made only when Auto (and the safety net hasn\'t switched)');

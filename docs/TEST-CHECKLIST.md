@@ -1,0 +1,566 @@
+# Thunder Plus test checklist, by priority
+
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 15 Nov 2026 with his ticks as in the doc (build 619).
+> The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
+> Re-export this file when the doc changes.
+> **Not updated in the Claude Doc.** The items for builds 624 to 632 (the new section at the top of section 1) were added to this file on 16 Nov from HANDOVER.md's punch list. The owner's Claude Doc does not have them yet. Builds 620 to 623 were already in this file.
+
+14 Nov 2026 · Matt
+
+## How to use this list
+
+This list is in order of importance, so start at the top.
+
+Do section 1 first; it is short: the newest builds (589 to 632, ears first), what could lose work or sound.
+
+Do sections 2 and 3 as time allows.
+
+Section 4 can be skipped unless something looks wrong; tell Claude "close the skip list" and those items are closed as not tested.
+
+The Parked items are open but block nothing, and the Set aside table is probably superseded.
+
+If something fails, tell Claude the build number and what happened; tick an item when it passes.
+
+| Section | Open items | Mostly on | Why it matters |
+| --- | --- | --- | --- |
+| 1. Do these first | 131 | Phone and computer | The newest builds (589 to 632), lost work or sound |
+| 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
+| 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
+| 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
+| Parked | 6 | Phone | When the native apps start; whether three optional things get built |
+| Set aside | 5 | none | Nothing: probably superseded |
+
+## 1. Do these first
+
+### New in builds 624 to 632: the folded phone's header, the MOD strip, generators' instrument, LOOP, playback keeps a selection
+
+*The newest builds, first. Computer unless the item says otherwise.*
+
+- [ ] Phone, folded (Galaxy Z Fold 6, about 344 px wide), IDM skin and one other: the Phrase screen. Pass: the line under the tabs reads BPM, LPB, then ROWS (a number only), then LEFT with the time, in that order; nothing clips or wraps. Unfolded phone and computer unchanged. (632)
+- [ ] Phone, folded (about 344 px wide), IDM skin and one other: the Phrase screen. Pass: the top bar holds Tracker / Synth, File, Settings, Play and the CPU meter with room to spare; the ROWS number has no − / + and tapping it opens a box to type a row count (1 to 256). The line's order is the one in the build 632 item. Nothing clips or wraps. (631)
+- [ ] Phone, folded: File menu. Pass: a Record section with REC: OFF · tap to turn on; tapping it arms REC (the header has no REC button) and the entry then reads ON · tap to turn off; it records exactly as the old button did. (631)
+- [ ] Phone, unfolded, and computer: nothing changed (LEFT in the top bar on the unfolded phone, REC and ROWS with − / + on the line). (631)
+- [ ] Computer, bottom panel (FX bar): a track with 1 to 4 LFOs (MOD screen). Click the folded MOD strip. Pass: it opens, titled MOD · TRACK nn, one row per LFO with a small wave, a dot moving on it while the song plays, the shape and rate, and the destination name; clicking a row opens MOD on that track; clicking the title folds it again. Check the IDM skin and one other, with ANIMATIONS off (no dot), and on a track with no LFO (a one-line message). (630)
+- [ ] Phone: nothing changes: the MOD section is not shown there. (630)
+- [ ] Computer or phone, Phrase: GEN › Arp, Chords, Polymeter, Markov melody, Probability fill, Mutate. Pass: each panel has an Instrument choice; with Current nothing changes from before; picking one (it plays a note) and pressing the write / roll button puts that instrument number on the written notes (Mutate: on the notes it adds). Acid line, Euclidean fill (4th number) and the Drum pattern's parts still pick theirs. (629)
+- [ ] Phone (folded) and computer with a small Arrange / Song view: play a song and watch Arrange and the Song screen. Pass: the next page turns noticeably earlier than before (about a third of the view from the bottom on a view under 16 rows), once per page, with the rows just played still in sight. Say if it should be sooner still, or if the ARRANGE LOOK-AHEAD setting should apply on small views too. (628)
+- [ ] Computer, the top bar: the LOOP button is immediately left of PLAY. Pass: Alt+L and the button still work. The phone layout is unchanged (LOOP stays in the selection bar). (627)
+- [ ] Computer and phone, Song screen (Arrange and the text grid): put the cursor on an empty row below the last block, with the view there, then press LOOP play on the command bar. Pass: the view stays where it is and a toast says there is nothing on that row to loop; PLAY still works. On a row with a block, LOOP plays it as before. If LOOP still pages the view away in another case, say exactly where the cursor was and what the song looked like. (626)
+- [ ] Computer, Song / Arrange: select a few blocks (also upward), press UNIQ on the command bar. Pass: the blocks get new numbers and the selection and cursor stay where they were; picked cells (Ctrl-click) stay picked. (625)
+- [ ] Computer, Phrase view with Arrange beside it, FOLLOW PATTERN: give Arrange the keys, select 8 or more rows upward (Shift+▲), then press PLAY. Pass: the selection stays exactly as made while the song plays (the view may page, the selection does not shrink). Check FOLLOW ON and OFF too, and the Song screen itself. (624)
+
+### New in builds 622 and 623: command bar line, the side panel's instrument list plays and selects
+
+*The newest builds, first. Computer unless the item says otherwise.*
+
+- [ ] Computer: the small command bar has a thin line along its top in each skin you use. Pass: a thin line in the skin's line colour runs along the top of the bar, so it reads as its own section. (622)
+- [ ] Computer: click an instrument in the side panel's instrument list, with the song stopped and then while it plays. Pass: it plays once and is selected each time, and INST opens on it. (623)
+- [ ] Computer, Phrase view: click an instrument in the side panel's instrument list. Pass: it selects the instrument you clicked, not the instrument on the cursor row. (623)
+
+### New in build 621: chains and waves Send / Receive, cross-track warning, Mixer meters, square cables, the side panel's skin
+
+*The newest build, first. Computer unless the item says otherwise.*
+
+- [ ] Computer: an old chains patch (any you have): play it and render it. Pass: it sounds as it did before build 621. (621)
+- [ ] Computer, …chains: a Send and a Receive with the same label (A to H or free text) and a module between them. Pass: the sound passes through like a cable; a second Receive on the same label also gets it. (621)
+- [ ] Computer, …chains: a cable from one track's chains into another track's chains. Pass: the cable is dashed and marked "no signal", with a tooltip and a one-time toast. (621)
+- [ ] Computer, by ear: duck a track from a bus: Sidechain Out with Send 1 in the bus's chain, and Source: Send 1 on the compressor. Pass: the track ducks when the bus plays. (621)
+- [ ] Computer: a Mixer module's OUT meter. Pass: it moves with the audio and falls back when it stops. (621)
+- [ ] Computer: drag a cable bend close to a right angle. Pass: it snaps square; hold Alt and it moves freely; the cable menu's "Square up" squares it. (621)
+- [ ] Computer and phone: the ? button is the same size as ✕. Pass: they match. (621)
+- [ ] Computer: the side panel (status card, meters, KEYS, instrument list) in the IDM, IDM pink, IDM pink & green, 909 and Low power skins. Pass: it takes each skin's colours, and no band shows above the command bar. (621)
+- [ ] Phone: …chains still opens and plays an old patch. Pass: it opens and plays. (621)
+
+### New in build 620: the owner's list from desktop build 609
+
+*The newest build, first. Most of it is on the Windows desktop app; the phone items say so.*
+
+- [ ] Computer, Windows desktop app: open a song you know, press PLAY, then STOP. Pass: the page loads, plays and stops; nothing is blank or stuck. If it is, tell Claude the build. (620)
+- [ ] Computer: on Arrange, select some blocks with LOOP SEL on, then press PLAY from Mixer, then from FX, MOD, INST and PROJECT. Pass: the selected blocks loop, as they do when PLAY is pressed on Arrange. (620)
+- [ ] Computer: add a poly track with a sound on it and press PLAY at once. Pass: its first pass is audible. If it is still silent, say whether a kit slot was set on that track. (620)
+- [ ] Computer: Mixer, double-click a track’s PAN, VOL or OUT value. Pass: a box opens; type a value (or -6 dB on a level) and Enter, and the control goes there. Esc leaves it alone; Alt-click and the right-click menu reset it. (Double-click used to reset on the Mixer; you asked for typing.) (620)
+- [ ] Computer: on FX, double-click a value on the FX bar. Pass: a small slider with a number box opens; type a number and Enter, and the effect is there. Esc closes it. (620)
+- [ ] Computer: on Mixer, FX, MOD, INST and Synth, press ADD FX on the FX bar. Pass: the effect list opens over the page you are on, you stay on that page, and the effect you pick is added. (620)
+- [ ] Computer: an LFO aimed at a Mixer PAN / VOL / OUT or an FX row shows a dot beside that control. Pass: the dot shows while the LFO targets it and goes when it is removed. Not expected yet on Synth engine knobs or pump windows: say if you want them there. (620)
+- [ ] Computer: open the dogs’ MOD screen. Pass: the screen is named for the dogs, and each ✕ is always showing (no hover needed). (620)
+- [ ] Computer: LOOP sits beside PLAY. Pass: it toggles from its button and from Alt+L, and the button shows the state. (620)
+- [ ] Phone: LOOP is still in the tab bar. Pass: it is there and turns the loop on and off. (620)
+- [ ] Computer: the Synth page and a pad’s tooltip show “Used on” with the tracks that play the pad. Pass: the tracks listed are the ones that use it. (620)
+- [ ] Computer: Renoise transpose keys Alt+F1, F2, F11, F12. Pass: each transposes by its step; Alt+F1 no longer opens Help. (620)
+- [ ] Computer: on FX, scroll the wheel over the slot list. Pass: the list scrolls and the ACTIVE line stays pinned at the top. (620)
+- [ ] Phone: on FX, scroll a long slot list. Pass: the ACTIVE line stays pinned at the top. (620)
+- [ ] Computer: Settings, ARRANGE LOOK-AHEAD: set 4, then 32 (default 16). Pass: the rows after the playhead change to match; the cursor pages with the keys and the wheel, not with clicks. (620)
+- [ ] Computer: on Arrange, scroll down, make an edit, press Ctrl+Z (⌘Z on a Mac). Pass: Arrange keeps the scroll you had, not the top. (620)
+- [ ] Computer: with LOOP on, go to the Synth page and back to Arrange. Pass: Arrange is not left paged away. (620)
+- [ ] Computer: with PIN on, move the Arrange cursor to another track. Pass: the Mixer follows it. (620)
+- [ ] Computer: Pattern view with PHRASE ON STOP set to STAYS, then press STOP. Pass: the pattern stays on its phrase; only the song row moves. If you meant while playing, say so: that is FOLLOW. (620)
+
+### New in builds 617 to 619: engine presets, drum sounds and kits, stereo renders
+
+*The three newest builds, newest first. Build 619 changes what renders contain; 617 and 618 are by ear.*
+
+- [ ] Computer: a stereo sample on a pad (something wide), play it, render it, compare on headphones. Pass: the render is as wide as playback (it was mono). (619)
+- [ ] Computer: render the stems of your 22-track song, twice in one session. Pass: every stem has sound; or, if it runs out, the render stops with a “Render failed” message and writes no silent file (reload, then render again). (619)
+- [ ] Any device, by ear: load the IDM clicks, Glitch and Chip kits. Pass: the 8 pads of each are distinct and at a similar loudness. Then the other nine kits: name any that are weak. (618)
+- [ ] Any device, by ear: hats and cymbals: the open hats choke on the closed ones; the reverse crash and riser swells sound right. (618)
+- [ ] Any device, by ear: toms: Analog tom 1 to 6 step evenly in pitch; the big drums (Taiko-style) feel big. (618)
+- [ ] Any device, by ear: kicks, snares and claps: step through the new ones on a pad. Pass: nothing clipped, clicky by mistake, or far off the level of the old ones. Name the ones to cut. (618)
+- [ ] Any device, by ear: Acid and Bass: step through the new presets with your own patterns. Pass: each is usable and sits at the level of the old ones. Name the ones to cut or fix. (617)
+- [ ] Any device, by ear: Bytebeat: the new formulas. Pass: they read as musical lines, not only noise. (617)
+- [ ] Any device, by ear: Tone and Blip: the new tonal presets (Tone “Spectra bell”, Blip “FM bleep”). Pass: they sit at a usable level next to the drum presets. (617)
+- [ ] Any device, by ear: a quick pass over the other engines’ new presets (Phase, Partials, Vector, Scanned, Swarm, Table, Chip, Drift, Resynth, Modal, the acoustic ones). Pass: nothing harsh, silent, or far louder or quieter than its neighbours; tell me any that are near-copies. (617)
+
+### New in builds 611 to 616: mono / poly tracks, MOD and names, Arrange keys, latency
+
+*The six newest builds, newest first. Builds 616, 615, 612 and 611 are the ones that touch sound or saved songs.*
+
+- [ ] Computer, by ear: a kick on one track; a second drum track fed into a bus that holds pump CALM and a synced 1/8 delay. Pass: bus and echoes are in time with the kick (before: the whole bus about 46 ms late). Switch CALM off and on: the timing does not move. (616)
+- [ ] Computer: the first time you press PLAY with such an effect loaded. Pass: one notice names the effect and the track and says the other tracks now wait; it never comes back. Audio & MIDI shows LATENCY COMP: AUTO / ON / OFF. (616)
+- [ ] Computer, by ear: with that song stopped, play a pad by hand: it answers at once. While the song plays the pad is about 46 ms late (it has to be, to line up). Say if that bothers you when playing along: ON / OFF are there, and the delay could be kept off live pads. (616)
+- [ ] Computer, by ear: Step gate or Flex on the master with CALM on a track. Pass: the gate chops on the beat (it was early). (616)
+- [ ] Computer, by ear: add and remove CALM on a track while the song plays, and press STOP and PLAY with a pad still ringing. Pass: no click (a short pitch wobble on what is ringing is expected). Say if PLAY with something ringing still ticks. (616)
+- [ ] Computer: a song with no look-ahead effects. Pass: it sounds and renders exactly as before. (616)
+- [ ] Computer: Settings › Song › POLY TRACKS up one, then down one. Pass: the Arrange boxes follow (“POLY 09–17”, then “09–16”), a short “Hid track 17 (poly)” notice, no question. (615)
+- [ ] Computer (a COPY of a song): MONO TRACKS down past a track with notes. Pass: it asks “Hide track 08 (mono)?”; Cancel changes nothing; Hide gives “MONO 01–07” and every poly track keeps its notes, mixer, effects and LFOs under its new number; Ctrl+Z puts both counts and every track back; raising MONO brings the hidden track back with its notes. (615)
+- [ ] Phone: drag the MONO slider down past a track with notes. Pass: one question when you let go, not one per step. (615)
+- [ ] Computer: try to take either count to 0, and the total above 24 with a voice per track (32 without). Pass: the row stops and its info line says why. (615)
+- [ ] Computer: save an uneven song (say 4 mono, 12 poly), reopen it. Pass: the same split, the same notes. (615)
+- [ ] Mac: on Phrase with a selection and Arrange beside it, Option+A, move around Arrange, Option+A again. Pass: the same screen, cell, selection and scroll as before. The same with Esc. (614)
+- [ ] Mac: Option+A, open a block from Arrange (Option+▶), Option+A. Pass: it does not jump back to the old place; Arrange takes the keys again from the new one. (614)
+- [ ] Mac: on Mixer, FX, MOD and INST press Option+▼ then Option+▲. Pass: you stay on the page, the Arrange cursor moves a block down and up on that track (MOD and FX show that track still), and Phrase then shows that block. (614)
+- [ ] Mac: Option+◀▶ and Option+8. Pass: they change screen as before; Option+8 is Project. (614)
+- [ ] Mac desktop: double-click acid.thunder (or File › Open). Pass: Project › NAME says “acid”, the title bar shows no unsaved dot, and a render suggests “acid mix.wav”. (613)
+- [ ] Mac desktop: New project, Save as beat2.thunder. Pass: NAME becomes “beat2”. Rename a song to “My tune”, save, open another file and come back: “My tune” is kept. (613)
+- [ ] Mac: load acid, open MOD, press Option+A (Arrange takes the keys, MOD says FOLLOWS), move the cursor to track 12, then 13. Pass: the MOD header says TRACK 12 and lists its three LFOs at once, and TRACK 13 lists one; it changes with every move, across the mono / poly boundary too. (612)
+- [ ] Mac: the two LFOs on track 12 that point at settings those effects do not have. Pass: they read “no such setting” (or “no effect in this slot”), not “(empty)”, and can be re-pointed or cleared. (612)
+- [ ] Computer: open a few existing songs (acid, an older one), play them, Settings › TRACKS up two and down two, save, reopen. Pass: everything as before this build: the same tracks mono and poly, the hidden tracks come back with their notes, nothing new on screen. (611)
+
+### New in builds 603 to 610: renders, sliders, CPU, chance
+
+*The eight newest builds, newest first. Builds 603, 607, 608, 609 and 610 include checks by ear.*
+
+- [ ] Computer or phone, by ear: a drum track with CHA 80 on every hat, and SED 07 on the first row of the MASTER column. PLAY from the top three times. Pass: the same hats every time. Render: the WAV has those hats. Change it to SED 08: a different set, again the same every time. Take the SED away: different every play. (610)
+- [ ] Computer: the same song, PLAY from the middle (a few song rows down). Pass: the hats there are the ones you heard there when it played from the top. (610)
+- [ ] Computer: with SED 07 on the master, put SED 21 on the hat track’s first row. Pass: only the hats change; try a few numbers until you like them, the other chance tracks stay. SED 00 on the track puts its first set back. (610)
+- [ ] Computer, by ear: TCH 80 on a busy track’s first row (no CHA). Pass: about half its notes play, for the rest of the song, until a TCH FF. TCH 40 in the master column thins every track. (610)
+- [ ] Computer: MOD on that track › add an LFO › target CHANCE, slow, full depth (take the TCH away first: a TCH on the track wins). Pass: the track thins out and fills up with the LFO. Note: the LFO swings around “every note”, so it only thins in its lower half; a scene or macro on CHANCE sets a lower middle. Say if you want the LFO to work differently. (610)
+- [ ] Computer, by ear: a long note followed by chance notes, with SKP 01 on the first row. Pass: when a chance note is skipped the long note stops there; with SKP 00 it rings on. (610)
+- [ ] Computer: a poly track with four-note chords and CHA 80, CHD 01 on the first row. Pass: chords come out thinned, some notes missing; with CHD 00 each chord is all there or not at all. (610)
+- [ ] Computer: NTH 41 and CND 08 on one row of a looping phrase. Pass: it plays on passes 2, 3 and 4 of every four, not the first. (610)
+- [ ] Computer: a track with a pump effect switched OFF on the FX screen and an FXO command that switches it on in the song (after it has played for a few seconds). Pass: the effect comes in on the row of the command, the first time and every time. (609)
+- [ ] Computer, by ear: a pump EQ on a track, switched OFF; while the track plays, open the EQ and change Phase to Linear Phase (and back). Pass: the track keeps sounding through the change (it moves slightly in time, as that EQ’s latency does); no gap. (609)
+- [ ] Computer (song acid), by ear: render the song on this build and play the WAV against the app playing it (headphones, same level). Pass: the drums are as crisp in the WAV as live, the WAV starts on the first kick, and the parts stay in step with each other to the end. If something still sounds different, tell me WHICH track and about what time in the song: measured here, each track’s level, tone, timing and pitch now match live within 0.1 dB and 2 ms; only the synths’ wave shape differs from one play to the next (their oscillators start at a different point in the wave each time, live too). (608)
+- [ ] Computer: the three LFOs on your old track 12 in acid: two of them point at effect slots that are now empty (they do nothing, live or rendered) and one at ENSEMBLE MODE; one on 13 at SPACE MIX. Pass: open MOD on those tracks and re-point or delete the two dead ones if you want them back (the song was changed before build 602, which is when LFOs started following their tracks). (608)
+- [ ] Computer (song acid, ROG): play it with the CPU panel open. Pass: “Master effects” is far lower than before (its three switched-off pump effects took about 8 to 12% between them), and the effects rows name effects, like “Effects · Track 07: pump TWANG 5%, Space reverb 3%”. (607)
+- [ ] Computer, by ear: while it plays, switch a pump effect on the master (CALM or MASTER) ON and OFF a few times. Pass: no click, no jump in timing, and ON is heard within a blink (it comes in 20 to 65 ms after the click). Say if that is too slow. (607)
+- [ ] Computer, by ear: mute a track with a long reverb or delay for half a minute, then unmute while it is playing. Pass: the track is back at once; its echoes build up again from nothing (no burst of old echoes). In the CPU panel that track’s effects row falls away while it is muted. Say if you miss the echoes that were ringing before the mute. (607)
+- [ ] Computer: a track switched by FXO commands on a pump effect. Pass: the switches land on the beat as before (a slot FXO has held never rests). (607)
+- [ ] Computer, Synth page: on a sample pad, double-click Loop start and type 500 ms. Pass: the readout says 0.500 s (it gave 1.000 s on a two-second sample). (607)
+- [ ] Computer, Synth page: on a slider that shows milliseconds (an envelope Attack, a delay time) double-click and type 500 ms, then 0.5 s. Pass: both give half a second (500 ms). On one that shows seconds, 250 ms gives 0.25 s. On a pad’s Level, 50% and 50 both give the middle of the slider. (606)
+
+- [ ] Computer: Phrase screen with Arrange beside it, click into Arrange, select several blocks (some sharing a phrase), click TRANSP. +. Pass: every phrase in the selection goes up a semitone once (a shared one not twice), one notice, and one Ctrl+Z undoes all of it. (605)
+- [ ] Computer: the same with a block whose phrase is also used on a row outside the selection. Pass: the notice says some are also used elsewhere, and that other block has moved too (the pattern itself is edited, as on the Song screen). Say if you would rather it made a copy. (605)
+- [ ] Computer: hover TRANSP. with blocks selected. Pass: the tip reads “Transposes the N selected blocks’ phrases…”. With Arrange focused and nothing selected, or the Phrase focused, the buttons behave as before. (605)
+- [ ] Phone: KEYS mode, Arrange selection, TRANSP. − / +. Pass: the same as on the computer. (605)
+- [ ] Computer, Synth page: double-click a slider. Pass: a field opens with the value selected; type 440 or 440 Hz (or 35%, -6 dB on a level) and Enter: the slider goes there, and one Ctrl+Z puts it back. Esc leaves it alone. (604)
+- [ ] Computer: Alt-click a slider. Pass: it returns to its default; double-click no longer resets. Right-click › Reset to default does the same. (604)
+- [ ] Computer: click a slider, then ◀ ▶ and Shift+◀ ▶. Pass: it moves about 1% a press (Shift: finer) with a ring round it, and the pad list and tracker cursor stay still; Esc lets go and the keys work as before. Say if 1% is the wrong size. (604)
+- [ ] Phone (Fold): double-tap a slider. Pass: the field opens with the number keyboard; long press › Reset to default still resets. (604)
+- [ ] Computer: a slider with a MIDI knob learned or an LFO on it. Pass: a typed value and a nudge behave like a drag (the sound follows, the learned knob still moves it). (604)
+- [ ] Computer (song acid): render the song and open the WAV in an editor. Pass: the first kick starts at the very beginning of the file (before this build it started about 93 ms in), and the end of the song is not cut short. (603)
+- [ ] Computer, by ear: Audio & MIDI › LATENCY COMP: AUTO (the default) or ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says. (603)
+
+### New in builds 591 to 602: your ears first
+
+*Builds 599, 602 and 600 first, then one listening check for each new module build.*
+
+- [ ] Computer (the ROG, desktop app), ears: open acid, Balanced, PLAY, then mute track 07's patterns or press STOP and leave it two minutes with the CPU panel open. Pass: "Effects T07" falls to about nothing within a minute or two and stays there (it used to climb to 40%). Un-mute or PLAY: the effects sound as before, tails included, with no click when they wake. On any track with a reverb or delay, stop the notes and listen to the whole tail: nothing is cut short. (599)
+- [ ] Phone or computer, ears: while a song plays, add an LFO on the MOD screen to an effect knob (for example track 12 FX1 delay time). Change its depth and rate, then delete it. Pass: you hear each change at once, without stopping the song. (599)
+- [ ] Computer, a COPY of a song with LFOs: Settings › TRACKS, add two tracks. Pass: the LFOs show on the same track's MOD screen (its new number) and still move the same knobs. Take the two tracks away: everything goes back. A song changed before this build is not repaired. (602)
+- [ ] Computer: set ARRANGE ON STOP to PLAYHEAD, show the Phrase screen with Arrange beside it, PLAY past a page turn, then STOP. Pass: the Arrange cursor sits on the row where it stopped, in view. With STAYS it stays where it was. (602)
+- [ ] Computer: on the FX screen with several effects, right-click the first one › Clear. Pass: only that one goes. Same on the master. (602)
+- [ ] Computer: in the Arrange header press − several times. Pass: rows get lower until about three times as many show; labels hide when rows get tiny, colours and the playhead stay; ○ goes back to fit. (600)
+- [ ] Computer and phone: play a song with Arrange beside the Phrase, hands off. Pass: the page turns once when the playhead is about 8 rows from the bottom, a few rows that just played stay at the top, and touching a key keeps it still for 4 seconds. (600)
+- [ ] By ear, …chains, control maths: Envelope follow → Comparator A (Level about 0.30), its A > B gate → a Switch's Select, dry on A and a delay's output on B. Pass: loud hits jump to B with no click (Fade 5 ms; at 0 it may click, which is what 0 is for). Then a Crossfade with dry on A, an effect on B and a slow LFO into Mix: it sweeps, and Equal power keeps the loudness even. (591)
+- [ ] By ear, …chains, clock tools: a Clock into Chance gate, Out to a drum, Seed 7, Chance 50%. Play twice from the start: the same hits both times, and a render has them too. Seed 0: different every play. Then Clock → Clock multiplier ×3 → a drum: three even hits a beat. A kick's gate into Burst (Count 4, Bend up) → a snare: a roll that tightens. (592)
+- [ ] Computer, …chains, Scope: a sine LFO into A and a square LFO into B. Pass: a teal sine and a purple square on one screen; Rising keeps the picture still, Free lets it drift; Freeze stops the picture while the sound carries on. On a Track In while the song plays at 20 ms: can you read the waveform? (593)
+- [ ] By ear, …chains, building blocks: four Allpass (Phase) in a row with one LFO into every Freq jack, the last Out on a Crossfade's B against the dry sound: a phaser sweep. Three Allpass in Echo on a drum hit: a soft smear, and a held tone keeps its pitch. Noise through a band-pass Filter and a VCA with a short ADSR: a hi-hat. (594)
+- [ ] By ear, Delay line: Noise burst into it, Time 4.5 ms, Feedback 95%, Damp 20%: a plucked string near 220 Hz. Time 350 ms, Feedback 40%: an echo that fades. Feedback 99% on a loud sustained sound: loud and bent, never exploding, clicking or going silent for good. Too harsh or too tame when pushed? (596)
+- [ ] By ear, Expression: a sound into A passes through; K1 at 0.5 is half as loud. Pick Soft clip, raise K1: more drive. Change the formula while the song plays: any click or dropout? Type sin( and press Enter: silence and a line saying where the mistake is; fix it and the sound returns. (597)
+- [ ] By ear, …chains, Morph (Granular and spectral): a pad into In, a drum loop into In B, Mode Convolve, Morph 50%. Pass: the pad is chopped by the drums' rhythm; 0% is the pad alone, 100% the drums alone; no clicks turning Morph, Sharpness or Smoothing. Mode Shape: the pad sounds with the drums' tone colour. Is Convolve loud enough at the default? (601)
+
+### New in build 589: feedback loops (listen first)
+
+*Cables can now loop back on themselves. Listen before relying on it in a song.*
+
+- [ ] By ear, computer, …chains: Track In → Tape delay → Reverb → Chain Out, then drag Reverb's Out back to the delay's In. It is accepted and drawn as a long dash and a dot with a "1 blk" tag. Does it sound like feedback should (a wash that builds)? Turn the levels in the loop up until it runs away: it should settle loud (about +6 dB at the cable), never explode, click or go silent for good. Usable when pushed, or too harsh / too tame? (589)
+- [ ] By ear: patch a module's Out into its own In (a filter or a delay): accepted, same look; a short metallic ring is expected. Then in …waves: oscillator → filter → Out, with the filter's Out back into the oscillator's FM, and several notes held: each voice has its own loop and nothing runs away. (589)
+- [ ] Computer, …chains: delete one of the loop's forward cables: the dash-and-dot look goes from the closing cable; Undo brings it back; reload: still marked. Save, reopen, render: the render sounds like what played. Also play one of your songs with no loops: it sounds as it did before. (589)
+- [ ] Phone and computer, looks: make a loop on the folded phone; is the "1 blk" tag readable at the zoom you use, and is the cable easy to tell from control (dashed) and gate (dotted)? On the computer try the white theme, IDM pink & green and 909; hover the cable: it says "feedback, one block late". (589)
+
+### New in build 590: phone notification and tabs
+
+*Your two phone bugs of 14 Nov.*
+
+- [ ] Phone (installed app if you use it): open the acid project from Files or "Open with", press PLAY, pull the notification shade down: the title says "acid", not "Song 1". Rename the song while it plays: the title follows. Which icon do you see: the small Chrome logo, or Thunder Plus's own? (590)
+- [ ] Folded phone, Mobile mode, Chains shown (three tabs): Tracker, Synth and Chains read in full on a row of their own at the top; nothing scrolls sideways and the gear and PLAY are on screen. Show Waves too (four tabs): the same. Is the extra row acceptable, or would you rather keep one row and lose the LEFT time readout at that width? (590)
+
+### New in build 598: your three small requests
+
+- [ ] Computer, any skin: press Play on the Pattern screen. Pass: the small "■ STOP" at the right of the control bar looks like the other lit buttons (flat, the skin's own playing colour; no amber, thick border or shadow) and still stops the song. Try white, an IDM skin and a Low power skin. (598)
+- [ ] Computer, bottom effects bar: a track strip's volume fader cap is a flat line like the Mixer's, not a round knob. Drag, wheel, double-click (0 dB), Shift-fine and the right-click menu work as before, also on a bus strip and the master. (598)
+- [ ] Poly track, a row with three notes: put the cursor on one, press Enter (EDIT on the phone). Pass: "3 notes picked up". Enter on an empty row: all three appear in their columns, and one Undo removes all three. A single note, a mono track and effect columns behave as before. (598)
+
+### Could lose work or sound
+
+*A failure here means lost notes, a lost save, a hang, or no sound.*
+
+- [ ] Phone, Mobile setup: new song, SHIFT+▶ on the empty Arrange cell, type notes, PLAY with FOLLOW ON for over 5 s; the notes stay on screen, are on song row 000 and play (the lost-notes bug). Also: type three notes into a new pattern and PLAY at once; the notes are still there, also after reloading; if it hangs, did the app reload or did the notes vanish? (571, 570)
+- [ ] Phone and computer: Reset audio engine when healthy gives a toast and no dialog; after a runaway on the Fold a "Reload the app?" dialog appears and Reload brings back song, screen and kit; "Not now" leaves everything; with a recording running it refuses or asks first. (563)
+- [ ] Phone: leave the app stopped for 2 minutes, then tap a pad and PLAY; the first pad sounds at once, PLAY starts cleanly, a long reverb tail is not cut off. (553)
+- [ ] Any device: reload a song with samples and Save to a file at once (it waits or asks); reopen the file; every sample plays. (552)
+- [ ] Computer, Audio thread sequencer: STOP late in a long song (row 60+) and RESUME; no freeze, and it continues exactly where it was. (552)
+- [ ] Computer: sleep and wake (Chrome, then the Mac and Windows apps once built); after waking, PLAY makes sound without a reload. (552)
+
+## 2. Really worth trying
+
+### Builds 586 to 588: the two most important checks of each
+
+*Moved down from section 1 on 14 Nov to make room for builds 591 to 602. Each build's other checks are in the groups below.*
+
+- [ ] Folded phone: tap Play in the top bar. Can you play a patch with one thumb (sliders, dropdowns, keys) without ever moving, folding or deleting a module? Is it obvious which mode you are in? Should the phone start in Play or in Edit? (586)
+- [ ] Folded phone: drag a slider sideways: it moves from where it was instead of jumping to your finger; slide your finger up or down away from it while dragging for fine control; double-tap resets it. Drag up or down starting on a slider: the patch pans instead of the value changing. Does the sideways-versus-up-down choice feel right? (586)
+- [ ] Computer: rest the pointer on a slider for a moment, then turn the mouse wheel: the value changes (hold Shift for fine steps). Scrolling across the patch without stopping on a slider never changes a value. Does the short wait feel right, also on a trackpad? (587)
+- [ ] Computer: plug a second cable into an input that already has one: both now feed it and add together (before, the new one replaced the old). Try two sources into one filter input: it should sound like both. (587)
+- [ ] Computer: collapse a whole patch to Mini (Alt+Shift+C, or Shift+click a module's arrow): each module becomes a one-line bar. Can you still tell the modules apart and follow the cables? Click a bar to open it. (588)
+- [ ] Computer: put a few modules in a group, then drag one of them: the group's box follows. Fold the group: it becomes one block that says how many modules and cables it holds. (588)
+
+### Re-check the fixes from your feedback
+
+*These check the fixes made from your 13 Nov results.*
+
+- [ ] Computer and phone: double-tap or double-click a cable: it is removed and "Find a module" does not open. (584)
+- [ ] Computer: collapse a Stereo mixer with many inputs patched: nothing is cut off and every jack sits inside the frame. (583)
+- [ ] Computer: a modulation cable into a collapsed module ends on the left, below the audio inputs, with the parameter's name beside it. (583)
+- [ ] Computer: drag an LFO to the small jack beside a mixer's Pan slider: it connects on the first try. (584)
+- [ ] Computer: Help shows Signal kinds as three tidy rows; choosing "Modules" in Help scrolls to that section and does not open a second editor. (584)
+- [ ] Computer: in Chains and Waves the File menu starts with New project and has no Undo / Redo; Edit has them; the Tracker says "New project" too. (584)
+
+### Phone editing in …waves / …chains (586)
+
+*The phone version of …chains and …waves. The two most important checks are in section 1.*
+
+- [ ] Folded phone: press and hold a module's title bar: its menu opens (Group, Copy, Duplicate, Delete). Hold a slider: Reset, Type a value, MIDI learn. Hold empty space: Add a module here. (586)
+- [ ] Folded phone: tap a value once: the box to type a number opens, and the number you type is what you get. (586)
+- [ ] Folded phone: the top bar is one row (name, Play / Edit, +, undo, Fit, …), and File, Settings, Help, MIDI learn, Select and zoom are all under the … button. Anything you reach for that is now too far away? (586)
+- [ ] Folded phone: … then Select: tap several modules, or drag a box around them, then move them together. (586)
+- [ ] Folded phone: a very long module (pump GATE in …chains) opens folded into sections; open one section at a time. (586)
+- [ ] Folded phone, …waves: the on-screen keys show a whole octave, and the octave buttons move it up and down. (586)
+- [ ] Folded phone: opening an editor no longer puts a tip box over the patch; the Tips button at the bottom left opens it. (586)
+- [ ] Unfolded phone: the same Play / Edit switch and long-press menus work, and the top bar still shows everything. (586)
+- [ ] Computer: with a mouse nothing above changed how the editors behave; Alt+E switches Play / Edit. (586)
+
+### Editors on a computer (587)
+
+*Mouse and keyboard changes in …chains and …waves. The wheel and second-cable checks are in section 1.*
+
+- [ ] Computer: Alt+click resets a slider; Ctrl / Cmd+click no longer does. Right-click on a slider opens Reset, Type a value, MIDI learn. Is losing Ctrl / Cmd+click a problem for you? (587)
+- [ ] Computer: modules now snap to a grid when you drag them. Good, or should it be off by default? (Right-click the background to turn it off.) (587)
+- [ ] Computer: press A (or N in …chains), type part of a module's name, Enter: it is added. F fits the patch; Shift+F zooms to what is selected; arrow keys nudge the selection; Ctrl / Cmd+A selects all. (587)
+- [ ] Computer: select three or more modules, right-click: Align, Space evenly, and on the background Tidy up. Do they do what you expect? (587)
+- [ ] Computer: right-click the background, Add a comment here; right-click a module, Rename. Save, reload: both are still there. (587)
+- [ ] Computer: hold the pointer over a cable: a small label says what it connects and its level. (587)
+- [ ] Computer, …chains: save a custom preset on a module, save the project, open it on another device or browser: the preset is there. (587)
+
+### Mini, groups and narrow modules (588)
+
+- [ ] Phone: press and hold a module's arrow: it goes to Mini. Is that easy to find, or would you want it somewhere more obvious? (588)
+- [ ] Computer: the small utility modules (Attenuverter, Math, Logic, Quantizer, Random, Slew limiter, Sample & hold) are narrower now. Anything cramped or hard to read? Their ? button moved into the module menu. (588)
+- [ ] Computer: an old patch with collapsed modules and groups opens looking the same as before. (588)
+
+### Editors' small fixes (585, pass 2)
+
+*These decide whether the phone pass for …waves and …chains can start.*
+
+- [ ] Computer: double-click a value and type one (try a delay Time in ms, a filter Cutoff in Hz or kHz, a Mix in %): the value shown is the value you typed. (585)
+- [ ] Computer: drag a slider once, then Undo once: it goes back to where it started in one step. (585)
+- [ ] Computer: a slider or dropdown that sits under a cable still responds to a click. (585)
+- [ ] Computer, Waves view inside Thunder Plus: Voices and On-screen keys can be reached. (585)
+
+### On the phone, playing a song
+
+*Normal playing on the Fold; a failure here gets in the way every session.*
+
+- [ ] Phone: PLAY, lock the screen, press a volume key; is the slider the MEDIA one (no vibration), does the sound carry on, and is there a media control on the lock screen? Then Copy playback report. (558)
+- [ ] Phone, Audio thread sequencer, song with patterns of different lengths: turn the screen off and on mid-song, and STOP / PLAY with RESUME; no track jumps back to an earlier row. (571)
+- [ ] Phone, Background play on: play 2 minutes on Song, Phrase, Mixer and FX; every readout still updates live (BPM, rows, headings, VOL / PAN, sliders), nothing stale after changing track, instrument or tempo. (563)
+- [ ] Phone, Audio thread sequencer, long song playing: hold ▲ then ▼ on Song / Arrange; the cursor keeps up and the audio does not lag or glitch. (569)
+- [ ] Phone: stop a song and tap PLAY again at once; it plays from the cursor and never jumps to the top (hold ▲ or tap the first Arrange block to go there; say if you want a one-tap way). (576)
+- [ ] Phone, ELECTRO playing, Settings, Screen, Meters: Light steps the Mixer meters about 10 times a second and a drum hit still shows; Off keeps them empty and they return at STOP; Smooth as before. Does the phone run cooler with Light or Off? (576)
+
+### Synth page rework (builds 578 and 582)
+
+*The rebuilt Synth page; nobody has tried it on a real device yet.*
+
+- [ ] Phone and computer: the engine picker is reachable without scrolling with the Pad / Sequence / Tuning folds closed and open; the folds remember open or closed after a reload. (578)
+- [ ] Folded phone (360 wide): labels read in full on Layers, Bass, Machine, Drift and Blip; sliders are wide enough; no value is cut off. (578)
+- [ ] Phone and computer: the Synth page takes the skin's colour in IDM pink & green, IDM and one Low power skin. (578)
+- [ ] Phone: the Synth page buttons are comfortable to hit with a thumb. (578)
+- [ ] Folded phone with Waves and Chains shown (Settings, App): the tabs read Tracker, Synth, Waves, Chains in full and do not scroll. (578)
+- [ ] Computer at 1280 wide: the top bar is one row on the Synth and Tracker views with everything still there. (578)
+- [ ] Phone or computer, Synth page, Sample layer: Reverse is two buttons (Off / On); double-click the word to reset to Off; right-click offers Reset to default and Learn a MIDI knob; a learned knob moves the buttons; same on a Digital layer's Loop (Long / Short). (582)
+- [ ] Phone and computer: select a different pad; the waveform and "in use" line change to the new pad, and "rendering…" shows only briefly if at all. (578)
+- [ ] Phone, and computer with keyboard: the pickers (layer type, LFO shape, Add effect) open a list, pick, and close; on the computer arrow keys step the value and Enter / Space opens the list. (578)
+- [ ] Phone and computer: two-state rows (Loop, Reverse, Freeze…) are two buttons; right-click on one offers no "Type a value…". (578)
+- [ ] Phone and computer: names read right: Pad (drum and synth), Cutoff, Macro osc and Resonator (the old layer types), kHz and ct. (578)
+
+### On the phone, editing
+
+*Cursor, Arrange and tracker behaviour while you write a song.*
+
+- [ ] Phone, FOLLOW ON then FOLLOW PATTERN, playhead looping on the top rows: hold ▼ over 5 s; the cursor runs past the bottom, the view pages with it, nothing jumps back. (569)
+- [ ] Phone, ON STOP at STAYS: PLAY from the pad, ▼ a few rows, STOP before the playhead reaches row 2; the cursor stays where you put it. (569)
+- [ ] Phone and computer, Phrase and Pattern view playing: playing-row marks and per-track bands move with the sound (FOLLOW off / PATTERN / ON, after a HOP, across a song wrap); typing, selecting and moving the cursor feel instant. (575)
+- [ ] Phone: tap the small |◁ in Arrange's top-left corner; cursor and Arrange go to row 000 on the same track, also while playing, nothing starts or stops, and the view is not pulled back to the playhead; try on Song and beside Phrase, in IDM and a Low power skin; is it big enough to hit? (577)
+- [ ] Phone, both sequencers, a song where one track's blocks start a few rows down and another has a gap: let it play past the end twice; every track comes round on its own rows, the gap track returns after its gap, nothing jumps to another section. (570)
+- [ ] Phone unfolded, song playing, Phrase or Pattern view with Arrange beside it: Arrange looks exactly as before (cursor and playing-block outlines, clipping) and the screen feels smoother than 576. (577)
+
+### On the computer
+
+*Everyday desktop features that have not been tried on a real machine.*
+
+- [ ] Any device: on Phrase, Mixer and FX, the top-bar Play plays the whole song from the cursor's song row, and stops when pressed again. (572)
+- [ ] Phone unfolded or computer: the control bar's ▶↻ plays with LOOP lit; LOOP mid-song carries on as normal play with no jump; ▶↻ again stops; pad PLAY and Space play plain. (570)
+- [ ] Computer: double-click BPM or LPB in the transport and type a value; it takes the edit and shows the new number. (563)
+- [ ] Computer: render a song where one track has a gap and another comes in on a later row; both are in the WAV in the right place. (571)
+- [ ] …waves inside Thunder Plus: open the screen and play a key; sound starts on the first note (a short first-time delay is expected); held keys, MIDI notes and voice count changes work; leave and return: still plays. (548)
+- [ ] Computer: open a chains patch and a waves patch that use Flex and Step gate (one on its own custom steps, one with something patched into Pattern); they play; Flex SCRATCH may be a little shallower, anything else wrong is a bug. (562)
+
+### Live synths and held notes
+
+*Commands and filters on held notes; by ear.*
+
+- [ ] By ear: on a long bass (or acid / machine) note, CUT 30 then CUT FF a bar later goes dark and opens again without retriggering; RES, ATK, DEC, REL likewise. (555)
+- [ ] By ear: MOD on a live synth: the TARGET list has CUT, RES, DEC, ENV, ATK, SUS, REL; an LFO on CUT sweeps the held note; try ENV and SUS; steppy or clicky at fast rates? (555)
+- [ ] After playing with commands and LFOs, the pad's own cutoff and envelope knobs read what you set. (555)
+- [ ] By ear: the same on …pump live synths (mono, poly, orbit, gloss, wob: filter and envelope; coil, tract, freeze: envelope only). (555)
+
+## 3. If you have time
+
+### On the phone: screen off, background play and sound
+
+- [ ] Phone, Audio thread sequencer: after a clock hiccup message, keep playing or stop; 10 to 20 s of steady clock later the report says "audio clock steady again" and the next PLAY is on the audio thread again. (573)
+- [ ] Phone: switch Background play off (a note says it is for testing only), PLAY, lock the screen a few seconds, come back; a message offers "Turn on" and tapping it turns it on again. (560)
+- [ ] Phone: turn Background play back on (Reset audio settings does it), then repeat the screen-off and locked-screen volume key tests and Copy playback report; its third line lists the settings and media session lines appear at PLAY. (559)
+- [ ] Phone, headphones or monitors, quiet song: can you hear or measure a constant 40 Hz tone at about -60 dB while playing? If it bothers you it can go lower or off. (558)
+- [ ] Phone: after a runaway, do pads feel late (report header 389 to 391 ms output delay vs 43 before)? Does reloading fix it? (557)
+- [ ] Phone: PLAY, screen off, then let another app make sound (a notification or video); does Thunder keep playing? The report shows whether background play paused and restarted. (552)
+- [ ] Phone, Audio thread sequencer (only if you use it): a very slow song (e.g. 20 BPM at 1 LPB) keeps playing instead of stopping after 3 s. (567)
+- [ ] Phone, Audio thread sequencer (only if you try it): fewer or no crackles than before. (566)
+
+### On the phone: notes, stutter, effects and the CPU panel
+
+- [ ] Any device: add the first effect to an effect-free song while it plays; it is heard without a reload (report any brief click). (545)
+- [ ] Phone: the stutter on a pad with a sample that stopped under LOOP (MUT); is it better? (545)
+- [ ] Phone: the song that stutters with Arrange showing: play it once, STOP, Copy report (slow and long frame lines); does it use MUT, CUT, RES or DEC on sample pads? (New on 10 Nov)
+- [ ] Phone, song playing, on Mixer, Inst, FX, MOD and Project: everything looks as before and nothing is stale after a tap or edit; a pattern-command value may show up to half a second late; say if that bothers you. (575)
+- [ ] Phone: does it run cooler / longer on battery, and does the CPU % read lower on Mixer and Pattern view than on build 574? (575)
+- [ ] Phone, song playing: tap the CPU %; heaviest parts first, a line on whether it is keeping up, one "Try", and the two buttons work; say what is unclear. (The note that screen drawing is not measured is out of date: build 575 adds "The screen".) (573)
+- [ ] Phone: open a song saved under a file name and PLAY; the notification shows that name and the app's icon; rename while playing and it follows. (573)
+- [ ] Phone: with Low power (hot pink) or (mustard), turn Low power display ON (the skin stays) and OFF (back to your earlier skin). (568)
+- [ ] MOD on the Fold: touch hold-and-drag on SHAPE / RATE / DEPTH works; tabs fit folded. (9 Nov)
+
+### On the computer: playback and audio
+
+- [ ] Computer: the first pump or track effect added while playing causes no click or stumble. (552)
+- [ ] Computer: reload and make PLAY your very first click; the song starts cleanly after under a second's pause; later PLAYs start at once. (548)
+- [ ] Computer, Audio thread sequencer, a busy song for 5 minutes: sounds exactly as before; Flex, Step gate and Retrigger in time; fades and glides on live engines in time. (567)
+
+### By ear: effects, sound and modulation
+
+- [ ] Phone and computer, by ear: add Lite reverb to a drum track and an acid line; try its six presets and the extremes of its knobs; a usable small room to long wash, no clicks, no unwanted ringing, silent when nothing plays; on the phone with four tracks at once, each should be a few percent at most in the CPU %. (574)
+- [ ] By ear: the 20 new Acid presets (Phuture 303 … Wow siren), 7 Bass and the new ones on other synth engines; say which to keep, cut or retune. (574)
+- [ ] By ear: MOD on a …pump EQ band (right-click FREQ or GAIN, Add LFO…): that band sweeps, others stay; a second LFO on another band works; MOD lists only bands in use; same for BAND / WIDE / HEAT. (556)
+- [ ] By ear: MOD on the master out (VOL · master out): the whole mix swells and dips, the limiter is not pushed harder, and OUT reads what you set after STOP. (556)
+- [ ] By ear: a rendered song with fast LFOs sounds like it did live. (556)
+- [ ] Old songs that used CUT / RES on a live synth now use the synth's own filter; does any song sound different in a way you do not want? (555)
+- [ ] Scenes / macros on CUT for a live synth with no CUT command: the value is an offset from the knob (FF = the knob, lower closes); OK, or should it be absolute? (555)
+- [ ] By ear: MOD on a …pump effect knob (Add LFO…): it sweeps while the song plays, returns to your setting on STOP, the knob shows \~; zipper noise at fast rates? (554)
+- [ ] Phone and computer, by ear: stop a song with the master limiter and compressor on, wait 5 s, PLAY; the first note is at normal level, no dip or pump; meters fall to silence when stopped. (563)
+- [ ] By ear: a track with Flex or Step gate, song stopped over 14 s, then PLAY; the pattern starts clean, no stale audio. (563)
+- [ ] By ear: a Vox pad with REL at 1000 ms or more rings on after the note ends; old Vox songs sound right (long-REL notes ring longer than before). (563)
+- [ ] Phone and computer: play two or three songs you know (one with …pump synths, one with a chains or waves track); they sound as before and no "stopped working" toast. (561)
+- [ ] Play the same 15 s on two settings (Safest vs Balanced), STOP, Copy report, compare the "level over this play" lines (under about 1 dB is nothing). (554)
+- [ ] By ear: reversed pads, pads with CUT / RES / DEC, stereo pads with moving pan, bass, vox and pitch effects sound as before. (553)
+
+### Files, settings and recording
+
+- [ ] Settings, Audio, Reset audio settings: change a few audio settings, press it, confirm; they return to default and song, skin, output and MIDI setup are untouched. (551)
+- [ ] Record a sample: pick an input and mode, change a REC / metronome setting, reload; the choices are still there. (549)
+
+### Needs gear plugged in (do these in one sitting)
+
+*Audio interface, MIDI gear, Windows or Ableton Link needed.*
+
+- [ ] Web, hardware synth: PLAY a MIDI track, hide the window, STOP (or come back and STOP at once); no notes play on. Say if drum gear sounding booked hits for up to 1.2 s matters. (548)
+- [ ] Computer with the audio interface: idle 5 minutes (no MIDI keyboard, MIDI clock out or waves / chains screens open), then play; any click from the interface or late first note? (553)
+- [ ] Phone, runaway kick retest: simple song with the delay, Page sequencer, PLAY, screen off, press a volume key, wait 15 s, screen on, STOP, Copy report; a short gap at the kick, then the song carries on (report: kicked 1x, moved on 0x). (557)
+- [ ] Computer: with your interface as Output, unplug it while stopped; a message says it plays on the system default; plug back: "is back" and sound returns. Repeat while a song plays. (552)
+- [ ] Computer: change the system default device (once with System default chosen in the app, once with a specific device); sound follows or stays as chosen, no reload. (552)
+- [ ] Computer: Reset audio engine with the interface chosen; sound comes back on the interface (say if a reload was still needed). Also unplug and replug the interface, then Reset audio engine; if the engine will not run you get the dialog; say whether the desktop app's own reload fires. (552, 563)
+- [ ] Computer: play a key on the …waves screen; it sounds on the chosen output. (552)
+- [ ] Computer: the desktop v1.3.0 helper checklist (claude.ai artifact link in the file), including monitoring after reopening the window and the clock in, which seemed slightly out of sync. (Carried over)
+- [ ] Windows: recording (WASAPI) and MIDI (WinMM). (Carried over)
+- [ ] Ableton Link: CI build on Mac / Windows, then against Live or Koala. (Carried over)
+- [ ] Hardware MIDI tests, including: inside Thunder Plus (chains), MIDI-map a slider and put another in the bottom panel, then collapse the module; a small "CC" and a dot show on its summary line (579; could not test MIDI). (Carried over)
+
+## 4. Safe to skip unless something looks wrong
+
+These can be closed in one go: cosmetic details, older builds that a later build reworked, and items an automated test already covers.
+
+- [ ] Phone: simple song with the synced delay, screen off: do the repeats still bend in pitch while the song is held? (552)
+- [ ] Phone: after waking from a locked screen, do pads feel late until Reset audio engine? (551)
+- [ ] Phone, your normal song with effects, Page sequencer: PLAY, screen off 20 to 30 s, back, STOP, Copy report; does it keep its tempo (gaps expected, rushing not)? (546)
+- [ ] Phone: the same song with the screen on for a minute; any small pauses that were not there before? (546)
+- [ ] Phone: a song with no effects, Page sequencer, Worklets On: the report's second line says "worklets none"; PLAY, screen off 20 s, back, STOP; clock lines about 1.00 s in 1.00 s and steady by ear. (545)
+- [ ] Phone: your normal song with effects plays with its effects as before and the report lists what loaded; it may still rush when hidden. (545)
+- [ ] Phone or computer, Pattern view: PLAY with the cursor on one track while another track HOPs or plays a different pattern; that track's column shows its own moving band, cleared on STOP; is the band easy to tell from the cursor row's tint? (571)
+- [ ] Any device: INS on Phrase and on the Song adds an empty row below the cursor, the cursor stays, one Undo reverts it; also in the Edit menu (folded Song screen: menus only). (570)
+- [ ] Computer, PAD mode: Shift+▼ on Song / Arrange opens the block's phrase (from Phrase it still goes to Mixer). (571)
+- [ ] Phone unfolded and computer, each skin you use: the loop play button shows a play sign inside a circular loop (word LOOP beside it on the thin bar), a stop mark while playing, still the icon after switching pad / keys mode. (573)
+- [ ] Phone unfolded: in Arrange select rows 4 to 7 and press LP.SEL; those rows loop and the button is lit, pressed again it stops; with nothing selected it loops the cursor's row and says to select rows; folded: Edit menu and Arrange right-click menu only. (573)
+- [ ] Phone unfolded, song playing, Phrase with Arrange beside it: tap ALT then ▲ repeatedly across the playhead's row (FOLLOW off, PATTERN, ON) and hold it; the pattern you went to stays open and in view, Arrange moves back once after you stop for 4 s (a minute with FOLLOW off); once with the Audio thread sequencer. (573)
+- [ ] Phone unfolded, Arrange holding the keys, cursor around rows 8 to 12, song playing: tap PLAY twice quickly; the cursor stays where you left it. (The part about a double tap going to the top with Phrase holding the keys is out of date: build 576 removed it.) (573)
+- [ ] Arrange: M.PAT (or Alt-click / long press) on a master-column block strikes it through; while muted its commands do nothing; unmute and they act again; survives copy, paste, move, undo, save and load. (570)
+- [ ] Phone, pad: SHIFT+▼ on Arrange opens the block's phrase on its track; on an empty cell a new phrase opens and nothing goes on the song until a note is entered. (570)
+- [ ] With a bus that has an old note pattern: CLN↓ many times leaves no empty row (a clone landing on a block inserts a whole song row by design); say which rows if one still appears. (570)
+- [ ] Phone: GEN on a block opens its phrase with the generator menu; on an empty cell a new pattern is made and the menu shows; on a bus or master column only a message. (569)
+- [ ] Phone or computer: select several blocks in Arrange, SEMI + / − (or Alt+, / Alt+.); every pattern moves once, the message counts them and says how many are used elsewhere; one Undo puts it all back; no selection: the block under the cursor. (569)
+- [ ] Phone unfolded or computer: solo and mute a few tracks, tap SOLO (or MUTE) twice quickly; every solo and mute clears, per-block mutes stay; a single tap still acts at once; check the marks on Song header, Mixer, Phrase title and pad keys. (569)
+- [ ] Phone or computer: pasting notes into a bus track's phrase pastes nothing (commands still paste) with a message; pasting, Alt-dragging or duplicating a pattern with notes onto a bus column is refused; a command-only pattern goes in. (569)
+- [ ] Phone, the three Low power skins, folded and unfolded: in Arrange the cursor, selected blocks, playing block and muted blocks can each be told apart at a glance. (569)
+- [ ] Phone unfolded, pad mode, Song / Arrange, Android font size largest: MUTE / PAT, LOOP / SEL and CLN / ↓ read in full; no COMMANDS heading; folded shows one more Arrange row; say if UNIQ and COPY drawn smaller than CUT and PST looks wrong. (576)
+- [ ] Phone, pad mode: the tab row holds SONG to PROJECT plus BPM, LPB, dots, ROWS and REC, no TRANSP (back in KEYS mode); is the row under the tabs gone on your phone unfolded? (573)
+- [ ] Phone folded: the Mixer's master row reads AUTO MASTER ON / OFF without clipping. (570)
+- [ ] Any device: tap the CPU %; under the audio list a section "The screen" shows Screen drawing and Sequencer (page), not added to the audio percentage. (575)
+- [ ] Any device: playback report after a STOP says "voices 0". (575)
+- [ ] Phone: effect-off commands (FXO 10 switches slot 1 off, FXO 90 all slots): the effect stays off until another command turns it on, also across a song wrap; STOP then PLAY starts clean. (570)
+- [ ] Phone (Fold, OLED): pick Low power (hot pink), then (mustard); in daylight check the tracker columns, Song / Arrange, Mixer, pads and Settings switches are readable; no blue, cyan, purple or violet anywhere, background pure black. (568)
+- [ ] Fold unfolded (and computer): Song screen with SECT lane has about equal space on its right as the lane takes on its left; nothing cut off (MST column whole). (565)
+- [ ] Fold folded: the Tracker button's left edge lines up with SONG below it. (564)
+- [ ] Fold unfolded: the word "Thunder" is whole or gone, never cut off; with it gone Tracker starts at the left edge; rotate / fold / unfold brings it back when there is room. (564)
+- [ ] Fold folded: Synth page, pick an engine: the page scrolls so its editor is at the top; sheets (Skin, Preset) have an easy Close / Done. (563)
+- [ ] Phone: Settings, Screen: ROW COLOR IN PATTERN says "press and hold a row number"; in Pattern view that opens the colour menu (not yet tested with a real finger). (563)
+- [ ] Phone: while a song plays, the tracker's title, info line and PLAYING / STOPPED state still update when you move or switch view. (562)
+- [ ] Idle look: the CPU bar steps instead of gliding; Mixer meters, faders and the stopped Mixer spectrum look as before. (548)
+- [ ] Phone, Arrange: after a pad press it holds its page 4 s (FOLLOW on) or a minute (FOLLOW off). (548)
+- [ ] Phone, pad keys: a slow press never acts twice. (548)
+- [ ] Folded: Tracker | Synth shows both words; taller File rows, "Help & keys" last (keep the Help header?); top bar about 6 px taller (OK?); FX opens on SLOT 1 first; Settings has a pinned Done; pop-up messages sit below the tab strip; POP-UP MESSAGES off hides all but the problem ones (any you miss?); stars, Arrange zoom, PIN and Settings switches easier to hit. (548)
+- [ ] Folded: Settings, Screen, BIGGER CELLS ON TOUCH (off by default): Arrange cells grow to about 28 by 26 px and scroll sideways; playhead, selection and bus bars line up; zoom buttons work; Off brings your zoom back. (550)
+- [ ] Windows: the Song screen's SELECTING hint says "Ctrl+C", not "Ctrl/⌘"; in the IDM, IDM pink paper, IDM pink & green and 909 skins BPM / LPB are readable while playing, "Stop" is dark on pink in pink paper, and the POLY 09 to 16 label is readable. (563)
+- [ ] Phone or computer: on an empty track, a pattern brought from another track gets its own copy; moving, repeating or rearranging it makes no new patterns; should Alt-drag copies onto another track also get their own copy? (New on 10 Nov)
+- [ ] Add LFO… inside a …pump window: right-click a knob; the entry is there (not on switches) and the window closes after adding; is closing right? (556)
+- [ ] Starting mid-song: earlier CUT / ATK commands are now in force for live synths. (555)
+- [ ] MOD on the master and on a bus: an LFO on a master effect and one on a bus effect both move while the song plays and the scope's dot keeps time; an LFO on a silent track carries on in phase when the track returns. (553)
+- [ ] MOD in Phrase / BUS PLAY: playing one phrase moves only that track's, its buses' and the master's LFOs. (553)
+- [ ] Add LFO… from an FX parameter's right-click (FX screen and FX bar); the \~ mark on modulated rows. (9 Nov)
+- [ ] LFO scopes: shapes look right; the dot keeps time with what you hear; SUM scope with two LFOs on one target; Low power display shows still shapes; no extra load on the phone. (9 Nov)
+- [ ] Computer: MOD keys: Alt+7 opens MOD; Ctrl/⌘+arrows step TARGET (▲▼ by eight), SHAPE, RATE, DEPTH; ⌘ on a real Mac. (9 Nov)
+- [ ] Chains rail lines: straight accent lines from real cables look right on your patches; 909 skin contrast OK? (9 Nov)
+- [ ] Chains feed view: a track feeding a chain shows it, its path lit, the rest greyed; the output track's view unchanged. (9 Nov)
+- [ ] By ear on any device: Bass engine and mastering sound unchanged. (545)
+- [ ] Acid Mutate: low vs high intensity stays related to the line; hand tweaks survive; Original (O) restores; TIME off keeps the rhythm. (9 Nov)
+- [ ] Save with a missing impulse response or preset sample (only if you see it): the question names what is missing. (554)
+- [ ] Phone, builds 529 to 535 on a real Fold: the lists in "9 Nov, end of session: what to test on the phone" and "9 Nov: builds 531 to 535". (Carried over)
+- [ ] Phone: clock toggle test: a simple song hidden about 20 s with Background play off, then with Keep screen on off; Copy report after each. (Carried over)
+
+## Parked: open, not blocking anything
+
+These decide when the native apps start and whether three optional things get built; nothing else waits on them.
+
+### Decides the native apps
+
+- [ ] Phone, Background play ON: your normal song with effects, PLAY, screen off 3 to 5 minutes, press a volume key once, screen on, STOP, Copy playback report; steady by ear the whole time, and the volume key changes media volume (no vibration); report clock lines near 1.00 with few held / kicked counts and underruns. (Native port test)
+- [ ] Phone: the same test with a heavier song (more effects, live synths). (Native port test)
+
+13 Nov: one 55-second screen-off run on battery looked steady (clock 0.99 to 1.02, one 0.06 s hold, no kicks), which is too short to decide. The test needs 3 to 5 minutes, twice.
+
+### Decides whether something gets built, and how
+
+- [x] Phone: Copy a playback report from one run plugged in and one on battery, same song and buffer; the report shows battery % and charging state; does charging help the clock? (573)
+- [ ] Phone, your experiment: play 2 minutes without touching the screen, then 2 minutes tapping somewhere harmless every 10 to 15 s; does the clock hiccup only come when untouched? (573)
+- [ ] Phone or computer: an LFO at 1/16 or 1/32 on a built-in effect's filter cutoff, and on a delay time or pitch; acceptable, or a staircase? (556)
+- [ ] Phone (Fold), simple song, Page sequencer: with Worklets On, PLAY, screen off about 20 s, back, STOP, Copy playback report; then Worklets Off (test), Apply (reload), the same steps; check the report's second line matches the mode; by ear, does Off stutter or rush less? (Effects are silent in Off.) (New on 10 Nov)
+- [ ] Phone: part of the same Worklets test: in each mode, PLAY a few seconds, STOP, screen off about 15 s, back, Copy report. (New on 10 Nov)
+
+## Set aside: probably superseded
+
+These were re-tested or made moot by a later block, so skip them unless you want to; they are not in any tier above and have no tick boxes.
+
+| Item | Build | Replaced by |
+| --- | --- | --- |
+| Runaway kick test, Fold (551) | 551 | Retested in 557 (runaway kick, retest) |
+| Volume keys with the screen off: media or ringer? (557) | 557 | Asked again in 558 and 559 (locked-screen volume key) |
+| Five-minute computer test, Audio thread sequencer (566) | 566 | 567 says "Same test as build 566" |
+| MOD by ear: do fast rates sound steppy? (New on 9 Nov) | New on 9 Nov | 556 asks the same (Smoothing check) |
+| MOD on the master: does an LFO move? (New on 9 Nov) | New on 9 Nov | 556 (MOD on the master out) |
+
+Two items stay in the list (sections 3 and 4) with a note because only part of them is out of date: the Build 573 double-tap PLAY item (the part about going to the top was removed in 576) and the Build 573 CPU panel item (the note that screen drawing is not measured; 575 adds "The screen").
+
+## Done on 13 Nov
+
+### Collapsed modules (579)
+
+- [x] Phone, folded and unfolded: double-tap a module's title bar to collapse, again to open; is the chevron easier to hit than before? (579)
+- [x] Phone: a collapsed module's text is readable at the zoom you really use (the patch still opens at 25%; that is pass 2). (579)
+- [x] Computer: in …chains and …waves, in IDM pink & green and 909, collapse all (Alt+C) on a real patch; can you read what every module is doing without opening one, with nothing overlapping or cut off? (579)
+- [x] Computer: is the first choice plus the first two sliders the right summary? Name the modules where another value matters more (the Mixers show "Inputs 4" first; you probably want Master level). (579)
+- [x] Computer: a collapsed module shows its summary, a thin level strip, only patched ports, and "+N" for unpatched ones (click it: it opens); a modulated slider has a labelled stub and a purple value. (579)
+- [x] Computer: collapse a module with modulation cables in, then drag, zoom and expand it; the cables stay on it and never jump. (579)
+- [x] Computer: Collapse all, then Undo: every module comes back in one step; same for Expand all. (579)
+- [x] Computer: a collapsed Track In or Chain Out reads "Track In" with "Track 1" below (waves: "Out", "Waves In 1"); the chevron tooltip says "Expand" while folded. (579)
+- [x] Computer: open a patch saved before this build with some modules collapsed; they come back collapsed in the new look. (579)
+
+### Signal kinds and cables (580)
+
+- [x] Phone, folded and unfolded: tap a cable; it selects and shows its handles; two quick taps still remove it. (580)
+- [x] Computer: in …chains and …waves, IDM pink & green and 909, patch a Euclidean's Gate into a Sample & hold's Trig and an LFO into its In; gate jacks are diamonds, gate cables dotted, control cables dashed, audio cables solid. (580)
+- [x] Computer, white theme: the same patch; gate is a pink dotted line into a diamond jack, control stays purple and dashed. (580)
+- [x] Computer: a collapsed module with a patched gate port (a Euclidean's Gate out) shows a diamond; a control stub is still round. (580)
+- [x] Computer: hover a cable (thickens, grey halo), click it (stays thick, stronger halo), press Delete (just that cable goes), then Undo brings it back in one step; Escape or a click on the background lets go. (580)
+- [x] Computer: hover a bent cable (Alt-drag makes a bend); a small square shows on each bend; drag it and the bend moves; a plain click only selects; at 50% zoom the handle is still about 12 px and easy to hit. (580)
+- [x] Computer: click a module's title; its outline reads as selection (not audio, control or gate) and cables that do not touch it fade back; click the background and they return. (580)
+- [x] Computer: open Help in each editor; a "Signal kinds" strip shows the three line styles and the round and diamond jacks, and the Patching text says the same. (580)
+- [x] Computer: open a patch saved before this build; every cable keeps its kind (gate cables are dotted now), and a patch saved in this build opens in 579 as before. (580)
+
+### Wording and type (581)
+
+- [x] Phone, folded (344 px) and unfolded: text size is comfortable; the smallest text is now 11 px; say if anything is too small or crowded in the patch, the module list or Help. (581)
+- [x] Phone, folded and unfolded: the first time …chains (or …waves) opens, a short tip note is at the top left; after a reload only a small Tips button stays; tap it to open, × folds it back. On a computer the long note is as before and × turns tips off. (581)
+- [x] Computer: in …chains and …waves, white theme and IDM pink & green, add long-named modules (Convolution reverb, Sidechain comp, Function generator, Transient shaper, Multiband squash), open and collapsed; titles read in full (a long name wraps, never "Tape de…") and no right-hand value is cut. Tell me if "Convolution reverb" breaking inside its first word looks wrong in IDM pink & green. (581)
+- [x] Computer: open the module list, a module's title bar, its ? card and Help; each module has the same name in all four (renamed, e.g. Envelope Follow → Envelope follow, Sidechain Comp → Sidechain comp, the second Compressor → Simple compressor; the list lost its brackets). (581)
+- [x] Computer: hover a jack; its tooltip says "audio", "control" or "gate" (e.g. "Cutoff: control input", "Trig: gate input"). (581)
+- [x] Computer: five ports that showed a raw key now have names: Blades filter Resonance, Meta modulator Modulator, Flex and Step gate Pattern, Sample & hold Noise, Clock Ramp and Bar (chains). (581)
+- [x] Computer, IDM pink & green and 909: open Help in each editor and scroll to Dynamics; each card has its module's colour, a light tint and readable text; the CPU readout's amber is darker. (581)
+- [x] Computer: in …waves with the window about 400 px tall, right-click a module; the menu stays on screen and scrolls with the wheel. (581)
+- [x] Computer: open a patch saved before this build; every module, cable and value is as it was, and a patch saved in this build opens in 580. (581)
+
+### Review fixes (582)
+
+- [x] Phone and computer: new patch, 1440 and a small window: the tip box is two lines with a More / Less button; Fit leaves no module under it. On a phone, Tips and × keep keyboard focus. (582)
+- [x] Computer: in …chains, collapse a Sidechain Out and play drums into it; a thin level strip along the bottom moves with the SEND meter. (582)
+- [x] Computer: in …chains and …waves, IDM pink & green and 909, add Convolution reverb and Compressor; titles break between words only (never "Convoluti / on"); the BYP button may be a little narrower. (582)
+
+### Settles Audition on the Synth page
+
+- [x] Phone and computer: move a slider on a drum pad, then a synth pad; after a short pause you hear the new sound and a long drag keeps playing along. Does the repeat rate feel right, and should Audition be on by default? (578)
+- [x] Phone and computer: with a song playing, is Audition in the way? Say if it should stay quiet while the song plays. (578)
+
+### Build 585 on the phone, and decisions (13 Nov, night)
+
+- [x] Folded phone: open …chains or …waves with a patch in it: it opens big enough to read (about 80%), on the first module, not as a tiny overview. (585)
+- [x] Folded phone: the Fit button is in the top bar, and the module list closes after you add a module, which is brought into view. (585)
+- [x] Phone: tap the × on a module: it asks "Remove …?" first; Cancel keeps it; after Remove, Undo brings it back. (585)
+- [x] Phone: tap a module's title bar without dragging: the module does not move. (585)
+- [x] Folded phone: the first time you open an editor, does the tip box sitting over the first module's title bar bother you? (585)
+- [x] Computer: collapsed mixers show the master level first; modules with a Mix or Level show those first. Compressors now show Mix and Makeup: would you rather see Threshold and Ratio? (583)

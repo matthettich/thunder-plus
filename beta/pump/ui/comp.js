@@ -1,4 +1,4 @@
-/* …pump COMP pop-up (stage 2): plugins/comp/UIComp.cpp in the browser. The scrolling level / gain-reduction history
+/* pump COMP pop-up (stage 2): plugins/comp/UIComp.cpp in the browser. The scrolling level / gain-reduction history
    with the draggable threshold line, the transfer-curve inset, In / Out / GR meters, the sidechain (Thunder's sends and
    tracks feed the External sidechain) and the controls. */
 (() => {
@@ -8,7 +8,7 @@ const {R, clamp, css, mix, alpha, Dial, Feed} = U;
 const STYLES = ['Clean', 'Glue', 'Opto', 'Punch', 'Vari-Mu', 'Pump'], CHANS = ['Stereo', 'Mid/Side', 'Mid only', 'Side only'], OS = ['1x', '2x', '4x'];
 const STYLE_TIP = ['Clean: feed-forward peak detector, exact curve, lowest distortion', 'Glue: bus compression; release slows as it compresses deeper',
   'Opto: smooth RMS leveling, fast-then-slow release, softer at depth', 'Punch: feedback design that lets the first milliseconds of transients through',
-  'Vari-Mu: tube; the ratio rises with level, gentle colour', 'Pump: aggressive ducking with a breathing release (try the external sidechain)'];
+  'Vari-Mu: tube; the ratio rises with level, gentle color', 'Pump: aggressive ducking with a breathing release (try the external sidechain)'];
 const hpfOn = f => f > 20.5, lpfOn = f => f < 19900;
 const RANGE_KEY = 'thunderplus-pump-comp-range-v1';
 // CompEngine.hpp Curve: the gain change (dB, <= 0) for a detector level
@@ -49,7 +49,7 @@ U.define('comp', {W:1000, H:620, nW:480, nH:930, bypass:true, back:8191, make(ui
   const atk = dial('attack', 'ATTACK', 1, 'Attack: how fast it reacts'), rel = dial('release', 'RELEASE', 1, 'Release: how fast it recovers');
   const hold = dial('hold', 'HOLD', 1, 'Hold: keeps the reduction this long before releasing'), la = dial('lookahead', 'LOOKAHEAD', 1, 'Lookahead: reacts before the audio arrives (adds this much latency)');
   const chanMenu = ui.menuBtn('channel_mode', 'CH'); chanMenu.tip = 'Channels: Stereo (L/R), Mid/Side (both, linked by Stereo Link), Mid only or Side only';
-  const osMenu = ui.menuBtn('oversampling', 'OS'); osMenu.tip = 'Oversampling: detector, gain and tube colour at 2x or 4x (adds a little latency)';
+  const osMenu = ui.menuBtn('oversampling', 'OS'); osMenu.tip = 'Oversampling: detector, gain and tube color at 2x or 4x (adds a little latency)';
   const autoGainBtn = ui.toggle('auto_makeup', 'AUTO GAIN'); autoGainBtn.small = true; autoGainBtn.tip = 'Auto makeup gain: compensates for the curve (half the reduction at 0 dBFS)';
   const inD = dial('in_gain', 'INPUT', 2, 'Input gain (before the compressor and the dry signal)', true), outD = dial('out_gain', 'OUTPUT', 2, 'Output gain', true);
   const mixD = dial('mix', 'MIX', 2, 'Mix: dry/wet for parallel compression (latency-aligned)'), linkD = dial('stereo_link', 'LINK', 2, 'Stereo link: 0% each channel on its own, 100% both follow the louder');
