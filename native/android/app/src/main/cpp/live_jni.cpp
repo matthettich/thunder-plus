@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <time.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -49,6 +50,9 @@ struct Live {
   int32_t (*aaBuf)(void*) = nullptr;
   int32_t (*aaTs)(void*, int32_t, int64_t*, int64_t*) = nullptr;   // H2: the clock map's AAudio pair (read by the audio callback only)
   int64_t (*aaWritten)(void*) = nullptr;
+  int32_t (*aaSetBuf)(void*, int32_t) = nullptr;   // F4: the buffer tuner's three AAudio calls (nativeStatus only, under g_dev + rerouteLock)
+  int32_t (*aaCap)(void*) = nullptr;
+  int32_t (*aaBurst)(void*) = nullptr;
   std::atomic<bool> midiOn{false};     // H2: the MIDI host runs on this engine. Set before the stream starts, cleared after it stopped (the callback reads it plainly)
   std::atomic<int64_t> lastLatNs{-1};   // the latency floor the MIDI host has accepted (set by the poller's tick hook only on rc 0)
   std::atomic<int64_t> pendLatNs{-1};   // the floor nativeStatus wants applied: the poller thread does it (B1: no caller thread waits on the control thread), and retries while it answers BUSY (B5)
@@ -66,6 +70,38 @@ std::mutex g_loadM;  // the three loads (project / song / kit) run one at a time
 rtlog g_lrt;         // A5's clock-drift logger on the live callback
 tpa::XrunGate g_xrun;   // the stream's xrun count since the A5 run began: fed to g_lrt by the status poll (verify-n2 F2)
 std::atomic<double> g_load{0.0};   // CORE-BRIDGE 7 G9: the callback's time over its period, peak-held with decay (written by the audio thread, read by Kotlin)
+
+// F4 (docs/port/SCREENOFF-NOTES.md): the output buffer tuner. The low-latency stream opens near its minimum (about 2 bursts) and nothing grew it: the first real native run on the Fold (28 Nov,
+// ELECTRO, 40 pads) counted 12 234 xruns. nativeStatus (the session poller, every 500 ms) sets a safer start size once per stream, then grows it by one burst in each round where AAudio counted new
+// xruns, up to a cap (and the stream's capacity). It never shrinks during a stream. Not the audio thread: AAudioStream_setBufferSizeInFrames is documented as callable while the stream runs.
+// State: only nativeStatus writes `stream` / `lastX` (under g_dev + rerouteLock); the display copies are atomics.
+constexpr double kTuneStartS = 0.012;   // the start size, at least 2 bursts (GUESS: 12 ms keeps the latency near what the web path had on screen-on while leaving room for a heavy block)
+constexpr double kTuneMaxS = 0.080;     // the cap: past ~80 ms a bigger buffer only hides a callback that is too slow (the `load` figure then says so)
+struct Tune {
+  void* stream = nullptr; int lastX = 0;
+  std::atomic<int> buf{0}, cap{0}, burst{0}, grows{0}, startBuf{0}, lastXr{0};
+};
+Tune g_tune;
+
+// Under g_dev + rerouteLock with a live stream. Returns the buffer size after tuning.
+int tuneLocked(void* stream, int x, int b, int sr) {
+  if (!g.aaSetBuf || !g.aaBurst || sr <= 0) return b;
+  const int burst = g.aaBurst(stream), cap = g.aaCap ? g.aaCap(stream) : 0;
+  if (burst <= 0) return b;
+  const int maxF = std::max(2 * burst, std::min(cap > 0 ? cap : (int)(kTuneMaxS * sr), (int)(kTuneMaxS * sr)));
+  if (stream != g_tune.stream || x < g_tune.lastX) {   // a new stream (start, reopen, miniaudio's own re-route; its xrun counter starts at 0 again)
+    g_tune.stream = stream; g_tune.lastX = x; g_tune.grows = 0;
+    int want = std::max(2 * burst, ((int)(kTuneStartS * sr) + burst - 1) / burst * burst);
+    want = std::min(want, maxF);
+    if (want > b) { const int r = g.aaSetBuf(stream, want); if (r > 0) b = r; }
+    g_tune.startBuf = b;
+  } else if (x > g_tune.lastX) {
+    g_tune.lastX = x;
+    if (b < maxF) { const int r = g.aaSetBuf(stream, std::min(b + burst, maxF)); if (r > 0) { b = r; g_tune.grows++; } }
+  }
+  g_tune.buf = b; g_tune.cap = cap; g_tune.burst = burst; g_tune.lastXr = x;
+  return b;
+}
 
 std::mutex g_inMu;
 std::shared_ptr<tpa::LiveEngine> g_inEng;   // the engine the MIDI-in sink pushes to (a copy under g_inMu: the reader thread never meets a freed one)
@@ -179,7 +215,10 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
   { std::lock_guard<std::mutex> dl(g_dev);   // resolved before the stream runs: the status call reads the xrun count and buffer size through these (under g_dev)
     g.aaLib = dlopen("libaaudio.so", RTLD_NOW);
     if (g.aaLib) { g.aaXrun = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getXRunCount"); g.aaBuf = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getBufferSizeInFrames");
-                   g.aaTs = (int32_t(*)(void*, int32_t, int64_t*, int64_t*))dlsym(g.aaLib, "AAudioStream_getTimestamp"); g.aaWritten = (int64_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getFramesWritten"); } }
+                   g.aaTs = (int32_t(*)(void*, int32_t, int64_t*, int64_t*))dlsym(g.aaLib, "AAudioStream_getTimestamp"); g.aaWritten = (int64_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getFramesWritten");
+                   g.aaSetBuf = (int32_t(*)(void*, int32_t))dlsym(g.aaLib, "AAudioStream_setBufferSizeInFrames"); g.aaCap = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getBufferCapacityInFrames");
+                   g.aaBurst = (int32_t(*)(void*))dlsym(g.aaLib, "AAudioStream_getFramesPerBurst"); } }
+  g_tune.stream = nullptr; g_tune.lastX = 0; g_tune.grows = 0; g_tune.buf = 0;
   rtlog_reset(&g_lrt, (int)g.device.sampleRate); g_xrun.restart();
   g.eng.set(eng);
   g.audioEng.store(eng.get(), std::memory_order_release);   // before the stream starts: the callback never sees a half-made engine
@@ -192,7 +231,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStart(JN
     eng->stopThreads(); if (g.midiOn) { g.midiOn = false; tpa::host().engineStop(); }
     eng->destroy();
     { std::lock_guard<std::mutex> dl(g_dev); ma_device_uninit(&g.device); g.deviceInit = false;
-      if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; }
+      if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; g.aaSetBuf = nullptr; g.aaCap = nullptr; g.aaBurst = nullptr; g_tune.stream = nullptr; }
     return -3;
   }
   LOGI("live engine started at %u Hz", g.device.sampleRate);
@@ -222,7 +261,8 @@ void teardownLocked() {
   g.lastSlots.clear();
   g.lastLatNs = -1; g.pendLatNs = -1;
   g.songText.reset(); g.kitText.reset(); g.kitDoc.reset();   // the page re-sends song and kit after an engine reset: a verdict must never be judged with the old kit
-  { std::lock_guard<std::mutex> dl(g_dev); if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; g.aaTs = nullptr; g.aaWritten = nullptr; }
+  { std::lock_guard<std::mutex> dl(g_dev); if (g.aaLib) { dlclose(g.aaLib); g.aaLib = nullptr; } g.aaXrun = nullptr; g.aaBuf = nullptr; g.aaTs = nullptr; g.aaWritten = nullptr;
+    g.aaSetBuf = nullptr; g.aaCap = nullptr; g.aaBurst = nullptr; g_tune.stream = nullptr; }
 }
 
 JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeShutdown(JNIEnv*, jobject) {
@@ -371,7 +411,8 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeStatu
       if (pthread_mutex_trylock((pthread_mutex_t*)&g.device.aaudio.rerouteLock) == 0) {
         void* stream = (void*)g.device.aaudio.pStreamPlayback;
         if (stream) {
-          const int x = g.aaXrun ? g.aaXrun(stream) : 0, b = g.aaBuf ? g.aaBuf(stream) : 0;
+          const int x = g.aaXrun ? g.aaXrun(stream) : 0;
+          const int b = tuneLocked(stream, x, g.aaBuf ? g.aaBuf(stream) : 0, (int)g.device.sampleRate);   // F4: may grow the buffer first; the stats then report the new size
           eng->setHostStats(b > 0 ? b : 0, x > 0 ? x : 0);   // the buffer size stands for the output latency (GUESS: an upper bound; H1c reads the AAudio timestamp as N0's probe does)
           // F2: the xruns AAudio counted since the A5 run began reach the gate's logger (N0 does the same in jni.cpp): "0 underruns" is then a measurement
           rtlog_host_underruns(&g_lrt, g_xrun.onStream(x));
@@ -647,6 +688,15 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_LiveNative_nativePadChop(
     if (cnt == 0 || nSlices < 2) return thunder_live_pad_hits(L, pad, 2, nullptr, 0);
     return thunder_live_pad_hits(L, pad, nSlices > 64 ? 64 : nSlices, v->data(), cnt > nSlices ? nSlices : cnt);
   }, 10000);
+}
+// F4: the tuner's line for the dark panel / COPY RESULTS: buffer now, its start size, the cap AAudio allows, burst, how often it grew, the stream's xruns, the callback load (peak-held).
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeTune(JNIEnv* env, jobject) {
+  const int sr = (int)(g.deviceInit ? g.device.sampleRate : 0);
+  auto ms = [sr](int f) { return sr > 0 ? 1000.0 * f / sr : 0.0; };
+  char b[256];
+  std::snprintf(b, sizeof b, "buffer %d fr (%.1f ms; start %d, cap %d, burst %d) grew %d  xruns %d  load %.0f%%%s", g_tune.buf.load(), ms(g_tune.buf.load()), g_tune.startBuf.load(), g_tune.cap.load(),
+                g_tune.burst.load(), g_tune.grows.load(), g_tune.lastXr.load(), 100.0 * g_load.load(std::memory_order_relaxed), g.aaSetBuf ? "" : "  (no setBufferSize: tuner off)");
+  return env->NewStringUTF(b);
 }
 JNIEXPORT jdouble JNICALL Java_app_thunderplus_nativetest_LiveNative_nativeLoad(JNIEnv*, jobject) { return (jdouble)g_load.load(std::memory_order_relaxed); }
 
