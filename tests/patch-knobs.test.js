@@ -85,11 +85,11 @@ const src = H.read('index.html'), core = H.read('core/seq-core.js');
 const KN = Array.from({ length: 8 }, (_, i) => 'KN' + (i + 1));
 const fxcOf = s => { const m = s.match(/const FXC = \[([\s\S]*?)\];/); assert.ok(m, 'FXC found'); return m[1].match(/'([^']+)'/g).map(x => x.slice(1, -1)); };
 
-test('FXC ends with ...CHD, KN1..KN8, FLZ in order (saved songs keep their numbers) in index.html and core', () => {
+test('FXC ends with ...CHD, KN1..KN8, FLZ, then the step components, in order (saved songs keep their numbers) in index.html and core', () => {
   for (const s of [src, core]) {
     const f = fxcOf(s), i = f.indexOf('CHD');
     assert.ok(i > 0);
-    assert.deepEqual(f.slice(i), ['CHD', ...KN, 'FLZ']);   // FLZ (23 Nov) goes after them
+    assert.deepEqual(f.slice(i), ['CHD', ...KN, 'FLZ', 'RST', 'RUP', 'RDN', 'MUL', 'SWP', 'GTO', 'SPK', 'PUL', 'HLD']);   // FLZ (23 Nov) goes after them, the step components (28 Nov) after FLZ
     assert.equal(f.filter(x => x === 'KN1').length, 1);
   }
   assert.deepEqual(fxcOf(src), fxcOf(core), 'core FXC matches the app');

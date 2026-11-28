@@ -85,7 +85,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CC_CMDS = ['CCA', 'CCB', 'CCC', 'CCD'];
 const NCC = CC_CMDS.length;
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8','FLZ'];
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD','KN1','KN2','KN3','KN4','KN5','KN6','KN7','KN8','FLZ','RST','RUP','RDN','MUL','SWP','GTO','SPK','PUL','HLD'];
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
 const s8 = v => v > 127 ? v - 256 : v;
 const RSTEP = {TIC:1, DEL:1, KIL:1, OFF:1, PSL:1, RET:1, PBN:1, TSP:1, PIT:1, FIN:4, ARP:1, HOP:1, INS:1, PGM:1, CSL:1, DIR:1};
@@ -275,7 +275,7 @@ function makeSeq(S, mode, o){
     while (w.length) for (const b of tg.get(w.pop()) || []) if (!hearT.has(b)){ hearT.add(b); w.push(b); } }
   const busT = new Set(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t);   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   const fresh = () => ({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
-    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0, wr:0, tch:null, skp:0, chd:0, seed:null, vn:-1});   // tch / skp / chd / seed: TCH, SKP, CHD and the track's SED; vn: see roll   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
+    rel:0, g:0, grv:null, dir:0, ramp:new Map(), ph:null, phv:0, phh:false, xs:0, gj:0, tvlv:null, tpnv:null, fxvv:new Map(), pp:1, cnt:0, r0:0, wr:0, tch:null, skp:0, chd:0, seed:null, vn:-1});   // tch / skp / chd / seed: TCH, SKP, CHD and the track's SED; vn: see roll   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
   for (let t = 0; t <= MT; t++) tr.push(fresh());
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
   api.rebus = () => { busT.clear(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t); };   // BUS EDITS WHILE PLAYING (20 Nov): the notes of a track that became a bus (or stopped being one) follow the plan from the next row; called when the plan changes
@@ -453,6 +453,11 @@ function makeSeq(S, mode, o){
               else tr[t].chd = v ? 1 : 0; } } } } }
   };
   if (mode === 'song' && o && (o.row | 0) > 0) chaseChance(o.row | 0);
+  // SPK 02: the commands a "no" takes off a row that still plays its note (the note's own shaping and the step components)
+  const STEP_CMDS = ['VOL','PAN','PIT','FIN','STA','PLY','KIL','OFF','ARP','PBN','PVB','PSL','RET','RTV','MUL','RUP','RDN','DEL','NUD','INS','SLC','MUT','GEN','FDI','TRM','APN','WOB','ONE','PUL','HLD','GTO'];
+  // RUP / RDN: note n moved k steps along scale Sx (n is on the scale); with no scale, k semitones
+  const degStep = (Sx, n, k) => { const sc = SCALES[Sx.scale | 0]; if (!k || !sc || !sc[1]) return n + k; const iv = sc[1], L = iv.length, rt = Sx.sroot | 0, rl = n - rt, oc = Math.floor(rl / 12);
+    let d = iv.indexOf(rl - oc * 12); if (d < 0) return n + k; d += k; const o2 = Math.floor(d / L); return rt + (oc + o2) * 12 + iv[d - o2 * L]; };
   const cmdV = (r, ci) => { let v = null; if (r) for (let k = FX0; k < RW; k += 2) if (r[k] === ci) v = Math.max(0, r[k + 1]); return v; };
   const grvOf = (v, tks) => v ? [(v >> 4) || tks, (v & 15) || tks] : null;
   // Each call plays the next line of every track that is due. Tracks keep their own clocks, so a phrase
@@ -575,7 +580,7 @@ function makeSeq(S, mode, o){
     // Pair assignment follows the phrase, not a global count (T.g counts steps only while this track runs),
     // so a 2-row pattern still swings exactly like two rows of a longer one would.
     // (DIR: the steps played this pass, not the row, so a backwards or random pass swings and lasts as a forward one)
-    const pair = 2 * swB, slot = ((T.dir && !(loop && mode === 'phrase') ? T.cnt : T.step) + (mode === 'song' ? offInSong(T, t) : 0)) % pair, offB = slot >= swB;
+    const pair = 2 * swB, slot = (((T.dir || T.gj) && !(loop && mode === 'phrase') ? T.cnt : T.step) + (mode === 'song' ? offInSong(T, t) : 0) + T.xs) % pair, offB = slot >= swB;
     // Each row averages one line: the on-beat half of the swing window is stretched by 2·sw and the off-beat half squeezed
     // by 2·(1 − sw). (Before song v6 this was pair·line·…, so every row lasted swB lines: SWING NOTE changed the speed.)
     const dur = gv ? gv[(T.g || 0) % 2] * tick : 2 * line * (offB ? 1 - sw : sw);
@@ -583,8 +588,8 @@ function makeSeq(S, mode, o){
       pos[t] = {row:T.row, cr:T.cr, step:T.step, sect:cid, phrase:pid};
       // A muted song block still runs its rows (so tempo and timing carry on) but its notes are dropped.
       const muted = mutedAt(t, T.row), ev0 = evs.length;
-      const ph = pid >= 0 ? S.phrases[pid] : null, r = r0(T, pid);
-      let hop = -1; T.vn = -1;
+      const ph = pid >= 0 ? S.phrases[pid] : null, r = T.phh && T.phv ? null : r0(T, pid);   // (HLD: a held row is read once; its repeats leave the note ringing)
+      let hop = -1, gto = -1; T.vn = -1;
       if (r){
         // Read the three FX columns left to right. REP repeats the track's last command; RND and RNL
         // change the command to their left (or, with none, the note's pitch).
@@ -619,8 +624,13 @@ function makeSeq(S, mode, o){
         if (fx.TSP != null) T.tsp = s8(fx.TSP);
         if (fx.LPB != null) api.lpb = fx.LPB ? clamp(fx.LPB, 1, 16) : 0;
         if (fx.PDL) pdl = Math.max(pdl, fx.PDL * line);
-        if (fx.TVL != null) evs.push({type:'tvl', t:t0, track:t, v:fx.TVL});
-        if (fx.TPN != null) evs.push({type:'tpn', t:t0, track:t, v:fx.TPN});
+        /* SWP XY (28 Nov, the OP-Z's sweep): this row's TVL, TPN and FXV glide to their value over XY ticks (00: across the step) from
+           where the last one left them, in steps of a tick (at most 32); the first one a track is given jumps, as without SWP. */
+        const sweep = (v0, v1, a0, mk) => { if (fx.SWP == null || v0 == null || v0 === v1){ mk(a0, v1); return; }
+          const span = fx.SWP ? fx.SWP * tick : Math.max(tick, t0 + dur - a0), n = clamp(Math.round(span / tick), 1, 32);
+          for (let k = 1; k <= n; k++) mk(a0 + span * (k - 1) / n, Math.round(v0 + (v1 - v0) * k / n)); };
+        if (fx.TVL != null){ sweep(T.tvlv, fx.TVL, t0, (tt, v) => evs.push({type:'tvl', t:tt, track:t, v})); T.tvlv = fx.TVL; }
+        if (fx.TPN != null){ sweep(T.tpnv, fx.TPN, t0, (tt, v) => evs.push({type:'tpn', t:tt, track:t, v})); T.tpnv = fx.TPN; }
         if (fx.STP != null) evs.push({type:'stp', t:t0, track:t, all:fx.STP > 0});
         if (fx.FXS != null) T.fxs = {s:Math.max(1, fx.FXS >> 4) - 1, p:Math.max(1, fx.FXS & 15) - 1};
         if (fx.SCA != null) T.scl = {scale:Math.min(SCALES.length - 1, fx.SCA & 15), sroot:(fx.SCA >> 4) % 12};
@@ -633,9 +643,12 @@ function makeSeq(S, mode, o){
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
         if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
+        /* RST (28 Nov, the OP-Z spark's "reset counter"): this track's pass counters (NTH, CND 1ST, RUP / RDN) start again from this row,
+           so its own NTH counts this pass as the first; RST 01 every track's. */
+        if (fx.RST != null) for (const U of fx.RST ? tr : [T]){ U.nth.clear(); if (U.c1) U.c1.clear(); U.ramp.clear(); }
         // NUD (owner, 1 Nov): ± ticks, so a note can land early as well as late (DEL only pushes it later); at most half a step early
         const nud = fx.NUD != null ? s8(fx.NUD) * tick : 0;
-        const at = Math.max(t0 - line * 0.5, t0 + Math.min((fx.DEL || 0) * tick, dur * 0.98) + nud), end = t0 + dur;
+        let at = Math.max(t0 - line * 0.5, t0 + Math.min((fx.DEL || 0) * tick, dur * 0.98) + nud), end = t0 + dur;
         // PERFORM commands (owner, 1 Nov): XFD the crossfader, MAC a macro (X 1–8, Y 0–F), PRT a part (00 = the song's own),
         // LK1–LK4 this track's locks (what they set: Perform → Locks). They act even when a condition stops the note
         // (and before the row's chance is rolled: a lock on the track's CHANCE counts for the note it is given with).
@@ -644,8 +657,8 @@ function makeSeq(S, mode, o){
         if (fx.PRT != null){ const k = fx.PRT - 1, P = k >= 0 && S.parts ? S.parts[k] : null; PF.part = P ? k : -1; evs.push(...partEvs(P || partSnap(), at)); PF.sent.clear(); perfDiff(evs, at); }
         { const lk = PFS.lk[t]; if (lk) for (let n = 0; n < 4; n++){ const v = fx['LK' + (n + 1)], id = lk[n]; if (v == null || !id) continue; evs.push(...tgtEvs(id, v, at, PF.pno)); if (!T.lk) T.lk = {}; T.lk[n] = id; } }
         let play = true;
-        if (fx.NTH != null){ const X = (fx.NTH >> 4) || 1, Y = (fx.NTH & 15) || 1, key = pid + ':' + T.step, n = T.nth.get(key) || 0;
-          T.nth.set(key, n + 1); play = n % X === (Y - 1) % X; T.cres = play; }
+        if (fx.NTH != null){ const X = (fx.NTH >> 4) || 1, Y = (fx.NTH & 15) || 1, key = pid + ':' + T.step, n = Math.max(0, (T.nth.get(key) || 0) - (T.phv ? 1 : 0));
+          if (!T.phv) T.nth.set(key, n + 1);   /* (PUL / HLD repeats are not new passes) */ play = n % X === (Y - 1) % X; T.cres = play; }
         /* CHANCE: the note's own (CHA) times the track's (TCH, else a MOD on CHANCE) times the master column's TCH, one roll for the row;
            with CHD 01 on a poly track one roll a note (keepC: the columns that play). The track's chance thins notes only: a row
            without one is not touched by it. */
@@ -670,14 +683,28 @@ function makeSeq(S, mode, o){
           if (kind === 0) ok = !!PF.fill;
           else if (kind === 1) ok = T.cres === true;
           else if (kind === 2){ const nb = tr[X ? Math.min(MT, X - 1) : t - 1]; ok = !!(nb && nb.cres === true); }
-          else { const key = pid + ':' + T.step; if (!T.c1) T.c1 = new Map(); const n = T.c1.get(key) || 0; T.c1.set(key, n + 1); ok = n === 0; }
+          else { const key = pid + ':' + T.step; if (!T.c1) T.c1 = new Map(); const n = Math.max(0, (T.c1.get(key) || 0) - (T.phv ? 1 : 0)); if (!T.phv) T.c1.set(key, n + 1); ok = n === 0; }
           if (ty & 1) ok = !ok;
           if (kind === 3) T.cres = ok;
           if (!ok) play = false; }
-        if (play) fxEvs(t, fx, at, line);
-        if (play && fx.FXV != null){ const sel = T.fxs || {s:0, p:0}; evs.push({type:'fxp', t:at, track:t, slot:sel.s, pi:sel.p, v:fx.FXV}); }   // FXV   // momentary lengths count rows (a row averages one line)
+        /* SPK Y (28 Nov; OP-XY skip trigger / skip parameter lock, OP-Z trigger / parameter / component sparks): what this row's NTH, chance
+           and CND decide. 00 the whole row (as before), 01 the note only (its commands always run), 02 the commands only (the note always
+           plays, plain, when they say no). Commands that set things from here on (CUT, TSP, SCA, DIR, HOP...) and LK1–LK4 always run, as before. */
+        // PUL repeats play as the first time did: the row's NTH, chance and CND are decided once, on its first read
+        if (T.phv && T.phc != null){ play = T.phc; keepC = null; } else T.phc = play;
+        const spk = fx.SPK != null ? Math.min(2, fx.SPK) : 0, cOn = spk === 1 || play;
+        if (spk === 2){ if (!play){ for (const k of STEP_CMDS) delete fx[k]; at = t0; } play = true; T.cres = cOn; keepC = null; }
+        /* PUL / HLD XY (28 Nov, the OP step components pulse and hold): the row plays Y times in all (2–F) before the track moves on, PUL
+           playing it again each time, HLD letting its note ring; X 1: a random count, 1 to Y. Only this track waits (its next rows come later;
+           M8-style, as a shorter pattern runs ahead). A row a condition skips does not pulse. */
+        if (T.ph == null && cOn && (fx.PUL || fx.HLD)){ const v = fx.PUL || fx.HLD, Y = v & 15, n = (v >> 4) ? 1 + Math.floor(rand() * Math.max(1, Y)) : Y;
+          if (n > 1){ T.ph = n - 1; T.phh = !fx.PUL; } }
+        // GTO XX (28 Nov, the OP jump): after this row the track goes on from row XX of the same phrase; the pass still lasts the phrase's length
+        if (fx.GTO != null && cOn) gto = Math.min(fx.GTO, PROWS - 1);
+        if (cOn) fxEvs(t, fx, at, line);
+        if (cOn && fx.FXV != null){ const sel = T.fxs || {s:0, p:0}, sk = sel.s + ':' + sel.p; sweep(T.fxvv.get(sk), fx.FXV, at, (tt, v) => evs.push({type:'fxp', t:tt, track:t, slot:sel.s, pi:sel.p, v})); T.fxvv.set(sk, fx.FXV); }   // FXV   // momentary lengths count rows (a row averages one line)
         // MIDI: PGM and the CC slots go to the row's instrument (or the track's last), ahead of the row's notes.
-        if (play && t < MT){
+        if (cOn && t < MT){
           let mi = -1;
           const miOf = () => mi >= 0 ? mi : (mi = fx.INS != null ? clamp(fx.INS, 0, NIs - 1) : r[IC] >= 0 ? r[IC] : T.inst);
           if (fx.PGM != null) evs.push({type:'mpg', t:at, track:t, ii:miOf(), v:Math.min(127, fx.PGM)});
@@ -711,11 +738,17 @@ function makeSeq(S, mode, o){
           if (fx.ARP) mods.arp = arpOf(fx.ARP, T, at, end, tick);
           else if (fx.PBN) mods.bend = {mul:Math.pow(2, s8(fx.PBN) / 12), t1:end};
           else if (fx.PVB) mods.vib = {spd:fx.PVB >> 4, dep:fx.PVB & 15, t1:end};
-          const every = (fx.RET || 0) & 15, fade = (fx.RET || 0) >> 4;
+          // MUL XY (28 Nov, the OP multiply): Y hits evenly across the step (2–F), whatever the ticks; X fades each hit as RET's X. RTV shapes them too.
+          const mulN = fx.MUL != null && (fx.MUL & 15) >= 2 ? fx.MUL & 15 : 0;
+          const every = mulN ? 1 : (fx.RET || 0) & 15, fade = mulN ? fx.MUL >> 4 : (fx.RET || 0) >> 4, gap = mulN ? dur / mulN : every * tick;
+          /* RUP / RDN XY (28 Nov, the OP ramps): each time this row's note plays it climbs (falls) X more (1–F; scale steps on a KEY FOLLOW
+             instrument with a scale, else semitones), back to the written note after Y plays (2–F; 0: 4). RST starts it again. */
+          let rk = 0; { const rv = fx.RUP != null ? fx.RUP : fx.RDN; if (rv != null){ const X = (rv >> 4) || 1, Y = (rv & 15) || 4, key = pid + ':' + T.step, n = T.ramp.get(key) || 0;
+            T.ramp.set(key, n + 1); rk = (n % Y) * X * (fx.RUP != null ? 1 : -1); } }
           let firstRate = 0;
           // KEY FOLLOW instruments: live transpose (live only) and the song's scale, before PIT/FIN. HUMAN TIME / HUMAN VEL:
           // each note a little early or late (± ms) and a little softer (up to %), on the song's random numbers (SED repeats them).
-          const kf = !!I.kf, lx = kf && o.live ? lxp.st : 0, nOf = x => { const b = x + ctsp + I.tsp + T.tsp + nrnd + lx; return (kf ? scaleSnap(T.scl || gscl || S, b) : b) + pit; };
+          const kf = !!I.kf, lx = kf && o.live ? lxp.st : 0, nOf = x => { const b = x + ctsp + I.tsp + T.tsp + nrnd + lx, Sx = T.scl || gscl || S; return (kf ? degStep(Sx, scaleSnap(Sx, b), rk) : b + rk) + pit; };
           const hut = clamp(I.hut | 0, 0, 50) / 1000, huv = clamp(I.huv | 0, 0, 90) / 100;
           notes.forEach((n, q) => {
             const nat = hut ? Math.max(t0 - hut, at + (rand() * 2 - 1) * hut) : at, hg = huv ? 1 - rand() * huv : 1;
@@ -731,11 +764,11 @@ function makeSeq(S, mode, o){
             if (every){ let k = 1;
               // RTV (owner, 1 Nov): the retriggers' level curve, signed: + a crescendo up to the last one (the first hits
               // softer), − a fade (as RET's X); 1/32 a hit. Without it RET's own fade.
-              const K = Math.max(1, Math.ceil((end - 1e-6 - nat) / (every * tick)) - 1), rv = fx.RTV != null ? s8(fx.RTV) : null;
+              const K = Math.max(1, Math.ceil((end - 1e-6 - nat) / gap) - 1), rv = fx.RTV != null ? s8(fx.RTV) : null;
               const lvl = k => rv == null ? Math.max(0, 1 - fade * k / 16) : rv > 0 ? Math.max(0, 1 - rv * (K - k) / 32) : Math.max(0, 1 + rv * k / 32);
               if (rv != null){ const g0 = lvl(0); ev.gain *= g0; ev.vel *= g0; }
               const g0b = rv != null ? Math.max(1e-6, lvl(0)) : 1;
-              for (let tt = nat + every * tick; tt < end - 1e-6 && k < 64; tt += every * tick, k++)
+              for (let tt = nat + gap; tt < end - 1e-6 && k < 64; tt += gap, k++)
                 evs.push(Object.assign({}, ev, {t:tt, slide:null, arp:null, bend:null, vib:null, cut:ev.cut != null ? tt + (ev.cut - nat) : null,
                   rel:ev.rel != null ? tt + (ev.rel - nat) : null, gain:ev.gain / g0b * lvl(k), vel:ev.vel / g0b * lvl(k)}));
             }
@@ -745,7 +778,7 @@ function makeSeq(S, mode, o){
           // transpose (sect, instrument, TSP, PIT, random) applied.
           pos[t].sc = ns.map((x, c) => x >= 0 && x < 120 ? [c, Math.round(nOf(x))] : null).filter(Boolean);
           pos[t].pd = vtrk ? voiceForTrack(t) : I.pad;   // the pad it plays (the drumming dogs: 00–07 the kit, the rest bongos)
-        } else if (!notes.length && !offN && play && t < MT){
+        } else if (!notes.length && !offN && cOn && t < MT){
           // No note on this row: instrument commands change the note that is already playing.
           const m = {type:'mod', t:at, track:t};
           let any = false;
@@ -770,16 +803,19 @@ function makeSeq(S, mode, o){
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
       // DIR: backwards, ping-pong or random steps; a pass still lasts L steps (T.cnt), so the song keeps its timing. dirGo:
       // where the next pass starts (-1 the top, Infinity the bottom, -2 a random row, else a row).
-      let dirGo = -1; T.cnt++;
+      let dirGo = -1, newRow = false;
+      if (T.ph > 0){ T.ph--; T.phv = 1; T.xs++; }   // PUL / HLD: this row again (the pass count, T.cnt, waits with it)
+      else { T.ph = null; T.phv = 0; T.phh = false; T.cnt++;
+      // GTO: the next row is XX; from then on this pass counts its steps (T.cnt) as DIR does, so it still lasts L steps
       if (hop >= 0){ T.step = L; T.next = hop; }
-      else if (!T.dir || (loop && mode === 'phrase')) T.step++;
-      else if (T.cnt >= L){ dirGo = T.dir === 1 ? Infinity : T.dir === 3 ? -2 : dirNext(T, T.step, L); T.step = L; }
-      else T.step = dirNext(T, T.step, L);
+      else if (gto >= 0 && !(loop && mode === 'phrase')){ T.gj = 1; T.step = T.cnt >= L ? L : Math.min(gto, L - 1); }
+      else if ((!T.dir && !T.gj) || (loop && mode === 'phrase')) T.step = gto >= 0 ? Math.min(gto, L - 1) : T.step + 1;
+      else if (T.cnt >= L){ dirGo = T.dir === 1 ? Infinity : T.dir === 3 ? -2 : T.dir ? dirNext(T, T.step, L) : -1; T.step = L; }
+      else T.step = T.dir ? dirNext(T, T.step, L) : T.step + 1 < L ? T.step + 1 : 0;
       // A phrase selection loops mid-phrase: wrap as soon as the step passes the loop's last row.
       if (mode === 'phrase' && loop && T.next < 0 && (T.step > loop.y1 || T.step < loop.y0)) T.step = loop.y0;
-      let newRow = false;
       if (T.step >= L){
-        T.cnt = 0;
+        T.cnt = 0; T.gj = 0;
         T.step = T.next >= 0 ? T.next : 0; T.next = -1;
         if (mode === 'phrase'){ if (loop && T.step >= loop.y1 + 1) T.step = loop.y0; }
         else { T.cr++;
@@ -791,6 +827,7 @@ function makeSeq(S, mode, o){
       { const np = mode === 'phrase' ? o.phrase : T.on && !T.empty ? ((S.chains[sectId(T, t)] || [])[T.cr] || [-1])[0] : -1, L2 = (mode === 'song' && np < 0) ? emptyLen() : lenOf(np);
         if (dirGo !== -1) T.step = dirGo === Infinity ? L2 - 1 : dirGo === -2 ? Math.floor(rand() * L2) : clamp(dirGo, 0, L2 - 1);
         if (T.step >= L2) T.step = 0; }
+      }
       T.rel += dur; T.g++;
       if (newRow) T.r0 = T.rel;   // LIVE SONG EDITS: the song row starts here (what a waking track lines up with)
     }
