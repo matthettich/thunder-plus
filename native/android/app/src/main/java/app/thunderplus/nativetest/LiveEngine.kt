@@ -150,7 +150,7 @@ object LiveEngine {
         val diag = HelloDiag.text(System.currentTimeMillis(), lastStartError)
         if (!active) return "native live engine: off" + (if (up) " (native side up but not active)" else "") + "\n" + diag
         val l = loaded
-        return diag + "\nlive $sampleRate Hz  " + (if (l == null) "no song loaded" else "$projectName: ${l.summary()}") + "\n" + status().line() + "\n" + gate.line() + (if (LiveSession.lastEvent.isEmpty()) "" else "\nlast device / focus event: " + LiveSession.lastEvent)
+        return diag + "\nlive $sampleRate Hz  " + (if (l == null) "no song loaded" else "$projectName: ${l.summary()}") + "\n" + status().line() + "\n" + (try { LiveNative.nativeTune() } catch (e: Throwable) { "tuner: n/a" }) + "\n" + gate.line() + (if (LiveSession.lastEvent.isEmpty()) "" else "\nlast device / focus event: " + LiveSession.lastEvent)
     }
 
     /** Runs [work] on a worker thread unless one is already running (the buttons and the notification can not queue two loads). */

@@ -61,6 +61,8 @@ object LiveNative {
     external fun nativePadChop(pad: Int, loopSecs: Double, nSlices: Int, pointsFrames: DoubleArray): Int
     /** The callback's time over its period, peak-held (CORE-BRIDGE 7 G9). */
     external fun nativeLoad(): Double
+    /** F4: the output buffer tuner's line (buffer, start, cap, burst, grows, xruns, callback load). */
+    external fun nativeTune(): String
 
     // ---- H1c ----
     /** Rebuilds the OUTPUT STREAM at the engine's rate and keeps the host (song, pads, rate). Stops the transport first and does not restart it. The rate, or a negative code (the host ended too when -1). */
