@@ -4,9 +4,9 @@ Pick-up notes for continuing this work in a later session. Read this together wi
 [`README.md`](README.md) (the app's own docs) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 Keep this file up to date at the end of a work session.
 
-## PICK UP HERE (28 Nov 2026): beta = main = build 703; build 704 is on branch `step-components` (not merged, not pushed)
+## PICK UP HERE (28 Nov 2026, 10:50): beta = main = build 704, desktop v1.3.22
 
-- **Build 704 (28 Nov, branch `step-components`, from `beta`; waits for the owner's test, then merge):** nine new tracker commands after the OP-Z / OP-XY step components, all in `makeSeq` (so `core/seq-core.js`, regenerated): RST RUP RDN MUL SWP GTO SPK PUL HLD (details in the 28 Nov entry under To-do; tests `tests/step-components.test.js`; punch list "Step components"). UI: command list groups, tooltips, value descriptions, manual, README, changelog. Not wired: the master column (`MST_FXC` unchanged), the native engine port (`docs/port/ENGINE-INVENTORY.md` has a line).
+- **Build 704 (28 Nov; PR #362 into `beta`, PR #363 beta → main; desktop v1.3.22; the owner's tests are in the punch list):** nine new tracker commands after the OP-Z / OP-XY step components, all in `makeSeq` (so `core/seq-core.js`, regenerated): RST RUP RDN MUL SWP GTO SPK PUL HLD (details in the 28 Nov entry under To-do; tests `tests/step-components.test.js`; punch list "Step components"). UI: command list groups, tooltips, value descriptions, manual, README, changelog. Not wired: the master column (`MST_FXC` unchanged), the native engine port (`docs/port/ENGINE-INVENTORY.md` has a line).
 - **Build 703 (27 Nov, 14:30):** FOLLOW froze on a track that had played one stray block and gone quiet (tp.pos kept its old row; `posLive` in followPlay now goes by tracks that played in the last 16 lines). PLY on live engines: a reversed note swells up from silence and stops dead (bassNote, `rvd` from the sequencer: until KIL / OFF, else PLY X1 = X lines, 01 = 4). Not heard by the lead: on the punch list.
 - **Shipped 27 Nov:** the 27 Nov code review (builds 690–698, its entry under To-do), tempo-synced envelopes follow the song
   (699), and Song sections (702: + on any row; the lane follows the grid's real scroll). Builds 700–701 came from another session.
@@ -392,6 +392,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.22** (28 Nov 2026, a regular release; owner, 28 Nov 10:24: "Merge and push a new desktop"; PR #362 into `beta`, PR #363 beta → main at build 704 (merge commit 4610edb), Run workflow through the API from `main`, run 46170743016, 11 assets, the latest release; macOS and Windows logs show thunder_io.node and thunder_link.node built, macOS adhoc-signed): build 704 (step components RST RUP RDN MUL SWP GTO SPK PUL HLD).
 - **v1.3.21** (27 Nov 2026, a regular release; owner, 27 Nov 14:15: "please add it and push a new main and desktop"; PR #360 into `beta`, PR #361 beta → main at build 703 (merge commit 8c2f9cc), Run workflow through the API from `main`, run 46070929940, the latest release): build 703 (FOLLOW with a stray block; PLY on live synths).
 - **v1.3.20** (27 Nov 2026, a regular release; owner, 27 Nov 13:46: "push to main and build a desktop"; PR #359 beta → main at build 702 (merge commit 3d3a5fc), Run workflow through the API from `main`, run 46065958742, all three platforms and 11 assets, the latest release): Song sections, + on any row and the lane following the grid's scroll.
 - **v1.3.19** (27 Nov 2026, a regular release; owner, 27 Nov 12:27: "merge with main and push a new desktop build"; PR #357 into `beta`, PR #358 beta → main at build 701 (merge commit e8d53aa), Run workflow through the API from `main`, run 46057548764, the latest release): build 701 (FX slot Enter, CLN↓ keeps mutes, Arrange loop-back with FOLLOW off, TRIM light, menu wording).
