@@ -202,7 +202,7 @@ test('FLZ reaches the Flex: FLZ v books the flx param at 512 + v (00 off)', () =
   const ev = cut(/if \(fx\.FLZ != null\)\{[^\n]*/, 'the FLZ event');
   assert.match(ev, /p:'flx', v:fx\.FLZ \? 512 \+ fx\.FLZ : 0/);
   assert.match(src, /const FX_NEEDS = \{[^}]*FLZ:'flex'/);
-  assert.match(cut(/const FXC = \[[\s\S]*?\];/, 'FXC'), /'FLZ'\s*\]/);   // on the end: saved songs keep their command numbers
+  assert.match(cut(/const FXC = \[[\s\S]*?\];/, 'FXC'), /'FLZ'(?:\s*,\s*'(?:RST|RUP|RDN|MUL|SWP|GTO|SPK|PUL|HLD)')*\s*\]/);   // on the end (the step components of 28 Nov follow it): saved songs keep their command numbers
     assert.match(src, /const p = c >= 0 \? Math\.min\(767, Math\.round\(c\)\)/, 'the bar keeps FLZ values');
 });
 

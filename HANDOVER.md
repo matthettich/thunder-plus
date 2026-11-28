@@ -4,10 +4,11 @@ Pick-up notes for continuing this work in a later session. Read this together wi
 [`README.md`](README.md) (the app's own docs) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 Keep this file up to date at the end of a work session.
 
-## PICK UP HERE (27 Nov 2026, 14:00): beta = main = build 702, desktop v1.3.20
+## PICK UP HERE (28 Nov 2026): beta = main = build 703; build 704 is on branch `step-components` (not merged, not pushed)
 
+- **Build 704 (28 Nov, branch `step-components`, from `beta`; waits for the owner's test, then merge):** nine new tracker commands after the OP-Z / OP-XY step components, all in `makeSeq` (so `core/seq-core.js`, regenerated): RST RUP RDN MUL SWP GTO SPK PUL HLD (details in the 28 Nov entry under To-do; tests `tests/step-components.test.js`; punch list "Step components"). UI: command list groups, tooltips, value descriptions, manual, README, changelog. Not wired: the master column (`MST_FXC` unchanged), the native engine port (`docs/port/ENGINE-INVENTORY.md` has a line).
 - **Build 703 (27 Nov, 14:30):** FOLLOW froze on a track that had played one stray block and gone quiet (tp.pos kept its old row; `posLive` in followPlay now goes by tracks that played in the last 16 lines). PLY on live engines: a reversed note swells up from silence and stops dead (bassNote, `rvd` from the sequencer: until KIL / OFF, else PLY X1 = X lines, 01 = 4). Not heard by the lead: on the punch list.
-- **Shipped today:** the 27 Nov code review (builds 690–698, its entry under To-do), tempo-synced envelopes follow the song
+- **Shipped 27 Nov:** the 27 Nov code review (builds 690–698, its entry under To-do), tempo-synced envelopes follow the song
   (699), and Song sections (702: + on any row; the lane follows the grid's real scroll). Builds 700–701 came from another session.
   Desktop v1.3.17, v1.3.18, v1.3.20 (v1.3.19 from the other session).
 - **Waiting on the owner:** the punch-list items dated 27 Nov (backups with a long sample, helper reset, offline link,
@@ -391,6 +392,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.21** (27 Nov 2026, a regular release; owner, 27 Nov 14:15: "please add it and push a new main and desktop"; PR #360 into `beta`, PR #361 beta → main at build 703 (merge commit 8c2f9cc), Run workflow through the API from `main`, run 46070929940, the latest release): build 703 (FOLLOW with a stray block; PLY on live synths).
 - **v1.3.20** (27 Nov 2026, a regular release; owner, 27 Nov 13:46: "push to main and build a desktop"; PR #359 beta → main at build 702 (merge commit 3d3a5fc), Run workflow through the API from `main`, run 46065958742, all three platforms and 11 assets, the latest release): Song sections, + on any row and the lane following the grid's scroll.
 - **v1.3.19** (27 Nov 2026, a regular release; owner, 27 Nov 12:27: "merge with main and push a new desktop build"; PR #357 into `beta`, PR #358 beta → main at build 701 (merge commit e8d53aa), Run workflow through the API from `main`, run 46057548764, the latest release): build 701 (FX slot Enter, CLN↓ keeps mutes, Arrange loop-back with FOLLOW off, TRIM light, menu wording).
 - **v1.3.18** (27 Nov 2026, a regular release; owner, 27 Nov 11:11: "Push to main and desktop"; PR #355 beta → main at build 699 (merge commit e29273a), Run workflow through the API from `main`, run 46047667178, all three platforms and 11 assets, the latest release): build 699, tempo-synced envelopes follow the song's tempo.
@@ -563,6 +565,13 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
    follows Ableton's guidelines (the name in full, Enabled / Disabled).
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
+
+### 28 Nov: build 704, step components (RST RUP RDN MUL SWP GTO SPK PUL HLD; branch `step-components`, from `beta`, PR into `beta`)
+
+- Owner's idea: the OP-Z and OP-XY step components as tracker commands. Nine new names on the end of `FXC` after FLZ (saved songs keep their numbers; `tests/patch-knobs.test.js` pins the tail). All in `makeSeq`; `core/seq-core.js` regenerated. Not in `MST_FXC`.
+- `RST XX`: this track's pass counters (NTH, CND 1ST, RUP / RDN ramps) start again from this row (an NTH on the same row counts this pass as the first); `RST 01` every track's. `RUP` / `RDN XY`: each play of the row's note climbs / falls X more (1–F, 0 = 1) and is back at the written note after Y plays (2–F, 0 = 4); scale steps on a KEY FOLLOW instrument when a scale is set (SCA, SCG or the song's), else semitones; one counter per row (phrase:row) per track. `MUL XY`: Y hits (2–F) evenly across the step whatever the ticks, X fades each like RET's X, RTV shapes them, wins over RET. `SWP XY`: the row's TVL, TPN and FXV glide to their value over XY ticks (00 across the step) from the track's last value of that command, a point a tick (at most 32); the first value jumps. `GTO XX`: after the row go on from row XX of the phrase (clamped); the pass still lasts the phrase's length (like DIR: `T.gj`, `T.cnt`), then the next song row. `SPK Y`: what NTH / chance (CHA, TCH, PRB as note chance) / CND decide: 00 the whole row, 01 the note only (the commands always run), 02 the commands only (the note plays plain when the condition says no; `STEP_CMDS` lists what is taken off). `PUL` / `HLD XY`: the row plays Y times before this track moves on (HLD: the note once, ringing on); X 1: a random 1–Y from the seeded stream (SED repeats it); only this track waits (`T.ph`, `T.xs` keeps the swing grid moving, `T.cnt` waits).
+- UI: value descriptions, `FXB` tooltips, `FXC_GROUPS` (RUP / RDN Pitch and arpeggio; MUL Note timing and repeat; SWP Volume and pan; GTO / PUL / HLD Play order; SPK / RST Chance and random), the in-app manual, README, changelog 704, `BUILD` 704, `sw.js` v704.
+- Tests: `tests/step-components.test.js` (18 tests); full suite 2055 pass, 0 fail (lint, precache-check and both generator checks clean). Things to know: a PUL repeat is not a new pass (lead, 28 Nov): the row's NTH / chance / CND are decided on its first read and the repeats follow (T.phc), so `NTH 21` with `PUL 3` pulses three times on every other pass; GTO keeps the pass at the phrase's length, wrapping to row 00 like DIR (row 00 with `GTO 04` in 8 rows plays 0 4 5 6 7 0 4 5); SWP glides TVL / TPN / FXV only (a pad filter sweep: a filter effect + FXS / FXV + SWP); a random PUL count (X 1) is seeded only from the SED read before it (a master-column SED on the same step is read after track 0's row).
 
 ### 27 Nov (11:22): build 701, Enter on an FX slot opens the effect list
 
@@ -993,6 +1002,15 @@ the WOB test as above; native re-pins (PR #225) to the same commit.
 **Decided 25 Nov (nothing to do):** pad removal fix pushed; on the new engine the effect and chains level meters come first, then the pad flashes / dogs, then the metronome click; hand-played pads and keys stay on the old engine for the first Android beta; the fallback message shows on the first PLAY of each song; Resume restarts the row; no verdict within 5 s = the old engine plays; Claude merges PRs without asking once CI and the lead's review pass.
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
+
+**Step components (28 Nov; build 704, branch `step-components`: not merged until you have tried them)**
+- [ ] **Phone or computer, ramps: on a one-row pattern repeated (or a loop) type a note with `RUP 14`, then `RDN 23`; then give the track a KEY FOLLOW instrument, set SCA (or the song's scale) to major and try `RUP 13` again.** Pass: with `RUP 14` the note climbs a semitone each pass for 4 passes, then starts over (C C# D D# C ...); `RDN 23` falls 2 semitones for 3 passes; with KEY FOLLOW and a scale the same steps are scale steps (C D E, never a note outside the scale).
+- [ ] **Phone or computer, ratchet: a note with `MUL 03`, then `MUL 05`, then `MUL 43`, then `MUL 03` and `RET 04` together.** Pass: 3 even hits (triplet), 5 even hits across the step, 3 hits each softer, and MUL 03 wins over RET 04. Change the ticks (TIC) and the hits stay even.
+- [ ] **Phone or computer, sweep: `TVL FF` on one row, then 4 rows later `TVL 20` with `SWP 00`; the same with `TPN` (80 → 00) and with a filter effect, `FXS` and `FXV` plus `SWP 18`.** Pass: the level / pan / filter glides over the step (or 24 ticks) instead of jumping; the first TVL a track ever gets jumps.
+- [ ] **Computer (or phone), order: an 8-row pattern with notes on every row, `GTO 04` on row 00; then add `DIR 01` on row 00 too.** Pass: row 00 then rows 04 05 06 07 then it wraps, the pattern still lasts 8 steps and then the next song row plays on time; with DIR 01 it goes backwards after the jump.
+- [ ] **Phone or computer, SPK: a note with `NTH 21` and `PIT 0C` (an octave up); then add `SPK 01`; then `SPK 02`; then `CHA 80` with `SPK 02`.** Pass: without SPK the row plays every other pass; SPK 01: the note keeps NTH 21 but a FXV or CC on the row would always run; SPK 02: the note plays every pass and the octave only on the passes NTH says yes.
+- [ ] **Phone or computer, pulse and hold: a 4-row pattern with notes, `PUL 03` on row 01, then `HLD 03` on row 01, and a second track with the same notes and no command; then `PUL 14` with `SED 07` earlier.** Pass: with PUL 03 row 01 sounds three times and rows 02 and 03 come 2 steps later on that track only (the other track keeps time); HLD 03 plays row 01's note once and it rings on for the 3 steps; PUL 14 sounds 1 to 4 times, the same each play.
+- [ ] **Phone or computer, RST: two tracks with `NTH 21` on every row; put `RST 00` on the last row of the first track's pattern, then `RST 01`.** Pass: with RST 00 only that track plays every pass (its NTH counts again from the start); with RST 01 both do.
 
 **FOLLOW with a stray block, and PLY on live synths (27 Nov; build 703)**
 - [ ] **Computer: a song where an otherwise unused track has one block near the top (the stray empty pattern), FOLLOW ON or PATTERN, play the song with the cursor on that track and then on an empty track.** Pass: Song / Arrange keep following and paging with the playhead after the stray block has played.
